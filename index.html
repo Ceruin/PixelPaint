@@ -309,6 +309,7 @@
       <button class="tool" data-tool="rect"       data-icon="rect"    data-key="R" title="Rectangle (R)">Rectangle</button>
       <button class="tool" data-tool="ellipse"    data-icon="ellipse" data-key="C" title="Ellipse (C)">Ellipse</button>
       <button class="tool" data-tool="select"     data-icon="select"  data-key="M" title="Rectangle select (M)">Select</button>
+      <button class="tool" data-tool="wand"       data-icon="wand"    data-key="W" title="Magic wand — select by color (W)">Wand</button>
 
       <div class="toolhead">Brush</div>
       <div class="group" style="gap:8px">
@@ -317,6 +318,13 @@
         <button id="brushUp" class="iconbtn" title="Bigger brush (])">+</button>
       </div>
       <label class="chk" style="margin-top:6px"><input type="checkbox" id="fillShape" /> Fill shapes</label>
+
+      <div class="toolhead">Wand</div>
+      <div class="group" style="gap:8px">
+        <span style="color:var(--muted)">Tol</span>
+        <input type="number" id="wandTol" min="0" max="255" value="32" style="width:54px" title="Color tolerance: 0 = exact match, higher = looser" />
+      </div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" id="wandContig" checked /> Contiguous</label>
 
       <div class="toolhead">Layer</div>
       <button id="addImageBtn" data-icon="image" title="Add an image as a new layer (or paste / drag-drop)">Add image…</button>
@@ -472,7 +480,8 @@ let recents=[];
 const MAX_RECENTS=16, MAX_UNDO=80;
 let placement=null;  // pending image being positioned: {img, name, x, y, w, h, ar}
 let xform=null;      // active move/resize gesture on the placement
-let selection=null;  // rectangle selection in art pixels: {x, y, w, h}
+let selection=null;  // bounding rect of the selection in art pixels: {x, y, w, h}
+let selMask=null;    // optional Uint8Array(W*H), 1=selected — arbitrary shape (magic wand). null = whole rect.
 let selDrag=null;    // active selection gesture: {mode:'new'|'move', ...}
 let selAnts=0, antsTimer=null;  // marching-ants animation
 
@@ -503,6 +512,7 @@ const P = {
   image:"M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z",
   select:"M3 5v4h2V5h4V3H5c-1.1 0-2 .9-2 2zm2 10H3v4c0 1.1.9 2 2 2h4v-2H5v-4zM19 3h-4v2h4v4h2V5c0-1.1-.9-2-2-2zm0 16h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4z",
   palette:"M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10c1.38 0 2.5-1.12 2.5-2.5 0-.61-.23-1.2-.64-1.67-.08-.1-.13-.21-.13-.33 0-.28.22-.5.5-.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm5.5 11c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm-3-4c-.83 0-1.5-.67-1.5-1.5S13.67 6 14.5 6s1.5.67 1.5 1.5S15.33 9 14.5 9zM5 11.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5S7.33 13 6.5 13 5 12.33 5 11.5zm6-4C11 8.33 10.33 9 9.5 9S8 8.33 8 7.5 8.67 6 9.5 6s1.5.67 1.5 1.5z",
+  wand:"M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29a.9959.9959 0 0 0-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z",
   add:"M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
   copy:"M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z",
   up:"M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z",
@@ -600,7 +610,7 @@ function activeLayer(){return layers[activeIndex];}
 // ------------------------------------------------------------------ document
 function newDocument(w,h,makeFirst=true){
   placement=null; xform=null; const pb=document.getElementById("placeBar"); if(pb) pb.hidden=true;
-  selection=null; selDrag=null; stopAnts(); updateSelStatus();
+  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
   W=clamp(w|0,1,512); H=clamp(h|0,1,512);
   layers=[]; activeIndex=0; layerSeq=1;
   flat.width=W; flat.height=H;
@@ -678,7 +688,7 @@ function restore(snap){
     return {id:layerSeq++, name:s.name, visible:s.visible, opacity:s.opacity, canvas:c, ctx:ctx};
   });
   activeIndex=clamp(snap.active,0,layers.length-1);
-  selection=null; selDrag=null; stopAnts(); updateSelStatus();
+  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
   setZoom(zoom,false); renderLayers(); composite(); updateDocInfo();
 }
 function cloneImg(img){return new ImageData(new Uint8ClampedArray(img.data),img.width,img.height);}
@@ -709,16 +719,21 @@ function updateUndoButtons(){
 // ------------------------------------------------------------------ drawing primitives
 function stamp(ctx,x,y,erase){
   const s=brush, o=Math.floor((s-1)/2);
-  let sx=x-o, sy=y-o, ex=sx+s, ey=sy+s;
-  if(selection){ // clip the brush block to the selection
-    sx=Math.max(sx,selection.x); sy=Math.max(sy,selection.y);
-    ex=Math.min(ex,selection.x+selection.w); ey=Math.min(ey,selection.y+selection.h);
-    if(ex<=sx||ey<=sy) return;
+  const sx=x-o, sy=y-o, ex=sx+s, ey=sy+s;
+  if(!selection){ // fast path: no selection, draw the whole brush block at once
+    if(erase) ctx.clearRect(sx,sy,s,s); else{ ctx.fillStyle=drawColor; ctx.fillRect(sx,sy,s,s); }
+    return;
   }
-  if(erase) ctx.clearRect(sx,sy,ex-sx,ey-sy);
-  else{ ctx.fillStyle=drawColor; ctx.fillRect(sx,sy,ex-sx,ey-sy); }
+  if(!erase) ctx.fillStyle=drawColor;          // masked: draw only the cells inside the selection
+  for(let yy=sy; yy<ey; yy++) for(let xx=sx; xx<ex; xx++){
+    if(!inSel(xx,yy)) continue;
+    if(erase) ctx.clearRect(xx,yy,1,1); else ctx.fillRect(xx,yy,1,1);
+  }
 }
-function inSel(x,y){ return !selection || (x>=selection.x && x<selection.x+selection.w && y>=selection.y && y<selection.y+selection.h); }
+function inSel(x,y){
+  if(selMask) return x>=0 && y>=0 && x<W && y<H && selMask[y*W+x]===1;
+  return !selection || (x>=selection.x && x<selection.x+selection.w && y>=selection.y && y<selection.y+selection.h);
+}
 
 function linePixels(x0,y0,x1,y1){
   const pts=[]; let dx=Math.abs(x1-x0), dy=Math.abs(y1-y0);
@@ -758,8 +773,6 @@ function previewPixels(pts){
 
 function floodFill(ctx,sx,sy,hex){
   if(!inSel(sx,sy)) return;                 // can't start a fill outside the selection
-  const bx0=selection?selection.x:0, by0=selection?selection.y:0;
-  const bx1=selection?selection.x+selection.w:W, by1=selection?selection.y+selection.h:H;
   const img=ctx.getImageData(0,0,W,H), d=img.data;
   const at=(x,y)=>(y*W+x)*4;
   const si=at(sx,sy);
@@ -769,7 +782,8 @@ function floodFill(ctx,sx,sy,hex){
   const stack=[[sx,sy]];
   while(stack.length){
     const [x,y]=stack.pop();
-    if(x<bx0||y<by0||x>=bx1||y>=by1) continue;   // confine the flood to the selection bounds
+    if(x<0||y<0||x>=W||y>=H) continue;
+    if(!inSel(x,y)) continue;                     // confine the flood to the selection / mask
     const i=at(x,y);
     if(d[i]!==tr||d[i+1]!==tg||d[i+2]!==tb||d[i+3]!==ta) continue;
     d[i]=fr;d[i+1]=fg;d[i+2]=fb;d[i+3]=fa;
@@ -905,37 +919,108 @@ function loadImageFromURL(url, name){
 }
 
 // ------------------------------------------------------------------ selection (rectangle marquee)
-function updateSelStatus(){ $("#selInfo").textContent = selection ? ("Sel "+selection.w+"×"+selection.h) : ""; }
-function startAnts(){ if(antsTimer||!selection) return; antsTimer=setInterval(()=>{ if(!selection){ stopAnts(); return; } selAnts=(selAnts+1)%8; composite(); }, 90); }
+function maskCount(){ let n=0; for(let i=0;i<selMask.length;i++) n+=selMask[i]; return n; }
+function updateSelStatus(){
+  if(selMask) $("#selInfo").textContent="Sel "+maskCount()+" px";
+  else $("#selInfo").textContent = selection ? ("Sel "+selection.w+"×"+selection.h) : "";
+}
+function startAnts(){ if(antsTimer||!selection||selMask) return; antsTimer=setInterval(()=>{ if(!selection){ stopAnts(); return; } selAnts=(selAnts+1)%8; composite(); }, 90); }
 function stopAnts(){ if(antsTimer){ clearInterval(antsTimer); antsTimer=null; } }
-function clearSelection(){ selection=null; selDrag=null; stopAnts(); updateSelStatus(); composite(); }
-function selectAll(){ selection={x:0,y:0,w:W,h:H}; updateSelStatus(); startAnts(); composite(); }
-function clearSelectionContents(){ const L=activeLayer(); if(!L||!selection) return; pushUndo(); L.ctx.clearRect(selection.x,selection.y,selection.w,selection.h); composite(); refreshThumb(L); }
-function fillSelection(){ const L=activeLayer(); if(!L||!selection) return; pushUndo(); L.ctx.fillStyle=primary; L.ctx.fillRect(selection.x,selection.y,selection.w,selection.h); composite(); refreshThumb(L); }
+function clearSelection(){ selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); composite(); }
+function selectAll(){ selection={x:0,y:0,w:W,h:H}; selMask=null; updateSelStatus(); startAnts(); composite(); }
+// iterate the selected pixels (within the bounding rect) honoring an optional mask
+function eachSelPixel(fn){
+  if(!selection) return;
+  for(let y=selection.y;y<selection.y+selection.h;y++) for(let x=selection.x;x<selection.x+selection.w;x++){
+    if(!selMask || selMask[y*W+x]===1) fn(x,y);
+  }
+}
+function clearSelectionContents(){ const L=activeLayer(); if(!L||!selection) return; pushUndo();
+  if(selMask) eachSelPixel((x,y)=>L.ctx.clearRect(x,y,1,1)); else L.ctx.clearRect(selection.x,selection.y,selection.w,selection.h);
+  composite(); refreshThumb(L); }
+function fillSelection(){ const L=activeLayer(); if(!L||!selection) return; pushUndo(); L.ctx.fillStyle=primary;
+  if(selMask) eachSelPixel((x,y)=>L.ctx.fillRect(x,y,1,1)); else L.ctx.fillRect(selection.x,selection.y,selection.w,selection.h);
+  composite(); refreshThumb(L); }
 
 function drawFloat(){
   vctx.imageSmoothingEnabled=false;
   vctx.drawImage(selDrag.float, selDrag.fx*zoom, selDrag.fy*zoom, selDrag.float.width*zoom, selDrag.float.height*zoom);
 }
 function drawSelection(){
+  if(selMask){ drawMaskOutline(); return; }
   const z=zoom, x=selection.x*z, y=selection.y*z, w=selection.w*z, h=selection.h*z;
   vctx.save(); vctx.lineWidth=1; vctx.setLineDash([4,4]);
   vctx.strokeStyle="#000"; vctx.lineDashOffset=-selAnts; vctx.strokeRect(x+0.5,y+0.5,w,h);
   vctx.strokeStyle="#fff"; vctx.lineDashOffset=-selAnts+4; vctx.strokeRect(x+0.5,y+0.5,w,h);
   vctx.setLineDash([]); vctx.restore();
 }
+// trace the boundary of an arbitrary mask: stroke every edge between a selected and non-selected cell
+function drawMaskOutline(){
+  const z=zoom, sel=i=>selMask[i]===1;
+  vctx.save();
+  for(const pass of [{c:"#000",w:3},{c:"#fff",w:1}]){
+    vctx.beginPath();
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      if(!sel(y*W+x)) continue;
+      const px=x*z, py=y*z;
+      if(y===0   || !sel((y-1)*W+x)){ vctx.moveTo(px,py);     vctx.lineTo(px+z,py);   }
+      if(y===H-1 || !sel((y+1)*W+x)){ vctx.moveTo(px,py+z);   vctx.lineTo(px+z,py+z); }
+      if(x===0   || !sel(y*W+(x-1))){ vctx.moveTo(px,py);     vctx.lineTo(px,py+z);   }
+      if(x===W-1 || !sel(y*W+(x+1))){ vctx.moveTo(px+z,py);   vctx.lineTo(px+z,py+z); }
+    }
+    vctx.lineWidth=pass.w; vctx.strokeStyle=pass.c; vctx.stroke();
+  }
+  vctx.restore();
+}
+// magic wand: select pixels on the active layer whose color is within tolerance of the clicked pixel
+function magicWand(p){
+  const L=activeLayer(); if(!L) return;
+  const d=L.ctx.getImageData(0,0,W,H).data;
+  const at=(x,y)=>(y*W+x)*4;
+  const si=at(p.x,p.y), sr=d[si],sg=d[si+1],sb=d[si+2],sa=d[si+3];
+  const tol=clamp($("#wandTol").value|0,0,255), tol2=tol*tol;
+  const match=i=>{ const dr=d[i]-sr,dg=d[i+1]-sg,db=d[i+2]-sb,da=d[i+3]-sa; return dr*dr+dg*dg+db*db+da*da<=tol2; };
+  const mask=new Uint8Array(W*H);
+  let minx=W,miny=H,maxx=-1,maxy=-1,count=0;
+  const mark=(x,y)=>{ mask[y*W+x]=1; count++; if(x<minx)minx=x; if(x>maxx)maxx=x; if(y<miny)miny=y; if(y>maxy)maxy=y; };
+  if($("#wandContig").checked){
+    const stack=[[p.x,p.y]];
+    while(stack.length){
+      const [x,y]=stack.pop();
+      if(x<0||y<0||x>=W||y>=H) continue;
+      const m=y*W+x; if(mask[m]) continue;
+      if(!match(at(x,y))) continue;
+      mark(x,y); stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+    }
+  } else {
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){ if(match(at(x,y))) mark(x,y); }
+  }
+  if(!count){ clearSelection(); showToast("No pixels matched within tolerance.","info"); return; }
+  selMask=mask; selection={x:minx,y:miny,w:maxx-minx+1,h:maxy-miny+1};
+  selDrag=null; stopAnts(); updateSelStatus(); composite();
+}
 
 function selectDown(p){
   if(selection && inSel(p.x,p.y)){               // grab the selected pixels and float them
     const L=activeLayer(); if(!L) return;
     pushUndo();
-    const f=document.createElement("canvas"); f.width=selection.w; f.height=selection.h;
-    f.getContext("2d").drawImage(L.canvas, selection.x,selection.y,selection.w,selection.h, 0,0,selection.w,selection.h);
-    L.ctx.clearRect(selection.x,selection.y,selection.w,selection.h);
-    selDrag={mode:"move", start:{x:p.x,y:p.y}, orig:{x:selection.x,y:selection.y}, float:f, fx:selection.x, fy:selection.y};
+    const r=selection;
+    const f=document.createElement("canvas"); f.width=r.w; f.height=r.h;
+    const fc=f.getContext("2d");
+    fc.drawImage(L.canvas, r.x,r.y,r.w,r.h, 0,0,r.w,r.h);
+    if(selMask){                                   // keep only masked pixels in the float, clear them from the layer
+      const fi=fc.getImageData(0,0,r.w,r.h), fd=fi.data;
+      for(let yy=0;yy<r.h;yy++) for(let xx=0;xx<r.w;xx++)
+        if(selMask[(r.y+yy)*W+(r.x+xx)]!==1) fd[(yy*r.w+xx)*4+3]=0;
+      fc.putImageData(fi,0,0);
+      eachSelPixel((x,y)=>L.ctx.clearRect(x,y,1,1));
+    } else {
+      L.ctx.clearRect(r.x,r.y,r.w,r.h);
+    }
+    selDrag={mode:"move", start:{x:p.x,y:p.y}, orig:{x:r.x,y:r.y}, float:f, fx:r.x, fy:r.y, origMask:selMask?selMask.slice():null};
     stopAnts(); composite();
   } else {                                        // start a fresh marquee
-    selection=null; updateSelStatus(); stopAnts();
+    selection=null; selMask=null; updateSelStatus(); stopAnts();
     selDrag={mode:"new", start:{x:p.x,y:p.y}};
     composite();
   }
@@ -947,9 +1032,18 @@ function selectMove(e){
     const x1=Math.max(selDrag.start.x,cur.x), y1=Math.max(selDrag.start.y,cur.y);
     selection={x:x0,y:y0,w:x1-x0+1,h:y1-y0+1};
   } else {
-    selDrag.fx=selDrag.orig.x+(cur.x-selDrag.start.x);
-    selDrag.fy=selDrag.orig.y+(cur.y-selDrag.start.y);
+    const dx=cur.x-selDrag.start.x, dy=cur.y-selDrag.start.y;
+    selDrag.fx=selDrag.orig.x+dx; selDrag.fy=selDrag.orig.y+dy;
     selection.x=selDrag.fx; selection.y=selDrag.fy;
+    if(selDrag.origMask){                          // shift the mask to match the moved float
+      const nm=new Uint8Array(W*H), om=selDrag.origMask;
+      for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+        if(om[y*W+x]!==1) continue;
+        const nx=x+dx, ny=y+dy;
+        if(nx>=0&&ny>=0&&nx<W&&ny<H) nm[ny*W+nx]=1;
+      }
+      selMask=nm;
+    }
   }
   updateSelStatus(); composite();
 }
@@ -959,7 +1053,8 @@ function selectUp(){
     if(L){ L.ctx.drawImage(selDrag.float, selDrag.fx, selDrag.fy); refreshThumb(L); }
   }
   selDrag=null;
-  if(selection && selection.w>0 && selection.h>0) startAnts(); else selection=null;
+  if(selection && selection.w>0 && selection.h>0){ if(!selMask) startAnts(); }
+  else { selection=null; selMask=null; }
   updateSelStatus(); composite();
 }
 
@@ -973,6 +1068,7 @@ function applyPaletteToLayer(){
   const x0=selection?selection.x:0, y0=selection?selection.y:0;
   const x1=selection?selection.x+selection.w:W, y1=selection?selection.y+selection.h:H;
   for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){
+    if(!inSel(x,y)) continue;
     const i=(y*W+x)*4; if(d[i+3]===0) continue;
     const r=d[i],g=d[i+1],b=d[i+2]; let bi=0,bd=Infinity;
     for(let k=0;k<pal.length;k++){ const dr=r-pal[k][0],dg=g-pal[k][1],db=b-pal[k][2],dist=dr*dr+dg*dg+db*db; if(dist<bd){bd=dist;bi=k;} }
@@ -1014,6 +1110,8 @@ view.addEventListener("pointerdown",e=>{
     composite(); previewPixels(shape(start,p));
   }else if(tool==="select"){
     if(e.button===0) selectDown(p);
+  }else if(tool==="wand"){
+    if(e.button===0) magicWand(p);
   }
 });
 
@@ -1202,7 +1300,7 @@ function loadProject(file){
 }
 function finishLoad(data){
   activeIndex=clamp(data.active||0,0,layers.length-1);
-  selection=null; selDrag=null; stopAnts(); updateSelStatus();
+  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
   undoStack=[]; redoStack=[]; fitZoom();
   renderLayers(); composite(); updateUndoButtons(); updateDocInfo();
   showToast("Project loaded.","success");
@@ -1212,7 +1310,7 @@ function finishLoad(data){
 function setTool(t){
   tool=t;
   document.querySelectorAll(".tool").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
-  const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select"};
+  const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand"};
   $("#toolInfo").textContent=names[t];
   view.style.cursor = CURSORS[t] || "crosshair";
 }
@@ -1391,6 +1489,7 @@ window.addEventListener("keydown",e=>{
     case "g": showGrid=!showGrid; $("#gridToggle").checked=showGrid; composite(); break;
     case "x": swapColors(); break;
     case "m": setTool("select"); break;
+    case "w": setTool("wand"); break;
     case "delete": case "backspace": if(selection){ e.preventDefault(); clearSelectionContents(); } break;
     case "escape": if(selection) clearSelection(); break;
   }
