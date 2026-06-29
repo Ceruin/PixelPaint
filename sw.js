@@ -1,9 +1,9 @@
 // PixelPaint service worker — enables offline use + Chrome install.
 // Bump CACHE when you change the app so clients pick up the new version.
-const CACHE = "pixelpaint-v1";
+const CACHE = "pixelpaint-v2";
 const ASSETS = [
   "./",
-  "./PixelPaint.html",
+  "./index.html",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png"
@@ -28,7 +28,7 @@ self.addEventListener("fetch", e => {
   if (req.mode === "navigate") {
     e.respondWith(
       fetch(req).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); return r; })
-        .catch(() => caches.match(req).then(r => r || caches.match("./PixelPaint.html")))
+        .catch(() => caches.match(req).then(r => r || caches.match("./index.html")))
     );
     return;
   }

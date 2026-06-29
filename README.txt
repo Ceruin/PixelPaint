@@ -1,29 +1,42 @@
 PixelPaint — a simple pixel-art editor
 ======================================
 
-HOW TO RUN
-  Double-click PixelPaint.html. It opens in your default browser. No install,
-  no internet, nothing to set up. Everything runs locally.
+HOW TO RUN (locally)
+  Double-click index.html. It opens in your default browser and everything runs
+  locally -- no internet, nothing to set up. (Drawing, layers, palettes, export,
+  save/open all work this way.)
 
-INSTALL AS A DESKTOP APP (Chrome / Edge)
-  Chrome only lets you install a web app when it is served from a real address
-  (http://localhost), not from a double-clicked file. So:
+WHY THERE IS NO "INSTALL" WHEN YOU DOUBLE-CLICK THE FILE
+  A double-clicked file opens as a "file://" page. Browsers ONLY allow a web app
+  to be installed (and to register the offline service worker) from a SECURE
+  ORIGIN -- "https://..." or "http://localhost". "file://" is not allowed, by
+  design. So the install option simply cannot appear on a double-clicked file.
+  The fix is to host it as a static site (below). After that, anyone just visits
+  the URL and clicks Install -- no .bat, no local server, nothing to run.
 
-  1. Double-click PixelPaint-App.bat. It starts a tiny local server and opens
-     PixelPaint at http://localhost:8137 in your browser. (Needs Node.js or
-     Python installed -- most dev machines have one. Keep that little black
-     window open while you use the app; closing it stops the server.)
-  2. Click the "Install App" button in the top bar, OR use the install icon
-     that appears at the right of Chrome's address bar (Edge: the same icon,
-     or menu > Apps > Install this site as an app).
-  3. PixelPaint installs like a normal app: its own window, Start-menu /
-     taskbar entry, and it works offline (a service worker caches it).
+PUBLISH AS A STATIC SITE + INSTALL AS AN APP (recommended -- GitHub Pages, free)
+  This whole folder IS the static site (entry point: index.html).
 
-  After that first install (done with the server running, so it caches itself),
-  you can launch PixelPaint from the Start menu / taskbar any time -- it loads
-  from its offline cache and the local server does NOT need to be running.
-  (Re-run PixelPaint-App.bat only if you edit PixelPaint.html and want the
-  installed app to pick up the changes.)
+  1. Create a GitHub repo and push this folder's contents to it
+     (index.html, manifest.webmanifest, sw.js, icon-192.png, icon-512.png,
+      .nojekyll). A git repo is already initialized here.
+  2. On GitHub: Settings > Pages > Build and deployment > Source = "Deploy from
+     a branch", Branch = main, folder = / (root). Save.
+  3. Wait ~1 minute, then open the URL it gives you, e.g.
+       https://YOURNAME.github.io/YOURREPO/
+     It loads PixelPaint directly (index.html), over https.
+  4. Click the "Install App" button in the top bar, OR the install icon at the
+     right of Chrome's/Edge's address bar. It installs like a native app: own
+     window, Start-menu / taskbar entry, and works offline afterwards.
+
+  Any static host works the same way (Netlify, Cloudflare Pages, your own
+  https server) -- the only requirement is https. The .nojekyll file tells
+  GitHub Pages to serve every file as-is.
+
+OPTIONAL: test the installable app locally without hosting
+  Run "node server.js" in this folder (needs Node.js). It serves the app at
+  http://localhost:8137 -- localhost counts as a secure origin, so Install works
+  there too. This is only for local testing; published users never need it.
 
 FEATURES
   - Layers: add, duplicate, reorder, rename (double-click), per-layer opacity

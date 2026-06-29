@@ -19,7 +19,7 @@ const TYPES = {
 
 http.createServer((req, res) => {
   let url = decodeURIComponent(req.url.split("?")[0]);
-  if (url === "/" || url === "") url = "/PixelPaint.html";
+  if (url === "/" || url === "") url = "/index.html";
   const file = path.normalize(path.join(ROOT, url));
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end("forbidden"); return; }
   fs.readFile(file, (err, data) => {
@@ -28,7 +28,7 @@ http.createServer((req, res) => {
     res.end(data);
   });
 }).listen(PORT, () => {
-  const url = "http://localhost:" + PORT + "/PixelPaint.html";
+  const url = "http://localhost:" + PORT + "/";
   console.log("PixelPaint is running at " + url);
   console.log("Open the browser's menu and choose \"Install PixelPaint\" (or click Install in the app).");
   console.log("Close this window to stop the server.");

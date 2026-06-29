@@ -2,7 +2,7 @@
   "name": "PixelPaint",
   "short_name": "PixelPaint",
   "description": "A simple pixel-art editor with layers, transparency, and retro palettes.",
-  "start_url": "./PixelPaint.html",
+  "start_url": "./",
   "scope": "./",
   "id": "pixelpaint",
   "display": "standalone",
