@@ -288,6 +288,7 @@
       <span id="zoomReadout" style="min-width:46px; text-align:center;">1600%</span>
       <button id="zoomIn" class="iconbtn" title="Zoom in (+)">+</button>
       <label class="chk"><input type="checkbox" id="gridToggle" checked /><span data-icon="grid" data-icon-size="15"></span> Grid</label>
+      <label class="chk"><input type="checkbox" id="centerToggle" checked /><span data-icon="center" data-icon-size="15"></span> Center</label>
     </div>
 
     <div class="sep"></div>
@@ -515,6 +516,7 @@ let tool="pencil";
 let brush=1;
 let fillShape=false;
 let showGrid=true;
+let showCenter=true;
 let recents=[];
 const MAX_RECENTS=16, MAX_UNDO=80;
 let placement=null;  // pending image being positioned: {img, name, x, y, w, h, ar}
@@ -550,6 +552,7 @@ const P = {
   save:"M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",
   folder:"M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z",
   grid:"M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z",
+  center:"M5 15H3v4c0 1.1.9 2 2 2h4v-2H5v-4zM5 5h4V3H5c-1.1 0-2 .9-2 2v4h2V5zm14-2h-4v2h4v4h2V5c0-1.1-.9-2-2-2zm0 16h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4zM12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
   clear:"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
   menu:"M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
   swap:"M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z",
@@ -733,7 +736,7 @@ function fitZoom(){
 function setZoom(z, recompose=true){
   zoom=clamp(z,1,48);
   view.width=W*zoom; view.height=H*zoom;
-  const cell=Math.max(6, Math.min(zoom,16));
+  const cell=Math.max(6, zoom);   // 1 checker square == 1 art pixel, so the background aligns to the grid at any zoom
   wrap.style.backgroundSize=(cell*2)+"px "+(cell*2)+"px";
   $("#zoomReadout").textContent=Math.round(zoom*100)+"%";
   if(recompose) composite();
@@ -826,6 +829,7 @@ function composite(){
   vctx.clearRect(0,0,view.width,view.height);
   vctx.drawImage(flat,0,0,W*zoom,H*zoom);
   if(showGrid && zoom>=4) drawGrid();
+  if(showCenter) drawCenterGuide();
   paintPlaceOverlay();
   if(selDrag && selDrag.float) drawFloat();
   if(selection) drawSelection();
@@ -841,6 +845,21 @@ function drawGrid(){
     vctx.fillStyle = (y%8===0)?"rgba(0,0,0,.35)":"rgba(0,0,0,.16)";
     vctx.fillRect(0,y*zoom,W*zoom,1);
   }
+  vctx.restore();
+}
+// Subtle crossed lines through the exact center. For odd sizes the line runs through the
+// middle of the center pixel; for even sizes it sits on the boundary between the two middle pixels.
+function drawCenterGuide(){
+  const cx=(W/2)*zoom, cy=(H/2)*zoom, w=W*zoom, h=H*zoom;
+  vctx.save();
+  vctx.setLineDash([5,5]); vctx.lineWidth=1;
+  const line=(x0,y0,x1,y1)=>{
+    vctx.strokeStyle="rgba(0,0,0,.45)";  vctx.lineDashOffset=0; vctx.beginPath(); vctx.moveTo(x0,y0); vctx.lineTo(x1,y1); vctx.stroke();
+    vctx.strokeStyle="rgba(255,255,255,.6)"; vctx.lineDashOffset=5; vctx.beginPath(); vctx.moveTo(x0,y0); vctx.lineTo(x1,y1); vctx.stroke();
+  };
+  line(cx,0,cx,h);   // vertical center
+  line(0,cy,w,cy);   // horizontal center
+  vctx.setLineDash([]);
   vctx.restore();
 }
 
@@ -1597,6 +1616,7 @@ window.addEventListener("drop",e=>{
 $("#zoomIn").onclick=()=>setZoom(zoom+1);
 $("#zoomOut").onclick=()=>setZoom(zoom-1);
 $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
+$("#centerToggle").onchange=e=>{showCenter=e.target.checked; composite();};
 
 $("#undoBtn").onclick=undo;
 $("#redoBtn").onclick=redo;

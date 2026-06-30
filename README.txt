@@ -75,7 +75,12 @@ FEATURES
     (authentic 64) & Sega Genesis (authentic 512), PICO-8, Commodore 64,
     ZX Spectrum, CGA, Endesga 16/32, NA16, Sweetie 16, Oil 6, Grayscale. Plus a
     custom color picker, hex input, and a recent-colors strip.
-  - Zoom + pixel grid overlay.
+  - Zoom + pixel grid overlay, plus a "Center" toggle that draws a subtle dashed
+    crosshair through the exact middle of the canvas. On odd sizes (e.g. 15 x 15)
+    the lines run through the center of the middle pixel; on even sizes they sit
+    on the boundary between the two middle pixels -- so it's always clear where
+    (and whether) a true center pixel is. The transparency checkerboard also lines
+    up 1 square per pixel at any zoom, so the background matches the grid.
   - Undo / Redo (up to 80 steps).
   - Export to transparent PNG at 1x / 2x / 4x / 8x / 16x.
   - Save / Open projects (.pxpaint file keeps all layers).
