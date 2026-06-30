@@ -79,6 +79,13 @@
     background:var(--panel); border:1px solid var(--line); align-items:center; justify-content:center; color:var(--muted); display:none;}
   .tl-frame:hover .tl-x{display:inline-flex;}
   .tl-frame .tl-x:hover{background:var(--danger); color:#fff; border-color:var(--danger);}
+
+  /* ---- sub-canvas panel ---- */
+  .rg-row{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
+  .rg-row:last-child{margin-bottom:0;}
+  .rg-lbl{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; width:34px; flex:none;}
+  .rg-row input[type=number]{width:58px;}
+  .rg-x{color:var(--muted);}
   .group{display:flex; align-items:center; gap:6px;}
   .sep{width:1px; height:24px; background:var(--line);}
   label.lbl{color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px;}
@@ -365,6 +372,7 @@
       <button class="tool" data-tool="ellipse"    data-icon="ellipse" data-key="C" title="Ellipse (C)">Ellipse</button>
       <button class="tool" data-tool="select"     data-icon="select"  data-key="M" title="Rectangle select (M)">Select</button>
       <button class="tool" data-tool="wand"       data-icon="wand"    data-key="W" title="Magic wand — select by color (W)">Wand</button>
+      <button class="tool" data-tool="region"     data-icon="region"  data-key="D" title="Sub-canvas — drag a draw area (D)">Region</button>
 
       <div class="toolhead">Brush</div>
       <div class="group" style="gap:6px; width:100%">
@@ -428,6 +436,25 @@
         <select id="paletteSelect" style="width:100%"></select>
         <div class="palette" id="paletteGrid"></div>
         <button id="applyPaletteBtn" data-icon="palette" style="width:100%; margin-top:8px;" title="Remap the active layer (or the current selection) to the nearest colors in this palette">Snap to this palette</button>
+      </div>
+
+      <div class="section" id="regionSection">
+        <h3>Sub-canvas</h3>
+        <div id="regionNone">
+          <button id="regionCreate" data-icon="region" style="width:100%">Create draw area</button>
+          <div class="hint" style="padding:7px 0 0; margin:0">A box you can draw inside but not outside. Create one, set its size, then Lock it. Or use the Region tool (D) to drag it on the canvas.</div>
+        </div>
+        <div id="regionCtl" style="display:none">
+          <div class="rg-row"><span class="rg-lbl">Size</span>
+            <input type="number" id="rgW" min="1" max="512" /><span class="rg-x">×</span><input type="number" id="rgH" min="1" max="512" /></div>
+          <div class="rg-row"><span class="rg-lbl">Pos</span>
+            <input type="number" id="rgX" min="0" /><span class="rg-x">,</span><input type="number" id="rgY" min="0" /></div>
+          <div class="rg-row" style="gap:8px; margin-top:2px">
+            <label class="chk"><input type="checkbox" id="rgLock" /><span data-icon="lock" data-icon-size="14"></span> Lock</label>
+            <button id="rgCenter">Center</button>
+            <button id="rgRemove" style="background:var(--danger); border-color:var(--danger); color:#fff;">Remove</button>
+          </div>
+        </div>
       </div>
 
       <div class="layers">
@@ -586,6 +613,11 @@ let playing=false, playTimer=null;
 const DEFAULT_DUR=120;
 const TAG_COLORS=["#e43b44","#fee761","#63c74d","#0099db","#b55088","#f77622","#2ce8f5","#9a46e6"];
 
+// sub-canvas: a persistent draw region (drawing is confined to it). lockable / resizable / removable.
+let region=null;          // {x,y,w,h} in art pixels, or null
+let regionLocked=false;
+let regionDrag=null;      // active create/move/resize gesture on the region
+
 // ------------------------------------------------------------------ DOM
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -610,6 +642,8 @@ const P = {
   play:"M8 5v14l11-7z",
   stop:"M6 6h12v12H6z",
   tag:"M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z",
+  region:"M18 4H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H6V6h12v12z",
+  lock:"M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10z",
   clear:"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
   menu:"M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
   swap:"M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z",
@@ -757,6 +791,7 @@ function activeLayer(){return layers[activeIndex];}
 function newDocument(w,h,makeFirst=true){
   placement=null; xform=null; const pb=document.getElementById("placeBar"); if(pb) pb.hidden=true;
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
+  region=null; regionLocked=false; regionDrag=null;
   W=clamp(w|0,1,512); H=clamp(h|0,1,512);
   layerSeq=1;
   frames=[{layers:[], dur:DEFAULT_DUR}];   // one frame to start
@@ -766,7 +801,7 @@ function newDocument(w,h,makeFirst=true){
   if(makeFirst) addLayer("Layer 1");       // pushes into frames[0].layers (same array ref)
   fitZoom();
   undoStack=[]; redoStack=[];
-  renderLayers(); renderTimeline(); composite(); updateUndoButtons(); updateDocInfo();
+  renderLayers(); renderTimeline(); renderRegionPanel(); composite(); updateUndoButtons(); updateDocInfo();
 }
 
 // change the current canvas size at will — crops or extends from the top-left (keeps the pixels)
@@ -775,13 +810,14 @@ function resizeCanvas(nw,nh){
   if(nw===W && nh===H) return;
   pushUndo();
   W=nw; H=nh; flat.width=W; flat.height=H;
-  layers.forEach(l=>{
+  frames.forEach(f=>f.layers.forEach(l=>{      // resize every frame, not just the active one
     const c=makeLayerCanvas(), ctx=c.getContext("2d");
     ctx.imageSmoothingEnabled=false; ctx.drawImage(l.canvas,0,0);
     l.canvas=c; l.ctx=ctx;
-  });
+  }));
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
-  fitZoom(); renderLayers(); composite(); updateDocInfo();
+  clampRegion();
+  fitZoom(); renderLayers(); renderTimeline(); composite(); updateDocInfo(); renderRegionPanel();
   captureActiveDoc(); renderTabs();
   showToast("Canvas resized to "+W+" × "+H+".","success");
 }
@@ -943,6 +979,7 @@ function captureActiveDoc(){
   d.W=W; d.H=H; d.frames=frames; d.frameIndex=frameIndex; d.tags=tags;
   d.activeIndex=activeIndex; d.layerSeq=layerSeq;
   d.zoom=zoom; d.undo=undoStack; d.redo=redoStack; d.selection=selection; d.selMask=selMask;
+  d.region=region; d.regionLocked=regionLocked;
 }
 function loadDocIntoGlobals(d){
   if(placement) cancelPlacement();
@@ -951,8 +988,9 @@ function loadDocIntoGlobals(d){
   frames=d.frames; frameIndex=clamp(d.frameIndex||0,0,frames.length-1); tags=d.tags||[];
   layers=frames[frameIndex].layers; activeIndex=clamp(d.activeIndex||0,0,layers.length-1); layerSeq=d.layerSeq;
   undoStack=d.undo; redoStack=d.redo; selection=d.selection; selMask=d.selMask; selDrag=null; stopAnts();
+  region=d.region||null; regionLocked=!!d.regionLocked; regionDrag=null;
   setZoom(d.zoom||16,false);
-  renderLayers(); renderTimeline(); composite(); updateDocInfo(); updateUndoButtons(); updateSelStatus();
+  renderLayers(); renderTimeline(); renderRegionPanel(); composite(); updateDocInfo(); updateUndoButtons(); updateSelStatus();
   if(selection && !selMask) startAnts();
 }
 function activateDoc(id){
@@ -1024,6 +1062,7 @@ function composite(){
   vctx.drawImage(flat,0,0,W*zoom,H*zoom);
   if(showGrid && zoom>=4) drawGrid();
   if(showCenter) drawCenterGuide();
+  if(region) drawRegion();
   paintPlaceOverlay();
   if(selDrag && selDrag.float) drawFloat();
   if(selection) drawSelection();
@@ -1057,6 +1096,93 @@ function drawCenterGuide(){
   line(0,cy,w,cy);   // horizontal center
   vctx.setLineDash([]);
   vctx.restore();
+}
+
+// ------------------------------------------------------------------ sub-canvas (draw region)
+function clampRegion(){
+  if(!region) return;
+  region.x=Math.round(region.x); region.y=Math.round(region.y); region.w=Math.round(region.w); region.h=Math.round(region.h);
+  region.w=clamp(region.w,1,W); region.h=clamp(region.h,1,H);
+  region.x=clamp(region.x,0,W-region.w); region.y=clamp(region.y,0,H-region.h);
+}
+function rectHandleHitArt(r,a,tol){
+  const pts={nw:[r.x,r.y],n:[r.x+r.w/2,r.y],ne:[r.x+r.w,r.y],e:[r.x+r.w,r.y+r.h/2],se:[r.x+r.w,r.y+r.h],s:[r.x+r.w/2,r.y+r.h],sw:[r.x,r.y+r.h],w:[r.x,r.y+r.h/2]};
+  for(const k in pts){ if(Math.abs(a.x-pts[k][0])<=tol && Math.abs(a.y-pts[k][1])<=tol) return k; }
+  if(a.x>=r.x && a.x<=r.x+r.w && a.y>=r.y && a.y<=r.y+r.h) return "move";
+  return null;
+}
+function drawRegion(){
+  const z=zoom, x=region.x*z, y=region.y*z, w=region.w*z, h=region.h*z, VW=W*z, VH=H*z;
+  vctx.save();
+  vctx.fillStyle="rgba(8,10,16,.5)";                  // dim everything outside the draw area
+  vctx.beginPath(); vctx.rect(0,0,VW,VH); vctx.rect(x,y,w,h); vctx.fill("evenodd");
+  vctx.lineWidth=2; vctx.strokeStyle=regionLocked?"#f0a020":"#2ce8f5";
+  vctx.strokeRect(x+1,y+1,Math.max(0,w-2),Math.max(0,h-2));
+  if(tool==="region" && !regionLocked){             // editable handles
+    const hs=8, pts={nw:[x,y],n:[x+w/2,y],ne:[x+w,y],e:[x+w,y+h/2],se:[x+w,y+h],s:[x+w/2,y+h],sw:[x,y+h],w:[x,y+h/2]};
+    for(const k in pts){ const [hx,hy]=pts[k];
+      vctx.fillStyle="#fff"; vctx.fillRect(hx-hs/2,hy-hs/2,hs,hs);
+      vctx.strokeStyle="#2ce8f5"; vctx.strokeRect(hx-hs/2+0.5,hy-hs/2+0.5,hs-1,hs-1);
+    }
+  }
+  vctx.restore();
+}
+function regionDown(p,e){
+  if(regionLocked){ if(region) showToast("Sub-canvas is locked — unlock it to move or resize.","info"); return; }
+  const a=toArtF(e);
+  if(region){
+    const m=rectHandleHitArt(region, a, 9/zoom);
+    if(m){ regionDrag={mode:m, start:a, orig:{x:region.x,y:region.y,w:region.w,h:region.h}}; return; }
+  }
+  regionDrag={mode:"new", start:{x:p.x,y:p.y}};      // drag out a fresh region
+  region={x:p.x,y:p.y,w:1,h:1}; composite();
+}
+function regionMove(e){
+  if(regionDrag.mode==="new"){
+    const cur=toPixel(e);
+    const x0=Math.min(regionDrag.start.x,cur.x), y0=Math.min(regionDrag.start.y,cur.y);
+    const x1=Math.max(regionDrag.start.x,cur.x), y1=Math.max(regionDrag.start.y,cur.y);
+    region={x:x0,y:y0,w:x1-x0+1,h:y1-y0+1};
+  } else {
+    const a=toArtF(e), r=regionDrag.orig, m=regionDrag.mode, dx=a.x-regionDrag.start.x, dy=a.y-regionDrag.start.y;
+    let x=r.x,y=r.y,w=r.w,h=r.h;
+    if(m==="move"){ x=r.x+dx; y=r.y+dy; }
+    else{
+      if(m.indexOf("e")>=0) w=r.w+dx;
+      if(m.indexOf("s")>=0) h=r.h+dy;
+      if(m.indexOf("w")>=0){ x=r.x+dx; w=r.w-dx; }
+      if(m.indexOf("n")>=0){ y=r.y+dy; h=r.h-dy; }
+      if(w<1) w=1; if(h<1) h=1;
+    }
+    region={x,y,w,h};
+  }
+  clampRegion(); composite(); renderRegionPanel();
+}
+function regionUp(){ regionDrag=null; clampRegion(); composite(); renderRegionPanel(); }
+function createRegion(){
+  const sz=clamp(Math.round(Math.min(W,H)/2),1,Math.min(W,H));
+  region={x:Math.floor((W-sz)/2), y:Math.floor((H-sz)/2), w:sz, h:sz}; regionLocked=false;
+  clampRegion(); setTool("region"); renderRegionPanel(); composite();
+  showToast("Sub-canvas created. Drag its handles to resize, or set the size below; Lock to draw safely inside.","info",4200);
+}
+function removeRegion(){ region=null; regionDrag=null; renderRegionPanel(); composite(); }
+function centerRegion(){ if(!region) return; region.x=Math.floor((W-region.w)/2); region.y=Math.floor((H-region.h)/2); clampRegion(); renderRegionPanel(); composite(); }
+function setRegionFromInputs(){
+  if(!region) return;
+  region.w=clamp(parseInt($("#rgW").value,10)||1,1,W);
+  region.h=clamp(parseInt($("#rgH").value,10)||1,1,H);
+  region.x=clamp(parseInt($("#rgX").value,10)||0,0,W-region.w);
+  region.y=clamp(parseInt($("#rgY").value,10)||0,0,H-region.h);
+  composite(); renderRegionPanel();
+}
+function renderRegionPanel(){
+  const none=$("#regionNone"), ctl=$("#regionCtl"); if(!none||!ctl) return;
+  if(region){
+    none.style.display="none"; ctl.style.display="";
+    $("#rgW").value=region.w; $("#rgH").value=region.h; $("#rgX").value=region.x; $("#rgY").value=region.y;
+    $("#rgW").max=W; $("#rgH").max=H; $("#rgX").max=Math.max(0,W-1); $("#rgY").max=Math.max(0,H-1);
+    $("#rgLock").checked=regionLocked;
+  } else { none.style.display=""; ctl.style.display="none"; }
 }
 
 // ------------------------------------------------------------------ undo / redo
@@ -1111,13 +1237,13 @@ function updateUndoButtons(){
 function stamp(ctx,x,y,erase){
   const s=brush, o=Math.floor((s-1)/2);
   const sx=x-o, sy=y-o, ex=sx+s, ey=sy+s;
-  if(!selection){ // fast path: no selection, draw the whole brush block at once
+  if(!selection && !region){ // fast path: no constraint, draw the whole brush block at once
     if(erase) ctx.clearRect(sx,sy,s,s); else{ ctx.fillStyle=drawColor; ctx.fillRect(sx,sy,s,s); }
     return;
   }
-  if(!erase) ctx.fillStyle=drawColor;          // masked: draw only the cells inside the selection
+  if(!erase) ctx.fillStyle=drawColor;          // constrained: draw only cells inside the selection AND the sub-canvas
   for(let yy=sy; yy<ey; yy++) for(let xx=sx; xx<ex; xx++){
-    if(!inSel(xx,yy)) continue;
+    if(!inSel(xx,yy) || !inRegion(xx,yy)) continue;
     if(erase) ctx.clearRect(xx,yy,1,1); else ctx.fillRect(xx,yy,1,1);
   }
 }
@@ -1125,6 +1251,8 @@ function inSel(x,y){
   if(selMask) return x>=0 && y>=0 && x<W && y<H && selMask[y*W+x]===1;
   return !selection || (x>=selection.x && x<selection.x+selection.w && y>=selection.y && y<selection.y+selection.h);
 }
+// drawing is confined to the sub-canvas region whenever one exists
+function inRegion(x,y){ return !region || (x>=region.x && x<region.x+region.w && y>=region.y && y<region.y+region.h); }
 
 function linePixels(x0,y0,x1,y1){
   const pts=[]; let dx=Math.abs(x1-x0), dy=Math.abs(y1-y0);
@@ -1154,7 +1282,7 @@ function ellipsePixels(x0,y0,x1,y1,filled){
 }
 function applyPixels(ctx,pts,erase){
   if(!erase) ctx.fillStyle=drawColor;
-  for(const [x,y] of pts){ if(!inSel(x,y)) continue; if(erase) ctx.clearRect(x,y,1,1); else ctx.fillRect(x,y,1,1); }
+  for(const [x,y] of pts){ if(!inSel(x,y)||!inRegion(x,y)) continue; if(erase) ctx.clearRect(x,y,1,1); else ctx.fillRect(x,y,1,1); }
 }
 function previewPixels(pts){
   vctx.save(); vctx.globalAlpha=.85; vctx.fillStyle=drawColor;
@@ -1163,7 +1291,7 @@ function previewPixels(pts){
 }
 
 function floodFill(ctx,sx,sy,hex){
-  if(!inSel(sx,sy)) return;                 // can't start a fill outside the selection
+  if(!inSel(sx,sy) || !inRegion(sx,sy)) return;   // can't start a fill outside the selection / sub-canvas
   const img=ctx.getImageData(0,0,W,H), d=img.data;
   const at=(x,y)=>(y*W+x)*4;
   const si=at(sx,sy);
@@ -1174,7 +1302,7 @@ function floodFill(ctx,sx,sy,hex){
   while(stack.length){
     const [x,y]=stack.pop();
     if(x<0||y<0||x>=W||y>=H) continue;
-    if(!inSel(x,y)) continue;                     // confine the flood to the selection / mask
+    if(!inSel(x,y)||!inRegion(x,y)) continue;     // confine the flood to the selection / mask / sub-canvas
     const i=at(x,y);
     if(d[i]!==tr||d[i+1]!==tg||d[i+2]!==tb||d[i+3]!==ta) continue;
     d[i]=fr;d[i+1]=fg;d[i+2]=fb;d[i+3]=fa;
@@ -1527,6 +1655,8 @@ view.addEventListener("pointerdown",e=>{
     if(e.button===0) selectDown(p);
   }else if(tool==="wand"){
     if(e.button===0) magicWand(p);
+  }else if(tool==="region"){
+    if(e.button===0) regionDown(p,e);
   }
 });
 
@@ -1538,6 +1668,7 @@ stage.addEventListener("scroll",()=>{ if(placement) paintPlaceOverlay(); });
 
 window.addEventListener("pointermove",e=>{
   if(placement){ if(xform) placementMove(e); else updatePlacementCursor(e); return; }
+  if(regionDrag){ regionMove(e); return; }
   if(selDrag){ selectMove(e); return; }
   if(drawing){
     const p=toPixel(e), L=activeLayer();
@@ -1553,11 +1684,20 @@ window.addEventListener("pointermove",e=>{
 view.addEventListener("pointermove",e=>{
   const p=toPixel(e); $("#cursorInfo").textContent=p.x+", "+p.y;
   if(tool==="select" && !selDrag && !placement) view.style.cursor=(selection && inSel(p.x,p.y))?"move":"crosshair";
+  else if(tool==="region" && !regionDrag && !placement){
+    if(regionLocked){ view.style.cursor="not-allowed"; }
+    else{
+      const m=region?rectHandleHitArt(region, toArtF(e), 9/zoom):null;
+      const map={nw:"nwse-resize",se:"nwse-resize",ne:"nesw-resize",sw:"nesw-resize",n:"ns-resize",s:"ns-resize",e:"ew-resize",w:"ew-resize",move:"move"};
+      view.style.cursor = m ? map[m] : "crosshair";
+    }
+  }
 });
 view.addEventListener("pointerleave",()=>{ if(!drawing&&!shaping&&!selDrag&&!xform) $("#cursorInfo").textContent="—"; });
 
 window.addEventListener("pointerup",e=>{
   if(placement){ xform=null; return; }
+  if(regionDrag){ regionUp(); return; }
   if(selDrag){ selectUp(); return; }
   if(shaping){
     const p=toPixel(e), L=activeLayer();
@@ -1768,7 +1908,7 @@ function exportSpritesheet(scale){
 function setTool(t){
   tool=t;
   document.querySelectorAll(".tool").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
-  const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand"};
+  const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand",region:"Region"};
   $("#toolInfo").textContent=names[t];
   view.style.cursor = CURSORS[t] || "crosshair";
 }
@@ -1856,6 +1996,13 @@ $("#playBtn").onclick=startPlayback;
 $("#addFrameBtn").onclick=()=>addFrame(true);
 $("#addTagBtn").onclick=addTag;
 $("#frameDur").onchange=e=>setFrameDur(parseInt(e.target.value,10)||DEFAULT_DUR);
+
+// sub-canvas (draw region) controls
+$("#regionCreate").onclick=createRegion;
+$("#rgRemove").onclick=removeRegion;
+$("#rgCenter").onclick=centerRegion;
+$("#rgLock").onchange=e=>{ regionLocked=e.target.checked; composite(); };
+["#rgW","#rgH","#rgX","#rgY"].forEach(id=>{ $(id).onchange=setRegionFromInputs; });
 
 $("#undoBtn").onclick=undo;
 $("#redoBtn").onclick=redo;
@@ -1964,6 +2111,7 @@ window.addEventListener("keydown",e=>{
     case "x": swapColors(); break;
     case "m": setTool("select"); break;
     case "w": setTool("wand"); break;
+    case "d": setTool("region"); break;
     case " ": e.preventDefault(); startPlayback(); break;
     case "delete": case "backspace": if(selection){ e.preventDefault(); clearSelectionContents(); } break;
     case "escape": if(selection) clearSelection(); break;
