@@ -33,11 +33,6 @@ PUBLISH AS A STATIC SITE + INSTALL AS AN APP (recommended -- GitHub Pages, free)
   https server) -- the only requirement is https. The .nojekyll file tells
   GitHub Pages to serve every file as-is.
 
-OPTIONAL: test the installable app locally without hosting
-  Run "node server.js" in this folder (needs Node.js). It serves the app at
-  http://localhost:8137 -- localhost counts as a secure origin, so Install works
-  there too. This is only for local testing; published users never need it.
-
 FEATURES
   - Layers: add, duplicate, reorder, rename (double-click), per-layer opacity
     and visibility. Transparency is fully supported (checkerboard = see-through).
@@ -46,7 +41,9 @@ FEATURES
     (native) size in a movable, resizable box -- drag it to position, drag the
     handles to resize (hold Shift on a corner to keep aspect ratio), then click
     Place / press Enter to add it as a new layer (Esc cancels). It's resampled
-    to the pixel grid on placement.
+    to the pixel grid on placement. If the image is bigger than the canvas, its
+    resize handles sit out in the gray area around the canvas -- you can grab and
+    drag them there too, so you can always size a big paste down to fit.
       - The place bar has 1:1 (actual size) and Fit (shrink to canvas) buttons.
       - Right-click the image for more: Actual size, Fit to canvas, Fill canvas,
         Center, Flip horizontal, Flip vertical, Place, Cancel.
@@ -57,6 +54,12 @@ FEATURES
     inside the selection to move the selected pixels. Right-click a selection for
     options: Fill with foreground, Snap to palette, Clear, Select all, Deselect.
     Keys: Delete = clear contents, Ctrl+A = select all, Ctrl+D / Esc = deselect.
+  - Magic wand (the Wand tool, or press W): click a pixel to select an area by
+    color. "Tol" (tolerance) controls how close a color must be to match -- 0 is
+    an exact match, higher is looser. "Contiguous" (on) selects only the touching
+    region; turn it off to select every matching color on the layer at once. The
+    wand selection behaves like any other selection -- confine drawing to it,
+    move it, clear/fill/snap it, or use the right-click menu.
   - Snap to palette: "Snap to this palette" (under the palette) remaps the active
     layer -- or just the current selection -- to the nearest colors in the chosen
     palette. Great for forcing imported art into a retro palette like NES or C64.
@@ -67,17 +70,19 @@ FEATURES
     RIGHT mouse paints the background color. Left/right-click a palette swatch to
     set each; click a swatch in the Color box to choose which one the picker edits;
     press X (or the swap button) to swap them.
-  - Preset color palettes: DawnBringer 16/32, NES (Nintendo), Game Boy (DMG) &
-    Pocket, Sega Master System (full 64) & Genesis, PICO-8, Commodore 64,
-    ZX Spectrum, CGA, Endesga 32, Sweetie 16, Grayscale. Plus a custom color
-    picker, hex input, and a recent-colors strip.
+  - 21 preset color palettes: DawnBringer 16/32, NES (Nintendo), Game Boy (DMG /
+    Pocket / Color), Ice Cream GB, Kirokaze GB, Mist GB, Sega Master System
+    (authentic 64) & Sega Genesis (authentic 512), PICO-8, Commodore 64,
+    ZX Spectrum, CGA, Endesga 16/32, NA16, Sweetie 16, Oil 6, Grayscale. Plus a
+    custom color picker, hex input, and a recent-colors strip.
   - Zoom + pixel grid overlay.
   - Undo / Redo (up to 80 steps).
   - Export to transparent PNG at 1x / 2x / 4x / 8x / 16x.
   - Save / Open projects (.pxpaint file keeps all layers).
 
 KEYBOARD SHORTCUTS
-  B Pencil   E Eraser   F Fill   I Pick   L Line   R Rectangle   C Ellipse   M Select
+  B Pencil   E Eraser   F Fill   I Pick   L Line   R Rectangle   C Ellipse
+  M Select   W Wand (magic wand)
   Ctrl+A select all   Ctrl+D / Esc deselect   Delete clear selection contents
   [ / ]      brush size down / up
   + / -      zoom in / out
@@ -91,6 +96,19 @@ KEYBOARD SHORTCUTS
   Mouse wheel over the canvas = zoom
 
 TIPS
-  - Set the canvas size before you start (top bar). "New" clears everything.
+  - Tabs: each open drawing is a tab below the toolbar. Click "+" (or File > New,
+    or the New button) to start another canvas; click a tab to switch; click its x
+    to close it (you're asked first if it has artwork). Every tab keeps its own
+    layers, size, zoom, undo history and selection.
+  - File menu (top-left "File") holds all the file actions: New canvas, Resize
+    canvas, Open project, Save project, Export PNG, Close tab, Install app. Only
+    the everyday controls (zoom, grid, undo/redo) stay on the bar.
+  - New canvas asks for a size: pick a preset or type any width x height from
+    1 to 512 (odd sizes like 15 x 15 or 23 x 9 are fine), then Create -- it opens
+    in a new tab.
+  - Resize canvas (File > Resize canvas) changes the current canvas size at any
+    time. It crops or extends from the top-left corner, so your pixels stay put
+    (it does not scale them). Undo reverts a resize.
+  - Export PNG asks for a scale (defaults to 1x = true pixel size).
   - The PNG export is transparent wherever you didn't paint, so it drops
-    straight into a game engine or sprite sheet.
+    straight into a game engine or sprite sheet (export scale defaults to 1x).

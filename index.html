@@ -33,36 +33,53 @@
   }
   .brand{font-weight:700; letter-spacing:.3px; font-size:15px; white-space:nowrap;}
   .brand b{color:var(--accent);}
+
+  /* ---- tab bar ---- */
+  .tabbar{display:flex; align-items:flex-end; gap:4px; padding:6px 8px 0; background:var(--panel);
+    border-bottom:1px solid var(--line); overflow-x:auto; overflow-y:hidden; flex:none;}
+  .tabs{display:flex; align-items:flex-end; gap:4px; min-width:0;}
+  .tab{display:flex; align-items:center; gap:7px; max-width:170px; padding:7px 8px 7px 12px;
+    background:var(--panel2); border:1px solid var(--line); border-bottom:none;
+    border-radius:8px 8px 0 0; cursor:pointer; color:var(--muted); white-space:nowrap; font-size:12.5px;}
+  .tab:hover{background:#323744; color:var(--text);}
+  .tab.active{background:var(--bg); color:var(--text);}
+  .tab .tname{overflow:hidden; text-overflow:ellipsis; max-width:128px;}
+  .tab .tclose{display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
+    border-radius:5px; opacity:.65; flex:none;}
+  .tab .tclose:hover{background:var(--danger); color:#fff; opacity:1;}
+  .tab-add{align-self:center; min-height:30px; margin-bottom:5px; flex:none;}
   .group{display:flex; align-items:center; gap:6px;}
   .sep{width:1px; height:24px; background:var(--line);}
   label.lbl{color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px;}
   button, select, input{font:inherit; color:var(--text);}
   button{
-    background:var(--panel2); border:1px solid var(--line); border-radius:7px;
-    padding:0 11px; min-height:30px; cursor:pointer; transition:.08s; white-space:nowrap;
-    display:inline-flex; align-items:center; justify-content:center; gap:5px;
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    padding:0 12px; min-height:32px; cursor:pointer; transition:.08s; white-space:nowrap;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px; font-weight:500;
   }
   button svg{flex:none;}
-  .iconbtn{padding:0 9px;}
+  .iconbtn{padding:0; min-width:32px;}   /* square icon-only buttons (zoom, brush +/-) */
   button:hover{border-color:var(--accent); background:#323744;}
   button:active{transform:translateY(1px);}
   button.primary{background:var(--accent2); border-color:var(--accent2);}
   button.primary:hover{background:var(--accent);}
   select, input[type=number], input[type=text]{
-    background:var(--panel2); border:1px solid var(--line); border-radius:7px; padding:0 8px; height:30px;
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:0 9px; height:32px;
   }
+  select:hover, input[type=text]:hover, input[type=number]:hover{border-color:#4c5366;}
   input[type=color]{
-    height:30px; width:100%; padding:2px; background:var(--panel2);
-    border:1px solid var(--line); border-radius:7px; cursor:pointer;
+    height:32px; width:100%; padding:2px; background:var(--panel2);
+    border:1px solid var(--line); border-radius:8px; cursor:pointer;
   }
-  input[type=number]{width:56px;}
+  input[type=number]{width:54px;}
 
   /* ---- main ---- */
   .main{flex:1; display:flex; min-height:0;}
   .tools{
-    width:142px; flex:none; background:var(--panel); border-right:1px solid var(--line);
-    padding:9px; display:flex; flex-direction:column; gap:5px; overflow:auto;
+    width:156px; flex:none; background:var(--panel); border-right:1px solid var(--line);
+    padding:10px; display:flex; flex-direction:column; gap:6px; overflow-y:auto; overflow-x:hidden;
   }
+  .tools .group{max-width:100%;}
   .tool{
     display:flex; align-items:center; justify-content:flex-start; gap:8px; text-align:left; width:100%;
   }
@@ -73,7 +90,8 @@
     border-radius:4px; padding:1px 5px; line-height:1.45;
   }
   .tool.active::after{color:#fff; border-color:#ffffff55; background:#ffffff22;}
-  .toolhead{color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.5px; margin:6px 2px 1px;}
+  .toolhead{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin:9px 2px 2px;}
+  .toolhead:first-child{margin-top:0;}
 
   .stage{
     flex:1; min-width:0; overflow:auto; display:flex; align-items:center; justify-content:center;
@@ -95,38 +113,42 @@
     background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 20px 20px;
   }
   #view{display:block; image-rendering:pixelated; cursor:crosshair; touch-action:none;}
+  /* full-stage overlay for placing/resizing a pasted image — lets handles live in the gray "no man's land" */
+  #placeOverlay{position:absolute; inset:0; z-index:20; pointer-events:none; touch-action:none;}
+  #placeOverlay[hidden]{display:none;}
+  #placeOverlay.active{pointer-events:auto;}
 
   .side{
     width:252px; flex:none; background:var(--panel); border-left:1px solid var(--line);
-    display:flex; flex-direction:column; min-height:0;
+    display:flex; flex-direction:column; min-height:0; overflow-y:auto;
   }
-  .section{padding:9px 12px; border-bottom:1px solid var(--line);}
-  .section h3{margin:0 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted);}
+  .section{padding:12px 14px; border-bottom:1px solid var(--line);}
+  .section h3{margin:0 0 10px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);}
 
   .colorrow{display:flex; align-items:center; gap:10px;}
-  .dualswatch{position:relative; width:58px; height:50px; flex:none;}
-  .dualswatch .sw{position:absolute; width:32px; height:32px; border-radius:7px;
+  .dualswatch{position:relative; width:66px; height:60px; flex:none;}
+  .dualswatch .sw{position:absolute; width:34px; height:34px; border-radius:8px;
     border:2px solid #0007; box-shadow:0 1px 4px #0007; cursor:pointer;}
   #primarySwatch{left:0; top:0; z-index:2;}
-  #secondarySwatch{right:0; bottom:0; z-index:1;}
+  #secondarySwatch{right:0; bottom:0; z-index:1;}    /* (32..66, 26..60) — clear of the swap button */
   .dualswatch .sw.active{outline:2px solid var(--accent); outline-offset:1px; z-index:3;}
-  .swap{position:absolute; right:0; top:0; z-index:4; width:18px; height:18px;
-    min-height:0; padding:0; border-radius:5px; font-size:11px; line-height:1;}
+  .swap{position:absolute; right:0; top:0; z-index:4; width:22px; height:22px;
+    min-width:0; min-height:0; padding:0; border-radius:6px;}
   .colorrow .col{display:flex; flex-direction:column; gap:6px; flex:1; min-width:0;}
   .recents{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; min-height:18px;}
   .recents .rc{width:18px; height:18px; border-radius:4px; border:1px solid #0006; cursor:pointer;}
 
-  .palette{display:grid; grid-template-columns:repeat(8,1fr); gap:4px; margin-top:8px; max-height:158px; overflow:auto;}
-  .palette .sw{width:100%; aspect-ratio:1; border-radius:4px; border:1px solid #0006; cursor:pointer;}
-  .palette .sw:hover{outline:2px solid var(--accent); outline-offset:1px;}
+  .palette{display:grid; grid-template-columns:repeat(auto-fill, minmax(22px,1fr)); gap:5px; margin-top:10px; max-height:176px; overflow:auto; padding:2px;}
+  .palette .sw{width:100%; aspect-ratio:1; border-radius:5px; border:1px solid #0006; cursor:pointer;}
+  .palette .sw:hover{outline:2px solid var(--accent); outline-offset:1px; position:relative; z-index:1;}
 
-  .layers{flex:1; min-height:0; display:flex; flex-direction:column;}
-  .layers .bar{display:flex; gap:5px; padding:8px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
-  .layers .bar button{padding:5px 8px;}
-  .layerlist{flex:1; overflow:auto; padding:8px;}
+  .layers{flex:1 0 auto; min-height:0; display:flex; flex-direction:column;}
+  .layers .bar{display:flex; gap:6px; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .layers .bar button{flex:1; min-width:34px;}
+  .layerlist{flex:1; overflow:auto; padding:10px; min-height:150px; max-height:360px;}
   .layer{
-    display:flex; align-items:center; gap:8px; padding:7px 8px; border:1px solid var(--line);
-    border-radius:8px; margin-bottom:6px; background:var(--panel2); cursor:pointer;
+    display:flex; align-items:center; gap:9px; padding:8px 9px; border:1px solid var(--line);
+    border-radius:9px; margin-bottom:7px; background:var(--panel2); cursor:pointer;
   }
   .layer.active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
   .layer .eye{width:24px; text-align:center; cursor:pointer; opacity:.9;}
@@ -181,6 +203,13 @@
   .modal-card p{margin:0 0 15px; color:var(--muted); font-size:13px; line-height:1.55; white-space:pre-wrap;}
   .modal-card p:empty{display:none;}
   .modal-card #modalInput{width:100%; margin:0 0 15px;}
+  .modal-card #modalBody{margin:0 0 15px;}
+  .modal-card #modalBody:empty{display:none;}
+  .modal-card #modalBody .row{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
+  .modal-card #modalBody .row:last-child{margin-bottom:0;}
+  .modal-card #modalBody .row label{color:var(--muted); width:58px; flex:none;}
+  .modal-card #modalBody select{flex:1; min-width:0;}
+  .modal-card #modalBody input[type=number]{width:72px;}
   .modal-actions{display:flex; justify-content:flex-end; gap:8px;}
   .modal-card .danger{background:var(--danger); border-color:var(--danger); color:#fff;}
   .modal-card .danger:hover{background:#ec6a7c; border-color:#ec6a7c;}
@@ -216,19 +245,32 @@
   .ctx-sep{height:1px; background:var(--line); margin:5px 4px;}
 
   /* tighten chrome on smaller windows so the canvas keeps room */
-  @media (max-width: 1024px){
-    .topbar{gap:6px 9px; padding:6px 10px;}
+  @media (max-width: 1100px){
+    .topbar{gap:6px 9px; padding:7px 10px;}
     .sep{display:none;}
-    .tools{width:128px; padding:8px;}
-    .side{width:228px;}
+    .tools{width:138px; padding:9px;}
+    .side{width:236px;}
     .stage{padding:16px;}
   }
-  @media (max-width: 820px){
+  @media (max-width: 900px){
     .brand{font-size:14px;}
-    .tools{width:120px;}
-    .side{width:208px;}
-    .hint{display:none;}
+    .tools{width:126px;}
+    .side{width:216px;}
+    .tool::after{display:none;}        /* drop the keyboard-hint badge to save width */
     label.lbl{display:none;}
+  }
+  @media (max-width: 720px){
+    .hint{display:none;}
+    .tools{width:116px;}
+    .side{width:194px;}
+    .section{padding:10px 11px;}
+    .stage{padding:10px;}
+    .layers .bar{padding:8px 10px;}
+  }
+  @media (max-width: 600px){
+    .topbar{padding:6px 8px;}
+    .tools{width:106px; padding:8px;}
+    .side{width:174px;}
   }
 </style>
 </head>
@@ -237,29 +279,9 @@
   <!-- TOP BAR -->
   <div class="topbar">
     <div class="brand">Pixel<b>Paint</b></div>
+    <button id="fileMenuBtn" data-icon="menu" title="File menu — New, Open, Save, Export, Install">File</button>
     <div class="sep"></div>
 
-    <div class="group">
-      <label class="lbl">Size</label>
-      <select id="presetSize" title="Canvas presets">
-        <option value="8">8 × 8</option>
-        <option value="16">16 × 16</option>
-        <option value="32" selected>32 × 32</option>
-        <option value="48">48 × 48</option>
-        <option value="64">64 × 64</option>
-        <option value="96">96 × 96</option>
-        <option value="128">128 × 128</option>
-        <option value="custom">Custom…</option>
-      </select>
-      <span id="customSize" class="group" style="display:none">
-        <input type="number" id="cw" min="1" max="512" value="32" title="Width" />
-        <span style="color:var(--muted)">×</span>
-        <input type="number" id="ch" min="1" max="512" value="32" title="Height" />
-      </span>
-      <button id="newBtn" data-icon="new" title="New canvas (clears everything)">New</button>
-    </div>
-
-    <div class="sep"></div>
     <div class="group">
       <label class="lbl">Zoom</label>
       <button id="zoomOut" class="iconbtn" title="Zoom out (-)">−</button>
@@ -274,26 +296,26 @@
       <button id="redoBtn" data-icon="redo" title="Redo (Ctrl+Y)">Redo</button>
     </div>
 
-    <div class="sep"></div>
-    <div class="group">
-      <label class="lbl">Export</label>
-      <select id="exportScale" title="Export scale">
-        <option value="1">1×</option>
-        <option value="2">2×</option>
-        <option value="4" selected>4×</option>
-        <option value="8">8×</option>
-        <option value="16">16×</option>
-      </select>
-      <button id="exportBtn" class="primary" data-icon="download" title="Export PNG (transparent)">PNG</button>
-      <button id="saveBtn" data-icon="save" title="Save project (.pxpaint)">Save</button>
-      <button id="openBtn" data-icon="folder" title="Open project (.pxpaint)">Open</button>
-      <input type="file" id="openInput" accept=".pxpaint,.json,application/json" style="display:none" />
-    </div>
+    <input type="file" id="openInput" accept=".pxpaint,.json,application/json" style="display:none" />
+  </div>
 
-    <div class="sep"></div>
-    <div class="group">
-      <button id="installBtn" class="primary" data-icon="download" title="Install PixelPaint as a desktop app" style="display:none">Install App</button>
-    </div>
+  <!-- TAB BAR (one tab per open drawing) -->
+  <div class="tabbar">
+    <div class="tabs" id="tabs"></div>
+    <button id="newTabBtn" class="tab-add iconbtn" data-icon="add" data-icon-size="16" title="New tab"></button>
+  </div>
+
+  <!-- FILE MENU -->
+  <div id="fileMenu" class="ctx-menu" hidden>
+    <button data-fa="new"    data-icon="new"      data-icon-size="16">New canvas…</button>
+    <button data-fa="resize" data-icon="select"   data-icon-size="16">Resize canvas…</button>
+    <div class="ctx-sep"></div>
+    <button data-fa="open"   data-icon="folder"   data-icon-size="16">Open project…</button>
+    <button data-fa="save"   data-icon="save"     data-icon-size="16">Save project</button>
+    <button data-fa="export" data-icon="download" data-icon-size="16">Export PNG…</button>
+    <div class="ctx-sep"></div>
+    <button data-fa="closetab" data-icon="clear"  data-icon-size="16">Close tab</button>
+    <button id="installBtn" data-fa="install" data-icon="download" data-icon-size="16" style="display:none">Install app</button>
   </div>
 
   <!-- MAIN -->
@@ -312,17 +334,17 @@
       <button class="tool" data-tool="wand"       data-icon="wand"    data-key="W" title="Magic wand — select by color (W)">Wand</button>
 
       <div class="toolhead">Brush</div>
-      <div class="group" style="gap:8px">
+      <div class="group" style="gap:6px; width:100%">
         <button id="brushDown" class="iconbtn" title="Smaller brush ([)">−</button>
-        <span id="brushReadout" style="min-width:54px; text-align:center;">1 px</span>
+        <span id="brushReadout" style="flex:1; min-width:0; text-align:center;">1 px</span>
         <button id="brushUp" class="iconbtn" title="Bigger brush (])">+</button>
       </div>
       <label class="chk" style="margin-top:6px"><input type="checkbox" id="fillShape" /> Fill shapes</label>
 
       <div class="toolhead">Wand</div>
-      <div class="group" style="gap:8px">
+      <div class="group" style="gap:6px; width:100%">
         <span style="color:var(--muted)">Tol</span>
-        <input type="number" id="wandTol" min="0" max="255" value="32" style="width:54px" title="Color tolerance: 0 = exact match, higher = looser" />
+        <input type="number" id="wandTol" min="0" max="255" value="32" style="flex:1; min-width:0; width:auto" title="Color tolerance: 0 = exact match, higher = looser" />
       </div>
       <label class="chk" style="margin-top:6px"><input type="checkbox" id="wandContig" checked /> Contiguous</label>
 
@@ -339,6 +361,7 @@
       <div class="canvas-wrap" id="wrap">
         <canvas id="view"></canvas>
       </div>
+      <canvas id="placeOverlay" hidden></canvas>
       <div class="place-bar" id="placeBar" hidden>
         <span class="info"><span data-icon="image" data-icon-size="15"></span><span id="placeSize">—</span></span>
         <button id="placeActual" title="Actual size (1:1)">1:1</button>
@@ -356,7 +379,7 @@
           <div class="dualswatch">
             <div class="sw" id="secondarySwatch" title="Background — right-click a palette color, or right-drag on the canvas"></div>
             <div class="sw" id="primarySwatch" title="Foreground — left-click a palette color, or left-drag on the canvas"></div>
-            <button class="swap" id="swapColors" title="Swap foreground / background (X)">⇄</button>
+            <button class="swap" id="swapColors" data-icon="swap" data-icon-size="14" title="Swap foreground / background (X)"></button>
           </div>
           <div class="col">
             <input type="color" id="colorPicker" value="#000000" />
@@ -404,6 +427,7 @@
   <div class="modal-card" role="dialog" aria-modal="true">
     <h3 id="modalTitle"></h3>
     <p id="modalMsg"></p>
+    <div id="modalBody"></div>
     <input type="text" id="modalInput" spellcheck="false" />
     <div class="modal-actions">
       <button id="modalCancel">Cancel</button>
@@ -449,19 +473,34 @@ const PALETTES = {
   "NES (Nintendo)": ["#7c7c7c","#0000fc","#0000bc","#4428bc","#940084","#a80020","#a81000","#881400","#503000","#007800","#006800","#005800","#004058","#000000","#bcbcbc","#0078f8","#0058f8","#6844fc","#d800cc","#e40058","#f83800","#e45c10","#ac7c00","#00b800","#00a800","#00a844","#008888","#f8f8f8","#3cbcfc","#6888fc","#9878f8","#f878f8","#f85898","#f87858","#fca044","#f8b800","#b8f818","#58d854","#58f898","#00e8d8","#787878","#fcfcfc","#a4e4fc","#b8b8f8","#d8b8f8","#f8b8f8","#f8a4c0","#f0d0b0","#fce0a8","#f8d878","#d8f878","#b8f8b8","#b8f8d8","#00fcfc","#f8d8f8"],
   "Game Boy (DMG)": ["#0f380f","#306230","#8bac0f","#9bbc0f"],
   "Game Boy Pocket": ["#000000","#545454","#a9a9a9","#ffffff"],
-  "Sega Master System": [], // generated below (64 colors, 2 bits/channel)
-  "Sega Genesis (curated)": ["#000000","#555555","#aaaaaa","#ffffff","#aa0000","#ff0000","#ff5555","#ffaaaa","#005500","#00aa00","#55ff55","#aaffaa","#000055","#0000aa","#5555ff","#aaaaff","#aa5500","#ff8800","#ffaa00","#ffdd55","#550055","#aa00aa","#ff55ff","#ffaaff","#005555","#00aaaa","#55ffff","#aaffff","#553300","#885500","#aa7733","#ddaa77"],
+  "Game Boy Color": ["#000000","#2b2b2b","#555555","#808080","#aaaaaa","#d5d5d5","#ffffff","#7a4a1e","#8b1a1a","#e23b2e","#ff8a78","#b45a16","#ff9d28","#ffce85","#b8a014","#ffe331","#fff59a","#1a7a26","#3cc23a","#9bee5e","#157f7f","#27c9cf","#8df0ef","#1d2f9c","#3a6cf0","#86b0ff","#5a1e9e","#9a46e6","#c79bff","#a81f6e","#ef5fa6","#ffb3d6"],
+  "Ice Cream GB": ["#fff6d3","#f9a875","#eb6b6f","#7c3f58"],
+  "Kirokaze GB": ["#332c50","#46878f","#94e344","#e2f3e4"],
+  "Mist GB": ["#2d1b00","#1e606e","#5ab9a8","#c4f0c2"],
+  "Sega Master System": [], // generated below (authentic 64 = 2 bits/channel)
+  "Sega Genesis": [],       // generated below (authentic 512 = 9-bit ramp)
   "PICO-8": ["#000000","#1d2b53","#7e2553","#008751","#ab5236","#5f574f","#c2c3c7","#fff1e8","#ff004d","#ffa300","#ffec27","#00e436","#29adff","#83769c","#ff77a8","#ffccaa"],
   "Commodore 64": ["#000000","#ffffff","#880000","#aaffee","#cc44cc","#00cc55","#0000aa","#eeee77","#dd8855","#664400","#ff7777","#333333","#777777","#aaff66","#0088ff","#bbbbbb"],
   "ZX Spectrum": ["#000000","#0000d7","#d70000","#d700d7","#00d700","#00d7d7","#d7d700","#d7d7d7","#0000ff","#ff0000","#ff00ff","#00ff00","#00ffff","#ffff00","#ffffff"],
   "CGA": ["#000000","#0000aa","#00aa00","#00aaaa","#aa0000","#aa00aa","#aa5500","#aaaaaa","#555555","#5555ff","#55ff55","#55ffff","#ff5555","#ff55ff","#ffff55","#ffffff"],
   "Endesga 32": ["#be4a2f","#d77643","#ead4aa","#e4a672","#b86f50","#733e39","#3e2731","#a22633","#e43b44","#f77622","#feae34","#fee761","#63c74d","#3e8948","#265c42","#193c3e","#124e89","#0099db","#2ce8f5","#ffffff","#c0cbdc","#8b9bb4","#5a6988","#3a4466","#262b44","#181425","#ff0044","#68386c","#b55088","#f6757a","#e8b796","#c28569"],
+  "Endesga 16": ["#e4a672","#b86f50","#743f39","#3f2832","#9e2835","#e53b44","#fb922b","#ffe762","#63c64d","#327345","#193d3f","#4f6781","#afbfd2","#ffffff","#2ce8f5","#0484d1"],
+  "NA16": ["#8c8fae","#584563","#3e2137","#9a6348","#d79b7d","#f5edba","#c0c741","#647d34","#e4943a","#9d303b","#d26471","#70377f","#7ec4c1","#34859d","#17434b","#1f0e1c"],
+  "Oil 6": ["#fbf5ef","#f2d3ab","#c69fa5","#8b6d9c","#494d7e","#272744"],
   "Sweetie 16": ["#1a1c2c","#5d275d","#b13e53","#ef7d57","#ffcd75","#a7f070","#38b764","#257179","#29366f","#3b5dc9","#41a6f6","#73eff7","#f4f4f4","#94b0c2","#566c86","#333c57"],
   "Grayscale": (()=>{const o=[];for(let i=0;i<16;i++){const v=Math.round(i*255/15).toString(16).padStart(2,"0");o.push("#"+v+v+v);}return o;})(),
 };
-// Generate authentic Sega Master System palette (4 levels per channel = 64 colors)
-(function(){const lv=[0,85,170,255],o=[];for(const r of lv)for(const g of lv)for(const b of lv)
-  o.push("#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join(""));PALETTES["Sega Master System"]=o;})();
+// Generate the authentic Sega palettes: Master System = 2 bits/channel (64),
+// Genesis/Mega Drive = the 9-bit VDP intensity ramp (512).
+(function(){
+  const hx=(r,g,b)=>"#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("");
+  const sms=[0,85,170,255], a=[];
+  for(const r of sms)for(const g of sms)for(const b of sms) a.push(hx(r,g,b));
+  PALETTES["Sega Master System"]=a;
+  const gen=[0,52,87,116,144,172,206,255], b2=[];
+  for(const r of gen)for(const g of gen)for(const b of gen) b2.push(hx(r,g,b));
+  PALETTES["Sega Genesis"]=b2;
+})();
 
 // ------------------------------------------------------------------ state
 let W=32, H=32, zoom=16;
@@ -487,11 +526,16 @@ let selAnts=0, antsTimer=null;  // marching-ants animation
 
 let undoStack=[], redoStack=[];
 
+// open documents (tabs). The "live" globals above mirror the active doc.
+let docs=[], activeDocId=null, docSeq=0, untitledN=0;
+let lastSize={w:32,h:32};   // remembered size for the next "New canvas"
+
 // ------------------------------------------------------------------ DOM
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
 const flat=document.createElement("canvas"), fctx=flat.getContext("2d");
 const wrap=$("#wrap"), stage=$("#stage");
+const placeOverlay=$("#placeOverlay"), octx=placeOverlay.getContext("2d");
 
 // ------------------------------------------------------------------ icons (inline Material-style SVG, fully offline)
 const P = {
@@ -507,6 +551,8 @@ const P = {
   folder:"M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z",
   grid:"M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z",
   clear:"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+  menu:"M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
+  swap:"M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z",
   check:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
   info:"M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z",
   image:"M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z",
@@ -561,11 +607,15 @@ function openModal(o){
     $("#modalMsg").textContent=o.message||"";
     const inp=$("#modalInput");
     if(o.input){ inp.style.display=""; inp.value=o.value||""; } else { inp.style.display="none"; }
+    $("#modalBody").innerHTML=o.bodyHTML||"";
     const ok=$("#modalOk"); ok.textContent=o.okText||"OK"; ok.classList.toggle("danger", !!o.danger);
     const cancel=$("#modalCancel");
     if(o.cancel===false){ cancel.style.display="none"; } else { cancel.style.display=""; cancel.textContent=o.cancelText||"Cancel"; }
     $("#modalRoot").hidden=false;
-    setTimeout(()=>{ const f=o.input?inp:ok; f.focus(); if(o.input) inp.select(); },0);
+    setTimeout(()=>{
+      const f = o.bodyHTML ? $("#modalBody").querySelector("input,select") : (o.input?inp:ok);
+      if(f){ f.focus(); if(f.select) f.select(); }
+    },0);
   });
 }
 function closeModal(result){
@@ -577,6 +627,42 @@ function closeModal(result){
 function showConfirm(message,opts){ opts=opts||{}; return openModal({title:opts.title||"Confirm",message,okText:opts.okText||"Confirm",cancelText:opts.cancelText,danger:opts.danger}); }
 function showPrompt(message,value,opts){ opts=opts||{}; return openModal({title:opts.title||"Rename",message,input:true,value,okText:opts.okText||"OK"}); }
 function showAlert(message,opts){ opts=opts||{}; return openModal({title:opts.title||"Notice",message,okText:"OK",cancel:false}); }
+
+const PRESET_SIZES=[8,16,32,48,64,96,128];
+// Ask for a canvas size (preset dropdown + W x H). Returns {w,h} or null.
+async function showSizeDialog(title, w, h, okText, message){
+  const sq = PRESET_SIZES.includes(w) && w===h ? String(w) : "custom";
+  const opts = PRESET_SIZES.map(s=>`<option value="${s}"${s+''===sq?" selected":""}>${s} × ${s}</option>`).join("")
+    + `<option value="custom"${sq==="custom"?" selected":""}>Custom…</option>`;
+  const body = `
+    <div class="row"><label>Preset</label><select id="dlgPreset">${opts}</select></div>
+    <div class="row"><label>Size</label>
+      <input type="number" id="dlgW" min="1" max="512" value="${w}" />
+      <span style="color:var(--muted)">×</span>
+      <input type="number" id="dlgH" min="1" max="512" value="${h}" />
+      <span style="color:var(--muted)">px</span>
+    </div>`;
+  const p = openModal({title, message, bodyHTML:body, okText:okText||"Create"});
+  const ps=$("#dlgPreset");
+  ps.onchange=()=>{ if(ps.value!=="custom"){ $("#dlgW").value=ps.value; $("#dlgH").value=ps.value; } };
+  const mark=()=>{ ps.value="custom"; };
+  $("#dlgW").oninput=mark; $("#dlgH").oninput=mark;
+  const ok=await p;
+  if(!ok) return null;
+  return { w:clamp(parseInt($("#dlgW").value,10)||32,1,512), h:clamp(parseInt($("#dlgH").value,10)||32,1,512) };
+}
+// Ask for an export scale. Returns an integer scale or null.
+async function showExportDialog(){
+  const body = `<div class="row"><label>Scale</label>
+    <select id="dlgScale">
+      <option value="1" selected>1× (true pixel size)</option>
+      <option value="2">2×</option><option value="4">4×</option>
+      <option value="8">8×</option><option value="16">16×</option>
+    </select></div>`;
+  const ok=await openModal({title:"Export PNG", bodyHTML:body, okText:"Export PNG"});
+  if(!ok) return null;
+  return parseInt($("#dlgScale").value,10)||1;
+}
 
 function showToast(message,type,ms){
   const el=document.createElement("div");
@@ -620,6 +706,23 @@ function newDocument(w,h,makeFirst=true){
   renderLayers(); composite(); updateUndoButtons(); updateDocInfo();
 }
 
+// change the current canvas size at will — crops or extends from the top-left (keeps the pixels)
+function resizeCanvas(nw,nh){
+  nw=clamp(nw,1,512); nh=clamp(nh,1,512);
+  if(nw===W && nh===H) return;
+  pushUndo();
+  W=nw; H=nh; flat.width=W; flat.height=H;
+  layers.forEach(l=>{
+    const c=makeLayerCanvas(), ctx=c.getContext("2d");
+    ctx.imageSmoothingEnabled=false; ctx.drawImage(l.canvas,0,0);
+    l.canvas=c; l.ctx=ctx;
+  });
+  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
+  fitZoom(); renderLayers(); composite(); updateDocInfo();
+  captureActiveDoc(); renderTabs();
+  showToast("Canvas resized to "+W+" × "+H+".","success");
+}
+
 function fitZoom(){
   let target=Math.min(stage.clientWidth, stage.clientHeight)-40;
   if(!isFinite(target) || target<80) target=640; // layout not ready / headless fallback
@@ -638,6 +741,77 @@ function setZoom(z, recompose=true){
 
 function updateDocInfo(){$("#docInfo").textContent=W+" × "+H;}
 
+// ------------------------------------------------------------------ tabs / multiple documents
+// The live globals (W,H,layers,activeIndex,layerSeq,zoom,undo/redo,selection,selMask) ARE the
+// active document; switching tabs persists them into the doc and loads the target doc's state.
+function captureActiveDoc(){
+  const d=docs.find(x=>x.id===activeDocId); if(!d) return;
+  d.W=W; d.H=H; d.layers=layers; d.activeIndex=activeIndex; d.layerSeq=layerSeq;
+  d.zoom=zoom; d.undo=undoStack; d.redo=redoStack; d.selection=selection; d.selMask=selMask;
+}
+function loadDocIntoGlobals(d){
+  if(placement) cancelPlacement();
+  W=d.W; H=d.H; flat.width=W; flat.height=H;
+  layers=d.layers; activeIndex=d.activeIndex; layerSeq=d.layerSeq;
+  undoStack=d.undo; redoStack=d.redo; selection=d.selection; selMask=d.selMask; selDrag=null; stopAnts();
+  setZoom(d.zoom||16,false);
+  renderLayers(); composite(); updateDocInfo(); updateUndoButtons(); updateSelStatus();
+  if(selection && !selMask) startAnts();
+}
+function activateDoc(id){
+  if(id===activeDocId) return;
+  captureActiveDoc();
+  activeDocId=id;
+  loadDocIntoGlobals(docs.find(x=>x.id===id));
+  renderTabs();
+}
+// create a fresh document in a new tab (using the current size selection)
+function createDoc(w,h,name){
+  if(placement) cancelPlacement();
+  captureActiveDoc();
+  const d={id:++docSeq, name:name||("Untitled "+(++untitledN))};
+  docs.push(d);
+  activeDocId=d.id;
+  newDocument(w,h);     // reset the live globals to a blank canvas
+  captureActiveDoc();   // store that blank state into the new doc
+  renderTabs();
+}
+async function closeDoc(id){
+  const i=docs.findIndex(x=>x.id===id); if(i<0) return;
+  const wasActive=(id===activeDocId);
+  // confirm if the doc has drawn content
+  const d=docs.find(x=>x.id===id);
+  const live=wasActive ? layers : (d.layers||[]);
+  const hasContent=live.some(l=>!isLayerEmpty(l));
+  if(hasContent){
+    const ok=await showConfirm("Close \""+d.name+"\"? Its drawing will be discarded.",{title:"Close tab",okText:"Close tab",danger:true});
+    if(!ok) return;
+  }
+  docs.splice(i,1);
+  if(wasActive){
+    activeDocId=null;
+    if(docs.length){ const next=docs[Math.min(i,docs.length-1)]; activeDocId=next.id; loadDocIntoGlobals(next); }
+    else { createDoc(lastSize.w, lastSize.h); return; }   // never leave zero tabs
+  }
+  renderTabs();
+}
+function renderTabs(){
+  const host=$("#tabs"); host.innerHTML="";
+  for(const d of docs){
+    const t=document.createElement("div");
+    t.className="tab"+(d.id===activeDocId?" active":"");
+    t.title=d.name+"  ("+(d.id===activeDocId? W+"×"+H : d.W+"×"+d.H)+")";
+    const nm=document.createElement("span"); nm.className="tname"; nm.textContent=d.name;
+    const x=document.createElement("span"); x.className="tclose"; x.innerHTML=iconSVG("clear",13); x.title="Close tab";
+    t.appendChild(nm); t.appendChild(x);
+    t.onclick=()=>activateDoc(d.id);
+    x.onclick=ev=>{ ev.stopPropagation(); closeDoc(d.id); };
+    host.appendChild(t);
+  }
+}
+async function newCanvasDialog(){ const s=await showSizeDialog("New canvas", lastSize.w, lastSize.h, "Create"); if(s){ lastSize=s; createDoc(s.w, s.h); } }
+async function resizeDialog(){ const s=await showSizeDialog("Resize canvas", W, H, "Resize", "Crops or extends from the top-left corner; your pixels stay put."); if(s) resizeCanvas(s.w, s.h); }
+
 // ------------------------------------------------------------------ compositing
 function composite(){
   fctx.clearRect(0,0,W,H);
@@ -652,7 +826,7 @@ function composite(){
   vctx.clearRect(0,0,view.width,view.height);
   vctx.drawImage(flat,0,0,W*zoom,H*zoom);
   if(showGrid && zoom>=4) drawGrid();
-  if(placement) drawPlacement();
+  paintPlaceOverlay();
   if(selDrag && selDrag.float) drawFloat();
   if(selection) drawSelection();
 }
@@ -812,12 +986,15 @@ function beginPlacement(img, name){
   placeCenter();   // full (native) size by default, centered on the canvas
   xform=null;
   $("#placeBar").hidden=false; updatePlaceInfo();
-  view.style.cursor="move";
+  placeOverlay.hidden=false; placeOverlay.classList.add("active"); sizePlaceOverlay();
+  placeOverlay.style.cursor="move";
   composite();
   showToast("Pasted at full size. Drag to move, handles to resize, right-click for options (Fit, 1:1…).","info",4400);
 }
 function endPlacement(){
   placement=null; xform=null; $("#placeBar").hidden=true; closeCtxMenu();
+  placeOverlay.classList.remove("active"); placeOverlay.hidden=true;
+  octx.clearRect(0,0,placeOverlay.width,placeOverlay.height);
   view.style.cursor=CURSORS[tool]||"crosshair";
 }
 function openMenuAt(m,x,y){
@@ -828,7 +1005,7 @@ function openMenuAt(m,x,y){
 }
 function openCtxMenu(x,y){ openMenuAt($("#ctxMenu"),x,y); }
 function openSelMenu(x,y){ openMenuAt($("#selMenu"),x,y); }
-function closeCtxMenu(){ const a=$("#ctxMenu"),b=$("#selMenu"); if(a)a.hidden=true; if(b)b.hidden=true; }
+function closeCtxMenu(){ ["#ctxMenu","#selMenu","#fileMenu"].forEach(id=>{ const m=$(id); if(m) m.hidden=true; }); }
 function cancelPlacement(){ if(!placement) return; endPlacement(); composite(); }
 function commitPlacement(){
   if(!placement) return;
@@ -851,21 +1028,41 @@ function drawImageFlipped(ctx, img, dx, dy, dw, dh, fh, fv){
   ctx.drawImage(img, 0, 0, dw, dh);
   ctx.restore();
 }
-function drawPlacement(){
-  const z=zoom, x=placement.x*z, y=placement.y*z, w=placement.w*z, h=placement.h*z;
-  vctx.save();
-  vctx.imageSmoothingEnabled=false;
-  drawImageFlipped(vctx, placement.img, x, y, w, h, placement.flipH, placement.flipV);
-  vctx.lineWidth=1.5; vctx.strokeStyle="#5b8cff"; vctx.setLineDash([6,4]);
-  vctx.strokeRect(x+0.5, y+0.5, w, h);
-  vctx.setLineDash([]);
-  const hs=9;
-  const pts=[[x,y],[x+w/2,y],[x+w,y],[x+w,y+h/2],[x+w,y+h],[x+w/2,y+h],[x,y+h],[x,y+h/2]];
-  for(const [hx,hy] of pts){
-    vctx.fillStyle="#fff"; vctx.fillRect(hx-hs/2, hy-hs/2, hs, hs);
-    vctx.strokeStyle="#5b8cff"; vctx.strokeRect(hx-hs/2+0.5, hy-hs/2+0.5, hs-1, hs-1);
+function sizePlaceOverlay(){
+  const w=stage.clientWidth, h=stage.clientHeight;
+  if(placeOverlay.width!==w) placeOverlay.width=w;
+  if(placeOverlay.height!==h) placeOverlay.height=h;
+}
+// where the canvas (view) sits within the overlay, in overlay pixels
+function overlayOffset(){
+  const vr=view.getBoundingClientRect(), or=placeOverlay.getBoundingClientRect();
+  return {ox:vr.left-or.left, oy:vr.top-or.top};
+}
+// the placement preview + resize handles are drawn across the WHOLE stage, so handles
+// that fall outside the canvas (in the gray area) are still visible and grabbable.
+function paintPlaceOverlay(){
+  if(!placement){ octx.clearRect(0,0,placeOverlay.width,placeOverlay.height); return; }
+  sizePlaceOverlay();
+  octx.clearRect(0,0,placeOverlay.width,placeOverlay.height);
+  const z=zoom, {ox,oy}=overlayOffset();
+  const x=ox+placement.x*z, y=oy+placement.y*z, w=placement.w*z, h=placement.h*z;
+  octx.save();
+  octx.strokeStyle="rgba(255,255,255,.28)"; octx.lineWidth=1;   // canvas bounds, for reference
+  octx.strokeRect(ox+0.5, oy+0.5, W*z, H*z);
+  octx.imageSmoothingEnabled=false;
+  drawImageFlipped(octx, placement.img, x, y, w, h, placement.flipH, placement.flipV);
+  octx.lineWidth=1.5; octx.strokeStyle="#5b8cff"; octx.setLineDash([6,4]);
+  octx.strokeRect(x+0.5, y+0.5, w, h);
+  octx.setLineDash([]);
+  const hs=10, pts=placeHandlePoints(x,y,w,h);
+  for(const k in pts){ const [hx,hy]=pts[k];
+    octx.fillStyle="#fff"; octx.fillRect(hx-hs/2, hy-hs/2, hs, hs);
+    octx.strokeStyle="#5b8cff"; octx.strokeRect(hx-hs/2+0.5, hy-hs/2+0.5, hs-1, hs-1);
   }
-  vctx.restore();
+  octx.restore();
+}
+function placeHandlePoints(x,y,w,h){
+  return {nw:[x,y],n:[x+w/2,y],ne:[x+w,y],e:[x+w,y+h/2],se:[x+w,y+h],s:[x+w/2,y+h],sw:[x,y+h],w:[x,y+h/2]};
 }
 
 function placementHit(a){
@@ -876,9 +1073,9 @@ function placementHit(a){
   return null;
 }
 function placementDown(e){
-  const a=toArtF(e), mode=placementHit(a);
+  const a=toArtF(e), mode=placementHit(a);   // toArtF works anywhere on the page, incl. off-canvas
   if(!mode) return;
-  view.setPointerCapture(e.pointerId);
+  try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
   xform={mode, start:a, rect:{x:placement.x,y:placement.y,w:placement.w,h:placement.h}};
 }
 function placementMove(e){
@@ -902,7 +1099,7 @@ function placementMove(e){
 function updatePlacementCursor(e){
   const m=placementHit(toArtF(e));
   const map={nw:"nwse-resize",se:"nwse-resize",ne:"nesw-resize",sw:"nesw-resize",n:"ns-resize",s:"ns-resize",e:"ew-resize",w:"ew-resize",move:"move"};
-  view.style.cursor = m ? map[m] : "default";
+  placeOverlay.style.cursor = m ? map[m] : "default";
 }
 
 function loadImageFromBlob(blob, name){
@@ -1115,6 +1312,12 @@ view.addEventListener("pointerdown",e=>{
   }
 });
 
+// placement gestures arrive on the full-stage overlay, so handles in the gray area work
+placeOverlay.addEventListener("pointerdown",e=>{ if(placement && e.button===0) placementDown(e); });
+placeOverlay.addEventListener("contextmenu",e=>{ if(placement){ e.preventDefault(); openCtxMenu(e.clientX,e.clientY); } });
+window.addEventListener("resize",()=>{ if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); } });
+stage.addEventListener("scroll",()=>{ if(placement) paintPlaceOverlay(); });
+
 window.addEventListener("pointermove",e=>{
   if(placement){ if(xform) placementMove(e); else updatePlacementCursor(e); return; }
   if(selDrag){ selectMove(e); return; }
@@ -1273,7 +1476,9 @@ function saveProject(){
   const data={app:"PixelPaint",version:1,w:W,h:H,active:activeIndex,
     layers:layers.map(l=>({name:l.name,visible:l.visible,opacity:l.opacity,data:l.canvas.toDataURL("image/png")}))};
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
-  const a=document.createElement("a"); a.download="untitled.pxpaint"; a.href=URL.createObjectURL(blob); a.click();
+  const d=docs.find(x=>x.id===activeDocId);
+  const fname=((d&&d.name)||"untitled").replace(/[^\w\- ]+/g,"").trim()||"untitled";
+  const a=document.createElement("a"); a.download=fname+".pxpaint"; a.href=URL.createObjectURL(blob); a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   showToast("Project saved.","success");
 }
@@ -1303,6 +1508,7 @@ function finishLoad(data){
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
   undoStack=[]; redoStack=[]; fitZoom();
   renderLayers(); composite(); updateUndoButtons(); updateDocInfo();
+  captureActiveDoc(); renderTabs();   // persist the loaded state into the active tab
   showToast("Project loaded.","success");
 }
 
@@ -1314,7 +1520,7 @@ function setTool(t){
   $("#toolInfo").textContent=names[t];
   view.style.cursor = CURSORS[t] || "crosshair";
 }
-function setBrush(n){ brush=clamp(n,1,16); $("#brushReadout").textContent=brush+" px"; }
+function setBrush(n){ const max=Math.max(16, Math.round(Math.max(W,H)/2)); brush=clamp(n,1,max); $("#brushReadout").textContent=brush+" px"; }
 
 // ------------------------------------------------------------------ wire events
 document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
@@ -1356,8 +1562,10 @@ $("#selMenu").addEventListener("click",e=>{
 $("#applyPaletteBtn").onclick=applyPaletteToLayer;
 
 document.addEventListener("pointerdown",e=>{
-  const cm=$("#ctxMenu"), sm=$("#selMenu");
-  if((!cm.hidden||!sm.hidden) && !cm.contains(e.target) && !sm.contains(e.target)) closeCtxMenu();
+  const menus=[$("#ctxMenu"),$("#selMenu"),$("#fileMenu")];
+  const anyOpen=menus.some(m=>!m.hidden);
+  const inside=menus.some(m=>m.contains(e.target)) || $("#fileMenuBtn").contains(e.target);
+  if(anyOpen && !inside) closeCtxMenu();
 }, true);
 
 window.addEventListener("paste",e=>{
@@ -1393,27 +1601,33 @@ $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
 $("#undoBtn").onclick=undo;
 $("#redoBtn").onclick=redo;
 
-$("#presetSize").onchange=e=>{
-  const custom=e.target.value==="custom";
-  $("#customSize").style.display=custom?"":"none";
-  if(custom){ $("#cw").focus(); }
-  else{ const v=parseInt(e.target.value,10); $("#cw").value=v; $("#ch").value=v; }
-};
-$("#newBtn").onclick=async ()=>{
-  const w=parseInt($("#cw").value,10)||32, h=parseInt($("#ch").value,10)||32;
-  if(layers.some(l=>!isLayerEmpty(l))){
-    const ok=await showConfirm("Start a new "+w+" × "+h+" canvas?\nYour current drawing will be cleared and cannot be undone.",
-      {title:"New canvas", okText:"Start new", danger:true});
-    if(!ok) return;
-  }
-  newDocument(w,h);
-};
 function isLayerEmpty(l){const d=l.ctx.getImageData(0,0,W,H).data; for(let i=3;i<d.length;i+=4) if(d[i]!==0) return false; return true;}
+function openProjectFile(f){ const name=f.name.replace(/\.[^.]+$/,""); createDoc(lastSize.w, lastSize.h, name); loadProject(f); }
+function doInstall(){
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(c=>{ deferredPrompt=null; $("#installBtn").style.display="none"; if(c&&c.outcome==="accepted") showToast("Installing PixelPaint…","success"); });
+}
 
-$("#exportBtn").onclick=()=>exportPNG(parseInt($("#exportScale").value,10));
-$("#saveBtn").onclick=saveProject;
-$("#openBtn").onclick=()=>$("#openInput").click();
-$("#openInput").onchange=e=>{ if(e.target.files[0]) loadProject(e.target.files[0]); e.target.value=""; };
+$("#newTabBtn").onclick=newCanvasDialog;
+$("#openInput").onchange=e=>{ const f=e.target.files[0]; if(f) openProjectFile(f); e.target.value=""; };
+
+// File menu (dropdown under the File button)
+$("#fileMenuBtn").onclick=e=>{ e.stopPropagation();
+  const m=$("#fileMenu");
+  if(m.hidden){ const r=$("#fileMenuBtn").getBoundingClientRect(); openMenuAt(m, r.left, r.bottom+4); }
+  else closeCtxMenu();
+};
+$("#fileMenu").addEventListener("click",e=>{
+  const b=e.target.closest("[data-fa]"); if(!b) return; const a=b.dataset.fa; closeCtxMenu();
+  if(a==="new") newCanvasDialog();
+  else if(a==="resize") resizeDialog();
+  else if(a==="open") $("#openInput").click();
+  else if(a==="save") saveProject();
+  else if(a==="export") showExportDialog().then(s=>{ if(s) exportPNG(s); });
+  else if(a==="closetab") closeDoc(activeDocId);
+  else if(a==="install") doInstall();
+});
 
 $("#colorPicker").oninput=e=>setColor(e.target.value, activeSlot);
 $("#hexInput").onchange=e=>{
@@ -1504,13 +1718,7 @@ if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
 }
 let deferredPrompt=null;
 window.addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); deferredPrompt=e; $("#installBtn").style.display=""; });
-$("#installBtn").onclick=async ()=>{
-  if(!deferredPrompt) return;
-  deferredPrompt.prompt();
-  const choice=await deferredPrompt.userChoice;
-  deferredPrompt=null; $("#installBtn").style.display="none";
-  if(choice && choice.outcome==="accepted") showToast("Installing PixelPaint…","success");
-};
+// install is triggered from the File menu (data-fa="install" -> doInstall)
 window.addEventListener("appinstalled", ()=>{ $("#installBtn").style.display="none"; showToast("PixelPaint installed!","success"); });
 
 hydrateIcons();
@@ -1520,7 +1728,7 @@ setColor("#000000","fg");
 setActiveSlot("fg");
 setTool("pencil");
 setBrush(1);
-newDocument(32,32);
+createDoc(32,32);
 // Re-fit once the browser has finished laying out the stage (boot may run pre-layout).
 requestAnimationFrame(()=>{ fitZoom(); composite(); });
 
