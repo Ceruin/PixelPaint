@@ -48,6 +48,37 @@
     border-radius:5px; opacity:.65; flex:none;}
   .tab .tclose:hover{background:var(--danger); color:#fff; opacity:1;}
   .tab-add{align-self:center; min-height:30px; margin-bottom:5px; flex:none;}
+
+  /* ---- timeline (frames / playback / tags) ---- */
+  .timeline{flex:none; background:var(--panel); border-top:1px solid var(--line); display:flex; flex-direction:column; max-height:158px;}
+  .tl-bar{display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  .tl-bar .vsep{width:1px; height:22px; background:var(--line);}
+  .tl-bar .tl-grow{flex:1 1 12px;}
+  .tl-field{display:flex; align-items:center; gap:6px;}
+  .tl-field .lbl{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;}
+  .tl-field .muted{color:var(--muted);}
+  .tl-field input[type=number]{width:60px;}
+  #playBtn.playing{background:var(--accent2); border-color:var(--accent2);}
+  .tl-tags{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .tl-tag{display:inline-flex; align-items:center; gap:6px; padding:3px 5px 3px 8px; background:var(--panel2);
+    border:1px solid var(--line); border-radius:20px; font-size:12px; cursor:pointer; white-space:nowrap;}
+  .tl-tag:hover{border-color:var(--accent);}
+  .tl-tag .dot{width:9px; height:9px; border-radius:50%; flex:none;}
+  .tl-tag .rg{color:var(--muted); font-size:11px;}
+  .tl-tag .tl-tx{display:inline-flex; align-items:center; opacity:.55;}
+  .tl-tag .tl-tx:hover{opacity:1; color:var(--danger);}
+  .tl-frames{display:flex; align-items:flex-start; gap:7px; padding:9px 10px; overflow-x:auto; overflow-y:hidden;}
+  .tl-frame{position:relative; flex:none; display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:4px; border:2px solid var(--line); border-radius:8px; background:var(--panel2); cursor:pointer;}
+  .tl-frame:hover{border-color:#56607a;}
+  .tl-frame.active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
+  .tl-frame .tl-num{font-size:10px; color:var(--muted); line-height:1;}
+  .tl-frame .tl-thumb{image-rendering:pixelated; display:block; border:1px solid #0006;
+    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 10px 10px;}
+  .tl-frame .tl-x{position:absolute; top:-7px; right:-7px; width:16px; height:16px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--line); align-items:center; justify-content:center; color:var(--muted); display:none;}
+  .tl-frame:hover .tl-x{display:inline-flex;}
+  .tl-frame .tl-x:hover{background:var(--danger); color:#fff; border-color:var(--danger);}
   .group{display:flex; align-items:center; gap:6px;}
   .sep{width:1px; height:24px; background:var(--line);}
   label.lbl{color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px;}
@@ -314,6 +345,7 @@
     <button data-fa="open"   data-icon="folder"   data-icon-size="16">Open project…</button>
     <button data-fa="save"   data-icon="save"     data-icon-size="16">Save project</button>
     <button data-fa="export" data-icon="download" data-icon-size="16">Export PNG…</button>
+    <button data-fa="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
     <div class="ctx-sep"></div>
     <button data-fa="closetab" data-icon="clear"  data-icon-size="16">Close tab</button>
     <button id="installBtn" data-fa="install" data-icon="download" data-icon-size="16" style="display:none">Install app</button>
@@ -410,6 +442,22 @@
         <div class="layerlist" id="layerList"></div>
       </div>
     </div>
+  </div>
+
+  <!-- TIMELINE (frames, playback, tags) -->
+  <div class="timeline" id="timeline">
+    <div class="tl-bar">
+      <button id="playBtn" class="iconbtn" title="Play (Space)"></button>
+      <label class="chk"><input type="checkbox" id="loopToggle" checked /> Loop</label>
+      <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of the current frame" /><span class="muted">ms</span></span>
+      <span class="vsep"></span>
+      <span class="tl-field"><span class="lbl">Play</span><select id="playTag" title="Which frames to play"><option value="__all">All frames</option></select></span>
+      <button id="addTagBtn" data-icon="tag" data-icon-size="15" title="Add a tag (named frame range like idle / run / jump)">Tag</button>
+      <div id="tlTags" class="tl-tags"></div>
+      <span class="tl-grow"></span>
+      <button id="addFrameBtn" data-icon="add" data-icon-size="16" title="New frame (copies the current one)">Frame</button>
+    </div>
+    <div class="tl-frames" id="tlFrames"></div>
   </div>
 
   <!-- STATUS -->
@@ -532,6 +580,12 @@ let undoStack=[], redoStack=[];
 let docs=[], activeDocId=null, docSeq=0, untitledN=0;
 let lastSize={w:32,h:32};   // remembered size for the next "New canvas"
 
+// animation: each frame owns its own layer set + a duration; tags are named frame ranges
+let frames=[], frameIndex=0, tags=[];
+let playing=false, playTimer=null;
+const DEFAULT_DUR=120;
+const TAG_COLORS=["#e43b44","#fee761","#63c74d","#0099db","#b55088","#f77622","#2ce8f5","#9a46e6"];
+
 // ------------------------------------------------------------------ DOM
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -553,6 +607,9 @@ const P = {
   folder:"M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z",
   grid:"M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z",
   center:"M5 15H3v4c0 1.1.9 2 2 2h4v-2H5v-4zM5 5h4V3H5c-1.1 0-2 .9-2 2v4h2V5zm14-2h-4v2h4v4h2V5c0-1.1-.9-2-2-2zm0 16h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4zM12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
+  play:"M8 5v14l11-7z",
+  stop:"M6 6h12v12H6z",
+  tag:"M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z",
   clear:"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
   menu:"M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
   swap:"M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z",
@@ -699,14 +756,17 @@ function activeLayer(){return layers[activeIndex];}
 // ------------------------------------------------------------------ document
 function newDocument(w,h,makeFirst=true){
   placement=null; xform=null; const pb=document.getElementById("placeBar"); if(pb) pb.hidden=true;
-  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
+  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
   W=clamp(w|0,1,512); H=clamp(h|0,1,512);
-  layers=[]; activeIndex=0; layerSeq=1;
+  layerSeq=1;
+  frames=[{layers:[], dur:DEFAULT_DUR}];   // one frame to start
+  frameIndex=0; tags=[];
+  layers=frames[0].layers; activeIndex=0;
   flat.width=W; flat.height=H;
-  if(makeFirst) addLayer("Layer 1");
+  if(makeFirst) addLayer("Layer 1");       // pushes into frames[0].layers (same array ref)
   fitZoom();
   undoStack=[]; redoStack=[];
-  renderLayers(); composite(); updateUndoButtons(); updateDocInfo();
+  renderLayers(); renderTimeline(); composite(); updateUndoButtons(); updateDocInfo();
 }
 
 // change the current canvas size at will — crops or extends from the top-left (keeps the pixels)
@@ -742,23 +802,157 @@ function setZoom(z, recompose=true){
   if(recompose) composite();
 }
 
-function updateDocInfo(){$("#docInfo").textContent=W+" × "+H;}
+function updateDocInfo(){$("#docInfo").textContent=W+" × "+H+(frames&&frames.length>1?("  ·  frame "+(frameIndex+1)+"/"+frames.length):"");}
+
+// ------------------------------------------------------------------ animation: frames, playback, tags
+function compositeFrameInto(tctx, fr){
+  tctx.clearRect(0,0,W,H);
+  for(const l of fr.layers){ if(!l.visible) continue; tctx.globalAlpha=l.opacity; tctx.drawImage(l.canvas,0,0); }
+  tctx.globalAlpha=1;
+}
+function selectFrame(i, light){
+  frameIndex=clamp(i,0,frames.length-1);
+  layers=frames[frameIndex].layers;
+  activeIndex=clamp(activeIndex,0,layers.length-1);
+  if(!light) renderLayers();
+  highlightActiveFrame();
+  composite(); updateDocInfo();
+  const di=$("#frameDur"); if(di) di.value=frames[frameIndex].dur;
+}
+function highlightActiveFrame(){
+  const host=$("#tlFrames"); if(!host) return;
+  [...host.children].forEach((c,idx)=>c.classList.toggle("active", idx===frameIndex));
+}
+function addFrame(duplicate){
+  stopPlayback();
+  const src=frames[frameIndex];
+  const newLayers=src.layers.map(l=>{
+    const c=makeLayerCanvas(), ctx=c.getContext("2d");
+    if(duplicate) ctx.drawImage(l.canvas,0,0);
+    return {id:layerSeq++, name:l.name, visible:l.visible, opacity:l.opacity, canvas:c, ctx:ctx};
+  });
+  frames.splice(frameIndex+1,0,{layers:newLayers, dur:src.dur});
+  frameIndex++; layers=frames[frameIndex].layers;
+  renderLayers(); renderTimeline(); composite(); updateDocInfo();
+}
+function deleteFrame(i){
+  if(frames.length<=1){ showToast("A drawing needs at least one frame.","error"); return; }
+  stopPlayback();
+  frames.splice(i,1);
+  if(frameIndex>=frames.length) frameIndex=frames.length-1;
+  tags.forEach(t=>{ t.from=clamp(t.from,0,frames.length-1); t.to=clamp(t.to,0,frames.length-1); if(t.from>t.to) t.from=t.to; });
+  layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
+  renderLayers(); renderTimeline(); composite(); updateDocInfo();
+}
+function setFrameDur(ms){ frames[frameIndex].dur=clamp(ms|0,10,5000); renderTimeline(); }
+
+function renderTimeline(){
+  const di=$("#frameDur"); if(di && frames[frameIndex]) di.value=frames[frameIndex].dur;
+  const host=$("#tlFrames"); if(!host) return;
+  host.innerHTML="";
+  frames.forEach((fr,i)=>{
+    const cell=document.createElement("div"); cell.className="tl-frame"+(i===frameIndex?" active":"");
+    cell.title="Frame "+(i+1)+" — "+fr.dur+" ms";
+    const num=document.createElement("span"); num.className="tl-num"; num.textContent=(i+1);
+    const cv=document.createElement("canvas"); cv.className="tl-thumb"; cv.width=W; cv.height=H; fr._thumb=cv;
+    const TH=44, TW=Math.max(8,Math.round(TH*W/H)); cv.style.width=TW+"px"; cv.style.height=TH+"px";
+    compositeFrameInto(cv.getContext("2d"), fr);
+    const x=document.createElement("span"); x.className="tl-x"; x.innerHTML=iconSVG("clear",12); x.title="Delete frame";
+    cell.append(num,cv,x);
+    cell.onclick=()=>selectFrame(i);
+    x.onclick=ev=>{ev.stopPropagation(); deleteFrame(i);};
+    host.appendChild(cell);
+  });
+  renderTags(); updatePlayUI();
+}
+function renderTags(){
+  const sel=$("#playTag");
+  if(sel){ const cur=sel.value;
+    sel.innerHTML='<option value="__all">All frames</option>'+tags.map(t=>`<option value="${t.name}">${t.name}</option>`).join("");
+    if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
+  }
+  const host=$("#tlTags"); if(!host) return; host.innerHTML="";
+  tags.forEach((t,i)=>{
+    const chip=document.createElement("span"); chip.className="tl-tag";
+    chip.innerHTML='<span class="dot" style="background:'+t.color+'"></span><span class="nm">'+t.name+'</span><span class="rg">'+(t.from+1)+(t.to>t.from?("-"+(t.to+1)):"")+'</span>';
+    const x=document.createElement("span"); x.className="tl-tx"; x.innerHTML=iconSVG("clear",11); x.title="Delete tag";
+    chip.appendChild(x);
+    chip.onclick=()=>{ if($("#playTag")) $("#playTag").value=t.name; selectFrame(clamp(t.from,0,frames.length-1)); };
+    chip.ondblclick=ev=>{ev.stopPropagation(); editTag(i);};
+    x.onclick=ev=>{ev.stopPropagation(); tags.splice(i,1); renderTags();};
+    host.appendChild(chip);
+  });
+}
+function playRange(){
+  const sel=$("#playTag"); const v=sel?sel.value:"__all";
+  if(v && v!=="__all"){ const t=tags.find(x=>x.name===v); if(t) return {from:clamp(t.from,0,frames.length-1), to:clamp(t.to,0,frames.length-1)}; }
+  return {from:0, to:frames.length-1};
+}
+function startPlayback(){
+  if(playing){ stopPlayback(); return; }
+  if(frames.length<2){ showToast("Add another frame to play an animation.","info"); return; }
+  playing=true; updatePlayUI();
+  const r=playRange();
+  if(frameIndex<r.from || frameIndex>=r.to) selectFrame(r.from, true);
+  stepPlayback();
+}
+function stepPlayback(){
+  if(!playing) return;
+  const dur=frames[frameIndex].dur||DEFAULT_DUR;
+  playTimer=setTimeout(()=>{
+    if(!playing) return;
+    const r=playRange();
+    let ni=frameIndex+1;
+    if(ni>r.to){ if($("#loopToggle") && !$("#loopToggle").checked){ stopPlayback(); return; } ni=r.from; }
+    selectFrame(ni, true);
+    stepPlayback();
+  }, dur);
+}
+function stopPlayback(){
+  if(playTimer){ clearTimeout(playTimer); playTimer=null; }
+  if(playing){ playing=false; renderLayers(); }
+  updatePlayUI();
+}
+function updatePlayUI(){ const b=$("#playBtn"); if(!b) return; b.innerHTML=iconSVG(playing?"stop":"play",18); b.title=playing?"Stop (Space)":"Play (Space)"; b.classList.toggle("playing",playing); }
+
+async function showTagDialog(tag){
+  const nm=tag?tag.name:("tag"+(tags.length+1));
+  const from=(tag?tag.from:Math.min(frameIndex,frames.length-1))+1, to=(tag?tag.to:frames.length-1)+1;
+  const body=`
+    <div class="row"><label>Name</label><input type="text" id="tgName" value="${nm}" style="flex:1; min-width:0" spellcheck="false"></div>
+    <div class="row"><label>Frames</label>
+      <input type="number" id="tgFrom" min="1" max="${frames.length}" value="${from}">
+      <span style="color:var(--muted)">to</span>
+      <input type="number" id="tgTo" min="1" max="${frames.length}" value="${to}"></div>`;
+  const ok=await openModal({title:tag?"Edit tag":"New tag", bodyHTML:body, okText:tag?"Save":"Add"});
+  if(!ok) return null;
+  let name=($("#tgName").value||"").trim()||nm;
+  let f=clamp(parseInt($("#tgFrom").value,10)||1,1,frames.length)-1;
+  let t=clamp(parseInt($("#tgTo").value,10)||1,1,frames.length)-1;
+  if(f>t){ const z=f; f=t; t=z; }
+  return {name, from:f, to:t};
+}
+async function addTag(){ const r=await showTagDialog(null); if(!r) return; r.color=TAG_COLORS[tags.length%TAG_COLORS.length]; tags.push(r); renderTags(); }
+async function editTag(i){ const r=await showTagDialog(tags[i]); if(!r) return; r.color=tags[i].color; tags[i]=r; renderTags(); }
 
 // ------------------------------------------------------------------ tabs / multiple documents
 // The live globals (W,H,layers,activeIndex,layerSeq,zoom,undo/redo,selection,selMask) ARE the
 // active document; switching tabs persists them into the doc and loads the target doc's state.
 function captureActiveDoc(){
   const d=docs.find(x=>x.id===activeDocId); if(!d) return;
-  d.W=W; d.H=H; d.layers=layers; d.activeIndex=activeIndex; d.layerSeq=layerSeq;
+  d.W=W; d.H=H; d.frames=frames; d.frameIndex=frameIndex; d.tags=tags;
+  d.activeIndex=activeIndex; d.layerSeq=layerSeq;
   d.zoom=zoom; d.undo=undoStack; d.redo=redoStack; d.selection=selection; d.selMask=selMask;
 }
 function loadDocIntoGlobals(d){
   if(placement) cancelPlacement();
+  stopPlayback();
   W=d.W; H=d.H; flat.width=W; flat.height=H;
-  layers=d.layers; activeIndex=d.activeIndex; layerSeq=d.layerSeq;
+  frames=d.frames; frameIndex=clamp(d.frameIndex||0,0,frames.length-1); tags=d.tags||[];
+  layers=frames[frameIndex].layers; activeIndex=clamp(d.activeIndex||0,0,layers.length-1); layerSeq=d.layerSeq;
   undoStack=d.undo; redoStack=d.redo; selection=d.selection; selMask=d.selMask; selDrag=null; stopAnts();
   setZoom(d.zoom||16,false);
-  renderLayers(); composite(); updateDocInfo(); updateUndoButtons(); updateSelStatus();
+  renderLayers(); renderTimeline(); composite(); updateDocInfo(); updateUndoButtons(); updateSelStatus();
   if(selection && !selMask) startAnts();
 }
 function activateDoc(id){
@@ -784,8 +978,8 @@ async function closeDoc(id){
   const wasActive=(id===activeDocId);
   // confirm if the doc has drawn content
   const d=docs.find(x=>x.id===id);
-  const live=wasActive ? layers : (d.layers||[]);
-  const hasContent=live.some(l=>!isLayerEmpty(l));
+  const allLayers = wasActive ? layers.slice() : (d.frames||[]).flatMap(f=>f.layers);
+  const hasContent=allLayers.some(l=>!isLayerEmpty(l));
   if(hasContent){
     const ok=await showConfirm("Close \""+d.name+"\"? Its drawing will be discarded.",{title:"Close tab",okText:"Close tab",danger:true});
     if(!ok) return;
@@ -833,6 +1027,8 @@ function composite(){
   paintPlaceOverlay();
   if(selDrag && selDrag.float) drawFloat();
   if(selection) drawSelection();
+  const fr=frames[frameIndex];   // keep the active frame's timeline thumbnail live while drawing
+  if(fr && fr._thumb) compositeFrameInto(fr._thumb.getContext("2d"), fr);
 }
 
 function drawGrid(){
@@ -866,7 +1062,7 @@ function drawCenterGuide(){
 // ------------------------------------------------------------------ undo / redo
 function snapshot(){
   return {
-    w:W,h:H,active:activeIndex,
+    w:W,h:H,active:activeIndex, fi:frameIndex,
     layers:layers.map(l=>({
       name:l.name, visible:l.visible, opacity:l.opacity,
       img:l.ctx.getImageData(0,0,W,H)
@@ -875,14 +1071,16 @@ function snapshot(){
 }
 function restore(snap){
   W=snap.w; H=snap.h; flat.width=W; flat.height=H;
-  layers=snap.layers.map(s=>{
+  if(snap.fi!=null) frameIndex=clamp(snap.fi,0,frames.length-1);
+  const arr=snap.layers.map(s=>{
     const c=makeLayerCanvas(); const ctx=c.getContext("2d");
     ctx.putImageData(cloneImg(s.img),0,0);
     return {id:layerSeq++, name:s.name, visible:s.visible, opacity:s.opacity, canvas:c, ctx:ctx};
   });
+  frames[frameIndex].layers=arr; layers=arr;      // write back into the current frame
   activeIndex=clamp(snap.active,0,layers.length-1);
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
-  setZoom(zoom,false); renderLayers(); composite(); updateDocInfo();
+  setZoom(zoom,false); renderLayers(); renderTimeline(); composite(); updateDocInfo();
 }
 function cloneImg(img){return new ImageData(new Uint8ClampedArray(img.data),img.width,img.height);}
 
@@ -1307,6 +1505,7 @@ function toPixel(e){
 view.addEventListener("pointerdown",e=>{
   if(placement){ if(e.button===0) placementDown(e); return; }
   if(e.button!==0 && e.button!==2) return;          // left or right button only
+  if(playing) stopPlayback();                        // editing stops playback
   view.setPointerCapture(e.pointerId);
   const p=toPixel(e);
   const slot = e.button===2 ? "bg" : "fg";
@@ -1492,8 +1691,9 @@ function exportPNG(scale){
   showToast("Exported PNG at "+scale+"× ("+(W*scale)+" × "+(H*scale)+")","success");
 }
 function saveProject(){
-  const data={app:"PixelPaint",version:1,w:W,h:H,active:activeIndex,
-    layers:layers.map(l=>({name:l.name,visible:l.visible,opacity:l.opacity,data:l.canvas.toDataURL("image/png")}))};
+  const data={app:"PixelPaint",version:2,w:W,h:H,active:activeIndex,frameIndex,
+    tags:tags.map(t=>({name:t.name,from:t.from,to:t.to,color:t.color})),
+    frames:frames.map(f=>({dur:f.dur, layers:f.layers.map(l=>({name:l.name,visible:l.visible,opacity:l.opacity,data:l.canvas.toDataURL("image/png")}))}))};
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
   const d=docs.find(x=>x.id===activeDocId);
   const fname=((d&&d.name)||"untitled").replace(/[^\w\- ]+/g,"").trim()||"untitled";
@@ -1505,30 +1705,63 @@ function loadProject(file){
   const reader=new FileReader();
   reader.onload=()=>{
     let data; try{data=JSON.parse(reader.result);}catch(_){ showToast("That file isn't a valid PixelPaint project.","error"); return; }
-    if(!data.layers||!data.w){ showToast("Unrecognized project format.","error"); return; }
+    if(!data.w || !(data.frames||data.layers)){ showToast("Unrecognized project format.","error"); return; }
     W=clamp(data.w,1,512); H=clamp(data.h,1,512); flat.width=W; flat.height=H;
-    layers=[]; layerSeq=1;
-    let pending=data.layers.length;
-    data.layers.forEach((s,idx)=>{
-      const c=makeLayerCanvas(), ctx=c.getContext("2d");
-      const l={id:layerSeq++,name:s.name||("Layer "+(idx+1)),visible:s.visible!==false,opacity:(s.opacity==null?1:s.opacity),canvas:c,ctx:ctx};
-      layers.push(l);
-      const img=new Image();
-      img.onload=()=>{ctx.drawImage(img,0,0); if(--pending===0) finishLoad(data);};
-      img.onerror=()=>{if(--pending===0) finishLoad(data);};
-      img.src=s.data;
+    layerSeq=1;
+    const frameDefs = data.frames || [{dur:DEFAULT_DUR, layers:data.layers||[]}];   // v1 files load as a single frame
+    const built = frameDefs.map(fd=>({dur:fd.dur||DEFAULT_DUR, layers:[]}));
+    let pending=0; frameDefs.forEach(fd=>pending+=((fd.layers||[]).length));
+    const done=()=>{
+      frames = built.length ? built : [{dur:DEFAULT_DUR, layers:[]}];
+      frameIndex=clamp(data.frameIndex||0,0,frames.length-1);
+      tags=(data.tags||[]).map((t,i)=>({name:t.name||("tag"+(i+1)), from:t.from||0, to:t.to||0, color:t.color||TAG_COLORS[i%TAG_COLORS.length]}));
+      layers=frames[frameIndex].layers;
+      finishLoad(data);
+    };
+    if(pending===0){ done(); return; }
+    frameDefs.forEach((fd,fi)=>{
+      (fd.layers||[]).forEach((s,li)=>{
+        const c=makeLayerCanvas(), ctx=c.getContext("2d");
+        built[fi].layers.push({id:layerSeq++,name:s.name||("Layer "+(li+1)),visible:s.visible!==false,opacity:(s.opacity==null?1:s.opacity),canvas:c,ctx:ctx});
+        const img=new Image();
+        img.onload=()=>{ctx.drawImage(img,0,0); if(--pending===0) done();};
+        img.onerror=()=>{ if(--pending===0) done(); };
+        img.src=s.data;
+      });
     });
-    if(!data.layers.length) finishLoad(data);
   };
   reader.readAsText(file);
 }
 function finishLoad(data){
   activeIndex=clamp(data.active||0,0,layers.length-1);
-  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
+  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
   undoStack=[]; redoStack=[]; fitZoom();
-  renderLayers(); composite(); updateUndoButtons(); updateDocInfo();
+  renderLayers(); renderTimeline(); composite(); updateUndoButtons(); updateDocInfo();
   captureActiveDoc(); renderTabs();   // persist the loaded state into the active tab
-  showToast("Project loaded.","success");
+  showToast("Project loaded"+(frames.length>1?(" — "+frames.length+" frames"):"")+".","success");
+}
+
+// ------------------------------------------------------------------ spritesheet export (+ Aseprite-style JSON sidecar)
+function spriteBaseName(){ const d=docs.find(x=>x.id===activeDocId); return ((d&&d.name)||"sprite").replace(/[^\w\- ]+/g,"").trim()||"sprite"; }
+function exportSpritesheet(scale){
+  scale=scale||1;
+  const cw=W*scale, ch=H*scale, n=frames.length;
+  const sheet=document.createElement("canvas"); sheet.width=cw*n; sheet.height=ch;
+  const sctx=sheet.getContext("2d"); sctx.imageSmoothingEnabled=false;
+  const tmp=document.createElement("canvas"); tmp.width=W; tmp.height=H; const tctx=tmp.getContext("2d");
+  frames.forEach((f,i)=>{ compositeFrameInto(tctx,f); sctx.drawImage(tmp,0,0,W,H, i*cw,0,cw,ch); });
+  const base=spriteBaseName();
+  const a=document.createElement("a"); a.download=base+"_sheet.png"; a.href=sheet.toDataURL("image/png"); a.click();
+  // Aseprite "Array" JSON sidecar (importable as a spritesheet)
+  const fjson={};
+  frames.forEach((f,i)=>{ fjson[base+" "+i+".png"]={frame:{x:i*cw,y:0,w:cw,h:ch}, duration:f.dur,
+    rotated:false, trimmed:false, spriteSourceSize:{x:0,y:0,w:cw,h:ch}, sourceSize:{w:cw,h:ch}}; });
+  const json={ frames:fjson, meta:{ app:"PixelPaint", version:"1.0", image:base+"_sheet.png",
+    format:"RGBA8888", size:{w:sheet.width,h:sheet.height}, scale:String(scale),
+    frameTags:tags.map(t=>({name:t.name, from:t.from, to:t.to, direction:"forward", color:t.color})) } };
+  const jb=new Blob([JSON.stringify(json,null,1)],{type:"application/json"}), ju=URL.createObjectURL(jb);
+  setTimeout(()=>{ const a2=document.createElement("a"); a2.download=base+"_sheet.json"; a2.href=ju; a2.click(); setTimeout(()=>URL.revokeObjectURL(ju),1000); }, 300);
+  showToast("Exported spritesheet: "+n+" frame"+(n>1?"s":"")+" at "+scale+"× (PNG + Aseprite JSON).","success");
 }
 
 // ------------------------------------------------------------------ tool UI
@@ -1618,6 +1851,12 @@ $("#zoomOut").onclick=()=>setZoom(zoom-1);
 $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
 $("#centerToggle").onchange=e=>{showCenter=e.target.checked; composite();};
 
+// timeline / animation controls
+$("#playBtn").onclick=startPlayback;
+$("#addFrameBtn").onclick=()=>addFrame(true);
+$("#addTagBtn").onclick=addTag;
+$("#frameDur").onchange=e=>setFrameDur(parseInt(e.target.value,10)||DEFAULT_DUR);
+
 $("#undoBtn").onclick=undo;
 $("#redoBtn").onclick=redo;
 
@@ -1645,6 +1884,7 @@ $("#fileMenu").addEventListener("click",e=>{
   else if(a==="open") $("#openInput").click();
   else if(a==="save") saveProject();
   else if(a==="export") showExportDialog().then(s=>{ if(s) exportPNG(s); });
+  else if(a==="sheet") showExportDialog().then(s=>{ if(s) exportSpritesheet(s); });
   else if(a==="closetab") closeDoc(activeDocId);
   else if(a==="install") doInstall();
 });
@@ -1724,6 +1964,7 @@ window.addEventListener("keydown",e=>{
     case "x": swapColors(); break;
     case "m": setTool("select"); break;
     case "w": setTool("wand"); break;
+    case " ": e.preventDefault(); startPlayback(); break;
     case "delete": case "backspace": if(selection){ e.preventDefault(); clearSelectionContents(); } break;
     case "escape": if(selection) clearSelection(); break;
   }

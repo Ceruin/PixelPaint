@@ -115,5 +115,25 @@ TIPS
     time. It crops or extends from the top-left corner, so your pixels stay put
     (it does not scale them). Undo reverts a resize.
   - Export PNG asks for a scale (defaults to 1x = true pixel size).
+
+ANIMATION (timeline at the bottom)
+  - Frames: each drawing can have multiple frames. Click "Frame" (or it copies the
+    current frame) to add one; click a frame thumbnail to edit it; hover a frame and
+    click the x to delete it. Each frame keeps its own layers, so you draw the next
+    pose on the new frame.
+  - Play: press the play button or the Spacebar to play the animation; "Loop" repeats
+    it. Each frame has its own duration in milliseconds (the "Frame ___ ms" box), so
+    you can set the speed per frame. Drawing stops playback.
+  - Tags: click "Tag" to name a range of frames (e.g. idle = 1-2, run = 3-6,
+    jump = 7-9) -- great for keeping several animations in one file. The "Play"
+    dropdown lets you play just one tag's range. Click a tag to jump to it,
+    double-click to edit, x to remove.
+  - Saving: the .pxpaint format now stores all frames, durations and tags, so your
+    animation round-trips. (Old single-image .pxpaint files still open fine, as a
+    one-frame animation.)
+  - Export spritesheet (File > Export spritesheet) writes one PNG with every frame
+    in a row, plus an Aseprite-style .json sidecar (frame rects, durations, and your
+    tags as frameTags) -- which Aseprite and most engines can import. A true binary
+    .aseprite file isn't written yet; the spritesheet + JSON is the interchange.
   - The PNG export is transparent wherever you didn't paint, so it drops
     straight into a game engine or sprite sheet (export scale defaults to 1x).
