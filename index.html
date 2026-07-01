@@ -2,15 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>PixelPaint</title>
-<link rel="manifest" href="manifest.webmanifest" />
+<!-- single-file app: the PWA manifest, icons and favicon are generated at runtime (see boot) -->
 <meta name="theme-color" content="#1b1d23" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="PixelPaint" />
-<link rel="icon" type="image/png" href="icon-192.png" />
-<link rel="apple-touch-icon" href="icon-192.png" />
 <style>
   :root{
     --bg:#1b1d23; --panel:#23262e; --panel2:#2b2f39; --line:#3a3f4b;
@@ -23,8 +21,9 @@
     background:var(--bg); color:var(--text);
     font:13px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif;
     overflow:hidden; user-select:none;
+    overscroll-behavior:none; touch-action:manipulation; -webkit-tap-highlight-color:transparent;
   }
-  #app{display:flex; flex-direction:column; height:100vh;}
+  #app{display:flex; flex-direction:column; height:100vh; height:100dvh;}
 
   /* ---- top bar ---- */
   .topbar{
@@ -299,16 +298,61 @@
   }
   @media (max-width: 720px){
     .hint{display:none;}
-    .tools{width:116px;}
-    .side{width:194px;}
     .section{padding:10px 11px;}
     .stage{padding:10px;}
     .layers .bar{padding:8px 10px;}
   }
   @media (max-width: 600px){
     .topbar{padding:6px 8px;}
-    .tools{width:106px; padding:8px;}
-    .side{width:174px;}
+  }
+
+  /* ---- mobile: the tool + color/layer panels become popout drawers ---- */
+  .drawer-btn{display:none;}
+  .panel-backdrop{position:fixed; inset:0; background:#000a; z-index:490;
+    opacity:0; pointer-events:none; transition:opacity .18s;}
+  .panel-backdrop.show{opacity:1; pointer-events:auto;}
+  @media (max-width: 768px){
+    .drawer-btn{display:inline-flex;}
+    .tools{
+      position:fixed; left:0; top:0; bottom:0; z-index:500; width:min(76vw,250px);
+      transform:translateX(-106%); transition:transform .22s ease;
+      box-shadow:14px 0 40px #000a; border-right:1px solid var(--line);
+      padding-bottom:max(12px, env(safe-area-inset-bottom));
+    }
+    .tools.open{transform:none;}
+    .side{
+      position:fixed; right:0; top:0; bottom:0; z-index:500; width:min(86vw,310px);
+      transform:translateX(106%); transition:transform .22s ease;
+      box-shadow:-14px 0 40px #000a; border-left:1px solid var(--line);
+      padding-bottom:max(0px, env(safe-area-inset-bottom));
+    }
+    .side.open{transform:none;}
+    .layerlist{max-height:none;}
+    .timeline{max-height:136px;}
+    .statusbar{gap:10px; padding-bottom:max(5px, env(safe-area-inset-bottom));}
+    .place-bar{max-width:96vw; flex-wrap:wrap; justify-content:center;}
+    .toast{max-width:92vw;}
+  }
+  @media (prefers-reduced-motion: reduce){ .tools,.side,.panel-backdrop{transition:none;} }
+
+  /* ---- finger-friendly targets: any touch device, or any screen small enough to be in drawer mode ---- */
+  @media (pointer: coarse), (max-width: 768px){
+    button, select, input[type=text], input[type=number]{min-height:42px;}
+    .iconbtn{min-width:42px;}
+    .tool{min-height:44px;}
+    .tool::after{display:none;}          /* keyboard hints are meaningless on touch */
+    .tab{padding:10px 10px 10px 14px;}
+    .tab .tclose{width:24px; height:24px;}
+    .palette{grid-template-columns:repeat(auto-fill, minmax(30px,1fr)); gap:6px; max-height:224px;}
+    .recents .rc{width:26px; height:26px;}
+    .layer{padding:10px 9px;}
+    .layer .eye{width:30px;}
+    .layer .op{width:74px;}
+    input[type=range]{height:30px;}
+    .swap{width:28px; height:28px;}
+    .tl-frame .tl-x{display:inline-flex;}   /* no hover on touch — always show the delete button */
+    .tl-tag .tl-tx{opacity:.85;}
+    .ctx-menu button{padding:11px 12px;}
   }
 </style>
 </head>
@@ -316,6 +360,7 @@
 <div id="app">
   <!-- TOP BAR -->
   <div class="topbar">
+    <button id="toolsDrawerBtn" class="iconbtn drawer-btn" data-icon="pencil" title="Tools"></button>
     <div class="brand">Pixel<b>Paint</b></div>
     <button id="fileMenuBtn" data-icon="menu" title="File menu — New, Open, Save, Export, Install">File</button>
     <div class="sep"></div>
@@ -335,6 +380,7 @@
       <button id="redoBtn" data-icon="redo" title="Redo (Ctrl+Y)">Redo</button>
     </div>
 
+    <button id="sideDrawerBtn" class="iconbtn drawer-btn" data-icon="palette" title="Colors, palette &amp; layers" style="margin-left:auto"></button>
     <input type="file" id="openInput" accept=".pxpaint,.json,application/json" style="display:none" />
   </div>
 
@@ -413,7 +459,7 @@
     </div>
 
     <!-- SIDE -->
-    <div class="side">
+    <div class="side" id="sidePanel">
       <div class="section">
         <h3>Color</h3>
         <div class="colorrow">
@@ -496,6 +542,9 @@
     <span id="toolInfo">Pencil</span>
   </div>
 </div>
+
+<!-- dimmer behind the mobile popout drawers -->
+<div id="panelBackdrop" class="panel-backdrop"></div>
 
 <!-- themed modal (confirm / prompt / alert) -->
 <div id="modalRoot" class="modal-root" hidden>
@@ -1128,7 +1177,7 @@ function drawRegion(){
   vctx.restore();
 }
 function regionDown(p,e){
-  if(regionLocked){ if(region) showToast("Sub-canvas is locked — unlock it to move or resize.","info"); return; }
+  if(region && regionLocked){ showToast("Sub-canvas is locked — unlock it to move or resize.","info"); return; }
   const a=toArtF(e);
   if(region){
     const m=rectHandleHitArt(region, a, 9/zoom);
@@ -1165,7 +1214,7 @@ function createRegion(){
   clampRegion(); setTool("region"); renderRegionPanel(); composite();
   showToast("Sub-canvas created. Drag its handles to resize, or set the size below; Lock to draw safely inside.","info",4200);
 }
-function removeRegion(){ region=null; regionDrag=null; renderRegionPanel(); composite(); }
+function removeRegion(){ region=null; regionLocked=false; regionDrag=null; renderRegionPanel(); composite(); }
 function centerRegion(){ if(!region) return; region.x=Math.floor((W-region.w)/2); region.y=Math.floor((H-region.h)/2); clampRegion(); renderRegionPanel(); composite(); }
 function setRegionFromInputs(){
   if(!region) return;
@@ -1623,6 +1672,17 @@ function applyPaletteToLayer(){
 // ------------------------------------------------------------------ pointer
 let drawing=false, shaping=false, last=null, start=null;
 
+// touch: track active fingers on the canvas so a second finger becomes pinch-to-zoom
+const touchPtrs=new Map();
+let pinch=null;   // {d0: starting distance, z0: starting zoom}
+function pinchDist(){ const v=[...touchPtrs.values()]; return Math.hypot(v[0].x-v[1].x, v[0].y-v[1].y); }
+function cancelActiveOps(){
+  if(drawing){ drawing=false; undo(); }                 // revert the accidental first-finger dot
+  if(shaping){ shaping=false; composite(); }
+  if(selDrag){ selDrag=null; composite(); }
+  if(regionDrag){ regionDrag=null; clampRegion(); composite(); renderRegionPanel(); }
+}
+
 function toPixel(e){
   const r=view.getBoundingClientRect();
   const x=clamp(Math.floor((e.clientX-r.left)/zoom),0,W-1);
@@ -1631,6 +1691,11 @@ function toPixel(e){
 }
 
 view.addEventListener("pointerdown",e=>{
+  if(e.pointerType==="touch"){
+    touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(touchPtrs.size===2){ cancelActiveOps(); pinch={d0:Math.max(1,pinchDist()), z0:zoom}; return; }
+    if(touchPtrs.size>2) return;
+  }
   if(placement){ if(e.button===0) placementDown(e); return; }
   if(e.button!==0 && e.button!==2) return;          // left or right button only
   if(playing) stopPlayback();                        // editing stops playback
@@ -1667,6 +1732,11 @@ window.addEventListener("resize",()=>{ if(placement){ sizePlaceOverlay(); paintP
 stage.addEventListener("scroll",()=>{ if(placement) paintPlaceOverlay(); });
 
 window.addEventListener("pointermove",e=>{
+  if(touchPtrs.has(e.pointerId)) touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pinch){
+    if(touchPtrs.size>=2){ const d=pinchDist(); if(d>0) setZoom(Math.round(pinch.z0*d/pinch.d0)); }
+    return;
+  }
   if(placement){ if(xform) placementMove(e); else updatePlacementCursor(e); return; }
   if(regionDrag){ regionMove(e); return; }
   if(selDrag){ selectMove(e); return; }
@@ -1696,6 +1766,8 @@ view.addEventListener("pointermove",e=>{
 view.addEventListener("pointerleave",()=>{ if(!drawing&&!shaping&&!selDrag&&!xform) $("#cursorInfo").textContent="—"; });
 
 window.addEventListener("pointerup",e=>{
+  touchPtrs.delete(e.pointerId);
+  if(pinch){ if(touchPtrs.size<2) pinch=null; return; }
   if(placement){ xform=null; return; }
   if(regionDrag){ regionUp(); return; }
   if(selDrag){ selectUp(); return; }
@@ -1705,6 +1777,17 @@ window.addEventListener("pointerup",e=>{
     applyPixels(L.ctx,shape(start,p),false);
     shaping=false; composite(); refreshThumb(L);
   }
+  if(drawing){ drawing=false; refreshThumb(activeLayer()); }
+});
+
+// touch gestures can be cancelled by the OS (edge swipes etc.) — tidy up any half-finished op
+window.addEventListener("pointercancel",e=>{
+  touchPtrs.delete(e.pointerId);
+  if(touchPtrs.size<2) pinch=null;
+  xform=null;
+  if(regionDrag){ regionDrag=null; clampRegion(); composite(); renderRegionPanel(); }
+  if(selDrag){ selDrag=null; composite(); }
+  if(shaping){ shaping=false; composite(); }
   if(drawing){ drawing=false; refreshThumb(activeLayer()); }
 });
 
@@ -1914,8 +1997,27 @@ function setTool(t){
 }
 function setBrush(n){ const max=Math.max(16, Math.round(Math.max(W,H)/2)); brush=clamp(n,1,max); $("#brushReadout").textContent=brush+" px"; }
 
+// ------------------------------------------------------------------ mobile popout drawers
+const toolsPanelEl=$("#toolPanel"), sidePanelEl=$("#sidePanel"), panelBackdropEl=$("#panelBackdrop");
+function isMobileLayout(){ return window.innerWidth<=768; }
+function closeDrawers(){
+  toolsPanelEl.classList.remove("open"); sidePanelEl.classList.remove("open");
+  panelBackdropEl.classList.remove("show");
+}
+function toggleDrawer(el){
+  const wasOpen=el.classList.contains("open");
+  closeDrawers();
+  if(!wasOpen){ el.classList.add("open"); panelBackdropEl.classList.add("show"); }
+}
+$("#toolsDrawerBtn").onclick=()=>toggleDrawer(toolsPanelEl);
+$("#sideDrawerBtn").onclick=()=>toggleDrawer(sidePanelEl);
+panelBackdropEl.onclick=closeDrawers;
+
 // ------------------------------------------------------------------ wire events
-document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>setTool(b.dataset.tool));
+document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{
+  setTool(b.dataset.tool);
+  if(isMobileLayout()) closeDrawers();   // picking a tool returns you to the canvas
+});
 $("#brushUp").onclick=()=>setBrush(brush+1);
 $("#brushDown").onclick=()=>setBrush(brush-1);
 $("#fillShape").onchange=e=>fillShape=e.target.checked;
@@ -2118,12 +2220,42 @@ window.addEventListener("keydown",e=>{
   }
 });
 
-window.addEventListener("resize",()=>{ /* keep zoom; just leave layout */ });
+window.addEventListener("resize",()=>{ if(!isMobileLayout()) closeDrawers(); });
 
 // ------------------------------------------------------------------ boot
-// PWA: register the service worker (only on http/https — file:// can't install) and wire the Install button.
-if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
-  navigator.serviceWorker.register("sw.js").catch(()=>{});
+// Single-file PWA: the icon, favicon and manifest are all generated at runtime,
+// so index.html is the entire app — no sw.js / manifest / icon files needed.
+function makeIconDataURL(size){
+  const c=document.createElement("canvas"); c.width=c.height=size;
+  const x=c.getContext("2d"), px=size/8;
+  x.fillStyle="#1b1d23"; x.fillRect(0,0,size,size);
+  const art=["........",".....cc.","....ccc.","...ccc..","..bcc...",".abb....",".aab....","........"]; // pixel brush
+  const cols={a:"#e0556a", b:"#f0a020", c:"#5b8cff"};
+  for(let r=0;r<8;r++) for(let q=0;q<8;q++){
+    const ch=art[r][q];
+    if(ch!=="."){ x.fillStyle=cols[ch]; x.fillRect(Math.floor(q*px),Math.floor(r*px),Math.ceil(px),Math.ceil(px)); }
+  }
+  return c.toDataURL("image/png");
+}
+const icon192=makeIconDataURL(192), icon512=makeIconDataURL(512);
+{
+  const fav=document.createElement("link"); fav.rel="icon"; fav.type="image/png"; fav.href=icon192; document.head.appendChild(fav);
+  const ati=document.createElement("link"); ati.rel="apple-touch-icon"; ati.href=icon192; document.head.appendChild(ati);
+}
+if(location.protocol.indexOf("http")===0){
+  // installable: inject a runtime manifest pointing back at this page (Chrome/Edge accept blob manifests)
+  const man={ name:"PixelPaint", short_name:"PixelPaint",
+    start_url:location.href, scope:location.href.replace(/[^/]*$/,""),
+    display:"standalone", background_color:"#1b1d23", theme_color:"#1b1d23",
+    icons:[ {src:icon192, sizes:"192x192", type:"image/png"},
+            {src:icon512, sizes:"512x512", type:"image/png"},
+            {src:icon512, sizes:"512x512", type:"image/png", purpose:"maskable"} ] };
+  const ml=document.createElement("link"); ml.rel="manifest";
+  ml.href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:"application/manifest+json"}));
+  document.head.appendChild(ml);
+  // clean up the old multi-file version's service worker + caches so clients update
+  if("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
+  if(window.caches) caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});
 }
 let deferredPrompt=null;
 window.addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); deferredPrompt=e; $("#installBtn").style.display=""; });
