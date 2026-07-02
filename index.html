@@ -51,6 +51,13 @@
   /* ---- timeline (frames / playback / tags) ---- */
   .timeline{flex:none; background:var(--panel); border-top:1px solid var(--line); display:flex; flex-direction:column; max-height:158px;}
   .tl-bar{display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  #tlSummary{display:none; color:var(--muted); font-size:12px; cursor:pointer; white-space:nowrap;}
+  #tlSummary:hover{color:var(--text);}
+  .timeline.collapsed .tl-frames{display:none;}
+  .timeline.collapsed .tl-bar{border-bottom:none;}
+  .timeline.collapsed .tl-bar > *{display:none;}
+  .timeline.collapsed .tl-bar > #tlCollapseBtn{display:inline-flex;}
+  .timeline.collapsed .tl-bar > #tlSummary{display:inline-flex; align-items:center;}
   .tl-bar .vsep{width:1px; height:22px; background:var(--line);}
   .tl-bar .tl-grow{flex:1 1 12px;}
   .tl-field{display:flex; align-items:center; gap:6px;}
@@ -328,11 +335,28 @@
     }
     .side.open{transform:none;}
     .layerlist{max-height:none;}
-    .timeline{max-height:136px;}
+
+    /* single, clean top row — nothing wraps */
+    .topbar{flex-wrap:nowrap; overflow-x:auto; gap:6px; padding:6px 8px;}
+    .topbar .sep{display:none;}
+    .topbar .group{gap:6px;}
+    .brand{font-size:14px;}
+    .btxt{display:none;}                          /* Undo / Redo become icon-only */
+    #undoBtn, #redoBtn{padding:0; min-width:42px;}
+
+    /* compact timeline: one scrollable control row, frames strip never clipped */
+    .timeline{max-height:none;}
+    .tl-bar{flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; gap:6px; padding:6px 8px;}
+    .tl-bar .lbl, .tl-bar .vsep{display:none;}
+    .tl-field input[type=number]{width:58px;}
+    #playTag{max-width:112px;}
+    .tl-frames{padding:8px;}
+
     .statusbar{gap:10px; padding-bottom:max(5px, env(safe-area-inset-bottom));}
     .place-bar{max-width:96vw; flex-wrap:wrap; justify-content:center;}
     .toast{max-width:92vw;}
   }
+  @media (max-width: 374px){ .brand{display:none;} }   /* keep the single row on tiny phones */
   @media (prefers-reduced-motion: reduce){ .tools,.side,.panel-backdrop{transition:none;} }
 
   /* ---- finger-friendly targets: any touch device, or any screen small enough to be in drawer mode ---- */
@@ -366,18 +390,8 @@
     <div class="sep"></div>
 
     <div class="group">
-      <label class="lbl">Zoom</label>
-      <button id="zoomOut" class="iconbtn" title="Zoom out (-)">−</button>
-      <span id="zoomReadout" style="min-width:46px; text-align:center;">1600%</span>
-      <button id="zoomIn" class="iconbtn" title="Zoom in (+)">+</button>
-      <label class="chk"><input type="checkbox" id="gridToggle" checked /><span data-icon="grid" data-icon-size="15"></span> Grid</label>
-      <label class="chk"><input type="checkbox" id="centerToggle" checked /><span data-icon="center" data-icon-size="15"></span> Center</label>
-    </div>
-
-    <div class="sep"></div>
-    <div class="group">
-      <button id="undoBtn" data-icon="undo" title="Undo (Ctrl+Z)">Undo</button>
-      <button id="redoBtn" data-icon="redo" title="Redo (Ctrl+Y)">Redo</button>
+      <button id="undoBtn" data-icon="undo" title="Undo (Ctrl+Z)"><span class="btxt">Undo</span></button>
+      <button id="redoBtn" data-icon="redo" title="Redo (Ctrl+Y)"><span class="btxt">Redo</span></button>
     </div>
 
     <button id="sideDrawerBtn" class="iconbtn drawer-btn" data-icon="palette" title="Colors, palette &amp; layers" style="margin-left:auto"></button>
@@ -400,6 +414,7 @@
     <button data-fa="export" data-icon="download" data-icon-size="16">Export PNG…</button>
     <button data-fa="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
     <div class="ctx-sep"></div>
+    <button data-fa="rename" data-icon="pencil"   data-icon-size="16">Rename tab&hellip;</button>
     <button data-fa="closetab" data-icon="clear"  data-icon-size="16">Close tab</button>
     <button id="installBtn" data-fa="install" data-icon="download" data-icon-size="16" style="display:none">Install app</button>
   </div>
@@ -434,6 +449,16 @@
         <input type="number" id="wandTol" min="0" max="255" value="32" style="flex:1; min-width:0; width:auto" title="Color tolerance: 0 = exact match, higher = looser" />
       </div>
       <label class="chk" style="margin-top:6px"><input type="checkbox" id="wandContig" checked /> Contiguous</label>
+
+      <div class="toolhead">View</div>
+      <div class="group" style="gap:6px; width:100%">
+        <button id="zoomOut" class="iconbtn" title="Zoom out (-)">−</button>
+        <span id="zoomReadout" style="flex:1; min-width:0; text-align:center;">1600%</span>
+        <button id="zoomIn" class="iconbtn" title="Zoom in (+)">+</button>
+      </div>
+      <button id="zoomFit" style="width:100%; margin-top:6px" title="Fit the canvas to the window">Fit to window</button>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" id="gridToggle" checked /><span data-icon="grid" data-icon-size="15"></span> Grid</label>
+      <label class="chk"><input type="checkbox" id="centerToggle" checked /><span data-icon="center" data-icon-size="15"></span> Center</label>
 
       <div class="toolhead">Layer</div>
       <button id="addImageBtn" data-icon="image" title="Add an image as a new layer (or paste / drag-drop)">Add image…</button>
@@ -520,6 +545,8 @@
   <!-- TIMELINE (frames, playback, tags) -->
   <div class="timeline" id="timeline">
     <div class="tl-bar">
+      <button id="tlCollapseBtn" class="iconbtn" title="Collapse / expand the animation panel"></button>
+      <span id="tlSummary" title="Expand the animation panel">Animation</span>
       <button id="playBtn" class="iconbtn" title="Play (Space)"></button>
       <label class="chk"><input type="checkbox" id="loopToggle" checked /> Loop</label>
       <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of the current frame" /><span class="muted">ms</span></span>
@@ -659,6 +686,7 @@ let lastSize={w:32,h:32};   // remembered size for the next "New canvas"
 // animation: each frame owns its own layer set + a duration; tags are named frame ranges
 let frames=[], frameIndex=0, tags=[];
 let playing=false, playTimer=null;
+let tlCollapsed=true;   // the animation panel folds to a slim bar when you're not animating
 const DEFAULT_DUR=120;
 const TAG_COLORS=["#e43b44","#fee761","#63c74d","#0099db","#b55088","#f77622","#2ce8f5","#9a46e6"];
 
@@ -712,6 +740,8 @@ const P = {
 };
 const ICON = {};
 for(const k in P) ICON[k] = '<path d="'+P[k]+'"/>';
+ICON.chevUp   = '<path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/>';
+ICON.chevDown = '<path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/>';
 ICON.line    = '<path d="M5 19L19 5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="5" cy="19" r="1.9"/><circle cx="19" cy="5" r="1.9"/>';
 ICON.rect    = '<rect x="4" y="6" width="16" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2.2"/>';
 ICON.ellipse = '<ellipse cx="12" cy="12" rx="8.4" ry="6.6" fill="none" stroke="currentColor" stroke-width="2.2"/>';
@@ -890,6 +920,18 @@ function setZoom(z, recompose=true){
 function updateDocInfo(){$("#docInfo").textContent=W+" × "+H+(frames&&frames.length>1?("  ·  frame "+(frameIndex+1)+"/"+frames.length):"");}
 
 // ------------------------------------------------------------------ animation: frames, playback, tags
+function setTimelineCollapsed(c){
+  tlCollapsed=c;
+  $("#timeline").classList.toggle("collapsed",c);
+  $("#tlCollapseBtn").innerHTML=iconSVG(c?"chevUp":"chevDown",16);
+  $("#tlCollapseBtn").title=c?"Expand the animation panel":"Collapse the animation panel";
+  try{ localStorage.setItem("pp_tlCollapsed", c?"1":"0"); }catch(_){}
+  updateTlSummary();
+}
+function updateTlSummary(){
+  const n=frames?frames.length:1;
+  $("#tlSummary").textContent="Animation — "+n+" frame"+(n>1?"s":"");
+}
 function compositeFrameInto(tctx, fr){
   tctx.clearRect(0,0,W,H);
   for(const l of fr.layers){ if(!l.visible) continue; tctx.globalAlpha=l.opacity; tctx.drawImage(l.canvas,0,0); }
@@ -948,7 +990,7 @@ function renderTimeline(){
     x.onclick=ev=>{ev.stopPropagation(); deleteFrame(i);};
     host.appendChild(cell);
   });
-  renderTags(); updatePlayUI();
+  renderTags(); updatePlayUI(); updateTlSummary();
 }
 function renderTags(){
   const sel=$("#playTag");
@@ -976,6 +1018,7 @@ function playRange(){
 function startPlayback(){
   if(playing){ stopPlayback(); return; }
   if(frames.length<2){ showToast("Add another frame to play an animation.","info"); return; }
+  if(tlCollapsed) setTimelineCollapsed(false);   // playing means you care about the timeline
   playing=true; updatePlayUI();
   const r=playRange();
   if(frameIndex<r.from || frameIndex>=r.to) selectFrame(r.from, true);
@@ -1079,16 +1122,22 @@ async function closeDoc(id){
   }
   renderTabs();
 }
+async function renameDoc(id){
+  const d=docs.find(x=>x.id===id); if(!d) return;
+  const n=await showPrompt("New name for this drawing:", d.name, {title:"Rename tab"});
+  if(n!=null && n.trim()!==""){ d.name=n.trim(); renderTabs(); }
+}
 function renderTabs(){
   const host=$("#tabs"); host.innerHTML="";
   for(const d of docs){
     const t=document.createElement("div");
     t.className="tab"+(d.id===activeDocId?" active":"");
-    t.title=d.name+"  ("+(d.id===activeDocId? W+"×"+H : d.W+"×"+d.H)+")";
+    t.title=d.name+"  ("+(d.id===activeDocId? W+"×"+H : d.W+"×"+d.H)+")  —  double-click to rename";
     const nm=document.createElement("span"); nm.className="tname"; nm.textContent=d.name;
     const x=document.createElement("span"); x.className="tclose"; x.innerHTML=iconSVG("clear",13); x.title="Close tab";
     t.appendChild(nm); t.appendChild(x);
     t.onclick=()=>activateDoc(d.id);
+    t.ondblclick=ev=>{ ev.stopPropagation(); renameDoc(d.id); };
     x.onclick=ev=>{ ev.stopPropagation(); closeDoc(d.id); };
     host.appendChild(t);
   }
@@ -1958,6 +2007,7 @@ function loadProject(file){
 function finishLoad(data){
   activeIndex=clamp(data.active||0,0,layers.length-1);
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
+  if(frames.length>1 && tlCollapsed) setTimelineCollapsed(false);   // an animated project wants its timeline
   undoStack=[]; redoStack=[]; fitZoom();
   renderLayers(); renderTimeline(); composite(); updateUndoButtons(); updateDocInfo();
   captureActiveDoc(); renderTabs();   // persist the loaded state into the active tab
@@ -2090,10 +2140,13 @@ window.addEventListener("drop",e=>{
 
 $("#zoomIn").onclick=()=>setZoom(zoom+1);
 $("#zoomOut").onclick=()=>setZoom(zoom-1);
+$("#zoomFit").onclick=()=>{ fitZoom(); composite(); };
 $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
 $("#centerToggle").onchange=e=>{showCenter=e.target.checked; composite();};
 
 // timeline / animation controls
+$("#tlCollapseBtn").onclick=()=>setTimelineCollapsed(!tlCollapsed);
+$("#tlSummary").onclick=()=>setTimelineCollapsed(false);
 $("#playBtn").onclick=startPlayback;
 $("#addFrameBtn").onclick=()=>addFrame(true);
 $("#addTagBtn").onclick=addTag;
@@ -2134,6 +2187,7 @@ $("#fileMenu").addEventListener("click",e=>{
   else if(a==="save") saveProject();
   else if(a==="export") showExportDialog().then(s=>{ if(s) exportPNG(s); });
   else if(a==="sheet") showExportDialog().then(s=>{ if(s) exportSpritesheet(s); });
+  else if(a==="rename") renameDoc(activeDocId);
   else if(a==="closetab") closeDoc(activeDocId);
   else if(a==="install") doInstall();
 });
@@ -2195,6 +2249,8 @@ window.addEventListener("keydown",e=>{
     else if(k==="y"){ e.preventDefault(); redo(); }
     else if(k==="a"){ e.preventDefault(); selectAll(); }
     else if(k==="d"){ e.preventDefault(); clearSelection(); }
+    else if(k==="s"){ e.preventDefault(); saveProject(); }
+    else if(k==="o"){ e.preventDefault(); $("#openInput").click(); }
     return;
   }
   switch(e.key.toLowerCase()){
@@ -2216,7 +2272,10 @@ window.addEventListener("keydown",e=>{
     case "d": setTool("region"); break;
     case " ": e.preventDefault(); startPlayback(); break;
     case "delete": case "backspace": if(selection){ e.preventDefault(); clearSelectionContents(); } break;
-    case "escape": if(selection) clearSelection(); break;
+    case "escape":
+      if(toolsPanelEl.classList.contains("open")||sidePanelEl.classList.contains("open")) closeDrawers();
+      else if(selection) clearSelection();
+      break;
   }
 });
 
@@ -2269,6 +2328,9 @@ setColor("#000000","fg");
 setActiveSlot("fg");
 setTool("pencil");
 setBrush(1);
+// animation panel starts collapsed unless the user expanded it last time
+let savedTl=null; try{ savedTl=localStorage.getItem("pp_tlCollapsed"); }catch(_){}
+setTimelineCollapsed(savedTl==null ? true : savedTl==="1");
 createDoc(32,32);
 // Re-fit once the browser has finished laying out the stage (boot may run pre-layout).
 requestAnimationFrame(()=>{ fitZoom(); composite(); });
