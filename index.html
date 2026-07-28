@@ -29,13 +29,15 @@
   .topbar{
     display:flex; align-items:center; gap:7px 11px; flex-wrap:wrap;
     padding:7px 12px; background:var(--panel); border-bottom:1px solid var(--line);
+    position:relative; z-index:3;   /* chrome always paints above the positioned canvas area */
   }
   .brand{font-weight:700; letter-spacing:.3px; font-size:15px; white-space:nowrap;}
   .brand b{color:var(--accent);}
 
   /* ---- tab bar ---- */
   .tabbar{display:flex; align-items:flex-end; gap:4px; padding:6px 8px 0; background:var(--panel);
-    border-bottom:1px solid var(--line); overflow-x:auto; overflow-y:hidden; flex:none;}
+    border-bottom:1px solid var(--line); overflow-x:auto; overflow-y:hidden; flex:none;
+    position:relative; z-index:3;}
   .tabs{display:flex; align-items:flex-end; gap:4px; min-width:0;}
   .tab{display:flex; align-items:center; gap:7px; max-width:170px; padding:7px 8px 7px 12px;
     background:var(--panel2); border:1px solid var(--line); border-bottom:none;
@@ -49,8 +51,11 @@
   .tab-add{align-self:center; min-height:30px; margin-bottom:5px; flex:none;}
 
   /* ---- timeline (frames / playback / tags) ---- */
-  .timeline{flex:none; background:var(--panel); border-top:1px solid var(--line); display:flex; flex-direction:column; max-height:158px;}
-  .tl-bar{display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
+  /* position+z-index so the timeline always wins against the canvas area, which is itself
+     positioned (see .stage) — without this the stage paints straight over these controls. */
+  .timeline{flex:none; background:var(--panel); border-top:1px solid var(--line); display:flex; flex-direction:column;
+    max-height:214px; position:relative; z-index:2;}
+  .tl-bar{display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:1px solid var(--line); flex-wrap:wrap; flex:none;}
   #tlSummary{display:none; color:var(--muted); font-size:12px; cursor:pointer; white-space:nowrap;}
   #tlSummary:hover{color:var(--text);}
   .timeline.collapsed .tl-frames{display:none;}
@@ -65,15 +70,23 @@
   .tl-field .muted{color:var(--muted);}
   .tl-field input[type=number]{width:60px;}
   #playBtn.playing{background:var(--accent2); border-color:var(--accent2);}
-  .tl-tags{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
-  .tl-tag{display:inline-flex; align-items:center; gap:6px; padding:3px 5px 3px 8px; background:var(--panel2);
-    border:1px solid var(--line); border-radius:20px; font-size:12px; cursor:pointer; white-space:nowrap;}
-  .tl-tag:hover{border-color:var(--accent);}
-  .tl-tag .dot{width:9px; height:9px; border-radius:50%; flex:none;}
-  .tl-tag .rg{color:var(--muted); font-size:11px;}
-  .tl-tag .tl-tx{display:inline-flex; align-items:center; opacity:.55;}
-  .tl-tag .tl-tx:hover{opacity:1; color:var(--danger);}
-  .tl-frames{display:flex; align-items:flex-start; gap:7px; padding:9px 10px; overflow-x:auto; overflow-y:hidden;}
+  /* ---- frame groups: each tagged run of frames gets its own labelled block ---- */
+  /* flex:1+min-height:0 so a crowded control bar squeezes (and scrolls) the frames strip rather
+     than the bar itself getting clipped by the timeline's max-height */
+  .tl-frames{display:flex; align-items:flex-start; gap:10px; padding:9px 10px; overflow:auto; flex:1 1 auto; min-height:0;}
+  .tl-group{flex:none; display:flex; flex-direction:column; gap:5px; padding:5px 6px 6px;
+    border:1px solid var(--line); border-radius:9px; background:#0000002e;}
+  .tl-group.ungrouped{border-style:dashed;}
+  .tl-group.ungrouped .tl-ghead .gname{color:var(--muted); font-weight:500;}
+  .tl-ghead{display:flex; align-items:center; gap:5px; font-size:11px; line-height:1;}
+  .tl-ghead .dot{width:8px; height:8px; border-radius:50%; flex:none;}
+  .tl-ghead .gname{font-weight:600; max-width:118px; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; cursor:pointer;}
+  .tl-ghead .gname:hover{color:var(--accent);}
+  .tl-ghead .gcount{color:var(--muted); font-size:10px; font-variant-numeric:tabular-nums;}
+  .tl-ghead .gsp{flex:1; min-width:8px;}
+  .tl-ghead button{min-height:0; height:20px; min-width:20px; padding:0; border-radius:5px;}
+  .tl-gframes{display:flex; align-items:flex-start; gap:7px;}
   .tl-frame{position:relative; flex:none; display:flex; flex-direction:column; align-items:center; gap:3px;
     padding:4px; border:2px solid var(--line); border-radius:8px; background:var(--panel2); cursor:pointer;}
   .tl-frame:hover{border-color:#56607a;}
@@ -111,10 +124,6 @@
     background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:0 9px; height:32px;
   }
   select:hover, input[type=text]:hover, input[type=number]:hover{border-color:#4c5366;}
-  input[type=color]{
-    height:32px; width:100%; padding:2px; background:var(--panel2);
-    border:1px solid var(--line); border-radius:8px; cursor:pointer;
-  }
   input[type=number]{width:54px;}
 
   /* ---- main ---- */
@@ -122,6 +131,7 @@
   .tools{
     width:156px; flex:none; background:var(--panel); border-right:1px solid var(--line);
     padding:10px; display:flex; flex-direction:column; gap:6px; overflow-y:auto; overflow-x:hidden;
+    position:relative; z-index:1;
   }
   .tools .group{max-width:100%;}
   .tool{
@@ -137,12 +147,19 @@
   .toolhead{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin:9px 2px 2px;}
   .toolhead:first-child{margin-top:0;}
 
+  /* z-index:0 makes the stage a stacking context, so #placeOverlay (20) and .place-bar (30)
+     stay *inside* the canvas area instead of floating over the timeline / side panel / status bar. */
   .stage{
-    flex:1; min-width:0; overflow:auto; display:flex; align-items:center; justify-content:center;
-    padding:24px; position:relative; background:
+    flex:1; min-width:0; min-height:0; overflow:auto; display:flex;
+    padding:24px; position:relative; z-index:0; background:
       radial-gradient(circle at 50% 0%, #20232b, var(--bg));
   }
+  /* Centred with auto margins instead of align-items/justify-content:center. Flex *centring*
+     makes overflow above/left of the box unreachable, so you could never scroll to the top-left
+     of a canvas zoomed bigger than the stage; auto margins collapse to 0 when space runs out. */
+  .stage > .canvas-wrap{margin:auto; flex:none;}
   .stage.dragging{outline:3px dashed var(--accent); outline-offset:-12px; background:#222838;}
+  .stage.panning{cursor:grabbing;}   /* the canvas itself is set from JS — a child cursor wins */
   .place-bar{
     position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:30;
     display:flex; align-items:center; gap:8px; background:var(--panel);
@@ -165,6 +182,8 @@
   .side{
     width:252px; flex:none; background:var(--panel); border-left:1px solid var(--line);
     display:flex; flex-direction:column; min-height:0; overflow-y:auto;
+    position:relative; z-index:1;
+    scrollbar-gutter:stable;   /* reserve the scrollbar track so controls never sit under it */
   }
   .section{padding:12px 14px; border-bottom:1px solid var(--line);}
   .section h3{margin:0 0 10px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);}
@@ -182,9 +201,48 @@
   .recents{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; min-height:18px;}
   .recents .rc{width:18px; height:18px; border-radius:4px; border:1px solid #0006; cursor:pointer;}
 
-  .palette{display:grid; grid-template-columns:repeat(auto-fill, minmax(22px,1fr)); gap:5px; margin-top:10px; max-height:176px; overflow:auto; padding:2px;}
-  .palette .sw{width:100%; aspect-ratio:1; border-radius:5px; border:1px solid #0006; cursor:pointer;}
-  .palette .sw:hover{outline:2px solid var(--accent); outline-offset:1px; position:relative; z-index:1;}
+  .palette{display:grid; grid-template-columns:repeat(auto-fill, minmax(22px,1fr)); gap:5px; margin-top:10px; max-height:176px; overflow:auto; padding:5px;}
+  .palette .sw{width:100%; aspect-ratio:1; border-radius:5px; border:1px solid #0006; cursor:pointer; position:relative;}
+  .palette .sw:hover{outline:2px solid var(--accent); outline-offset:1px; z-index:1;}
+  /* ---- editable (user-owned) palettes: per-swatch remove badge ---- */
+  .palette.editable .sw .swx{
+    position:absolute; top:-4px; right:-4px; width:14px; height:14px; border-radius:50%;
+    background:var(--panel); border:1px solid var(--line); color:var(--muted);
+    display:none; align-items:center; justify-content:center; z-index:2;
+  }
+  .palette.editable .sw:hover .swx{display:inline-flex;}
+  .palette.editable .sw .swx:hover{background:var(--danger); border-color:var(--danger); color:#fff;}
+  .palette .pal-empty{grid-column:1/-1; color:var(--muted); font-size:11px; line-height:1.5; padding:4px 2px;}
+  .pal-note{color:var(--muted); font-size:10px; line-height:1.45; margin-top:7px;}
+
+  /* ---- themed color picker (replaces the off-theme OS <input type=color> dialog) ---- */
+  .cp-swatch{
+    height:32px; width:100%; padding:0; border:1px solid var(--line); border-radius:8px;
+    cursor:pointer; background:#000; min-height:32px;
+  }
+  .cp-swatch:hover{border-color:var(--accent);}
+  .cp-pop{
+    position:fixed; z-index:1300; width:238px; background:var(--panel);
+    border:1px solid var(--line); border-radius:11px; padding:11px;
+    box-shadow:0 18px 50px #000c; animation:modalIn .12s ease;
+  }
+  .cp-pop[hidden]{display:none;}
+  .cp-sv{position:relative; height:132px; border-radius:8px; border:1px solid var(--line);
+    cursor:crosshair; touch-action:none; margin-bottom:10px;}
+  .cp-hue{position:relative; height:14px; border-radius:7px; border:1px solid var(--line);
+    cursor:ew-resize; touch-action:none; margin-bottom:10px;
+    background:linear-gradient(to right,#f00 0%,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00 100%);}
+  .cp-dot{position:absolute; width:13px; height:13px; border-radius:50%; border:2px solid #fff;
+    box-shadow:0 0 0 1px #0009, 0 1px 5px #000a; transform:translate(-50%,-50%); pointer-events:none;}
+  .cp-hue .cp-dot{top:50%;}
+  .cp-row{display:flex; align-items:center; gap:7px; margin-bottom:9px;}
+  .cp-prev{width:32px; height:32px; flex:none; border-radius:7px; border:1px solid var(--line);}
+  .cp-row input[type=text]{flex:1; min-width:0; text-transform:uppercase;}
+  .cp-row button{min-width:34px; padding:0; flex:none;}
+  .cp-rgb{display:flex; gap:6px; margin-bottom:10px;}
+  .cp-rgb label{flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px;
+    color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;}
+  .cp-rgb input{width:100%; text-align:center; padding:0 3px;}
 
   .layers{flex:1 0 auto; min-height:0; display:flex; flex-direction:column;}
   .layers .bar{display:flex; gap:6px; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
@@ -205,6 +263,7 @@
   .statusbar{
     display:flex; gap:18px; align-items:center; padding:5px 12px;
     background:var(--panel); border-top:1px solid var(--line); color:var(--muted); font-size:12px;
+    position:relative; z-index:2;   /* stay above the positioned canvas area */
   }
   .statusbar .sp{flex:1;}
   .hint{color:var(--muted); font-size:10px; line-height:1.4; margin-top:auto; padding-top:8px;}
@@ -386,8 +445,9 @@
   .brushbtns{display:flex; align-items:center; gap:6px; width:100%;}
   .brushbtns #brushReadout{flex:1; min-width:0; text-align:center;}
   #toolOpts .toolhead{display:none;}
-  #toolOpts.show-wand .opt-wand,#toolOpts.show-region .opt-region{display:block;}
-  .opt-wand,.opt-region{display:none;}
+  #toolOpts.show-wand .opt-wand,#toolOpts.show-region .opt-region,#toolOpts.show-shape .opt-shape{display:block;}
+  .opt-wand,.opt-region,.opt-shape{display:none;}
+  .opt-hint{color:var(--muted); font-size:10px; line-height:1.4; margin-top:5px;}
 
   /* ---- collapsible side sections with a chevron ---- */
   .section h3.sec-h{display:flex; align-items:center; gap:7px; cursor:pointer; margin-bottom:10px;}
@@ -395,9 +455,9 @@
   .section.collapsed h3.sec-h{margin-bottom:0;}
   .section.collapsed h3.sec-h .chev{transform:rotate(-90deg);}
   .section.collapsed .sec-body{display:none !important;}
-  .section h3.sec-h .sec-tools{margin-left:auto; display:flex; gap:4px;}
-  .section h3.sec-h .sec-tools button{min-height:0; height:26px; min-width:26px; padding:0; border-radius:6px;}
-  .section h3.sec-h .sec-tools button:hover{border-color:var(--accent);}
+  /* a full-width row of equal icon buttons — always fits, so nothing crowds the scrollbar */
+  .btnrow{display:flex; gap:5px; margin-bottom:9px;}
+  .btnrow button{flex:1 1 0; min-width:0; height:30px; min-height:30px; padding:0; border-radius:7px;}
 
   /* layer rows: eye · lock · name · thumb  (opacity is a single slider below the list) */
   .layer .lock{width:22px; text-align:center; cursor:pointer; opacity:.5; flex:none;}
@@ -410,9 +470,11 @@
   .opacity-row #opacityVal{color:var(--text); width:30px; text-align:right; flex:none; font-variant-numeric:tabular-nums;}
 
   /* ---- canvas rulers ---- */
+  /* minmax(0,1fr) + min-height:0 stop the grid's automatic minimum size from being driven by the
+     canvas, which would push .main taller than its flex slot and shove the timeline off-screen. */
   .canvasarea{
-    flex:1; min-width:0; display:grid;
-    grid-template-columns:22px 1fr; grid-template-rows:22px 1fr;
+    flex:1; min-width:0; min-height:0; display:grid;
+    grid-template-columns:22px minmax(0,1fr); grid-template-rows:22px minmax(0,1fr);
     background:var(--bg);
   }
   .ruler-corner{grid-column:1; grid-row:1; background:var(--panel); border-right:1px solid var(--line); border-bottom:1px solid var(--line);}
@@ -436,7 +498,7 @@
     .canvasarea .stage{padding:12px;}
     /* tools become a persistent horizontal scroll row above the canvas */
     .tools{
-      position:static; transform:none; width:auto; flex:none; flex-direction:row;
+      position:relative; z-index:1; transform:none; width:auto; flex:none; flex-direction:row;
       align-items:center; gap:6px; overflow-x:auto; overflow-y:hidden; box-shadow:none;
       border-right:none; border-bottom:1px solid var(--line); padding:7px 8px;
     }
@@ -446,7 +508,7 @@
     .tools .tool{width:44px; height:44px; aspect-ratio:auto; flex:none;}
     /* side panel becomes an in-flow stack under the canvas */
     .side{
-      position:static; transform:none; width:auto; flex:none;
+      position:relative; z-index:1; transform:none; width:auto; flex:none;
       border-left:none; border-top:1px solid var(--line); box-shadow:none;
       max-height:42vh; overflow-y:auto;
     }
@@ -469,6 +531,8 @@
     .tab{padding:10px 10px 10px 14px;}
     .tab .tclose{width:24px; height:24px;}
     .palette{grid-template-columns:repeat(auto-fill, minmax(30px,1fr)); gap:6px; max-height:224px;}
+    .palette.editable .sw .swx{display:inline-flex; width:17px; height:17px;}   /* no hover on touch */
+    .btnrow button{height:40px; min-height:40px;}
     .recents .rc{width:26px; height:26px;}
     .layer{padding:10px 9px;}
     .layer .eye{width:30px;}
@@ -476,7 +540,6 @@
     input[type=range]{height:30px;}
     .swap{width:28px; height:28px;}
     .tl-frame .tl-x{display:inline-flex;}   /* no hover on touch — always show the delete button */
-    .tl-tag .tl-tx{opacity:.85;}
     .ctx-menu button{padding:11px 12px;}
   }
 </style>
@@ -553,8 +616,12 @@
     <button data-cmd="addframe" data-icon="add"   data-icon-size="16">New frame</button>
     <button data-cmd="delframe" data-icon="trash" data-icon-size="16">Delete frame</button>
     <div class="ctx-sep"></div>
+    <div class="ctx-sep"></div>
+    <button data-cmd="addgroup" data-icon="tag" data-icon-size="16">New frame group…</button>
+    <button data-cmd="addtag"   data-icon="tag" data-icon-size="16">Group existing frames…</button>
+    <div class="ctx-sep"></div>
     <button data-cmd="play"   data-icon="play" data-icon-size="16">Play / stop<span class="hk">Space</span></button>
-    <button data-cmd="addtag" data-icon="tag"  data-icon-size="16">Add tag…</button>
+    <button data-cmd="sheet"  data-icon="image" data-icon-size="16">Export spritesheet…</button>
   </div>
   <div id="menu-select" class="ctx-menu menu-dd" hidden>
     <button data-cmd="selectall" data-icon="select" data-icon-size="16">Select all<span class="hk">Ctrl+A</span></button>
@@ -574,6 +641,7 @@
     <label class="chk"><input type="checkbox" id="gridToggle" checked /> <span data-icon="grid" data-icon-size="15"></span> Grid<span class="hk">G</span></label>
     <label class="chk"><input type="checkbox" id="centerToggle" checked /> <span data-icon="center" data-icon-size="15"></span> Center guide</label>
     <label class="chk"><input type="checkbox" id="regionToggleMenu" /> <span data-icon="region" data-icon-size="15"></span> Sub-canvas</label>
+    <button data-cmd="delregion" data-icon="trash" data-icon-size="16">Remove sub-canvas<span class="hk">Del</span></button>
   </div>
   <div id="menu-help" class="ctx-menu menu-dd" hidden>
     <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Keyboard shortcuts</button>
@@ -617,11 +685,15 @@
           <span id="brushReadout">1 px</span>
           <button id="brushUp" class="iconbtn" title="Bigger brush (])">+</button>
         </div>
-        <label class="chk" style="margin-top:8px"><input type="checkbox" id="fillShape" /> Fill shapes</label>
       </div>
 
       <!-- contextual options for the active tool -->
       <div id="toolOpts">
+        <div class="opt-shape">
+          <div class="toolhead">Shape</div>
+          <label class="chk" title="Solid: paint every pixel inside the shape. Off: draw only the 1px outline."><input type="checkbox" id="fillShape" /> Solid fill</label>
+          <div class="opt-hint">Off = outline only.</div>
+        </div>
         <div class="opt-wand">
           <div class="toolhead">Wand</div>
           <div class="brushbtns">
@@ -637,7 +709,7 @@
       </div>
 
       <input type="file" id="imgInput" accept="image/*" hidden />
-      <div class="hint">Alt+click = quick color pick.<br/>[ ] resize brush. Scroll = zoom.</div>
+      <div class="hint">Alt+click = quick color pick.<br/>[ ] resize brush. Scroll = zoom.<br/>Middle-drag = pan the canvas.</div>
     </div>
 
     <!-- CANVAS AREA (rulers + stage) -->
@@ -673,28 +745,40 @@
               <button class="swap" id="swapColors" data-icon="swap" data-icon-size="14" title="Swap foreground / background (X)"></button>
             </div>
             <div class="col">
-              <input type="color" id="colorPicker" value="#000000" />
+              <button class="cp-swatch" id="colorButton" title="Open the color picker"></button>
               <input type="text" id="hexInput" value="#000000" spellcheck="false" />
             </div>
           </div>
           <div class="recents" id="recents"></div>
           <select id="paletteSelect" style="width:100%; margin-top:10px"></select>
           <div class="palette" id="paletteGrid"></div>
+          <button id="palAddColor" data-icon="add" data-icon-size="15" style="width:100%; margin-top:8px;" title="Add the current foreground color to this palette">Add current color</button>
+          <div class="btnrow" id="palTools" style="margin-top:7px">
+            <button id="palNew"    data-icon="palette"  data-icon-size="15" title="New empty palette…"></button>
+            <button id="palDup"    data-icon="copy"     data-icon-size="15" title="Duplicate this palette so you can edit it"></button>
+            <button id="palRename" data-icon="pencil"   data-icon-size="15" title="Rename this palette"></button>
+            <button id="palImport" data-icon="folder"   data-icon-size="15" title="Import a palette (.hex .txt .gpl .json)"></button>
+            <button id="palExport" data-icon="download" data-icon-size="15" title="Export this palette as a .hex list"></button>
+            <button id="palDel"    data-icon="trash"    data-icon-size="15" title="Delete this palette"></button>
+          </div>
+          <div class="pal-note" id="palNote"></div>
           <button id="applyPaletteBtn" data-icon="palette" style="width:100%; margin-top:8px;" title="Remap the active layer (or the current selection) to the nearest colors in this palette">Snap to this palette</button>
+          <input type="file" id="palFileInput" accept=".hex,.txt,.gpl,.json,.pal,text/plain" hidden />
         </div>
       </div>
 
       <div class="section collapsible" id="layerSection" style="flex:1 0 auto; display:flex; flex-direction:column;">
-        <h3 class="sec-h" data-sec="layerSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span>Layers
-          <span class="sec-tools" onclick="event.stopPropagation()">
+        <h3 class="sec-h" data-sec="layerSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span>Layers</h3>
+        <div class="sec-body" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+          <!-- own row rather than crammed into the header: 5 icon buttons + the label overflowed
+               the section padding and ended up under the side panel's scrollbar -->
+          <div class="btnrow" id="layerTools">
             <button id="addLayer" data-icon="add" data-icon-size="15" title="Add layer"></button>
             <button id="dupLayer" data-icon="copy" data-icon-size="15" title="Duplicate layer"></button>
             <button id="upLayer" data-icon="up" data-icon-size="15" title="Move layer up"></button>
             <button id="downLayer" data-icon="down" data-icon-size="15" title="Move layer down"></button>
             <button id="delLayer" data-icon="trash" data-icon-size="15" title="Delete layer"></button>
-          </span>
-        </h3>
-        <div class="sec-body" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+          </div>
           <div class="layerlist" id="layerList"></div>
           <div class="opacity-row">
             <span class="lbl">Opacity</span>
@@ -720,8 +804,9 @@
           <div class="rg-row" style="gap:8px; margin-top:2px">
             <label class="chk"><input type="checkbox" id="rgLock" /><span data-icon="lock" data-icon-size="14"></span> Lock</label>
             <button id="rgCenter">Center</button>
-            <button id="rgRemove" style="background:var(--danger); border-color:var(--danger); color:#fff;">Remove</button>
+            <button id="rgRemove" style="background:var(--danger); border-color:var(--danger); color:#fff;" title="Delete the sub-canvas and draw on the whole canvas again (Del)">Remove</button>
           </div>
+          <div class="hint" style="padding:7px 0 0; margin:0">Remove also works with <b>Del</b>, or View ▸ Remove sub-canvas.</div>
         </div>
       </div>
     </div>
@@ -737,8 +822,7 @@
       <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of the current frame" /><span class="muted">ms</span></span>
       <span class="vsep"></span>
       <span class="tl-field"><span class="lbl">Play</span><select id="playTag" title="Which frames to play"><option value="__all">All frames</option></select></span>
-      <button id="addTagBtn" data-icon="tag" data-icon-size="15" title="Add a tag (named frame range like idle / run / jump)">Tag</button>
-      <div id="tlTags" class="tl-tags"></div>
+      <button id="addGroupBtn" data-icon="tag" data-icon-size="15" title="Add a group of frames (idle, walk, jump…) you can play and export on its own">Group</button>
       <span class="tl-grow"></span>
       <button id="addFrameBtn" data-icon="add" data-icon-size="16" title="New frame (copies the current one)">Frame</button>
     </div>
@@ -776,6 +860,26 @@
 </div>
 <!-- themed transient toasts -->
 <div id="toastRoot" class="toast-root"></div>
+
+<!-- themed color picker (in-app, so it matches the rest of the UI) -->
+<div id="cpPop" class="cp-pop" hidden>
+  <div class="cp-sv" id="cpSV"><div class="cp-dot" id="cpSVDot"></div></div>
+  <div class="cp-hue" id="cpHue"><div class="cp-dot" id="cpHueDot"></div></div>
+  <div class="cp-row">
+    <div class="cp-prev" id="cpPrev"></div>
+    <input type="text" id="cpHex" spellcheck="false" maxlength="7" />
+    <button id="cpEyedrop" data-icon="pick" data-icon-size="16" title="Pick a color from anywhere on screen"></button>
+  </div>
+  <div class="cp-rgb">
+    <label>R<input type="number" id="cpR" min="0" max="255" /></label>
+    <label>G<input type="number" id="cpG" min="0" max="255" /></label>
+    <label>B<input type="number" id="cpB" min="0" max="255" /></label>
+  </div>
+  <div class="btnrow" style="margin-bottom:0">
+    <button id="cpAddPal" data-icon="add" data-icon-size="15" title="Add this color to the active palette"></button>
+    <button id="cpDone" class="primary" data-icon="check" data-icon-size="15" title="Close">Done</button>
+  </div>
+</div>
 
 <!-- right-click menu for a pasted/dropped image -->
 <div id="ctxMenu" class="ctx-menu" hidden>
@@ -1038,6 +1142,29 @@ function showToast(message,type,ms){
 // ------------------------------------------------------------------ helpers
 function hexToRgb(h){h=h.replace("#","");return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
 function clamp(v,a,b){return v<a?a:v>b?b:v;}
+function rgbToHex(r,g,b){return "#"+[r,g,b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,"0")).join("");}
+// tolerant hex parser: accepts "fff", "#FFF", "ffffff", "#FFFFFF" -> "#ffffff", else null
+function normHex(v){
+  if(v==null) return null;
+  let s=String(v).trim().replace(/^#/,"");
+  if(/^[0-9a-f]{3}$/i.test(s)) s=s[0]+s[0]+s[1]+s[1]+s[2]+s[2];
+  return /^[0-9a-f]{6}$/i.test(s) ? "#"+s.toLowerCase() : null;
+}
+function rgbToHsv(r,g,b){
+  r/=255; g/=255; b/=255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn;
+  let h=0;
+  if(d){ if(mx===r) h=(g-b)/d+(g<b?6:0); else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; }
+  return {h:h, s:mx?d/mx:0, v:mx};
+}
+function hsvToRgb(h,s,v){
+  h=((h%360)+360)%360;
+  const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+  let r,g,b;
+  if(h<60){r=c;g=x;b=0;} else if(h<120){r=x;g=c;b=0;} else if(h<180){r=0;g=c;b=x;}
+  else if(h<240){r=0;g=x;b=c;} else if(h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
 
 function makeLayerCanvas(){const c=document.createElement("canvas");c.width=W;c.height=H;return c;}
 
@@ -1138,67 +1265,197 @@ function selectFrame(i, light){
 }
 function highlightActiveFrame(){
   const host=$("#tlFrames"); if(!host) return;
-  [...host.children].forEach((c,idx)=>c.classList.toggle("active", idx===frameIndex));
+  // cells are nested inside group boxes now, so match on the frame index we stamped on them
+  host.querySelectorAll(".tl-frame").forEach(c=>c.classList.toggle("active", +c.dataset.fi===frameIndex));
+}
+// ---- group (tag) range bookkeeping -------------------------------------------------
+// Inserting or deleting a frame has to move every group range that sits after it, otherwise
+// "walk" silently starts pointing at idle's frames.
+function shiftTagsOnInsert(at){
+  tags.forEach(t=>{
+    if(t.from>=at) t.from++;
+    if(t.to>=at) t.to++;          // a frame dropped inside a group extends that group
+  });
+}
+function shiftTagsOnDelete(at){
+  tags.forEach(t=>{
+    if(t.from>at) t.from--;
+    if(t.to>=at) t.to--;
+  });
+  pruneTags();
+}
+function pruneTags(){
+  const last=frames.length-1;
+  tags.forEach(t=>{ t.from=clamp(t.from,0,last); t.to=clamp(t.to,0,last); });
+  tags=tags.filter(t=>t.to>=t.from);   // a group whose frames are all gone goes with them
+}
+function uniqueTagName(base){
+  let n=base, i=2;
+  while(tags.some(t=>t.name===n)) n=base+" "+(i++);
+  return n;
+}
+
+function makeFrameFrom(src, copyPixels){
+  const newLayers=src.layers.map(l=>{
+    const c=makeLayerCanvas(), ctx=c.getContext("2d");
+    if(copyPixels) ctx.drawImage(l.canvas,0,0);
+    return {id:layerSeq++, name:l.name, visible:l.visible, opacity:l.opacity, locked:!!l.locked, canvas:c, ctx:ctx};
+  });
+  return {layers:newLayers, dur:src.dur};
+}
+function insertFrameAt(at, src, copyPixels){
+  frames.splice(at,0,makeFrameFrom(src,copyPixels));
+  shiftTagsOnInsert(at);
 }
 function addFrame(duplicate){
   stopPlayback();
-  const src=frames[frameIndex];
-  const newLayers=src.layers.map(l=>{
-    const c=makeLayerCanvas(), ctx=c.getContext("2d");
-    if(duplicate) ctx.drawImage(l.canvas,0,0);
-    return {id:layerSeq++, name:l.name, visible:l.visible, opacity:l.opacity, canvas:c, ctx:ctx};
-  });
-  frames.splice(frameIndex+1,0,{layers:newLayers, dur:src.dur});
-  frameIndex++; layers=frames[frameIndex].layers;
+  const at=frameIndex+1;
+  insertFrameAt(at, frames[frameIndex], duplicate);
+  frameIndex=at; layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
   renderLayers(); renderTimeline(); composite(); updateDocInfo();
 }
 function deleteFrame(i){
   if(frames.length<=1){ showToast("A drawing needs at least one frame.","error"); return; }
   stopPlayback();
   frames.splice(i,1);
+  shiftTagsOnDelete(i);
   if(frameIndex>=frames.length) frameIndex=frames.length-1;
-  tags.forEach(t=>{ t.from=clamp(t.from,0,frames.length-1); t.to=clamp(t.to,0,frames.length-1); if(t.from>t.to) t.from=t.to; });
   layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
   renderLayers(); renderTimeline(); composite(); updateDocInfo();
 }
+
+// ---- groups --------------------------------------------------------------------------
+// Split the timeline into consecutive runs sharing a group, so the strip reads
+// "idle 1-6 | walk 7-12". A frame covered by more than one tag belongs to the first listed.
+function frameGroups(){
+  const owner=i=>{ for(let t=0;t<tags.length;t++){ if(i>=tags[t].from && i<=tags[t].to) return t; } return -1; };
+  const out=[];
+  for(let i=0;i<frames.length;i++){
+    const o=owner(i), last=out[out.length-1];
+    if(last && last.tag===o) last.idx.push(i);
+    else out.push({tag:o, idx:[i]});
+  }
+  return out;
+}
+// a new group is always appended, so no existing range needs shifting
+function addGroup(name, n, copyPixels){
+  stopPlayback();
+  const src=frames[frameIndex], from=frames.length;
+  for(let i=0;i<n;i++) frames.push(makeFrameFrom(src, copyPixels));
+  const nm=uniqueTagName(name);
+  tags.push({name:nm, from:from, to:frames.length-1, color:TAG_COLORS[tags.length%TAG_COLORS.length]});
+  frameIndex=from; layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
+  renderLayers(); renderTimeline(); composite(); updateDocInfo();
+  showToast("Added group “"+nm+"” with "+n+" frame"+(n>1?"s":"")+".","success");
+}
+async function addGroupDialog(){
+  const body=`
+    <div class="row"><label>Name</label>
+      <input type="text" id="grpName" value="${uniqueTagName(tags.length?"walk":"idle")}" style="flex:1; min-width:0" spellcheck="false"></div>
+    <div class="row"><label>Frames</label><input type="number" id="grpN" min="1" max="64" value="6"></div>
+    <div class="row"><label></label>
+      <label class="chk"><input type="checkbox" id="grpCopy" checked> Start each from the current frame</label></div>`;
+  const ok=await openModal({title:"New frame group",
+    message:"Appends frames to the timeline and groups them, so you can play and export this animation on its own.",
+    bodyHTML:body, okText:"Add group"});
+  if(!ok) return;
+  const name=($("#grpName").value||"").trim()||"group";
+  addGroup(name, clamp(parseInt($("#grpN").value,10)||1,1,64), $("#grpCopy").checked);
+}
+function addFrameToGroup(ti){
+  const t=tags[ti]; if(!t) return;
+  stopPlayback();
+  const at=t.to+1;
+  insertFrameAt(at, frames[t.to], true);
+  t.to=at;                       // inserting at to+1 lands outside the range, so extend it explicitly
+  frameIndex=at; layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
+  renderLayers(); renderTimeline(); composite(); updateDocInfo();
+}
+function ungroup(ti){
+  const t=tags[ti]; if(!t) return;
+  tags.splice(ti,1); renderTimeline();
+  showToast("Removed the group “"+t.name+"” — its frames are still there.","info");
+}
+async function groupRun(idx){
+  const n=await showPrompt("Name this group of "+idx.length+" frame"+(idx.length>1?"s":"")+":",
+    uniqueTagName("group"), {title:"Group frames", okText:"Group"});
+  if(n==null) return;
+  const nm=uniqueTagName((n.trim()||"group"));
+  tags.push({name:nm, from:idx[0], to:idx[idx.length-1], color:TAG_COLORS[tags.length%TAG_COLORS.length]});
+  renderTimeline();
+  showToast("Grouped frames "+(idx[0]+1)+"–"+(idx[idx.length-1]+1)+" as “"+nm+"”.","success");
+}
+function playGroup(ti){
+  const t=tags[ti]; if(!t) return;
+  const sel=$("#playTag"); if(sel) sel.value=t.name;
+  stopPlayback();
+  selectFrame(clamp(t.from,0,frames.length-1));
+  startPlayback();
+}
 function setFrameDur(ms){ frames[frameIndex].dur=clamp(ms|0,10,5000); renderTimeline(); }
 
+function frameCell(i){
+  const fr=frames[i];
+  const cell=document.createElement("div");
+  cell.className="tl-frame"+(i===frameIndex?" active":"");
+  cell.dataset.fi=i;
+  cell.title="Frame "+(i+1)+" — "+fr.dur+" ms";
+  const num=document.createElement("span"); num.className="tl-num"; num.textContent=(i+1);
+  const cv=document.createElement("canvas"); cv.className="tl-thumb"; cv.width=W; cv.height=H; fr._thumb=cv;
+  const TH=44, TW=Math.max(8,Math.round(TH*W/H)); cv.style.width=TW+"px"; cv.style.height=TH+"px";
+  compositeFrameInto(cv.getContext("2d"), fr);
+  const x=document.createElement("span"); x.className="tl-x"; x.innerHTML=iconSVG("clear",12); x.title="Delete frame";
+  cell.append(num,cv,x);
+  cell.onclick=()=>selectFrame(i);
+  x.onclick=ev=>{ev.stopPropagation(); deleteFrame(i);};
+  return cell;
+}
+function groupHead(g){
+  const head=document.createElement("div"); head.className="tl-ghead";
+  const sp=document.createElement("span"); sp.className="gsp";
+  const btn=(icon,title,fn)=>{ const b=document.createElement("button"); b.innerHTML=iconSVG(icon,13); b.title=title; b.onclick=fn; return b; };
+  if(g.tag<0){
+    const nm=document.createElement("span"); nm.className="gname"; nm.textContent="Ungrouped";
+    nm.title="These frames aren't in a group yet";
+    head.append(nm, sp, btn("tag","Turn these frames into a group",()=>groupRun(g.idx)));
+  } else {
+    const t=tags[g.tag];
+    const dot=document.createElement("span"); dot.className="dot"; dot.style.background=t.color;
+    const nm=document.createElement("span"); nm.className="gname"; nm.textContent=t.name;
+    nm.title="Click to rename “"+t.name+"” or change its frame range";
+    nm.onclick=()=>editTag(g.tag);
+    const ct=document.createElement("span"); ct.className="gcount";
+    ct.textContent=(t.from+1)+"–"+(t.to+1);
+    head.append(dot, nm, ct, sp,
+      btn("play","Play just “"+t.name+"”",()=>playGroup(g.tag)),
+      btn("add","Add a frame to “"+t.name+"”",()=>addFrameToGroup(g.tag)),
+      btn("clear","Ungroup (keeps the frames)",()=>ungroup(g.tag)));
+  }
+  return head;
+}
 function renderTimeline(){
   const di=$("#frameDur"); if(di && frames[frameIndex]) di.value=frames[frameIndex].dur;
   const host=$("#tlFrames"); if(!host) return;
   host.innerHTML="";
-  frames.forEach((fr,i)=>{
-    const cell=document.createElement("div"); cell.className="tl-frame"+(i===frameIndex?" active":"");
-    cell.title="Frame "+(i+1)+" — "+fr.dur+" ms";
-    const num=document.createElement("span"); num.className="tl-num"; num.textContent=(i+1);
-    const cv=document.createElement("canvas"); cv.className="tl-thumb"; cv.width=W; cv.height=H; fr._thumb=cv;
-    const TH=44, TW=Math.max(8,Math.round(TH*W/H)); cv.style.width=TW+"px"; cv.style.height=TH+"px";
-    compositeFrameInto(cv.getContext("2d"), fr);
-    const x=document.createElement("span"); x.className="tl-x"; x.innerHTML=iconSVG("clear",12); x.title="Delete frame";
-    cell.append(num,cv,x);
-    cell.onclick=()=>selectFrame(i);
-    x.onclick=ev=>{ev.stopPropagation(); deleteFrame(i);};
-    host.appendChild(cell);
+  frameGroups().forEach(g=>{
+    const box=document.createElement("div");
+    box.className="tl-group"+(g.tag<0?" ungrouped":"");
+    const strip=document.createElement("div"); strip.className="tl-gframes";
+    g.idx.forEach(i=>strip.appendChild(frameCell(i)));
+    box.append(groupHead(g), strip);
+    host.appendChild(box);
   });
   renderTags(); updatePlayUI(); updateTlSummary();
 }
+// the "Play" dropdown is the only tag UI left in the bar; the strip shows the groups themselves
 function renderTags(){
-  const sel=$("#playTag");
-  if(sel){ const cur=sel.value;
-    sel.innerHTML='<option value="__all">All frames</option>'+tags.map(t=>`<option value="${t.name}">${t.name}</option>`).join("");
-    if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
-  }
-  const host=$("#tlTags"); if(!host) return; host.innerHTML="";
-  tags.forEach((t,i)=>{
-    const chip=document.createElement("span"); chip.className="tl-tag";
-    chip.innerHTML='<span class="dot" style="background:'+t.color+'"></span><span class="nm">'+t.name+'</span><span class="rg">'+(t.from+1)+(t.to>t.from?("-"+(t.to+1)):"")+'</span>';
-    const x=document.createElement("span"); x.className="tl-tx"; x.innerHTML=iconSVG("clear",11); x.title="Delete tag";
-    chip.appendChild(x);
-    chip.onclick=()=>{ if($("#playTag")) $("#playTag").value=t.name; selectFrame(clamp(t.from,0,frames.length-1)); };
-    chip.ondblclick=ev=>{ev.stopPropagation(); editTag(i);};
-    x.onclick=ev=>{ev.stopPropagation(); tags.splice(i,1); renderTags();};
-    host.appendChild(chip);
-  });
+  const sel=$("#playTag"); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML="";
+  const add=(v,label)=>{ const o=document.createElement("option"); o.value=v; o.textContent=label; sel.appendChild(o); };
+  add("__all","All frames");
+  tags.forEach(t=>add(t.name, t.name+" ("+(t.from+1)+"–"+(t.to+1)+")"));
+  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
 }
 function playRange(){
   const sel=$("#playTag"); const v=sel?sel.value:"__all";
@@ -1242,16 +1499,32 @@ async function showTagDialog(tag){
       <input type="number" id="tgFrom" min="1" max="${frames.length}" value="${from}">
       <span style="color:var(--muted)">to</span>
       <input type="number" id="tgTo" min="1" max="${frames.length}" value="${to}"></div>`;
-  const ok=await openModal({title:tag?"Edit tag":"New tag", bodyHTML:body, okText:tag?"Save":"Add"});
+  const ok=await openModal({title:tag?"Edit group":"Group existing frames",
+    message:tag?"":"Names a range of frames you already have, so it can be played and exported on its own.",
+    bodyHTML:body, okText:tag?"Save":"Group"});
   if(!ok) return null;
   let name=($("#tgName").value||"").trim()||nm;
   let f=clamp(parseInt($("#tgFrom").value,10)||1,1,frames.length)-1;
   let t=clamp(parseInt($("#tgTo").value,10)||1,1,frames.length)-1;
   if(f>t){ const z=f; f=t; t=z; }
-  return {name, from:f, to:t};
+  return {name:name, from:f, to:t};
 }
-async function addTag(){ const r=await showTagDialog(null); if(!r) return; r.color=TAG_COLORS[tags.length%TAG_COLORS.length]; tags.push(r); renderTags(); }
-async function editTag(i){ const r=await showTagDialog(tags[i]); if(!r) return; r.color=tags[i].color; tags[i]=r; renderTags(); }
+async function addTag(){
+  const r=await showTagDialog(null); if(!r) return;
+  r.name=uniqueTagName(r.name);
+  r.color=TAG_COLORS[tags.length%TAG_COLORS.length];
+  tags.push(r); renderTimeline();
+  showToast("Grouped frames "+(r.from+1)+"–"+(r.to+1)+" as “"+r.name+"”.","success");
+}
+async function editTag(i){
+  const old=tags[i]; if(!old) return;
+  const r=await showTagDialog(old); if(!r) return;
+  tags.splice(i,1);                 // pull it out first so the name check can't collide with itself
+  r.name=uniqueTagName(r.name);
+  r.color=old.color;
+  tags.splice(i,0,r);
+  pruneTags(); renderTimeline();
+}
 
 // ------------------------------------------------------------------ tabs / multiple documents
 // The live globals (W,H,layers,activeIndex,layerSeq,zoom,undo/redo,selection,selMask) ARE the
@@ -1456,11 +1729,22 @@ function regionDown(p,e){
     const m=rectHandleHitArt(region, a, 9/zoom);
     if(m){ regionDrag={mode:m, start:a, orig:{x:region.x,y:region.y,w:region.w,h:region.h}}; return; }
   }
-  regionDrag={mode:"new", start:{x:p.x,y:p.y}};      // drag out a fresh region
-  region={x:p.x,y:p.y,w:1,h:1}; composite();
+  // Drag out a fresh region — but create nothing until the pointer actually moves. A bare click
+  // must not resurrect a sub-canvas you just removed, nor wipe the one you already have.
+  regionDrag={mode:"new", start:{x:p.x,y:p.y}, prev:region, moved:false};
+}
+// give a cancelled gesture (pinch, OS edge-swipe) its starting state back
+function abortRegionDrag(){
+  const d=regionDrag; regionDrag=null;
+  if(d){
+    if(d.mode==="new") region=d.prev||null;
+    else if(d.orig) region={x:d.orig.x,y:d.orig.y,w:d.orig.w,h:d.orig.h};
+  }
+  clampRegion(); composite(); renderRegionPanel();
 }
 function regionMove(e){
   if(regionDrag.mode==="new"){
+    regionDrag.moved=true;
     const cur=toPixel(e);
     const x0=Math.min(regionDrag.start.x,cur.x), y0=Math.min(regionDrag.start.y,cur.y);
     const x1=Math.max(regionDrag.start.x,cur.x), y1=Math.max(regionDrag.start.y,cur.y);
@@ -1480,14 +1764,29 @@ function regionMove(e){
   }
   clampRegion(); composite(); renderRegionPanel();
 }
-function regionUp(){ regionDrag=null; clampRegion(); composite(); renderRegionPanel(); }
+function regionUp(){
+  const d=regionDrag; regionDrag=null;
+  if(d && d.mode==="new"){
+    // a click with no drag (or a 1×1 smudge) isn't an attempt to make a sub-canvas
+    if(!d.moved || (region && region.w<2 && region.h<2)) region=d.prev||null;
+  }
+  clampRegion(); composite(); renderRegionPanel();
+}
 function createRegion(){
   const sz=clamp(Math.round(Math.min(W,H)/2),1,Math.min(W,H));
   region={x:Math.floor((W-sz)/2), y:Math.floor((H-sz)/2), w:sz, h:sz}; regionLocked=false;
   clampRegion(); setTool("region"); renderRegionPanel(); composite();
   showToast("Sub-canvas created. Drag its handles to resize, or set the size below; Lock to draw safely inside.","info",4200);
 }
-function removeRegion(){ region=null; regionLocked=false; regionDrag=null; renderRegionPanel(); composite(); }
+// Removal has to also drop you out of the Region tool — otherwise the next click on the canvas
+// drags out a brand-new sub-canvas and it looks like Remove never worked.
+function removeRegion(quiet){
+  const had=!!region;
+  region=null; regionLocked=false; regionDrag=null;
+  if(tool==="region") setTool(lastPaintTool||"pencil");
+  renderRegionPanel(); composite();
+  if(had && !quiet) showToast("Sub-canvas removed — you can draw anywhere again.","success");
+}
 function centerRegion(){ if(!region) return; region.x=Math.floor((W-region.w)/2); region.y=Math.floor((H-region.h)/2); clampRegion(); renderRegionPanel(); composite(); }
 function setRegionFromInputs(){
   if(!region) return;
@@ -1497,14 +1796,22 @@ function setRegionFromInputs(){
   region.y=clamp(parseInt($("#rgY").value,10)||0,0,H-region.h);
   composite(); renderRegionPanel();
 }
+// Single source of truth for every bit of sub-canvas UI: the side panel, the left-hand tool
+// options and the View-menu checkbox. Keeping them in one place is what stops the checkbox from
+// going stale after a Remove (which used to leave it ticked with no region behind it).
 function renderRegionPanel(){
-  const none=$("#regionNone"), ctl=$("#regionCtl"); if(!none||!ctl) return;
-  if(region){
-    none.style.display="none"; ctl.style.display="";
-    $("#rgW").value=region.w; $("#rgH").value=region.h; $("#rgX").value=region.x; $("#rgY").value=region.y;
-    $("#rgW").max=W; $("#rgH").max=H; $("#rgX").max=Math.max(0,W-1); $("#rgY").max=Math.max(0,H-1);
-    $("#rgLock").checked=regionLocked;
-  } else { none.style.display=""; ctl.style.display="none"; }
+  const none=$("#regionNone"), ctl=$("#regionCtl");
+  if(none && ctl){
+    if(region){
+      none.style.display="none"; ctl.style.display="";
+      $("#rgW").value=region.w; $("#rgH").value=region.h; $("#rgX").value=region.x; $("#rgY").value=region.y;
+      $("#rgW").max=W; $("#rgH").max=H; $("#rgX").max=Math.max(0,W-1); $("#rgY").max=Math.max(0,H-1);
+      $("#rgLock").checked=regionLocked;
+    } else { none.style.display=""; ctl.style.display="none"; }
+  }
+  const rs=$("#regionSection"); if(rs) rs.style.display=(tool==="region"||region)?"":"none";
+  const rt=$("#regionToggleMenu"); if(rt) rt.checked=!!region;
+  const opts=$("#toolOpts"); if(opts) opts.classList.toggle("show-region", tool==="region" && !region);
 }
 
 // ------------------------------------------------------------------ undo / redo
@@ -1925,7 +2232,8 @@ function selectUp(){
 // ------------------------------------------------------------------ snap layer/selection to the active palette
 function applyPaletteToLayer(){
   const L=activeLayer(); if(!L) return;
-  const cols=PALETTES[$("#paletteSelect").value]; if(!cols||!cols.length) return;
+  const cols=paletteColors($("#paletteSelect").value);
+  if(!cols.length){ showToast("This palette is empty — add some colors first.","info"); return; }
   const pal=cols.map(hexToRgb);
   pushUndo();
   const img=L.ctx.getImageData(0,0,W,H), d=img.data;
@@ -1945,6 +2253,27 @@ function applyPaletteToLayer(){
 // ------------------------------------------------------------------ pointer
 let drawing=false, shaping=false, last=null, start=null;
 
+// ---- middle-button drag = pan the canvas ----
+// The stage is already a scroll container, so panning is just moving its scroll offsets. Works
+// anywhere in the canvas area (on the artwork or the gray surround) and never edits pixels.
+let pan=null;   // {mx,my, sl,st, cursor}
+function panStart(e){
+  pan={ mx:e.clientX, my:e.clientY, sl:stage.scrollLeft, st:stage.scrollTop, cursor:view.style.cursor };
+  try{ stage.setPointerCapture(e.pointerId); }catch(_){}
+  stage.classList.add("panning");
+  view.style.cursor="grabbing";
+}
+function panMove(e){
+  stage.scrollLeft = pan.sl - (e.clientX - pan.mx);
+  stage.scrollTop  = pan.st - (e.clientY - pan.my);
+}
+function panEnd(){
+  if(!pan) return;
+  view.style.cursor = pan.cursor || CURSORS[tool] || "crosshair";
+  stage.classList.remove("panning");
+  pan=null;
+}
+
 // touch: track active fingers on the canvas so a second finger becomes pinch-to-zoom
 const touchPtrs=new Map();
 let pinch=null;   // {d0: starting distance, z0: starting zoom}
@@ -1953,7 +2282,7 @@ function cancelActiveOps(){
   if(drawing){ drawing=false; undo(); }                 // revert the accidental first-finger dot
   if(shaping){ shaping=false; composite(); }
   if(selDrag){ selDrag=null; composite(); }
-  if(regionDrag){ regionDrag=null; clampRegion(); composite(); renderRegionPanel(); }
+  if(regionDrag) abortRegionDrag();
 }
 
 function toPixel(e){
@@ -1972,7 +2301,7 @@ view.addEventListener("pointerdown",e=>{
   if(placement){ if(e.button===0) placementDown(e); return; }
   if(e.button!==0 && e.button!==2) return;          // left or right button only
   if(playing) stopPlayback();                        // editing stops playback
-  view.setPointerCapture(e.pointerId);
+  try{ view.setPointerCapture(e.pointerId); }catch(_){}   // never let a capture refusal abort the stroke
   const p=toPixel(e);
   const slot = e.button===2 ? "bg" : "fg";
   if(e.altKey){ pickColor(p.x,p.y,slot); return; }
@@ -2009,6 +2338,7 @@ window.addEventListener("resize",()=>{ if(placement){ sizePlaceOverlay(); paintP
 stage.addEventListener("scroll",()=>{ if(placement) paintPlaceOverlay(); drawRulers(); });
 
 window.addEventListener("pointermove",e=>{
+  if(pan){ panMove(e); return; }
   if(touchPtrs.has(e.pointerId)) touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pinch){
     if(touchPtrs.size>=2){ const d=pinchDist(); if(d>0) setZoom(Math.round(pinch.z0*d/pinch.d0)); }
@@ -2029,6 +2359,7 @@ window.addEventListener("pointermove",e=>{
 
 // always-on cursor coordinate readout (+ move cursor when hovering inside a selection)
 view.addEventListener("pointermove",e=>{
+  if(pan) return;                       // keep the grabbing cursor while panning
   const p=toPixel(e); $("#cursorInfo").textContent=p.x+", "+p.y;
   if(tool==="select" && !selDrag && !placement) view.style.cursor=(selection && inSel(p.x,p.y))?"move":"crosshair";
   else if(tool==="region" && !regionDrag && !placement){
@@ -2043,6 +2374,7 @@ view.addEventListener("pointermove",e=>{
 view.addEventListener("pointerleave",()=>{ if(!drawing&&!shaping&&!selDrag&&!xform) $("#cursorInfo").textContent="—"; });
 
 window.addEventListener("pointerup",e=>{
+  if(pan){ panEnd(); return; }
   touchPtrs.delete(e.pointerId);
   if(pinch){ if(touchPtrs.size<2) pinch=null; return; }
   if(placement){ xform=null; return; }
@@ -2059,10 +2391,11 @@ window.addEventListener("pointerup",e=>{
 
 // touch gestures can be cancelled by the OS (edge swipes etc.) — tidy up any half-finished op
 window.addEventListener("pointercancel",e=>{
+  panEnd();
   touchPtrs.delete(e.pointerId);
   if(touchPtrs.size<2) pinch=null;
   xform=null;
-  if(regionDrag){ regionDrag=null; clampRegion(); composite(); renderRegionPanel(); }
+  if(regionDrag) abortRegionDrag();
   if(selDrag){ selDrag=null; composite(); }
   if(shaping){ shaping=false; composite(); }
   if(drawing){ drawing=false; refreshThumb(activeLayer()); }
@@ -2074,6 +2407,18 @@ function shape(a,b){
   if(tool==="ellipse") return ellipsePixels(a.x,a.y,b.x,b.y,fillShape);
   return [];
 }
+
+// Middle-drag anywhere in the canvas area pans. Bound on the stage so it works over the artwork,
+// the gray surround and the placement overlay alike.
+stage.addEventListener("pointerdown",e=>{
+  if(e.button!==1 || pan) return;
+  e.preventDefault();
+  panStart(e);
+});
+// Chrome/Edge on Windows turn middle-mousedown into autoscroll; only preventing the *mouse*
+// event suppresses it, so guard both event families.
+stage.addEventListener("mousedown",e=>{ if(e.button===1) e.preventDefault(); });
+stage.addEventListener("auxclick",e=>{ if(e.button===1) e.preventDefault(); });
 
 stage.addEventListener("wheel",e=>{
   if(e.target===view || view.contains(e.target) || e.target===wrap){
@@ -2089,29 +2434,40 @@ view.addEventListener("contextmenu",e=>{
 });
 
 // ------------------------------------------------------------------ color UI
-function setColor(hex, slot){
-  slot = slot || activeSlot;
-  hex = hex.toLowerCase();
-  if(slot==="bg"){ secondary=hex; $("#secondarySwatch").style.background=hex; }
-  else { primary=hex; $("#primarySwatch").style.background=hex; }
-  if(slot===activeSlot){ $("#colorPicker").value=hex; $("#hexInput").value=hex.toUpperCase(); }
+function currentColor(){ return activeSlot==="bg" ? secondary : primary; }
+function syncColorButton(hex){ const b=$("#colorButton"); if(b) b.style.background=hex; }
+function pushRecent(hex){
+  hex=normHex(hex); if(!hex) return;
   recents=recents.filter(c=>c!==hex); recents.unshift(hex);
   if(recents.length>MAX_RECENTS) recents.pop();
   renderRecents();
+}
+// opts.noRecent — don't log to recents (used while dragging in the picker, which would flood it)
+// opts.fromPicker — the picker is the source, so don't push state back into it mid-gesture
+function setColor(hex, slot, opts){
+  slot = slot || activeSlot; opts = opts || {};
+  hex = normHex(hex) || String(hex).toLowerCase();
+  if(slot==="bg"){ secondary=hex; $("#secondarySwatch").style.background=hex; }
+  else { primary=hex; $("#primarySwatch").style.background=hex; }
+  if(slot===activeSlot){ syncColorButton(hex); $("#hexInput").value=hex.toUpperCase(); }
+  if(!opts.noRecent) pushRecent(hex);
+  if(!opts.fromPicker) cpSyncFrom(hex);
 }
 function setActiveSlot(slot){
   activeSlot=slot;
   $("#primarySwatch").classList.toggle("active", slot==="fg");
   $("#secondarySwatch").classList.toggle("active", slot==="bg");
-  const cur = slot==="bg" ? secondary : primary;
-  $("#colorPicker").value=cur; $("#hexInput").value=cur.toUpperCase();
+  const cur=currentColor();
+  syncColorButton(cur); $("#hexInput").value=cur.toUpperCase();
+  cpSyncFrom(cur);
 }
 function swapColors(){
   const t=primary; primary=secondary; secondary=t;
   $("#primarySwatch").style.background=primary;
   $("#secondarySwatch").style.background=secondary;
-  const cur = activeSlot==="bg" ? secondary : primary;
-  $("#colorPicker").value=cur; $("#hexInput").value=cur.toUpperCase();
+  const cur=currentColor();
+  syncColorButton(cur); $("#hexInput").value=cur.toUpperCase();
+  cpSyncFrom(cur);
 }
 function renderRecents(){
   const el=$("#recents"); el.innerHTML="";
@@ -2123,24 +2479,237 @@ function renderRecents(){
   });
 }
 
-function renderPaletteSelect(){
-  const sel=$("#paletteSelect"); sel.innerHTML="";
-  Object.keys(PALETTES).forEach(name=>{
-    const o=document.createElement("option"); o.value=name; o.textContent=name+" ("+PALETTES[name].length+")";
-    sel.appendChild(o);
-  });
-  sel.value="DawnBringer 32";
-  renderPaletteGrid("DawnBringer 32");
+// ------------------------------------------------------------------ themed color picker
+// An in-app HSV popover: the native <input type="color"> opens the OS dialog, which is light-themed
+// and looks nothing like the rest of the app.
+const cpPop=$("#cpPop");
+let cpHSV={h:0,s:0,v:0}, cpOpen=false, cpDrag=null;
+
+function cpRender(){
+  const [r,g,b]=hsvToRgb(cpHSV.h,cpHSV.s,cpHSV.v), hex=rgbToHex(r,g,b);
+  $("#cpSV").style.background=
+    "linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, hsl("+cpHSV.h+", 100%, 50%))";
+  $("#cpSVDot").style.left=(cpHSV.s*100)+"%";
+  $("#cpSVDot").style.top=((1-cpHSV.v)*100)+"%";
+  $("#cpHueDot").style.left=(cpHSV.h/360*100)+"%";
+  $("#cpPrev").style.background=hex;
+  const hx=$("#cpHex"); if(document.activeElement!==hx) hx.value=hex.toUpperCase();
+  [["#cpR",r],["#cpG",g],["#cpB",b]].forEach(p=>{ const el=$(p[0]); if(document.activeElement!==el) el.value=p[1]; });
+  return hex;
+}
+function cpApply(){ setColor(cpRender(), activeSlot, {noRecent:true, fromPicker:true}); }
+// adopt an externally-set color. Achromatic colors carry no hue, so keep the wheel where it was
+// instead of snapping the SV field back to red every time you pick black or white.
+function cpSetHSVFromHex(hex){
+  const rgb=hexToRgb(hex), h=rgbToHsv(rgb[0],rgb[1],rgb[2]);
+  cpHSV={h:(h.s<0.001 ? cpHSV.h : h.h), s:h.s, v:h.v};
+}
+function cpSyncFrom(hex){ if(!cpOpen||cpDrag) return; const n=normHex(hex); if(!n) return; cpSetHSVFromHex(n); cpRender(); }
+function cpOpenAt(anchor){
+  cpOpen=true; cpPop.hidden=false;
+  cpSetHSVFromHex(currentColor()); cpRender();
+  const a=anchor.getBoundingClientRect(), p=cpPop.getBoundingClientRect();
+  let top=a.bottom+6;
+  if(top+p.height > window.innerHeight-8) top=Math.max(8, a.top-p.height-6);
+  cpPop.style.left=clamp(a.right-p.width, 8, Math.max(8, window.innerWidth-p.width-8))+"px";
+  cpPop.style.top=top+"px";
+}
+function cpClose(){
+  if(!cpOpen) return;
+  cpOpen=false; cpPop.hidden=true; cpDrag=null;
+  pushRecent(currentColor());   // log the color you actually settled on, not every drag step
+}
+function cpFromSV(e){
+  const r=$("#cpSV").getBoundingClientRect();
+  cpHSV.s=clamp((e.clientX-r.left)/r.width,0,1);
+  cpHSV.v=clamp(1-(e.clientY-r.top)/r.height,0,1);
+  cpApply();
+}
+function cpFromHue(e){
+  const r=$("#cpHue").getBoundingClientRect();
+  cpHSV.h=clamp((e.clientX-r.left)/r.width,0,1)*360;
+  cpApply();
+}
+function cpRGBInput(){
+  const r=clamp(parseInt($("#cpR").value,10)||0,0,255),
+        g=clamp(parseInt($("#cpG").value,10)||0,0,255),
+        b=clamp(parseInt($("#cpB").value,10)||0,0,255);
+  cpSetHSVFromHex(rgbToHex(r,g,b));
+  cpApply();
+}
+
+// ------------------------------------------------------------------ palettes (built-in + user-made)
+const PAL_KEY="pp_userPalettes", PAL_SEL_KEY="pp_activePalette";
+let userPalettes={};   // {name: ["#rrggbb", ...]} — persisted to localStorage
+function loadUserPalettes(){
+  try{
+    const raw=localStorage.getItem(PAL_KEY); if(!raw) return;
+    const o=JSON.parse(raw);
+    if(o && typeof o==="object") for(const k in o){
+      if(Array.isArray(o[k])) userPalettes[k]=o[k].map(normHex).filter(Boolean);
+    }
+  }catch(_){}
+}
+function saveUserPalettes(){
+  try{ localStorage.setItem(PAL_KEY, JSON.stringify(userPalettes)); }
+  catch(_){ showToast("Couldn't save your palettes — browser storage is full or blocked.","error"); }
+}
+function paletteColors(name){ return userPalettes[name] || PALETTES[name] || []; }
+function isUserPalette(name){ return Object.prototype.hasOwnProperty.call(userPalettes,name); }
+function activePaletteName(){ return $("#paletteSelect").value; }
+function paletteNameTaken(n){ return !!PALETTES[n] || isUserPalette(n); }
+function uniquePaletteName(base){
+  let n=base, i=2;
+  while(paletteNameTaken(n)){ n=base+" "+(i++); }
+  return n;
+}
+
+function renderPaletteSelect(keep){
+  const sel=$("#paletteSelect");
+  let want=keep || sel.value;
+  if(!want){ try{ want=localStorage.getItem(PAL_SEL_KEY); }catch(_){} }
+  sel.innerHTML="";
+  const group=(label,names)=>{
+    if(!names.length) return;
+    const g=document.createElement("optgroup"); g.label=label;
+    names.forEach(n=>{
+      const o=document.createElement("option"); o.value=n;
+      o.textContent=n+" ("+paletteColors(n).length+")"; g.appendChild(o);
+    });
+    sel.appendChild(g);
+  };
+  group("My palettes", Object.keys(userPalettes));
+  group("Built-in", Object.keys(PALETTES));
+  sel.value = (want && paletteNameTaken(want)) ? want : "DawnBringer 32";
+  try{ localStorage.setItem(PAL_SEL_KEY, sel.value); }catch(_){}
+  renderPaletteGrid(sel.value);
 }
 function renderPaletteGrid(name){
   const grid=$("#paletteGrid"); grid.innerHTML="";
-  PALETTES[name].forEach(c=>{
+  const mine=isUserPalette(name), cols=paletteColors(name);
+  grid.classList.toggle("editable", mine);
+  if(!cols.length){
+    const d=document.createElement("div"); d.className="pal-empty";
+    d.textContent="Empty palette — pick a color, then press “Add current color”.";
+    grid.appendChild(d);
+  }
+  cols.forEach((c,i)=>{
     const d=document.createElement("div"); d.className="sw"; d.style.background=c;
-    d.title=c+"  (left = foreground, right = background)";
+    d.title=c+(mine ? "  (left = foreground, right = background, × removes)" : "  (left = foreground, right = background)");
     d.onclick=()=>{ setColor(c,"fg"); setActiveSlot("fg"); };
     d.oncontextmenu=ev=>{ ev.preventDefault(); setColor(c,"bg"); setActiveSlot("bg"); };
+    if(mine){
+      const x=document.createElement("span"); x.className="swx"; x.innerHTML=iconSVG("clear",10);
+      x.title="Remove "+c.toUpperCase();
+      x.onclick=ev=>{ ev.stopPropagation(); removePaletteColor(name,i); };
+      d.appendChild(x);
+    }
     grid.appendChild(d);
   });
+  // built-ins are read-only; make that obvious rather than letting edits silently fail
+  $("#palAddColor").disabled=!mine; $("#palRename").disabled=!mine; $("#palDel").disabled=!mine;
+  $("#palNote").textContent = mine
+    ? cols.length+" color"+(cols.length===1?"":"s")+" · saved in this browser"
+    : "Built-in palette (read-only). Duplicate it to start your own.";
+}
+
+function addColorToPalette(hex){
+  const name=activePaletteName();
+  if(!isUserPalette(name)){ showToast("“"+name+"” is built-in — Duplicate it first, then you can add colors.","info",4000); return; }
+  hex=normHex(hex); if(!hex) return;
+  const arr=userPalettes[name];
+  if(arr.indexOf(hex)>=0){ showToast(hex.toUpperCase()+" is already in “"+name+"”.","info"); return; }
+  arr.push(hex); saveUserPalettes(); renderPaletteSelect(name);
+  showToast("Added "+hex.toUpperCase()+" to “"+name+"”.","success");
+}
+function removePaletteColor(name,i){
+  if(!isUserPalette(name)) return;
+  userPalettes[name].splice(i,1); saveUserPalettes(); renderPaletteSelect(name);
+}
+async function newPalette(){
+  const n=await showPrompt("Name for the new palette:", uniquePaletteName("My palette"), {title:"New palette", okText:"Create"});
+  if(n==null) return; const name=n.trim(); if(!name) return;
+  if(paletteNameTaken(name)){ showToast("“"+name+"” is already taken.","error"); return; }
+  userPalettes[name]=[]; saveUserPalettes(); renderPaletteSelect(name);
+  showToast("Created “"+name+"”. Build it up with “Add current color”.","success",4000);
+}
+async function duplicatePalette(){
+  const src=activePaletteName();
+  const n=await showPrompt("Name for the copy of “"+src+"”:", uniquePaletteName(src+" copy"), {title:"Duplicate palette", okText:"Duplicate"});
+  if(n==null) return; const name=n.trim(); if(!name) return;
+  if(paletteNameTaken(name)){ showToast("“"+name+"” is already taken.","error"); return; }
+  userPalettes[name]=paletteColors(src).slice(); saveUserPalettes(); renderPaletteSelect(name);
+  showToast("Copied to “"+name+"” — now editable.","success");
+}
+async function renamePalette(){
+  const old=activePaletteName(); if(!isUserPalette(old)) return;
+  const n=await showPrompt("New name for “"+old+"”:", old, {title:"Rename palette"});
+  if(n==null) return; const name=n.trim(); if(!name || name===old) return;
+  if(paletteNameTaken(name)){ showToast("“"+name+"” is already taken.","error"); return; }
+  const next={};                                   // rebuild to preserve list order
+  for(const k in userPalettes) next[k===old?name:k]=userPalettes[k];
+  userPalettes=next; saveUserPalettes(); renderPaletteSelect(name);
+}
+async function deletePalette(){
+  const name=activePaletteName(); if(!isUserPalette(name)) return;
+  const ok=await showConfirm("Delete the palette “"+name+"”? This can't be undone.",{title:"Delete palette", okText:"Delete", danger:true});
+  if(!ok) return;
+  delete userPalettes[name]; saveUserPalettes(); renderPaletteSelect("DawnBringer 32");
+  showToast("Deleted “"+name+"”.","success");
+}
+function exportPalette(){
+  const name=activePaletteName(), cols=paletteColors(name);
+  if(!cols.length){ showToast("Nothing to export — this palette is empty.","info"); return; }
+  const text=cols.map(c=>c.slice(1).toUpperCase()).join("\r\n")+"\r\n";   // Lospec/Aseprite .hex
+  const a=document.createElement("a");
+  a.download=(name.replace(/[^\w\- ]+/g,"").trim()||"palette").replace(/\s+/g,"_")+".hex";
+  a.href=URL.createObjectURL(new Blob([text],{type:"text/plain"})); a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  showToast("Exported "+cols.length+" colors as .hex.","success");
+}
+// understands .hex/.txt hex lists, GIMP .gpl, and JSON (bare array or {name, colors})
+function parsePaletteText(text, fileName){
+  let name=(fileName||"Imported").replace(/\.[^.]+$/,"");
+  let cols=null;
+  const t=text.trim();
+  if(t.startsWith("{")||t.startsWith("[")){
+    try{
+      const j=JSON.parse(t);
+      if(Array.isArray(j)) cols=j;
+      else if(j && Array.isArray(j.colors)){ cols=j.colors; if(j.name) name=String(j.name); }
+    }catch(_){}
+  }
+  if(!cols){
+    const gpl=/^Name:\s*(.+)$/im.exec(text);
+    if(/^GIMP Palette/im.test(text) && gpl) name=gpl[1].trim();
+    const hexes=text.match(/#?\b[0-9a-fA-F]{6}\b/g);
+    if(hexes && hexes.length) cols=hexes;
+    else{
+      const out=[];                               // "R G B  name" triplet rows
+      text.split(/\r?\n/).forEach(line=>{
+        const m=line.match(/^\s*(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})\b/);
+        if(m) out.push(rgbToHex(+m[1],+m[2],+m[3]));
+      });
+      if(out.length) cols=out;
+    }
+  }
+  if(!cols) return null;
+  const seen={}, clean=[];
+  cols.forEach(c=>{ const h=normHex(c); if(h && !seen[h]){ seen[h]=1; clean.push(h); } });
+  return clean.length ? {name:name, colors:clean} : null;
+}
+function importPaletteFile(file){
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const parsed=parsePaletteText(String(rd.result), file.name);
+    if(!parsed){ showToast("Couldn't find any colors in that file.","error"); return; }
+    const name=uniquePaletteName(parsed.name||"Imported");
+    userPalettes[name]=parsed.colors.slice(0,1024);
+    saveUserPalettes(); renderPaletteSelect(name);
+    showToast("Imported "+userPalettes[name].length+" colors as “"+name+"”.","success");
+  };
+  rd.onerror=()=>showToast("Couldn't read that file.","error");
+  rd.readAsText(file);
 }
 
 // ------------------------------------------------------------------ layers UI
@@ -2239,6 +2808,7 @@ function loadProject(file){
 }
 function finishLoad(data){
   activeIndex=clamp(data.active||0,0,layers.length-1);
+  pruneTags();   // a hand-edited or older project file may carry out-of-range group ranges
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
   if(frames.length>1 && tlCollapsed) setTimelineCollapsed(false);   // an animated project wants its timeline
   undoStack=[]; redoStack=[]; fitZoom();
@@ -2249,40 +2819,133 @@ function finishLoad(data){
 
 // ------------------------------------------------------------------ spritesheet export (+ Aseprite-style JSON sidecar)
 function spriteBaseName(){ const d=docs.find(x=>x.id===activeDocId); return ((d&&d.name)||"sprite").replace(/[^\w\- ]+/g,"").trim()||"sprite"; }
-function exportSpritesheet(scale){
-  scale=scale||1;
-  const cw=W*scale, ch=H*scale, n=frames.length;
-  const sheet=document.createElement("canvas"); sheet.width=cw*n; sheet.height=ch;
+function safeFilePart(s){ return (String(s).replace(/[^\w\- ]+/g,"").trim()||"group").replace(/\s+/g,"_"); }
+
+// Ask for scale + how the frames should be arranged. Groups can each become their own row
+// (one sheet) or their own file.
+async function showSheetDialog(){
+  const has=tags.length>0;
+  const dis=has?"":" disabled";
+  const body=`
+    <div class="row"><label>Scale</label><select id="shScale">
+      <option value="1" selected>1× (true pixel size)</option><option value="2">2×</option>
+      <option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></div>
+    <div class="row"><label>Layout</label><select id="shLayout">
+      <option value="row"${has?"":" selected"}>Single row — all ${frames.length} frames</option>
+      <option value="grid">Grid — fixed number of columns</option>
+      <option value="grouprows"${dis}${has?" selected":""}>One row per group</option>
+      <option value="groupfiles"${dis}>Separate file per group</option></select></div>
+    <div class="row"><label>Columns</label><input type="number" id="shCols" min="1" max="64" value="8">
+      <span style="color:var(--muted)">grid only</span></div>`;
+  const ok=await openModal({title:"Export spritesheet",
+    message: has ? (tags.length+" group"+(tags.length>1?"s":"")+" found — each can be its own row or its own file.")
+                 : "No groups yet — add one from the Frame menu to export idle / walk / jump separately.",
+    bodyHTML:body, okText:"Export"});
+  if(!ok) return null;
+  return { scale:parseInt($("#shScale").value,10)||1, layout:$("#shLayout").value,
+           cols:clamp(parseInt($("#shCols").value,10)||8,1,64) };
+}
+
+// rows: [{name, idx:[frameIndex,…]}] — laid out row-major, ragged rows allowed
+function buildSheet(rows, scale){
+  const cw=W*scale, ch=H*scale;
+  const cols=rows.reduce((m,r)=>Math.max(m,r.idx.length),0);
+  const sheet=document.createElement("canvas");
+  sheet.width=Math.max(1,cols*cw); sheet.height=Math.max(1,rows.length*ch);
   const sctx=sheet.getContext("2d"); sctx.imageSmoothingEnabled=false;
-  const tmp=document.createElement("canvas"); tmp.width=W; tmp.height=H; const tctx=tmp.getContext("2d");
-  frames.forEach((f,i)=>{ compositeFrameInto(tctx,f); sctx.drawImage(tmp,0,0,W,H, i*cw,0,cw,ch); });
-  const base=spriteBaseName();
-  const a=document.createElement("a"); a.download=base+"_sheet.png"; a.href=sheet.toDataURL("image/png"); a.click();
-  // Aseprite "Array" JSON sidecar (importable as a spritesheet)
-  const fjson={};
-  frames.forEach((f,i)=>{ fjson[base+" "+i+".png"]={frame:{x:i*cw,y:0,w:cw,h:ch}, duration:f.dur,
-    rotated:false, trimmed:false, spriteSourceSize:{x:0,y:0,w:cw,h:ch}, sourceSize:{w:cw,h:ch}}; });
-  const json={ frames:fjson, meta:{ app:"PixelPaint", version:"1.0", image:base+"_sheet.png",
-    format:"RGBA8888", size:{w:sheet.width,h:sheet.height}, scale:String(scale),
-    frameTags:tags.map(t=>({name:t.name, from:t.from, to:t.to, direction:"forward", color:t.color})) } };
-  const jb=new Blob([JSON.stringify(json,null,1)],{type:"application/json"}), ju=URL.createObjectURL(jb);
-  setTimeout(()=>{ const a2=document.createElement("a"); a2.download=base+"_sheet.json"; a2.href=ju; a2.click(); setTimeout(()=>URL.revokeObjectURL(ju),1000); }, 300);
-  showToast("Exported spritesheet: "+n+" frame"+(n>1?"s":"")+" at "+scale+"× (PNG + Aseprite JSON).","success");
+  const tmp=document.createElement("canvas"); tmp.width=W; tmp.height=H;
+  const tctx=tmp.getContext("2d");
+  const placed=[];
+  rows.forEach((r,ri)=>r.idx.forEach((fi,ci)=>{
+    compositeFrameInto(tctx, frames[fi]);
+    sctx.drawImage(tmp,0,0,W,H, ci*cw, ri*ch, cw, ch);
+    placed.push({fi:fi, x:ci*cw, y:ri*ch, w:cw, h:ch});
+  }));
+  return {sheet:sheet, placed:placed};
+}
+function downloadCanvas(canvas, name){
+  const a=document.createElement("a"); a.download=name; a.href=canvas.toDataURL("image/png"); a.click();
+}
+function downloadJSON(obj, name, delay){
+  const u=URL.createObjectURL(new Blob([JSON.stringify(obj,null,1)],{type:"application/json"}));
+  setTimeout(()=>{
+    const a=document.createElement("a"); a.download=name; a.href=u; a.click();
+    setTimeout(()=>URL.revokeObjectURL(u),1000);
+  }, delay||0);
+}
+// Aseprite "Array" sidecar. frameTags are renumbered against the exported order, which is
+// what makes "one row per group" importable with its groups intact.
+function sheetJSON(base, imgName, built, scale, rows){
+  const fj={};
+  built.placed.forEach((p,n)=>{
+    fj[base+" "+n+".png"]={ frame:{x:p.x,y:p.y,w:p.w,h:p.h}, duration:frames[p.fi].dur,
+      rotated:false, trimmed:false,
+      spriteSourceSize:{x:0,y:0,w:p.w,h:p.h}, sourceSize:{w:p.w,h:p.h} };
+  });
+  let n=0; const ft=[];
+  rows.forEach(r=>{
+    const from=n; n+=r.idx.length;
+    if(r.name){
+      const src=tags.filter(t=>t.name===r.name)[0];
+      ft.push({name:r.name, from:from, to:n-1, direction:"forward", color:(src&&src.color)||"#000000"});
+    }
+  });
+  return { frames:fj, meta:{ app:"PixelPaint", version:"1.0", image:imgName, format:"RGBA8888",
+    size:{w:built.sheet.width,h:built.sheet.height}, scale:String(scale), frameTags:ft } };
+}
+function groupRows(){
+  return frameGroups().map(g=>({ name: g.tag>=0 ? tags[g.tag].name : "", idx:g.idx }));
+}
+function exportSpritesheet(opts){
+  opts=opts||{};
+  const scale=opts.scale||1, base=spriteBaseName();
+  const all=frames.map((f,i)=>i);
+
+  if(opts.layout==="groupfiles"){
+    const rows=groupRows().filter(r=>r.idx.length);
+    rows.forEach((r,k)=>{
+      const part=safeFilePart(r.name||"ungrouped");
+      const built=buildSheet([r], scale);
+      // staggered: browsers throttle or silently drop rapid-fire downloads
+      setTimeout(()=>{
+        downloadCanvas(built.sheet, base+"_"+part+".png");
+        downloadJSON(sheetJSON(base+"_"+part, base+"_"+part+".png", built, scale, [r]), base+"_"+part+".json", 250);
+      }, k*700);
+    });
+    showToast("Exporting "+rows.length+" group file"+(rows.length>1?"s":"")+" (PNG + JSON each) — watch your downloads.","success",4600);
+    return;
+  }
+
+  let rows;
+  if(opts.layout==="grouprows") rows=groupRows().filter(r=>r.idx.length);
+  else if(opts.layout==="grid"){
+    const c=opts.cols||8; rows=[];
+    for(let i=0;i<all.length;i+=c) rows.push({name:"", idx:all.slice(i,i+c)});
+  } else rows=[{name:"", idx:all}];
+
+  const built=buildSheet(rows, scale);
+  downloadCanvas(built.sheet, base+"_sheet.png");
+  downloadJSON(sheetJSON(base, base+"_sheet.png", built, scale, rows), base+"_sheet.json", 300);
+  showToast("Exported "+frames.length+" frame"+(frames.length>1?"s":"")+" at "+scale+"× — "
+    +built.sheet.width+"×"+built.sheet.height+" px (PNG + Aseprite JSON).","success",4200);
 }
 
 // ------------------------------------------------------------------ tool UI
 const TOOL_ICONS={pencil:"pencil",eraser:"eraser",bucket:"fill",eyedropper:"pick",line:"line",rect:"rect",ellipse:"ellipse",select:"select",wand:"wand",region:"region"};
+// the last tool that actually paints — where Remove-sub-canvas drops you back to
+const PAINT_TOOLS=["pencil","eraser","bucket","line","rect","ellipse"];
+let lastPaintTool="pencil";
 function setTool(t){
   tool=t;
+  if(PAINT_TOOLS.indexOf(t)>=0) lastPaintTool=t;
   document.querySelectorAll(".tool").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
   const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand",region:"Region"};
   $("#toolInfo").textContent=names[t];
   const ts=$("#toolStat"); if(ts){ ts.firstChild.outerHTML=iconSVG(TOOL_ICONS[t]||"pencil",14); }
-  // contextual tool options in the left panel
-  const opts=$("#toolOpts"); if(opts){ opts.classList.toggle("show-wand",t==="wand"); opts.classList.toggle("show-region",t==="region" && !region); }
-  // the sub-canvas controls live in the side panel, revealed while the Region tool is active (or a region exists)
-  const rs=$("#regionSection"); if(rs) rs.style.display=(t==="region"||region)?"":"none";
-  const rt=$("#regionToggleMenu"); if(rt) rt.checked=!!region;
+  // contextual tool options in the left panel (solid-fill only means something for closed shapes)
+  const opts=$("#toolOpts");
+  if(opts){ opts.classList.toggle("show-wand",t==="wand"); opts.classList.toggle("show-shape",t==="rect"||t==="ellipse"); }
+  renderRegionPanel();   // owns .show-region, #regionSection and the View-menu checkbox
   view.style.cursor = CURSORS[t] || "crosshair";
 }
 function setBrush(n){ const max=Math.max(16, Math.round(Math.max(W,H)/2)); brush=clamp(n,1,max); $("#brushReadout").textContent=brush+" px"; }
@@ -2328,7 +2991,7 @@ function runCmd(cmd){
     case "open": $("#openInput").click(); break;
     case "save": saveProject(); break;
     case "export": showExportDialog().then(s=>{ if(s) exportPNG(s); }); break;
-    case "sheet": showExportDialog().then(s=>{ if(s) exportSpritesheet(s); }); break;
+    case "sheet": showSheetDialog().then(o=>{ if(o) exportSpritesheet(o); }); break;
     case "rename": renameDoc(activeDocId); break;
     case "closetab": closeDoc(activeDocId); break;
     case "install": doInstall(); break;
@@ -2346,10 +3009,12 @@ function runCmd(cmd){
     case "delframe": deleteFrame(frameIndex); break;
     case "play": startPlayback(); break;
     case "addtag": addTag(); break;
+    case "addgroup": addGroupDialog(); break;
     case "selectall": selectAll(); break;
     case "deselect": clearSelection(); break;
     case "wandtool": setTool("wand"); break;
     case "snap": applyPaletteToLayer(); break;
+    case "delregion": if(region) removeRegion(); else showToast("There's no sub-canvas to remove.","info"); break;
     case "fit": fitZoom(); composite(); break;
     case "shortcuts": showShortcuts(); break;
     case "about": showAbout(); break;
@@ -2360,7 +3025,7 @@ document.querySelectorAll(".menu-dd").forEach(dd=>dd.addEventListener("click",e=
   runCmd(b.dataset.cmd); closeMenus();
 }));
 function showShortcuts(){
-  showAlert("Tools: B pencil · E eraser · F fill · I pick · L line · R rect · C ellipse · M select · W wand · D sub-canvas\n\nCtrl+Z undo · Ctrl+Y redo · Ctrl+A select all · Ctrl+D deselect · Ctrl+S save · Ctrl+O open\n\n[ ] brush size · + − zoom · G grid · X swap colors · Space play · Alt+click pick color",{title:"Keyboard shortcuts"});
+  showAlert("Tools: B pencil · E eraser · F fill · I pick · L line · R rect · C ellipse · M select · W wand · D sub-canvas\n\nCtrl+Z undo · Ctrl+Y redo · Ctrl+A select all · Ctrl+D deselect · Ctrl+S save · Ctrl+O open\n\n[ ] brush size · + − zoom · G grid · X swap colors · Space play · Alt+click pick color\n\nDel clears the selection, or removes the sub-canvas when nothing is selected.\n\nMouse: scroll = zoom · middle-drag = pan the canvas · right-drag = paint with the background color.",{title:"Keyboard shortcuts"});
 }
 function showAbout(){
   showAlert("PixelPaint — a single-file pixel-art editor.\nDraw, animate, manage layers and palettes, and export PNGs or spritesheets. Works offline and installs as an app.",{title:"About PixelPaint"});
@@ -2413,6 +3078,9 @@ $("#selMenu").addEventListener("click",e=>{
 $("#applyPaletteBtn").onclick=applyPaletteToLayer;
 
 document.addEventListener("pointerdown",e=>{
+  // the color picker closes when you click away from it (but not on its own anchor buttons)
+  if(cpOpen && !e.target.closest("#cpPop") && !e.target.closest("#colorButton")
+     && !e.target.closest("#primarySwatch") && !e.target.closest("#secondarySwatch")) cpClose();
   // context menus (image / selection)
   const menus=[$("#ctxMenu"),$("#selMenu")];
   const anyOpen=menus.some(m=>!m.hidden);
@@ -2464,13 +3132,13 @@ $("#tlCollapseBtn").onclick=()=>setTimelineCollapsed(!tlCollapsed);
 $("#tlSummary").onclick=()=>setTimelineCollapsed(false);
 $("#playBtn").onclick=startPlayback;
 $("#addFrameBtn").onclick=()=>addFrame(true);
-$("#addTagBtn").onclick=addTag;
+$("#addGroupBtn").onclick=addGroupDialog;
 $("#frameDur").onchange=e=>setFrameDur(parseInt(e.target.value,10)||DEFAULT_DUR);
 
 // sub-canvas (draw region) controls
 $("#regionCreate").onclick=createRegion;
 $("#regionCreate2").onclick=()=>{ createRegion(); };
-$("#rgRemove").onclick=removeRegion;
+$("#rgRemove").onclick=()=>removeRegion();   // wrapped: the click event must not land on `quiet`
 $("#rgCenter").onclick=centerRegion;
 $("#rgLock").onchange=e=>{ regionLocked=e.target.checked; composite(); };
 ["#rgW","#rgH","#rgX","#rgY"].forEach(id=>{ $(id).onchange=setRegionFromInputs; });
@@ -2489,16 +3157,59 @@ function doInstall(){
 $("#newTabBtn").onclick=newCanvasDialog;
 $("#openInput").onchange=e=>{ const f=e.target.files[0]; if(f) openProjectFile(f); e.target.value=""; };
 
-$("#colorPicker").oninput=e=>setColor(e.target.value, activeSlot);
 $("#hexInput").onchange=e=>{
-  let v=e.target.value.trim(); if(!v.startsWith("#")) v="#"+v;
-  const cur=activeSlot==="bg"?secondary:primary;
-  if(/^#[0-9a-f]{6}$/i.test(v)) setColor(v, activeSlot); else e.target.value=cur.toUpperCase();
+  const v=normHex(e.target.value);
+  if(v) setColor(v, activeSlot); else e.target.value=currentColor().toUpperCase();
 };
 $("#primarySwatch").onclick=()=>setActiveSlot("fg");
 $("#secondarySwatch").onclick=()=>setActiveSlot("bg");
+$("#primarySwatch").ondblclick=()=>{ setActiveSlot("fg"); cpOpenAt($("#primarySwatch")); };
+$("#secondarySwatch").ondblclick=()=>{ setActiveSlot("bg"); cpOpenAt($("#secondarySwatch")); };
 $("#swapColors").onclick=swapColors;
-$("#paletteSelect").onchange=e=>renderPaletteGrid(e.target.value);
+
+// ---- themed color picker wiring ----
+$("#colorButton").onclick=()=>{ if(cpOpen) cpClose(); else cpOpenAt($("#colorButton")); };
+$("#cpSV").addEventListener("pointerdown",e=>{
+  e.preventDefault(); cpDrag="sv";
+  try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(_){}
+  cpFromSV(e);
+});
+$("#cpHue").addEventListener("pointerdown",e=>{
+  e.preventDefault(); cpDrag="hue";
+  try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(_){}
+  cpFromHue(e);
+});
+window.addEventListener("pointermove",e=>{ if(cpDrag) (cpDrag==="sv"?cpFromSV:cpFromHue)(e); });
+window.addEventListener("pointerup",()=>{ if(cpDrag){ cpDrag=null; pushRecent(currentColor()); } });
+$("#cpHex").onchange=e=>{ const v=normHex(e.target.value); if(v) setColor(v, activeSlot); else cpRender(); };
+["#cpR","#cpG","#cpB"].forEach(id=>{
+  $(id).oninput=cpRGBInput;
+  $(id).onchange=()=>{ cpRGBInput(); pushRecent(currentColor()); };
+});
+$("#cpAddPal").onclick=()=>addColorToPalette(currentColor());
+$("#cpDone").onclick=cpClose;
+$("#cpEyedrop").onclick=async()=>{
+  if(!window.EyeDropper){ showToast("This browser has no screen eyedropper — use the Pick tool (I) on the canvas instead.","info",4200); return; }
+  try{
+    const res=await new window.EyeDropper().open();
+    const v=res && normHex(res.sRGBHex);
+    if(v) setColor(v, activeSlot);
+  }catch(_){ /* dismissed */ }
+};
+
+// ---- palette wiring ----
+$("#paletteSelect").onchange=e=>{
+  renderPaletteGrid(e.target.value);
+  try{ localStorage.setItem(PAL_SEL_KEY, e.target.value); }catch(_){}
+};
+$("#palAddColor").onclick=()=>addColorToPalette(primary);
+$("#palNew").onclick=newPalette;
+$("#palDup").onclick=duplicatePalette;
+$("#palRename").onclick=renamePalette;
+$("#palDel").onclick=deletePalette;
+$("#palExport").onclick=exportPalette;
+$("#palImport").onclick=()=>$("#palFileInput").click();
+$("#palFileInput").onchange=e=>{ const f=e.target.files[0]; if(f) importPaletteFile(f); e.target.value=""; };
 
 // layer toolbar (shared by the header buttons and the Layer menu)
 function addLayerCmd(){ pushUndo(); addLayer("Layer "+(layers.length+1)); renderLayers(); composite(); }
@@ -2540,6 +3251,7 @@ window.addEventListener("keydown",e=>{
 // keyboard
 window.addEventListener("keydown",e=>{
   if(!$("#modalRoot").hidden) return;   // a dialog is open; it handles its own keys
+  if(cpOpen && e.key==="Escape"){ e.preventDefault(); cpClose(); return; }   // before the input guard: focus may be in a picker field
   const tag=(e.target.tagName||"").toLowerCase();
   if(tag==="input"||tag==="select"||tag==="textarea") return;
   if(placement){
@@ -2574,10 +3286,14 @@ window.addEventListener("keydown",e=>{
     case "w": setTool("wand"); break;
     case "d": setTool("region"); break;
     case " ": e.preventDefault(); startPlayback(); break;
-    case "delete": case "backspace": if(selection){ e.preventDefault(); clearSelectionContents(); } break;
+    case "delete": case "backspace":
+      if(selection){ e.preventDefault(); clearSelectionContents(); }
+      else if(region){ e.preventDefault(); removeRegion(); }
+      break;
     case "escape":
       if(toolsPanelEl.classList.contains("open")||sidePanelEl.classList.contains("open")) closeDrawers();
       else if(selection) clearSelection();
+      else if(region && tool==="region") removeRegion();
       break;
   }
 });
@@ -2625,6 +3341,7 @@ window.addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); deferred
 window.addEventListener("appinstalled", ()=>{ $("#installBtn").style.display="none"; showToast("PixelPaint installed!","success"); });
 
 hydrateIcons();
+loadUserPalettes();
 renderPaletteSelect();
 setColor("#ffffff","bg");
 setColor("#000000","fg");
