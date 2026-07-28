@@ -359,6 +359,107 @@
   @media (max-width: 374px){ .brand{display:none;} }   /* keep the single row on tiny phones */
   @media (prefers-reduced-motion: reduce){ .tools,.side,.panel-backdrop{transition:none;} }
 
+  /* ============================================================= redesign */
+  /* ---- menu bar (File / Edit / Sprite / Layer / Frame / Select / View / Help) ---- */
+  .menubar{display:flex; align-items:center; gap:1px; flex:1; min-width:0; overflow-x:auto; overflow-y:hidden;}
+  .menu-item{
+    padding:5px 10px; border-radius:6px; color:var(--muted); cursor:pointer;
+    font-size:13px; white-space:nowrap; line-height:1.4; user-select:none;
+  }
+  .menu-item:hover{background:var(--panel2); color:var(--text);}
+  .menu-item.open{background:var(--panel2); color:var(--text);}
+  .menu-dd{ /* dropdown panels reuse the .ctx-menu look via shared rules below */ }
+  .menu-dd .hk{margin-left:auto; padding-left:22px; color:var(--muted); font-size:11px; font-weight:600;}
+  .menu-dd button:hover .hk{color:var(--text);}
+  .menu-dd .mi-check{width:18px; flex:none; color:var(--accent); display:inline-flex; align-items:center; justify-content:center;}
+  /* the View menu carries the real zoom/grid controls; keep them readable inside the dropdown */
+  .menu-dd .dd-row{display:flex; align-items:center; gap:8px; padding:6px 10px;}
+  .menu-dd .dd-row .lbl{color:var(--muted); font-size:12px; flex:1; text-transform:none; letter-spacing:0;}
+  .menu-dd .dd-zoom{display:flex; align-items:center; gap:6px; padding:6px 10px;}
+  .menu-dd .dd-zoom span#zoomReadout{flex:1; text-align:center; font-size:12px;}
+  .menu-dd .chk{padding:6px 10px; font-size:13px; color:var(--text);}
+
+  /* ---- tools as an icon grid ---- */
+  .tools .toolgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; width:100%;}
+  .tools .tool{justify-content:center; padding:0; min-height:0; aspect-ratio:1; gap:0;}
+  .tools .tool::after{content:none; display:none;}   /* no keyboard badge in the grid */
+  .brushbtns{display:flex; align-items:center; gap:6px; width:100%;}
+  .brushbtns #brushReadout{flex:1; min-width:0; text-align:center;}
+  #toolOpts .toolhead{display:none;}
+  #toolOpts.show-wand .opt-wand,#toolOpts.show-region .opt-region{display:block;}
+  .opt-wand,.opt-region{display:none;}
+
+  /* ---- collapsible side sections with a chevron ---- */
+  .section h3.sec-h{display:flex; align-items:center; gap:7px; cursor:pointer; margin-bottom:10px;}
+  .section h3.sec-h .chev{display:inline-flex; transition:transform .15s; color:var(--muted);}
+  .section.collapsed h3.sec-h{margin-bottom:0;}
+  .section.collapsed h3.sec-h .chev{transform:rotate(-90deg);}
+  .section.collapsed .sec-body{display:none !important;}
+  .section h3.sec-h .sec-tools{margin-left:auto; display:flex; gap:4px;}
+  .section h3.sec-h .sec-tools button{min-height:0; height:26px; min-width:26px; padding:0; border-radius:6px;}
+  .section h3.sec-h .sec-tools button:hover{border-color:var(--accent);}
+
+  /* layer rows: eye · lock · name · thumb  (opacity is a single slider below the list) */
+  .layer .lock{width:22px; text-align:center; cursor:pointer; opacity:.5; flex:none;}
+  .layer .lock.on{opacity:1; color:var(--accent);}
+  .layer .lock:hover{opacity:1; color:var(--accent);}
+  .layer .nm{font-weight:500;}
+  .layer.active .nm{font-weight:700;}
+  .opacity-row{display:flex; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid var(--line);}
+  .opacity-row .lbl{color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; flex:none;}
+  .opacity-row #opacityVal{color:var(--text); width:30px; text-align:right; flex:none; font-variant-numeric:tabular-nums;}
+
+  /* ---- canvas rulers ---- */
+  .canvasarea{
+    flex:1; min-width:0; display:grid;
+    grid-template-columns:22px 1fr; grid-template-rows:22px 1fr;
+    background:var(--bg);
+  }
+  .ruler-corner{grid-column:1; grid-row:1; background:var(--panel); border-right:1px solid var(--line); border-bottom:1px solid var(--line);}
+  #rulerTop{grid-column:2; grid-row:1; width:100%; height:22px; display:block; background:var(--panel); border-bottom:1px solid var(--line);}
+  #rulerLeft{grid-column:1; grid-row:2; width:22px; height:100%; display:block; background:var(--panel); border-right:1px solid var(--line);}
+  .canvasarea .stage{grid-column:2; grid-row:2; padding:22px;}
+
+  /* status-bar zoom + tool chips */
+  .statusbar .sb-btn{display:inline-flex; align-items:center; gap:5px; cursor:pointer; color:var(--muted);}
+  .statusbar .sb-btn:hover{color:var(--text);}
+  .statusbar .sb-btn svg{opacity:.85;}
+
+  /* ---- mobile: tool row on top, panels stacked & collapsible below the canvas ---- */
+  #menuHamburger{display:none;}             /* desktop default; the media query below reveals it */
+  @media (max-width: 768px){
+    .menubar{display:none;}                 /* menus fold into the hamburger */
+    #menuHamburger{display:inline-flex;}
+    .main{flex-direction:column;}
+    .canvasarea{grid-template-columns:0 1fr; grid-template-rows:0 1fr;}
+    #rulerTop,#rulerLeft,.ruler-corner{display:none;}
+    .canvasarea .stage{padding:12px;}
+    /* tools become a persistent horizontal scroll row above the canvas */
+    .tools{
+      position:static; transform:none; width:auto; flex:none; flex-direction:row;
+      align-items:center; gap:6px; overflow-x:auto; overflow-y:hidden; box-shadow:none;
+      border-right:none; border-bottom:1px solid var(--line); padding:7px 8px;
+    }
+    .tools.open{transform:none;}
+    .tools .toolhead,.tools #toolOpts,.tools .brush-sec{display:none;}   /* keep the row clean; brush lives in the hamburger */
+    .tools .toolgrid{display:flex; grid-template-columns:none; gap:6px; width:auto;}
+    .tools .tool{width:44px; height:44px; aspect-ratio:auto; flex:none;}
+    /* side panel becomes an in-flow stack under the canvas */
+    .side{
+      position:static; transform:none; width:auto; flex:none;
+      border-left:none; border-top:1px solid var(--line); box-shadow:none;
+      max-height:42vh; overflow-y:auto;
+    }
+    .side.open{transform:none;}
+    .mobile-cols{display:flex;}
+    .mobile-cols .section{flex:1; min-width:0;}
+    #menuSheet .menu-item{display:block; padding:11px 14px; border-radius:8px; font-size:15px;}
+  }
+  /* mobile menu sheet (the hamburger opens a simple list of menus) */
+  #menuSheet{position:fixed; left:8px; top:52px; z-index:1200; min-width:210px; background:var(--panel);
+    border:1px solid var(--line); border-radius:10px; padding:6px; box-shadow:0 18px 50px #000c;}
+  #menuSheet[hidden]{display:none;}
+
   /* ---- finger-friendly targets: any touch device, or any screen small enough to be in drawer mode ---- */
   @media (pointer: coarse), (max-width: 768px){
     button, select, input[type=text], input[type=number]{min-height:42px;}
@@ -382,41 +483,113 @@
 </head>
 <body>
 <div id="app">
-  <!-- TOP BAR -->
+  <!-- TOP BAR: brand + menu bar -->
   <div class="topbar">
-    <button id="toolsDrawerBtn" class="iconbtn drawer-btn" data-icon="pencil" title="Tools"></button>
     <div class="brand">Pixel<b>Paint</b></div>
-    <button id="fileMenuBtn" data-icon="menu" title="File menu — New, Open, Save, Export, Install">File</button>
-    <div class="sep"></div>
-
-    <div class="group">
-      <button id="undoBtn" data-icon="undo" title="Undo (Ctrl+Z)"><span class="btxt">Undo</span></button>
-      <button id="redoBtn" data-icon="redo" title="Redo (Ctrl+Y)"><span class="btxt">Redo</span></button>
+    <button id="menuHamburger" class="iconbtn" data-icon="menu" title="Menu"></button>
+    <div class="menubar" id="menubar">
+      <div class="menu-item" data-menu="file">File</div>
+      <div class="menu-item" data-menu="edit">Edit</div>
+      <div class="menu-item" data-menu="sprite">Sprite</div>
+      <div class="menu-item" data-menu="layer">Layer</div>
+      <div class="menu-item" data-menu="frame">Frame</div>
+      <div class="menu-item" data-menu="select">Select</div>
+      <div class="menu-item" data-menu="view">View</div>
+      <div class="menu-item" data-menu="help">Help</div>
     </div>
-
-    <button id="sideDrawerBtn" class="iconbtn drawer-btn" data-icon="palette" title="Colors, palette &amp; layers" style="margin-left:auto"></button>
+    <div class="group" style="margin-left:auto">
+      <button id="undoBtn" class="iconbtn" data-icon="undo" title="Undo (Ctrl+Z)"></button>
+      <button id="redoBtn" class="iconbtn" data-icon="redo" title="Redo (Ctrl+Y)"></button>
+    </div>
+    <button id="sideDrawerBtn" class="iconbtn drawer-btn" data-icon="palette" title="Colors, palette &amp; layers"></button>
     <input type="file" id="openInput" accept=".pxpaint,.json,application/json" style="display:none" />
   </div>
 
-  <!-- TAB BAR (one tab per open drawing) -->
-  <div class="tabbar">
+  <!-- TAB BAR (shown only when more than one drawing is open) -->
+  <div class="tabbar" id="tabbar" style="display:none">
     <div class="tabs" id="tabs"></div>
     <button id="newTabBtn" class="tab-add iconbtn" data-icon="add" data-icon-size="16" title="New tab"></button>
   </div>
 
-  <!-- FILE MENU -->
-  <div id="fileMenu" class="ctx-menu" hidden>
-    <button data-fa="new"    data-icon="new"      data-icon-size="16">New canvas…</button>
-    <button data-fa="resize" data-icon="select"   data-icon-size="16">Resize canvas…</button>
+  <!-- ===================== MENU DROPDOWNS ===================== -->
+  <div id="menu-file" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="new"    data-icon="new"      data-icon-size="16">New canvas…</button>
     <div class="ctx-sep"></div>
-    <button data-fa="open"   data-icon="folder"   data-icon-size="16">Open project…</button>
-    <button data-fa="save"   data-icon="save"     data-icon-size="16">Save project</button>
-    <button data-fa="export" data-icon="download" data-icon-size="16">Export PNG…</button>
-    <button data-fa="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
+    <button data-cmd="open"   data-icon="folder"   data-icon-size="16">Open project…</button>
+    <button data-cmd="save"   data-icon="save"     data-icon-size="16">Save project<span class="hk">Ctrl+S</span></button>
     <div class="ctx-sep"></div>
-    <button data-fa="rename" data-icon="pencil"   data-icon-size="16">Rename tab&hellip;</button>
-    <button data-fa="closetab" data-icon="clear"  data-icon-size="16">Close tab</button>
-    <button id="installBtn" data-fa="install" data-icon="download" data-icon-size="16" style="display:none">Install app</button>
+    <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
+    <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="newtab"   data-icon="add"    data-icon-size="16">New tab</button>
+    <button data-cmd="rename" data-icon="pencil"   data-icon-size="16">Rename tab…</button>
+    <button data-cmd="closetab" data-icon="clear"  data-icon-size="16">Close tab</button>
+    <button id="installBtn" data-cmd="install" data-icon="download" data-icon-size="16" style="display:none">Install app</button>
+  </div>
+  <div id="menu-edit" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="undo" data-icon="undo" data-icon-size="16">Undo<span class="hk">Ctrl+Z</span></button>
+    <button data-cmd="redo" data-icon="redo" data-icon-size="16">Redo<span class="hk">Ctrl+Y</span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
+  </div>
+  <div id="menu-sprite" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="resize" data-icon="select" data-icon-size="16">Resize canvas…</button>
+    <button data-cmd="addimage" data-icon="image" data-icon-size="16">Add image…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
+    <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
+  </div>
+  <div id="menu-layer" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="addlayer" data-icon="add"  data-icon-size="16">New layer</button>
+    <button data-cmd="duplayer" data-icon="copy" data-icon-size="16">Duplicate layer</button>
+    <button data-cmd="dellayer" data-icon="trash" data-icon-size="16">Delete layer</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="uplayer"   data-icon="up"   data-icon-size="16">Move up</button>
+    <button data-cmd="downlayer" data-icon="down" data-icon-size="16">Move down</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
+  </div>
+  <div id="menu-frame" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="addframe" data-icon="add"   data-icon-size="16">New frame</button>
+    <button data-cmd="delframe" data-icon="trash" data-icon-size="16">Delete frame</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="play"   data-icon="play" data-icon-size="16">Play / stop<span class="hk">Space</span></button>
+    <button data-cmd="addtag" data-icon="tag"  data-icon-size="16">Add tag…</button>
+  </div>
+  <div id="menu-select" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="selectall" data-icon="select" data-icon-size="16">Select all<span class="hk">Ctrl+A</span></button>
+    <button data-cmd="deselect"  data-icon="clear"  data-icon-size="16">Deselect<span class="hk">Ctrl+D</span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="wandtool" data-icon="wand" data-icon-size="16">Magic wand tool</button>
+    <button data-cmd="snap" data-icon="palette" data-icon-size="16">Snap to palette</button>
+  </div>
+  <div id="menu-view" class="ctx-menu menu-dd" hidden>
+    <div class="dd-zoom">
+      <button id="zoomOut" class="iconbtn" title="Zoom out (-)">−</button>
+      <span id="zoomReadout">1600%</span>
+      <button id="zoomIn" class="iconbtn" title="Zoom in (+)">+</button>
+    </div>
+    <button id="zoomFit" data-cmd="fit" data-icon="center" data-icon-size="16">Fit to window</button>
+    <div class="ctx-sep"></div>
+    <label class="chk"><input type="checkbox" id="gridToggle" checked /> <span data-icon="grid" data-icon-size="15"></span> Grid<span class="hk">G</span></label>
+    <label class="chk"><input type="checkbox" id="centerToggle" checked /> <span data-icon="center" data-icon-size="15"></span> Center guide</label>
+    <label class="chk"><input type="checkbox" id="regionToggleMenu" /> <span data-icon="region" data-icon-size="15"></span> Sub-canvas</label>
+  </div>
+  <div id="menu-help" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Keyboard shortcuts</button>
+    <button data-cmd="about" data-icon="info" data-icon-size="16">About PixelPaint</button>
+  </div>
+
+  <!-- mobile: hamburger opens a simple stacked menu list -->
+  <div id="menuSheet" hidden>
+    <div class="menu-item" data-menu="file">File</div>
+    <div class="menu-item" data-menu="edit">Edit</div>
+    <div class="menu-item" data-menu="sprite">Sprite</div>
+    <div class="menu-item" data-menu="layer">Layer</div>
+    <div class="menu-item" data-menu="frame">Frame</div>
+    <div class="menu-item" data-menu="select">Select</div>
+    <div class="menu-item" data-menu="view">View</div>
+    <div class="menu-item" data-menu="help">Help</div>
   </div>
 
   <!-- MAIN -->
@@ -424,92 +597,116 @@
     <!-- TOOLS -->
     <div class="tools" id="toolPanel">
       <div class="toolhead">Tools</div>
-      <button class="tool" data-tool="pencil"     data-icon="pencil"  data-key="B" title="Pencil (B)">Pencil</button>
-      <button class="tool" data-tool="eraser"     data-icon="eraser"  data-key="E" title="Eraser (E)">Eraser</button>
-      <button class="tool" data-tool="bucket"     data-icon="fill"    data-key="F" title="Fill (F)">Fill</button>
-      <button class="tool" data-tool="eyedropper" data-icon="pick"    data-key="I" title="Pick color (I)">Pick</button>
-      <button class="tool" data-tool="line"       data-icon="line"    data-key="L" title="Line (L)">Line</button>
-      <button class="tool" data-tool="rect"       data-icon="rect"    data-key="R" title="Rectangle (R)">Rectangle</button>
-      <button class="tool" data-tool="ellipse"    data-icon="ellipse" data-key="C" title="Ellipse (C)">Ellipse</button>
-      <button class="tool" data-tool="select"     data-icon="select"  data-key="M" title="Rectangle select (M)">Select</button>
-      <button class="tool" data-tool="wand"       data-icon="wand"    data-key="W" title="Magic wand — select by color (W)">Wand</button>
-      <button class="tool" data-tool="region"     data-icon="region"  data-key="D" title="Sub-canvas — drag a draw area (D)">Region</button>
-
-      <div class="toolhead">Brush</div>
-      <div class="group" style="gap:6px; width:100%">
-        <button id="brushDown" class="iconbtn" title="Smaller brush ([)">−</button>
-        <span id="brushReadout" style="flex:1; min-width:0; text-align:center;">1 px</span>
-        <button id="brushUp" class="iconbtn" title="Bigger brush (])">+</button>
+      <div class="toolgrid">
+        <button class="tool" data-tool="pencil"     data-icon="pencil"  title="Pencil (B)"></button>
+        <button class="tool" data-tool="eraser"     data-icon="eraser"  title="Eraser (E)"></button>
+        <button class="tool" data-tool="bucket"     data-icon="fill"    title="Fill (F)"></button>
+        <button class="tool" data-tool="eyedropper" data-icon="pick"    title="Pick color (I)"></button>
+        <button class="tool" data-tool="line"       data-icon="line"    title="Line (L)"></button>
+        <button class="tool" data-tool="rect"       data-icon="rect"    title="Rectangle (R)"></button>
+        <button class="tool" data-tool="ellipse"    data-icon="ellipse" title="Ellipse (C)"></button>
+        <button class="tool" data-tool="select"     data-icon="select"  title="Rectangle select (M)"></button>
+        <button class="tool" data-tool="wand"       data-icon="wand"    title="Magic wand — select by color (W)"></button>
+        <button class="tool" data-tool="region"     data-icon="region"  title="Sub-canvas — drag a draw area (D)"></button>
       </div>
-      <label class="chk" style="margin-top:6px"><input type="checkbox" id="fillShape" /> Fill shapes</label>
 
-      <div class="toolhead">Wand</div>
-      <div class="group" style="gap:6px; width:100%">
-        <span style="color:var(--muted)">Tol</span>
-        <input type="number" id="wandTol" min="0" max="255" value="32" style="flex:1; min-width:0; width:auto" title="Color tolerance: 0 = exact match, higher = looser" />
+      <div class="brush-sec">
+        <div class="toolhead">Brush</div>
+        <div class="brushbtns">
+          <button id="brushDown" class="iconbtn" title="Smaller brush ([)">−</button>
+          <span id="brushReadout">1 px</span>
+          <button id="brushUp" class="iconbtn" title="Bigger brush (])">+</button>
+        </div>
+        <label class="chk" style="margin-top:8px"><input type="checkbox" id="fillShape" /> Fill shapes</label>
       </div>
-      <label class="chk" style="margin-top:6px"><input type="checkbox" id="wandContig" checked /> Contiguous</label>
 
-      <div class="toolhead">View</div>
-      <div class="group" style="gap:6px; width:100%">
-        <button id="zoomOut" class="iconbtn" title="Zoom out (-)">−</button>
-        <span id="zoomReadout" style="flex:1; min-width:0; text-align:center;">1600%</span>
-        <button id="zoomIn" class="iconbtn" title="Zoom in (+)">+</button>
+      <!-- contextual options for the active tool -->
+      <div id="toolOpts">
+        <div class="opt-wand">
+          <div class="toolhead">Wand</div>
+          <div class="brushbtns">
+            <span style="color:var(--muted)">Tol</span>
+            <input type="number" id="wandTol" min="0" max="255" value="32" style="flex:1; min-width:0; width:auto" title="Color tolerance: 0 = exact match, higher = looser" />
+          </div>
+          <label class="chk" style="margin-top:8px"><input type="checkbox" id="wandContig" checked /> Contiguous</label>
+        </div>
+        <div class="opt-region">
+          <div class="toolhead">Sub-canvas</div>
+          <button id="regionCreate2" style="width:100%" data-icon="region" data-icon-size="15">Create draw area</button>
+        </div>
       </div>
-      <button id="zoomFit" style="width:100%; margin-top:6px" title="Fit the canvas to the window">Fit to window</button>
-      <label class="chk" style="margin-top:6px"><input type="checkbox" id="gridToggle" checked /><span data-icon="grid" data-icon-size="15"></span> Grid</label>
-      <label class="chk"><input type="checkbox" id="centerToggle" checked /><span data-icon="center" data-icon-size="15"></span> Center</label>
 
-      <div class="toolhead">Layer</div>
-      <button id="addImageBtn" data-icon="image" title="Add an image as a new layer (or paste / drag-drop)">Add image…</button>
-      <button id="clearLayerBtn" data-icon="clear" title="Erase everything on the active layer">Clear layer</button>
       <input type="file" id="imgInput" accept="image/*" hidden />
-
       <div class="hint">Alt+click = quick color pick.<br/>[ ] resize brush. Scroll = zoom.</div>
     </div>
 
-    <!-- CANVAS -->
-    <div class="stage" id="stage">
-      <div class="canvas-wrap" id="wrap">
-        <canvas id="view"></canvas>
-      </div>
-      <canvas id="placeOverlay" hidden></canvas>
-      <div class="place-bar" id="placeBar" hidden>
-        <span class="info"><span data-icon="image" data-icon-size="15"></span><span id="placeSize">—</span></span>
-        <button id="placeActual" title="Actual size (1:1)">1:1</button>
-        <button id="placeFit" title="Fit to canvas">Fit</button>
-        <button id="placeCommit" class="primary" data-icon="check" title="Place image (Enter)">Place</button>
-        <button id="placeCancel" data-icon="clear" title="Cancel / right-click for more (Esc)">Cancel</button>
+    <!-- CANVAS AREA (rulers + stage) -->
+    <div class="canvasarea">
+      <div class="ruler-corner"></div>
+      <canvas id="rulerTop"></canvas>
+      <canvas id="rulerLeft"></canvas>
+      <div class="stage" id="stage">
+        <div class="canvas-wrap" id="wrap">
+          <canvas id="view"></canvas>
+        </div>
+        <canvas id="placeOverlay" hidden></canvas>
+        <div class="place-bar" id="placeBar" hidden>
+          <span class="info"><span data-icon="image" data-icon-size="15"></span><span id="placeSize">—</span></span>
+          <button id="placeActual" title="Actual size (1:1)">1:1</button>
+          <button id="placeFit" title="Fit to canvas">Fit</button>
+          <button id="placeCommit" class="primary" data-icon="check" title="Place image (Enter)">Place</button>
+          <button id="placeCancel" data-icon="clear" title="Cancel / right-click for more (Esc)">Cancel</button>
+        </div>
       </div>
     </div>
 
     <!-- SIDE -->
     <div class="side" id="sidePanel">
-      <div class="section">
-        <h3>Color</h3>
-        <div class="colorrow">
-          <div class="dualswatch">
-            <div class="sw" id="secondarySwatch" title="Background — right-click a palette color, or right-drag on the canvas"></div>
-            <div class="sw" id="primarySwatch" title="Foreground — left-click a palette color, or left-drag on the canvas"></div>
-            <button class="swap" id="swapColors" data-icon="swap" data-icon-size="14" title="Swap foreground / background (X)"></button>
+      <div class="mobile-cols">
+      <div class="section collapsible" id="colorSection">
+        <h3 class="sec-h" data-sec="colorSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span>Color</h3>
+        <div class="sec-body">
+          <div class="colorrow">
+            <div class="dualswatch">
+              <div class="sw" id="secondarySwatch" title="Background — right-click a palette color, or right-drag on the canvas"></div>
+              <div class="sw" id="primarySwatch" title="Foreground — left-click a palette color, or left-drag on the canvas"></div>
+              <button class="swap" id="swapColors" data-icon="swap" data-icon-size="14" title="Swap foreground / background (X)"></button>
+            </div>
+            <div class="col">
+              <input type="color" id="colorPicker" value="#000000" />
+              <input type="text" id="hexInput" value="#000000" spellcheck="false" />
+            </div>
           </div>
-          <div class="col">
-            <input type="color" id="colorPicker" value="#000000" />
-            <input type="text" id="hexInput" value="#000000" spellcheck="false" />
+          <div class="recents" id="recents"></div>
+          <select id="paletteSelect" style="width:100%; margin-top:10px"></select>
+          <div class="palette" id="paletteGrid"></div>
+          <button id="applyPaletteBtn" data-icon="palette" style="width:100%; margin-top:8px;" title="Remap the active layer (or the current selection) to the nearest colors in this palette">Snap to this palette</button>
+        </div>
+      </div>
+
+      <div class="section collapsible" id="layerSection" style="flex:1 0 auto; display:flex; flex-direction:column;">
+        <h3 class="sec-h" data-sec="layerSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span>Layers
+          <span class="sec-tools" onclick="event.stopPropagation()">
+            <button id="addLayer" data-icon="add" data-icon-size="15" title="Add layer"></button>
+            <button id="dupLayer" data-icon="copy" data-icon-size="15" title="Duplicate layer"></button>
+            <button id="upLayer" data-icon="up" data-icon-size="15" title="Move layer up"></button>
+            <button id="downLayer" data-icon="down" data-icon-size="15" title="Move layer down"></button>
+            <button id="delLayer" data-icon="trash" data-icon-size="15" title="Delete layer"></button>
+          </span>
+        </h3>
+        <div class="sec-body" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+          <div class="layerlist" id="layerList"></div>
+          <div class="opacity-row">
+            <span class="lbl">Opacity</span>
+            <input type="range" id="opacitySlider" min="0" max="100" value="100" />
+            <span id="opacityVal">100</span>
           </div>
         </div>
-        <div class="recents" id="recents"></div>
-        <div class="hint" style="margin:7px 0 0; padding:0;">Left = foreground, right = background. Click a swatch to choose which one the picker edits.</div>
+      </div>
       </div>
 
-      <div class="section">
-        <h3>Palette</h3>
-        <select id="paletteSelect" style="width:100%"></select>
-        <div class="palette" id="paletteGrid"></div>
-        <button id="applyPaletteBtn" data-icon="palette" style="width:100%; margin-top:8px;" title="Remap the active layer (or the current selection) to the nearest colors in this palette">Snap to this palette</button>
-      </div>
-
-      <div class="section" id="regionSection">
+      <!-- Sub-canvas controls (shown when the Region tool is active) -->
+      <div class="section" id="regionSection" style="display:none">
         <h3>Sub-canvas</h3>
         <div id="regionNone">
           <button id="regionCreate" data-icon="region" style="width:100%">Create draw area</button>
@@ -526,18 +723,6 @@
             <button id="rgRemove" style="background:var(--danger); border-color:var(--danger); color:#fff;">Remove</button>
           </div>
         </div>
-      </div>
-
-      <div class="layers">
-        <div class="section" style="border:none; padding-bottom:0;"><h3 style="margin:0">Layers</h3></div>
-        <div class="bar">
-          <button id="addLayer" class="iconbtn" data-icon="add" title="Add layer"></button>
-          <button id="dupLayer" class="iconbtn" data-icon="copy" title="Duplicate layer"></button>
-          <button id="upLayer" class="iconbtn" data-icon="up" title="Move layer up"></button>
-          <button id="downLayer" class="iconbtn" data-icon="down" title="Move layer down"></button>
-          <button id="delLayer" class="iconbtn" data-icon="trash" title="Delete layer"></button>
-        </div>
-        <div class="layerlist" id="layerList"></div>
       </div>
     </div>
   </div>
@@ -562,11 +747,13 @@
 
   <!-- STATUS -->
   <div class="statusbar">
-    <span id="docInfo">32 × 32</span>
+    <span id="layerInfo">Layer: —</span>
     <span id="cursorInfo">—</span>
     <span id="selInfo" style="color:var(--accent)"></span>
     <span class="sp"></span>
-    <span id="toolInfo">Pencil</span>
+    <span id="docInfo">32 × 32</span>
+    <span class="sb-btn" id="zoomStat" title="Zoom to fit"><span data-icon="wand" data-icon-size="14"></span><span id="zoomStatVal">600%</span></span>
+    <span class="sb-btn" id="toolStat"><span data-icon="pencil" data-icon-size="14"></span><span id="toolInfo">Pencil</span></span>
   </div>
 </div>
 
@@ -856,7 +1043,7 @@ function makeLayerCanvas(){const c=document.createElement("canvas");c.width=W;c.
 
 function addLayer(name,atTop=true){
   const c=makeLayerCanvas();
-  const l={id:layerSeq++, name:name||("Layer "+layerSeq), visible:true, opacity:1, canvas:c, ctx:c.getContext("2d")};
+  const l={id:layerSeq++, name:name||("Layer "+layerSeq), visible:true, opacity:1, locked:false, canvas:c, ctx:c.getContext("2d")};
   // Insert above the active layer; clamp so the very first layer lands at index 0 (not 1).
   const insertAt = atTop ? Math.min(activeIndex+1, layers.length) : layers.length;
   layers.splice(insertAt,0,l);
@@ -913,8 +1100,11 @@ function setZoom(z, recompose=true){
   view.width=W*zoom; view.height=H*zoom;
   const cell=Math.max(6, zoom);   // 1 checker square == 1 art pixel, so the background aligns to the grid at any zoom
   wrap.style.backgroundSize=(cell*2)+"px "+(cell*2)+"px";
-  $("#zoomReadout").textContent=Math.round(zoom*100)+"%";
+  const zt=Math.round(zoom*100)+"%";
+  const zr=$("#zoomReadout"); if(zr) zr.textContent=zt;
+  const zs=$("#zoomStatVal"); if(zs) zs.textContent=zt;
   if(recompose) composite();
+  drawRulers();
 }
 
 function updateDocInfo(){$("#docInfo").textContent=W+" × "+H+(frames&&frames.length>1?("  ·  frame "+(frameIndex+1)+"/"+frames.length):"");}
@@ -1128,6 +1318,7 @@ async function renameDoc(id){
   if(n!=null && n.trim()!==""){ d.name=n.trim(); renderTabs(); }
 }
 function renderTabs(){
+  const bar=$("#tabbar"); if(bar) bar.style.display = docs.length>1 ? "" : "none";
   const host=$("#tabs"); host.innerHTML="";
   for(const d of docs){
     const t=document.createElement("div");
@@ -1194,6 +1385,39 @@ function drawCenterGuide(){
   line(0,cy,w,cy);   // horizontal center
   vctx.setLineDash([]);
   vctx.restore();
+}
+
+// ---- rulers: tick marks + pixel coordinates around the canvas, aligned to the live view ----
+function sizeRulerCanvas(cv){ if(cv.width!==cv.clientWidth) cv.width=cv.clientWidth; if(cv.height!==cv.clientHeight) cv.height=cv.clientHeight; }
+function drawRulers(){
+  const rt=document.getElementById("rulerTop"), rl=document.getElementById("rulerLeft");
+  if(!rt||!rl||!rt.clientWidth||!rl.clientHeight) return;
+  sizeRulerCanvas(rt); sizeRulerCanvas(rl);
+  const rtx=rt.getContext("2d"), rlx=rl.getContext("2d");
+  const css=getComputedStyle(document.documentElement);
+  const muted=(css.getPropertyValue("--muted")||"#9aa1b1").trim();
+  const line =(css.getPropertyValue("--line") ||"#3a3f4b").trim();
+  const vr=view.getBoundingClientRect(), trr=rt.getBoundingClientRect(), lrr=rl.getBoundingClientRect();
+  const ox=vr.left-trr.left, oy=vr.top-lrr.top;
+  const step=(zoom>=16)?8:(zoom>=8?16:32);   // label density scales with zoom so ticks don't crowd
+  // top ruler
+  rtx.clearRect(0,0,rt.width,rt.height); rtx.font="9px system-ui,sans-serif"; rtx.textBaseline="alphabetic";
+  const TH=rt.height;
+  for(let px=0;px<=W;px++){
+    const x=Math.round(ox+px*zoom); if(x<-24||x>rt.width+24) continue;
+    const major=(px%step===0);
+    rtx.strokeStyle=major?muted:line; rtx.beginPath(); rtx.moveTo(x+.5, major?TH-8:TH-4); rtx.lineTo(x+.5,TH); rtx.stroke();
+    if(major && px<W){ rtx.fillStyle=muted; rtx.fillText(px, x+2, TH-9); }
+  }
+  // left ruler
+  rlx.clearRect(0,0,rl.width,rl.height); rlx.font="9px system-ui,sans-serif"; rlx.textBaseline="top";
+  const LW=rl.width;
+  for(let py=0;py<=H;py++){
+    const y=Math.round(oy+py*zoom); if(y<-24||y>rl.height+24) continue;
+    const major=(py%step===0);
+    rlx.strokeStyle=major?muted:line; rlx.beginPath(); rlx.moveTo(major?LW-8:LW-4, y+.5); rlx.lineTo(LW, y+.5); rlx.stroke();
+    if(major && py<H){ rlx.fillStyle=muted; rlx.fillText(py, 1, y+2); }
+  }
 }
 
 // ------------------------------------------------------------------ sub-canvas (draw region)
@@ -1754,6 +1978,10 @@ view.addEventListener("pointerdown",e=>{
   if(e.altKey){ pickColor(p.x,p.y,slot); return; }
   drawColor = slot==="bg" ? secondary : primary;     // right-click paints background color
   const L=activeLayer(); if(!L) return;
+  // locked layers block anything that edits pixels (picking / wand / region still work)
+  if(L.locked && tool!=="eyedropper" && tool!=="wand" && tool!=="region"){
+    showToast("This layer is locked.","info"); return;
+  }
 
   if(tool==="pencil"||tool==="eraser"){
     pushUndo(); drawing=true; last=p;
@@ -1777,8 +2005,8 @@ view.addEventListener("pointerdown",e=>{
 // placement gestures arrive on the full-stage overlay, so handles in the gray area work
 placeOverlay.addEventListener("pointerdown",e=>{ if(placement && e.button===0) placementDown(e); });
 placeOverlay.addEventListener("contextmenu",e=>{ if(placement){ e.preventDefault(); openCtxMenu(e.clientX,e.clientY); } });
-window.addEventListener("resize",()=>{ if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); } });
-stage.addEventListener("scroll",()=>{ if(placement) paintPlaceOverlay(); });
+window.addEventListener("resize",()=>{ if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); } drawRulers(); });
+stage.addEventListener("scroll",()=>{ if(placement) paintPlaceOverlay(); drawRulers(); });
 
 window.addEventListener("pointermove",e=>{
   if(touchPtrs.has(e.pointerId)) touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
@@ -1928,9 +2156,10 @@ function renderLayers(){
     eye.className="eye"+(l.visible?"":" off"); eye.innerHTML=iconSVG(l.visible?"visible":"hidden",16); eye.title="Toggle visibility";
     eye.onclick=ev=>{ev.stopPropagation(); l.visible=!l.visible; composite(); renderLayers();};
 
-    const thumb=document.createElement("canvas");
-    thumb.className="thumb"; thumb.width=W; thumb.height=H; l._thumb=thumb;
-    refreshThumb(l);
+    const lock=document.createElement("div");
+    lock.className="lock"+(l.locked?" on":""); lock.innerHTML=iconSVG("lock",15);
+    lock.title=l.locked?"Locked — click to unlock":"Unlocked — click to lock";
+    lock.onclick=ev=>{ev.stopPropagation(); l.locked=!l.locked; renderLayers();};
 
     const nm=document.createElement("div");
     nm.className="nm"; nm.textContent=l.name; nm.title="Double-click to rename";
@@ -1938,14 +2167,18 @@ function renderLayers(){
       const n=await showPrompt("New name for this layer:", l.name, {title:"Rename layer"});
       if(n!=null && n.trim()!==""){ l.name=n.trim(); renderLayers(); } };
 
-    const op=document.createElement("input");
-    op.type="range"; op.className="op"; op.min=0; op.max=100; op.value=Math.round(l.opacity*100); op.title="Opacity";
-    op.oninput=ev=>{ev.stopPropagation(); l.opacity=op.value/100; composite();};
-    op.onclick=ev=>ev.stopPropagation();
+    const thumb=document.createElement("canvas");
+    thumb.className="thumb"; thumb.width=W; thumb.height=H; l._thumb=thumb;
+    refreshThumb(l);
 
-    row.append(eye,thumb,nm,op);
+    row.append(eye,lock,nm,thumb);
     list.appendChild(row);
   }
+  // single opacity slider + status reflect the active layer
+  const AL=activeLayer();
+  const os=$("#opacitySlider"), ov=$("#opacityVal"), li=$("#layerInfo");
+  if(AL){ if(os) os.value=Math.round(AL.opacity*100); if(ov) ov.textContent=Math.round(AL.opacity*100); if(li) li.textContent="Layer: "+AL.name; }
+  else if(li){ li.textContent="Layer: —"; }
 }
 function refreshThumb(l){
   if(!l||!l._thumb) return;
@@ -2038,30 +2271,105 @@ function exportSpritesheet(scale){
 }
 
 // ------------------------------------------------------------------ tool UI
+const TOOL_ICONS={pencil:"pencil",eraser:"eraser",bucket:"fill",eyedropper:"pick",line:"line",rect:"rect",ellipse:"ellipse",select:"select",wand:"wand",region:"region"};
 function setTool(t){
   tool=t;
   document.querySelectorAll(".tool").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
   const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand",region:"Region"};
   $("#toolInfo").textContent=names[t];
+  const ts=$("#toolStat"); if(ts){ ts.firstChild.outerHTML=iconSVG(TOOL_ICONS[t]||"pencil",14); }
+  // contextual tool options in the left panel
+  const opts=$("#toolOpts"); if(opts){ opts.classList.toggle("show-wand",t==="wand"); opts.classList.toggle("show-region",t==="region" && !region); }
+  // the sub-canvas controls live in the side panel, revealed while the Region tool is active (or a region exists)
+  const rs=$("#regionSection"); if(rs) rs.style.display=(t==="region"||region)?"":"none";
+  const rt=$("#regionToggleMenu"); if(rt) rt.checked=!!region;
   view.style.cursor = CURSORS[t] || "crosshair";
 }
 function setBrush(n){ const max=Math.max(16, Math.round(Math.max(W,H)/2)); brush=clamp(n,1,max); $("#brushReadout").textContent=brush+" px"; }
 
-// ------------------------------------------------------------------ mobile popout drawers
+// ------------------------------------------------------------------ mobile popout side panel (tools are an in-flow row on mobile)
 const toolsPanelEl=$("#toolPanel"), sidePanelEl=$("#sidePanel"), panelBackdropEl=$("#panelBackdrop");
 function isMobileLayout(){ return window.innerWidth<=768; }
 function closeDrawers(){
   toolsPanelEl.classList.remove("open"); sidePanelEl.classList.remove("open");
   panelBackdropEl.classList.remove("show");
 }
-function toggleDrawer(el){
-  const wasOpen=el.classList.contains("open");
-  closeDrawers();
-  if(!wasOpen){ el.classList.add("open"); panelBackdropEl.classList.add("show"); }
+const sideDrawerBtn=$("#sideDrawerBtn"); if(sideDrawerBtn) sideDrawerBtn.style.display="none";  // side panel is inline now
+if(panelBackdropEl) panelBackdropEl.onclick=closeDrawers;
+
+// ------------------------------------------------------------------ menu bar (File / Edit / Sprite / … )
+const MENUS=["file","edit","sprite","layer","frame","select","view","help"];
+let openMenu=null;
+function menuEl(name){ return $("#menu-"+name); }
+function closeMenus(){
+  MENUS.forEach(n=>{ const m=menuEl(n); if(m) m.hidden=true; });
+  document.querySelectorAll(".menu-item.open").forEach(b=>b.classList.remove("open"));
+  openMenu=null;
 }
-$("#toolsDrawerBtn").onclick=()=>toggleDrawer(toolsPanelEl);
-$("#sideDrawerBtn").onclick=()=>toggleDrawer(sidePanelEl);
-panelBackdropEl.onclick=closeDrawers;
+function openMenuFor(btn){
+  const name=btn.dataset.menu; closeMenus(); const m=menuEl(name); if(!m) return;
+  document.querySelectorAll('.menu-item[data-menu="'+name+'"]').forEach(b=>b.classList.add("open"));
+  openMenu=name;
+  if(isMobileLayout()){ openMenuAt(m, 8, 52); }
+  else { const r=btn.getBoundingClientRect(); openMenuAt(m, r.left, r.bottom+4); }
+}
+document.querySelectorAll("#menubar .menu-item, #menuSheet .menu-item").forEach(btn=>{
+  btn.addEventListener("click", e=>{ e.stopPropagation();
+    if(openMenu===btn.dataset.menu) closeMenus();
+    else { $("#menuSheet").hidden=true; openMenuFor(btn); }
+  });
+  btn.addEventListener("pointerenter", ()=>{ if(openMenu && openMenu!==btn.dataset.menu && !isMobileLayout()) openMenuFor(btn); });
+});
+$("#menuHamburger").onclick=e=>{ e.stopPropagation(); closeMenus(); const s=$("#menuSheet"); s.hidden=!s.hidden; };
+
+function runCmd(cmd){
+  switch(cmd){
+    case "new": case "newtab": newCanvasDialog(); break;
+    case "open": $("#openInput").click(); break;
+    case "save": saveProject(); break;
+    case "export": showExportDialog().then(s=>{ if(s) exportPNG(s); }); break;
+    case "sheet": showExportDialog().then(s=>{ if(s) exportSpritesheet(s); }); break;
+    case "rename": renameDoc(activeDocId); break;
+    case "closetab": closeDoc(activeDocId); break;
+    case "install": doInstall(); break;
+    case "undo": undo(); break;
+    case "redo": redo(); break;
+    case "clearlayer": clearActiveLayer(); break;
+    case "resize": resizeDialog(); break;
+    case "addimage": $("#imgInput").click(); break;
+    case "addlayer": addLayerCmd(); break;
+    case "duplayer": dupLayerCmd(); break;
+    case "dellayer": delLayerCmd(); break;
+    case "uplayer": upLayerCmd(); break;
+    case "downlayer": downLayerCmd(); break;
+    case "addframe": addFrame(true); break;
+    case "delframe": deleteFrame(frameIndex); break;
+    case "play": startPlayback(); break;
+    case "addtag": addTag(); break;
+    case "selectall": selectAll(); break;
+    case "deselect": clearSelection(); break;
+    case "wandtool": setTool("wand"); break;
+    case "snap": applyPaletteToLayer(); break;
+    case "fit": fitZoom(); composite(); break;
+    case "shortcuts": showShortcuts(); break;
+    case "about": showAbout(); break;
+  }
+}
+document.querySelectorAll(".menu-dd").forEach(dd=>dd.addEventListener("click",e=>{
+  const b=e.target.closest("[data-cmd]"); if(!b) return;
+  runCmd(b.dataset.cmd); closeMenus();
+}));
+function showShortcuts(){
+  showAlert("Tools: B pencil · E eraser · F fill · I pick · L line · R rect · C ellipse · M select · W wand · D sub-canvas\n\nCtrl+Z undo · Ctrl+Y redo · Ctrl+A select all · Ctrl+D deselect · Ctrl+S save · Ctrl+O open\n\n[ ] brush size · + − zoom · G grid · X swap colors · Space play · Alt+click pick color",{title:"Keyboard shortcuts"});
+}
+function showAbout(){
+  showAlert("PixelPaint — a single-file pixel-art editor.\nDraw, animate, manage layers and palettes, and export PNGs or spritesheets. Works offline and installs as an app.",{title:"About PixelPaint"});
+}
+
+// ------------------------------------------------------------------ collapsible side sections
+document.querySelectorAll(".section.collapsible > h3.sec-h").forEach(h=>{
+  h.addEventListener("click",()=>{ h.parentElement.classList.toggle("collapsed"); });
+});
 
 // ------------------------------------------------------------------ wire events
 document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{
@@ -2071,10 +2379,9 @@ document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{
 $("#brushUp").onclick=()=>setBrush(brush+1);
 $("#brushDown").onclick=()=>setBrush(brush-1);
 $("#fillShape").onchange=e=>fillShape=e.target.checked;
-$("#clearLayerBtn").onclick=()=>{const L=activeLayer(); if(!L)return; pushUndo(); L.ctx.clearRect(0,0,W,H); composite(); refreshThumb(L);};
+function clearActiveLayer(){ const L=activeLayer(); if(!L)return; if(L.locked){ showToast("This layer is locked.","info"); return; } pushUndo(); L.ctx.clearRect(0,0,W,H); composite(); refreshThumb(L); }
 
-// image import: button + file dialog, place/cancel, paste, drag-and-drop
-$("#addImageBtn").onclick=()=>$("#imgInput").click();
+// image import: file dialog, place/cancel, paste, drag-and-drop (import is triggered from the Sprite menu)
 $("#imgInput").onchange=e=>{ const f=e.target.files[0]; if(f) loadImageFromBlob(f, f.name.replace(/\.[^.]+$/,"")); e.target.value=""; };
 $("#placeCommit").onclick=commitPlacement;
 $("#placeCancel").onclick=cancelPlacement;
@@ -2106,10 +2413,14 @@ $("#selMenu").addEventListener("click",e=>{
 $("#applyPaletteBtn").onclick=applyPaletteToLayer;
 
 document.addEventListener("pointerdown",e=>{
-  const menus=[$("#ctxMenu"),$("#selMenu"),$("#fileMenu")];
+  // context menus (image / selection)
+  const menus=[$("#ctxMenu"),$("#selMenu")];
   const anyOpen=menus.some(m=>!m.hidden);
-  const inside=menus.some(m=>m.contains(e.target)) || $("#fileMenuBtn").contains(e.target);
+  const inside=menus.some(m=>m.contains(e.target));
   if(anyOpen && !inside) closeCtxMenu();
+  // menu-bar dropdowns + mobile menu sheet
+  const inMenu = e.target.closest(".menu-dd") || e.target.closest(".menu-item") || e.target.closest("#menuHamburger") || e.target.closest("#menuSheet");
+  if(!inMenu){ closeMenus(); $("#menuSheet").hidden=true; }
 }, true);
 
 window.addEventListener("paste",e=>{
@@ -2143,6 +2454,10 @@ $("#zoomOut").onclick=()=>setZoom(zoom-1);
 $("#zoomFit").onclick=()=>{ fitZoom(); composite(); };
 $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
 $("#centerToggle").onchange=e=>{showCenter=e.target.checked; composite();};
+$("#zoomStat").onclick=()=>{ fitZoom(); composite(); };
+$("#toolStat").onclick=()=>{ if(isMobileLayout()){} };
+// View-menu sub-canvas toggle: create/remove the draw region
+$("#regionToggleMenu").onchange=e=>{ if(e.target.checked){ if(!region) createRegion(); } else { removeRegion(); } };
 
 // timeline / animation controls
 $("#tlCollapseBtn").onclick=()=>setTimelineCollapsed(!tlCollapsed);
@@ -2154,6 +2469,7 @@ $("#frameDur").onchange=e=>setFrameDur(parseInt(e.target.value,10)||DEFAULT_DUR)
 
 // sub-canvas (draw region) controls
 $("#regionCreate").onclick=createRegion;
+$("#regionCreate2").onclick=()=>{ createRegion(); };
 $("#rgRemove").onclick=removeRegion;
 $("#rgCenter").onclick=centerRegion;
 $("#rgLock").onchange=e=>{ regionLocked=e.target.checked; composite(); };
@@ -2173,25 +2489,6 @@ function doInstall(){
 $("#newTabBtn").onclick=newCanvasDialog;
 $("#openInput").onchange=e=>{ const f=e.target.files[0]; if(f) openProjectFile(f); e.target.value=""; };
 
-// File menu (dropdown under the File button)
-$("#fileMenuBtn").onclick=e=>{ e.stopPropagation();
-  const m=$("#fileMenu");
-  if(m.hidden){ const r=$("#fileMenuBtn").getBoundingClientRect(); openMenuAt(m, r.left, r.bottom+4); }
-  else closeCtxMenu();
-};
-$("#fileMenu").addEventListener("click",e=>{
-  const b=e.target.closest("[data-fa]"); if(!b) return; const a=b.dataset.fa; closeCtxMenu();
-  if(a==="new") newCanvasDialog();
-  else if(a==="resize") resizeDialog();
-  else if(a==="open") $("#openInput").click();
-  else if(a==="save") saveProject();
-  else if(a==="export") showExportDialog().then(s=>{ if(s) exportPNG(s); });
-  else if(a==="sheet") showExportDialog().then(s=>{ if(s) exportSpritesheet(s); });
-  else if(a==="rename") renameDoc(activeDocId);
-  else if(a==="closetab") closeDoc(activeDocId);
-  else if(a==="install") doInstall();
-});
-
 $("#colorPicker").oninput=e=>setColor(e.target.value, activeSlot);
 $("#hexInput").onchange=e=>{
   let v=e.target.value.trim(); if(!v.startsWith("#")) v="#"+v;
@@ -2203,22 +2500,28 @@ $("#secondarySwatch").onclick=()=>setActiveSlot("bg");
 $("#swapColors").onclick=swapColors;
 $("#paletteSelect").onchange=e=>renderPaletteGrid(e.target.value);
 
-// layer toolbar
-$("#addLayer").onclick=()=>{pushUndo(); addLayer("Layer "+(layers.length+1)); renderLayers(); composite();};
-$("#dupLayer").onclick=()=>{
+// layer toolbar (shared by the header buttons and the Layer menu)
+function addLayerCmd(){ pushUndo(); addLayer("Layer "+(layers.length+1)); renderLayers(); composite(); }
+function dupLayerCmd(){
   const src=activeLayer(); if(!src) return; pushUndo();
-  const l=addLayer(src.name+" copy"); l.ctx.drawImage(src.canvas,0,0); l.opacity=src.opacity;
+  const l=addLayer(src.name+" copy"); l.ctx.drawImage(src.canvas,0,0); l.opacity=src.opacity; l.locked=src.locked;
   renderLayers(); composite();
-};
-$("#delLayer").onclick=()=>{
+}
+function delLayerCmd(){
   if(layers.length<=1){ showToast("At least one layer is required.","error"); return; }
   pushUndo(); layers.splice(activeIndex,1); activeIndex=clamp(activeIndex,0,layers.length-1);
   renderLayers(); composite();
-};
-$("#upLayer").onclick=()=>{ if(activeIndex>=layers.length-1) return; pushUndo();
-  [layers[activeIndex],layers[activeIndex+1]]=[layers[activeIndex+1],layers[activeIndex]]; activeIndex++; renderLayers(); composite();};
-$("#downLayer").onclick=()=>{ if(activeIndex<=0) return; pushUndo();
-  [layers[activeIndex],layers[activeIndex-1]]=[layers[activeIndex-1],layers[activeIndex]]; activeIndex--; renderLayers(); composite();};
+}
+function upLayerCmd(){ if(activeIndex>=layers.length-1) return; pushUndo();
+  [layers[activeIndex],layers[activeIndex+1]]=[layers[activeIndex+1],layers[activeIndex]]; activeIndex++; renderLayers(); composite(); }
+function downLayerCmd(){ if(activeIndex<=0) return; pushUndo();
+  [layers[activeIndex],layers[activeIndex-1]]=[layers[activeIndex-1],layers[activeIndex]]; activeIndex--; renderLayers(); composite(); }
+$("#addLayer").onclick=addLayerCmd;
+$("#dupLayer").onclick=dupLayerCmd;
+$("#delLayer").onclick=delLayerCmd;
+$("#upLayer").onclick=upLayerCmd;
+$("#downLayer").onclick=downLayerCmd;
+$("#opacitySlider").oninput=e=>{ const L=activeLayer(); if(!L) return; L.opacity=e.target.value/100; $("#opacityVal").textContent=e.target.value; composite(); };
 
 // modal / dialog wiring
 $("#modalOk").onclick=()=>{ const inp=$("#modalInput"); closeModal(inp.style.display!=="none"? inp.value : true); };
@@ -2332,8 +2635,9 @@ setBrush(1);
 let savedTl=null; try{ savedTl=localStorage.getItem("pp_tlCollapsed"); }catch(_){}
 setTimelineCollapsed(savedTl==null ? true : savedTl==="1");
 createDoc(32,32);
+if(isMobileLayout()){ $("#colorSection").classList.add("collapsed"); $("#layerSection").classList.add("collapsed"); }
 // Re-fit once the browser has finished laying out the stage (boot may run pre-layout).
-requestAnimationFrame(()=>{ fitZoom(); composite(); });
+requestAnimationFrame(()=>{ fitZoom(); composite(); drawRulers(); });
 
 })();
 </script>
