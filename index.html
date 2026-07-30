@@ -65,6 +65,17 @@
   .timeline.collapsed .tl-bar > #tlSummary{display:inline-flex; align-items:center;}
   .tl-bar .vsep{width:1px; height:22px; background:var(--line);}
   .tl-bar .tl-grow{flex:1 1 12px;}
+  /* ---- group tabs: pick which animation the strip shows / plays / exports ---- */
+  .tl-tabs{display:flex; align-items:center; gap:5px; padding:7px 10px 0; flex:none;
+    overflow-x:auto; overflow-y:hidden;}
+  .tl-tabs[hidden]{display:none;}
+  .timeline.collapsed .tl-tabs{display:none;}
+  .tl-tab{flex:none; gap:6px; height:28px; min-height:0; padding:0 10px; border-radius:8px;
+    color:var(--muted); font-size:12.5px;}
+  .tl-tab:hover{color:var(--text);}
+  .tl-tab.active{background:var(--accent2); border-color:var(--accent2); color:#fff; font-weight:600;}
+  .tl-tab .dot{width:8px; height:8px; border-radius:50%; flex:none;}
+  .tl-tab .n{font-size:10px; opacity:.75; font-variant-numeric:tabular-nums;}
   .tl-field{display:flex; align-items:center; gap:6px;}
   .tl-field .lbl{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;}
   .tl-field .muted{color:var(--muted);}
@@ -187,6 +198,20 @@
   }
   .section{padding:12px 14px; border-bottom:1px solid var(--line);}
   .section h3{margin:0 0 10px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);}
+  /* Section headers pin to the top of the side panel while their body scrolls under them.
+     Negative margins pull the sticky strip out to the section edges so nothing shows through
+     beside it; the matching padding puts the text back where it was. */
+  @media (min-width: 769px){
+    .side .section > h3{position:sticky; top:0; z-index:5; background:var(--panel);
+      margin:-12px -14px 9px; padding:12px 14px 9px;}
+    .side .section.collapsed > h3.sec-h{margin-bottom:-12px;}
+  }
+  /* ---- mobile: Color / Layers / Animation become tabs, and the strip pins to the top ---- */
+  .panel-tabs{display:none; gap:5px; padding:8px 10px; position:sticky; top:0; z-index:6;
+    background:var(--panel); border-bottom:1px solid var(--line);}
+  .panel-tabs .ptab{flex:1 1 0; min-width:0; gap:5px; height:36px; min-height:36px;
+    padding:0 6px; border-radius:8px; font-size:12.5px; color:var(--muted);}
+  .panel-tabs .ptab.active{background:var(--accent2); border-color:var(--accent2); color:#fff; font-weight:600;}
 
   .colorrow{display:flex; align-items:center; gap:10px;}
   .dualswatch{position:relative; width:66px; height:60px; flex:none;}
@@ -408,7 +433,6 @@
     .tl-bar{flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; gap:6px; padding:6px 8px;}
     .tl-bar .lbl, .tl-bar .vsep{display:none;}
     .tl-field input[type=number]{width:58px;}
-    #playTag{max-width:112px;}
     .tl-frames{padding:8px;}
 
     .statusbar{gap:10px; padding-bottom:max(5px, env(safe-area-inset-bottom));}
@@ -513,9 +537,26 @@
       max-height:42vh; overflow-y:auto;
     }
     .side.open{transform:none;}
-    .mobile-cols{display:flex;}
-    .mobile-cols .section{flex:1; min-width:0;}
     #menuSheet .menu-item{display:block; padding:11px 14px; border-radius:8px; font-size:15px;}
+
+    /* The whole bottom panel is one tabbed surface: the pinned strip picks Color, Layers or
+       Animation, and only that one is in the document flow. Two half-width columns of controls
+       never fit a phone, and the animation strip shouldn't permanently eat the canvas either.
+       #layerSection carries an inline display:flex, hence the !important. */
+    .panel-tabs{display:flex;}
+    /* the tab strip is the header now (specific enough to beat .section h3.sec-h) */
+    .side .section > h3.sec-h{display:none;}
+    .mobile-cols{display:block;}
+    body[data-ptab="color"]  #layerSection{display:none !important;}
+    body[data-ptab="layers"] #colorSection{display:none !important;}
+    body[data-ptab="anim"]   #colorSection,
+    body[data-ptab="anim"]   #layerSection,
+    body[data-ptab="anim"]   #regionSection{display:none !important;}
+    body:not([data-ptab="anim"]) #timeline{display:none;}
+    /* the tab strip already draws the panel's top edge */
+    body[data-ptab="anim"] #timeline{border-top:none; max-height:46vh;}
+    body[data-ptab="anim"] .side{overflow:visible;}
+    #tlCollapseBtn, #tlSummary{display:none !important;}   /* the tab is the collapse control */
   }
   /* mobile menu sheet (the hamburger opens a simple list of menus) */
   #menuSheet{position:fixed; left:8px; top:52px; z-index:1200; min-width:210px; background:var(--panel);
@@ -541,6 +582,8 @@
     .swap{width:28px; height:28px;}
     .tl-frame .tl-x{display:inline-flex;}   /* no hover on touch — always show the delete button */
     .ctx-menu button{padding:11px 12px;}
+    .tl-tab{height:34px;}                   /* the tabs stay compact, but big enough to hit */
+    .panel-tabs .ptab{height:40px; min-height:40px;}
   }
 </style>
 </head>
@@ -709,7 +752,7 @@
       </div>
 
       <input type="file" id="imgInput" accept="image/*" hidden />
-      <div class="hint">Alt+click = quick color pick.<br/>[ ] resize brush. Scroll = zoom.<br/>Middle-drag = pan the canvas.</div>
+      <div class="hint">Alt+click = quick color pick.<br/>[ ] resize brush. Scroll = zoom.<br/>Middle-drag = pan the canvas.<br/>Touch: two fingers = pan &amp; zoom.</div>
     </div>
 
     <!-- CANVAS AREA (rulers + stage) -->
@@ -734,6 +777,13 @@
 
     <!-- SIDE -->
     <div class="side" id="sidePanel">
+      <!-- mobile only: switches the panel between Color, Layers and the animation timeline.
+           Stays pinned while the panel body scrolls under it. -->
+      <div class="panel-tabs" id="panelTabs" role="tablist">
+        <button class="ptab" data-ptab="color"  data-icon="palette" data-icon-size="15" title="Color &amp; palette">Color</button>
+        <button class="ptab" data-ptab="layers" data-icon="copy"    data-icon-size="15" title="Layers">Layers</button>
+        <button class="ptab" data-ptab="anim"   data-icon="play"    data-icon-size="15" title="Frames &amp; groups">Anim</button>
+      </div>
       <div class="mobile-cols">
       <div class="section collapsible" id="colorSection">
         <h3 class="sec-h" data-sec="colorSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span>Color</h3>
@@ -821,11 +871,12 @@
       <label class="chk"><input type="checkbox" id="loopToggle" checked /> Loop</label>
       <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of the current frame" /><span class="muted">ms</span></span>
       <span class="vsep"></span>
-      <span class="tl-field"><span class="lbl">Play</span><select id="playTag" title="Which frames to play"><option value="__all">All frames</option></select></span>
       <button id="addGroupBtn" data-icon="tag" data-icon-size="15" title="Add a group of frames (idle, walk, jump…) you can play and export on its own">Group</button>
       <span class="tl-grow"></span>
       <button id="addFrameBtn" data-icon="add" data-icon-size="16" title="New frame (copies the current one)">Frame</button>
     </div>
+    <!-- one tab per frame group; the selected tab is what the strip shows and what Play plays -->
+    <div class="tl-tabs" id="tlTabs" hidden></div>
     <div class="tl-frames" id="tlFrames"></div>
   </div>
 
@@ -978,6 +1029,9 @@ let lastSize={w:32,h:32};   // remembered size for the next "New canvas"
 let frames=[], frameIndex=0, tags=[];
 let playing=false, playTimer=null;
 let tlCollapsed=true;   // the animation panel folds to a slim bar when you're not animating
+// which group the timeline is showing: a tag name, "__all" or "__ungrouped". Also the play range
+// and the group the frame strip lists, so picking "walk" scopes viewing, playing and exporting.
+let tlView="__all";
 const DEFAULT_DUR=120;
 const TAG_COLORS=["#e43b44","#fee761","#63c74d","#0099db","#b55088","#f77622","#2ce8f5","#9a46e6"];
 
@@ -1188,7 +1242,7 @@ function newDocument(w,h,makeFirst=true){
   W=clamp(w|0,1,512); H=clamp(h|0,1,512);
   layerSeq=1;
   frames=[{layers:[], dur:DEFAULT_DUR}];   // one frame to start
-  frameIndex=0; tags=[];
+  frameIndex=0; tags=[]; tlView="__all";
   layers=frames[0].layers; activeIndex=0;
   flat.width=W; flat.height=H;
   if(makeFirst) addLayer("Layer 1");       // pushes into frames[0].layers (same array ref)
@@ -1247,7 +1301,8 @@ function setTimelineCollapsed(c){
 }
 function updateTlSummary(){
   const n=frames?frames.length:1;
-  $("#tlSummary").textContent="Animation — "+n+" frame"+(n>1?"s":"");
+  const g=tags.length ? ("  ·  "+tags.length+" group"+(tags.length>1?"s":"")) : "";
+  $("#tlSummary").textContent="Animation — "+n+" frame"+(n>1?"s":"")+g;
 }
 function compositeFrameInto(tctx, fr){
   tctx.clearRect(0,0,W,H);
@@ -1387,9 +1442,7 @@ async function groupRun(idx){
 }
 function playGroup(ti){
   const t=tags[ti]; if(!t) return;
-  const sel=$("#playTag"); if(sel) sel.value=t.name;
-  stopPlayback();
-  selectFrame(clamp(t.from,0,frames.length-1));
+  setTlView(t.name);      // selecting the group's tab is what scopes playback
   startPlayback();
 }
 function setFrameDur(ms){ frames[frameIndex].dur=clamp(ms|0,10,5000); renderTimeline(); }
@@ -1433,11 +1486,57 @@ function groupHead(g){
   }
   return head;
 }
+// ---- group tabs -----------------------------------------------------------------------
+// A group name is only a valid view while that group exists — deleting frames can take one
+// with it, and the strip would then render empty with no way back.
+function normalizeTlView(){
+  if(tlView==="__all") return;
+  if(tlView==="__ungrouped"){ if(!frameGroups().some(g=>g.tag<0)) tlView="__all"; return; }
+  if(!tags.some(t=>t.name===tlView)) tlView="__all";
+}
+function viewGroups(){
+  const all=frameGroups();
+  if(tlView==="__all") return all;
+  if(tlView==="__ungrouped") return all.filter(g=>g.tag<0);
+  return all.filter(g=>g.tag>=0 && tags[g.tag] && tags[g.tag].name===tlView);
+}
+function setTlView(v){
+  tlView=v;
+  stopPlayback();
+  const t=tags.find(x=>x.name===v);
+  if(t) selectFrame(clamp(t.from,0,frames.length-1));   // park the playhead inside what you picked
+  renderTimeline();
+}
+function renderTlTabs(){
+  const host=$("#tlTabs"); if(!host) return;
+  host.innerHTML="";
+  // with nothing grouped yet the strip would just read "All | Ungrouped" — pure noise
+  host.hidden = tags.length===0;
+  if(host.hidden) return;
+  const groups=frameGroups();
+  const tab=(v,label,color,count,title)=>{
+    const b=document.createElement("button");
+    b.className="tl-tab"+(tlView===v?" active":"");
+    b.title=title;
+    if(color){ const d=document.createElement("span"); d.className="dot"; d.style.background=color; b.appendChild(d); }
+    const n=document.createElement("span"); n.textContent=label; b.appendChild(n);
+    if(count!=null){ const c=document.createElement("span"); c.className="n"; c.textContent=count; b.appendChild(c); }
+    b.onclick=()=>setTlView(v);
+    host.appendChild(b);
+  };
+  tab("__all","All",null,frames.length,"Show every frame — Play runs the whole timeline");
+  tags.forEach(t=>tab(t.name,t.name,t.color,t.to-t.from+1,
+    "Show only “"+t.name+"” (frames "+(t.from+1)+"–"+(t.to+1)+") — Play runs just this group"));
+  const loose=groups.filter(g=>g.tag<0);
+  if(loose.length) tab("__ungrouped","Ungrouped",null,loose.reduce((s,g)=>s+g.idx.length,0),
+    "Frames that aren't in a group yet");
+}
 function renderTimeline(){
   const di=$("#frameDur"); if(di && frames[frameIndex]) di.value=frames[frameIndex].dur;
   const host=$("#tlFrames"); if(!host) return;
+  normalizeTlView();
   host.innerHTML="";
-  frameGroups().forEach(g=>{
+  viewGroups().forEach(g=>{
     const box=document.createElement("div");
     box.className="tl-group"+(g.tag<0?" ungrouped":"");
     const strip=document.createElement("div"); strip.className="tl-gframes";
@@ -1445,21 +1544,14 @@ function renderTimeline(){
     box.append(groupHead(g), strip);
     host.appendChild(box);
   });
-  renderTags(); updatePlayUI(); updateTlSummary();
+  renderTlTabs(); updatePlayUI(); updateTlSummary();
 }
-// the "Play" dropdown is the only tag UI left in the bar; the strip shows the groups themselves
-function renderTags(){
-  const sel=$("#playTag"); if(!sel) return;
-  const cur=sel.value;
-  sel.innerHTML="";
-  const add=(v,label)=>{ const o=document.createElement("option"); o.value=v; o.textContent=label; sel.appendChild(o); };
-  add("__all","All frames");
-  tags.forEach(t=>add(t.name, t.name+" ("+(t.from+1)+"–"+(t.to+1)+")"));
-  if([...sel.options].some(o=>o.value===cur)) sel.value=cur;
-}
+// the selected group tab is the play range, so what you see is what you hear
 function playRange(){
-  const sel=$("#playTag"); const v=sel?sel.value:"__all";
-  if(v && v!=="__all"){ const t=tags.find(x=>x.name===v); if(t) return {from:clamp(t.from,0,frames.length-1), to:clamp(t.to,0,frames.length-1)}; }
+  if(tlView!=="__all" && tlView!=="__ungrouped"){
+    const t=tags.find(x=>x.name===tlView);
+    if(t) return {from:clamp(t.from,0,frames.length-1), to:clamp(t.to,0,frames.length-1)};
+  }
   return {from:0, to:frames.length-1};
 }
 function startPlayback(){
@@ -1488,7 +1580,18 @@ function stopPlayback(){
   if(playing){ playing=false; renderLayers(); }
   updatePlayUI();
 }
-function updatePlayUI(){ const b=$("#playBtn"); if(!b) return; b.innerHTML=iconSVG(playing?"stop":"play",18); b.title=playing?"Stop (Space)":"Play (Space)"; b.classList.toggle("playing",playing); }
+function updatePlayUI(){
+  const b=$("#playBtn"); if(!b) return;
+  b.innerHTML=iconSVG(playing?"stop":"play",18);
+  b.title=playing ? "Stop (Space)" : ("Play "+viewLabel()+" (Space)");
+  b.classList.toggle("playing",playing);
+}
+// how to name what's currently selected, for the play button and the collapsed summary
+function viewLabel(){
+  if(tlView==="__all") return "all frames";
+  if(tlView==="__ungrouped") return "the ungrouped frames";
+  return "“"+tlView+"”";
+}
 
 async function showTagDialog(tag){
   const nm=tag?tag.name:("tag"+(tags.length+1));
@@ -1541,6 +1644,7 @@ function loadDocIntoGlobals(d){
   stopPlayback();
   W=d.W; H=d.H; flat.width=W; flat.height=H;
   frames=d.frames; frameIndex=clamp(d.frameIndex||0,0,frames.length-1); tags=d.tags||[];
+  tlView="__all";           // group views are per-document; a fresh tab starts on All
   layers=frames[frameIndex].layers; activeIndex=clamp(d.activeIndex||0,0,layers.length-1); layerSeq=d.layerSeq;
   undoStack=d.undo; redoStack=d.redo; selection=d.selection; selMask=d.selMask; selDrag=null; stopAnts();
   region=d.region||null; regionLocked=!!d.regionLocked; regionDrag=null;
@@ -2274,10 +2378,28 @@ function panEnd(){
   pan=null;
 }
 
-// touch: track active fingers on the canvas so a second finger becomes pinch-to-zoom
+// touch: track active fingers on the canvas so a second finger becomes pinch-zoom + drag-to-pan
 const touchPtrs=new Map();
-let pinch=null;   // {d0: starting distance, z0: starting zoom}
+let pinch=null;   // {d0: starting distance, z0: starting zoom, ax/ay: art pixel under the fingers}
 function pinchDist(){ const v=[...touchPtrs.values()]; return Math.hypot(v[0].x-v[1].x, v[0].y-v[1].y); }
+function pinchMid(){ const v=[...touchPtrs.values()]; return {x:(v[0].x+v[1].x)/2, y:(v[0].y+v[1].y)/2}; }
+// Baseline the gesture on the art pixel sitting under the midpoint of the two fingers. Re-baselined
+// whenever the finger count changes, so adding or lifting a finger doesn't make the canvas jump.
+function pinchStart(){
+  if(touchPtrs.size<2) return;
+  const m=pinchMid(), r=view.getBoundingClientRect();
+  pinch={ d0:Math.max(1,pinchDist()), z0:zoom, ax:(m.x-r.left)/zoom, ay:(m.y-r.top)/zoom };
+}
+// Zoom from the finger spread, then scroll the stage so that same art pixel stays under the
+// fingers — which is what makes a two-finger drag pan the canvas (touch has no middle button).
+function pinchApply(){
+  if(!pinch || touchPtrs.size<2) return;
+  const d=pinchDist();
+  if(d>0) setZoom(Math.round(pinch.z0*d/pinch.d0));
+  const m=pinchMid(), r=view.getBoundingClientRect();
+  stage.scrollLeft += (r.left + pinch.ax*zoom) - m.x;
+  stage.scrollTop  += (r.top  + pinch.ay*zoom) - m.y;
+}
 function cancelActiveOps(){
   if(drawing){ drawing=false; undo(); }                 // revert the accidental first-finger dot
   if(shaping){ shaping=false; composite(); }
@@ -2295,8 +2417,7 @@ function toPixel(e){
 view.addEventListener("pointerdown",e=>{
   if(e.pointerType==="touch"){
     touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(touchPtrs.size===2){ cancelActiveOps(); pinch={d0:Math.max(1,pinchDist()), z0:zoom}; return; }
-    if(touchPtrs.size>2) return;
+    if(touchPtrs.size>=2){ cancelActiveOps(); pinchStart(); return; }
   }
   if(placement){ if(e.button===0) placementDown(e); return; }
   if(e.button!==0 && e.button!==2) return;          // left or right button only
@@ -2340,10 +2461,7 @@ stage.addEventListener("scroll",()=>{ if(placement) paintPlaceOverlay(); drawRul
 window.addEventListener("pointermove",e=>{
   if(pan){ panMove(e); return; }
   if(touchPtrs.has(e.pointerId)) touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(pinch){
-    if(touchPtrs.size>=2){ const d=pinchDist(); if(d>0) setZoom(Math.round(pinch.z0*d/pinch.d0)); }
-    return;
-  }
+  if(pinch){ pinchApply(); return; }
   if(placement){ if(xform) placementMove(e); else updatePlacementCursor(e); return; }
   if(regionDrag){ regionMove(e); return; }
   if(selDrag){ selectMove(e); return; }
@@ -2376,7 +2494,7 @@ view.addEventListener("pointerleave",()=>{ if(!drawing&&!shaping&&!selDrag&&!xfo
 window.addEventListener("pointerup",e=>{
   if(pan){ panEnd(); return; }
   touchPtrs.delete(e.pointerId);
-  if(pinch){ if(touchPtrs.size<2) pinch=null; return; }
+  if(pinch){ if(touchPtrs.size<2) pinch=null; else pinchStart(); return; }
   if(placement){ xform=null; return; }
   if(regionDrag){ regionUp(); return; }
   if(selDrag){ selectUp(); return; }
@@ -2393,7 +2511,7 @@ window.addEventListener("pointerup",e=>{
 window.addEventListener("pointercancel",e=>{
   panEnd();
   touchPtrs.delete(e.pointerId);
-  if(touchPtrs.size<2) pinch=null;
+  if(touchPtrs.size<2) pinch=null; else if(pinch) pinchStart();
   xform=null;
   if(regionDrag) abortRegionDrag();
   if(selDrag){ selDrag=null; composite(); }
@@ -2826,23 +2944,27 @@ function safeFilePart(s){ return (String(s).replace(/[^\w\- ]+/g,"").trim()||"gr
 async function showSheetDialog(){
   const has=tags.length>0;
   const dis=has?"":" disabled";
+  // the group tab you're on is the obvious default — that's the animation you were just working on
+  const sel=(tlView!=="__all" && tlView!=="__ungrouped" && tags.some(t=>t.name===tlView)) ? tlView : null;
+  const only=sel?`<option value="onegroup" selected>Only “${sel}” — the selected group</option>`:"";
   const body=`
     <div class="row"><label>Scale</label><select id="shScale">
       <option value="1" selected>1× (true pixel size)</option><option value="2">2×</option>
       <option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></div>
     <div class="row"><label>Layout</label><select id="shLayout">
+      ${only}
       <option value="row"${has?"":" selected"}>Single row — all ${frames.length} frames</option>
       <option value="grid">Grid — fixed number of columns</option>
-      <option value="grouprows"${dis}${has?" selected":""}>One row per group</option>
+      <option value="grouprows"${dis}${(has&&!sel)?" selected":""}>One row per group</option>
       <option value="groupfiles"${dis}>Separate file per group</option></select></div>
     <div class="row"><label>Columns</label><input type="number" id="shCols" min="1" max="64" value="8">
       <span style="color:var(--muted)">grid only</span></div>`;
   const ok=await openModal({title:"Export spritesheet",
-    message: has ? (tags.length+" group"+(tags.length>1?"s":"")+" found — each can be its own row or its own file.")
+    message: has ? (tags.length+" group"+(tags.length>1?"s":"")+" found — export them together as one sheet (a row each), as separate files, or just the one you're on.")
                  : "No groups yet — add one from the Frame menu to export idle / walk / jump separately.",
     bodyHTML:body, okText:"Export"});
   if(!ok) return null;
-  return { scale:parseInt($("#shScale").value,10)||1, layout:$("#shLayout").value,
+  return { scale:parseInt($("#shScale").value,10)||1, layout:$("#shLayout").value, group:sel,
            cols:clamp(parseInt($("#shCols").value,10)||8,1,64) };
 }
 
@@ -2916,17 +3038,23 @@ function exportSpritesheet(opts){
     return;
   }
 
-  let rows;
-  if(opts.layout==="grouprows") rows=groupRows().filter(r=>r.idx.length);
+  let rows, stem=base+"_sheet";
+  if(opts.layout==="onegroup"){
+    const g=groupRows().filter(r=>r.name===opts.group && r.idx.length);
+    if(!g.length){ showToast("That group has no frames any more — export the whole sheet instead.","error"); return; }
+    rows=g; stem=base+"_"+safeFilePart(opts.group);
+  }
+  else if(opts.layout==="grouprows") rows=groupRows().filter(r=>r.idx.length);
   else if(opts.layout==="grid"){
     const c=opts.cols||8; rows=[];
     for(let i=0;i<all.length;i+=c) rows.push({name:"", idx:all.slice(i,i+c)});
   } else rows=[{name:"", idx:all}];
 
+  const n=rows.reduce((s,r)=>s+r.idx.length,0);
   const built=buildSheet(rows, scale);
-  downloadCanvas(built.sheet, base+"_sheet.png");
-  downloadJSON(sheetJSON(base, base+"_sheet.png", built, scale, rows), base+"_sheet.json", 300);
-  showToast("Exported "+frames.length+" frame"+(frames.length>1?"s":"")+" at "+scale+"× — "
+  downloadCanvas(built.sheet, stem+".png");
+  downloadJSON(sheetJSON(base, stem+".png", built, scale, rows), stem+".json", 300);
+  showToast("Exported "+n+" frame"+(n>1?"s":"")+" at "+scale+"× — "
     +built.sheet.width+"×"+built.sheet.height+" px (PNG + Aseprite JSON).","success",4200);
 }
 
@@ -2959,6 +3087,33 @@ function closeDrawers(){
 }
 const sideDrawerBtn=$("#sideDrawerBtn"); if(sideDrawerBtn) sideDrawerBtn.style.display="none";  // side panel is inline now
 if(panelBackdropEl) panelBackdropEl.onclick=closeDrawers;
+
+// ---- mobile panel tabs: Color | Layers | Animation ----------------------------------------
+// The CSS keys off body[data-ptab] and only inside the mobile media query, so on desktop the
+// attribute is inert and every panel stays visible.
+const PANEL_TABS=["color","layers","anim"];
+const PANEL_TAB_KEY="pp_panelTab";
+let panelTab="color";
+function setPanelTab(name){
+  if(PANEL_TABS.indexOf(name)<0) name="color";
+  panelTab=name;
+  document.body.dataset.ptab=name;
+  document.querySelectorAll("#panelTabs .ptab").forEach(b=>b.classList.toggle("active", b.dataset.ptab===name));
+  try{ localStorage.setItem(PANEL_TAB_KEY, name); }catch(_){}
+  // a collapsed timeline behind the Animation tab would look like a broken, empty panel
+  if(name==="anim" && tlCollapsed) setTimelineCollapsed(false);
+  // showing/hiding a panel resizes the stage, so the rulers and any placement box need a repaint
+  drawRulers();
+  if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); }
+}
+document.querySelectorAll("#panelTabs .ptab").forEach(b=>b.onclick=()=>setPanelTab(b.dataset.ptab));
+// The tab strip replaces the collapsible headers on mobile, so a section left collapsed on a
+// desktop-width window must not stay hidden once its tab is the only way in.
+function applyPanelLayout(){
+  if(!isMobileLayout()) return;
+  $("#colorSection").classList.remove("collapsed");
+  $("#layerSection").classList.remove("collapsed");
+}
 
 // ------------------------------------------------------------------ menu bar (File / Edit / Sprite / … )
 const MENUS=["file","edit","sprite","layer","frame","select","view","help"];
@@ -3025,7 +3180,7 @@ document.querySelectorAll(".menu-dd").forEach(dd=>dd.addEventListener("click",e=
   runCmd(b.dataset.cmd); closeMenus();
 }));
 function showShortcuts(){
-  showAlert("Tools: B pencil · E eraser · F fill · I pick · L line · R rect · C ellipse · M select · W wand · D sub-canvas\n\nCtrl+Z undo · Ctrl+Y redo · Ctrl+A select all · Ctrl+D deselect · Ctrl+S save · Ctrl+O open\n\n[ ] brush size · + − zoom · G grid · X swap colors · Space play · Alt+click pick color\n\nDel clears the selection, or removes the sub-canvas when nothing is selected.\n\nMouse: scroll = zoom · middle-drag = pan the canvas · right-drag = paint with the background color.",{title:"Keyboard shortcuts"});
+  showAlert("Tools: B pencil · E eraser · F fill · I pick · L line · R rect · C ellipse · M select · W wand · D sub-canvas\n\nCtrl+Z undo · Ctrl+Y redo · Ctrl+A select all · Ctrl+D deselect · Ctrl+S save · Ctrl+O open\n\n[ ] brush size · + − zoom · G grid · X swap colors · Space play · Alt+click pick color\n\nDel clears the selection, or removes the sub-canvas when nothing is selected.\n\nMouse: scroll = zoom · middle-drag = pan the canvas · right-drag = paint with the background color.\n\nTouch: one finger draws · two fingers drag to pan and pinch to zoom.",{title:"Keyboard shortcuts"});
 }
 function showAbout(){
   showAlert("PixelPaint — a single-file pixel-art editor.\nDraw, animate, manage layers and palettes, and export PNGs or spritesheets. Works offline and installs as an app.",{title:"About PixelPaint"});
@@ -3298,7 +3453,7 @@ window.addEventListener("keydown",e=>{
   }
 });
 
-window.addEventListener("resize",()=>{ if(!isMobileLayout()) closeDrawers(); });
+window.addEventListener("resize",()=>{ if(!isMobileLayout()) closeDrawers(); applyPanelLayout(); });
 
 // ------------------------------------------------------------------ boot
 // Single-file PWA: the icon, favicon and manifest are all generated at runtime,
@@ -3352,7 +3507,10 @@ setBrush(1);
 let savedTl=null; try{ savedTl=localStorage.getItem("pp_tlCollapsed"); }catch(_){}
 setTimelineCollapsed(savedTl==null ? true : savedTl==="1");
 createDoc(32,32);
-if(isMobileLayout()){ $("#colorSection").classList.add("collapsed"); $("#layerSection").classList.add("collapsed"); }
+// mobile: one panel at a time, on whichever tab was last used
+let savedPT=null; try{ savedPT=localStorage.getItem(PANEL_TAB_KEY); }catch(_){}
+setPanelTab(savedPT||"color");
+applyPanelLayout();
 // Re-fit once the browser has finished laying out the stage (boot may run pre-layout).
 requestAnimationFrame(()=>{ fitZoom(); composite(); drawRulers(); });
 
