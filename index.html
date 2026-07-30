@@ -537,7 +537,10 @@
       max-height:42vh; overflow-y:auto;
     }
     .side.open{transform:none;}
-    #menuSheet .menu-item{display:block; padding:11px 14px; border-radius:8px; font-size:15px;}
+    /* flex, not block: each row is an icon plus its label, and the icon has to sit on the
+       label's centre line rather than its baseline */
+    #menuSheet .menu-item{display:flex; align-items:center; gap:12px; padding:11px 14px;
+      border-radius:8px; font-size:15px;}
 
     /* The whole bottom panel is one tabbed surface: the pinned strip picks Color, Layers or
        Animation, and only that one is in the document flow. Two half-width columns of controls
@@ -700,16 +703,17 @@
     <button data-cmd="about" data-icon="info" data-icon-size="16">About PixelPaint</button>
   </div>
 
-  <!-- mobile: hamburger opens a simple stacked menu list -->
+  <!-- mobile: hamburger opens a simple stacked menu list. Icons here only — the desktop menu
+       bar stays plain text, the way a menu bar is expected to look. -->
   <div id="menuSheet" hidden>
-    <div class="menu-item" data-menu="file">File</div>
-    <div class="menu-item" data-menu="edit">Edit</div>
-    <div class="menu-item" data-menu="sprite">Sprite</div>
-    <div class="menu-item" data-menu="layer">Layer</div>
-    <div class="menu-item" data-menu="frame">Frame</div>
-    <div class="menu-item" data-menu="select">Select</div>
-    <div class="menu-item" data-menu="view">View</div>
-    <div class="menu-item" data-menu="help">Help</div>
+    <div class="menu-item" data-menu="file"   data-icon="folder"  data-icon-size="17">File</div>
+    <div class="menu-item" data-menu="edit"   data-icon="undo"    data-icon-size="17">Edit</div>
+    <div class="menu-item" data-menu="sprite" data-icon="image"   data-icon-size="17">Sprite</div>
+    <div class="menu-item" data-menu="layer"  data-icon="copy"    data-icon-size="17">Layer</div>
+    <div class="menu-item" data-menu="frame"  data-icon="play"    data-icon-size="17">Frame</div>
+    <div class="menu-item" data-menu="select" data-icon="select"  data-icon-size="17">Select</div>
+    <div class="menu-item" data-menu="view"   data-icon="visible" data-icon-size="17">View</div>
+    <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="17">Help</div>
   </div>
 
   <!-- MAIN -->
