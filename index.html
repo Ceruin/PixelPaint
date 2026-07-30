@@ -584,6 +584,10 @@
     .ctx-menu button{padding:11px 12px;}
     .tl-tab{height:34px;}                   /* the tabs stay compact, but big enough to hit */
     .panel-tabs .ptab{height:40px; min-height:40px;}
+    /* the picker is a floating panel, so it doesn't inherit the panel width — give it the
+       screen on a phone, where a 238px saturation square is a poor finger target */
+    .cp-pop{width:min(340px, calc(100vw - 16px));}
+    .cp-sv{height:158px;}
   }
 </style>
 </head>
