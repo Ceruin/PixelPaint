@@ -853,7 +853,7 @@
         <h3>Sub-canvas</h3>
         <div id="regionNone">
           <button id="regionCreate" data-icon="region" style="width:100%">Create draw area</button>
-          <div class="hint" style="padding:7px 0 0; margin:0">A box you can draw inside but not outside. Create one, set its size, then Lock it. Or use the Region tool (D) to drag it on the canvas.</div>
+          <div class="hint" style="padding:7px 0 0; margin:0">A box you can draw inside but not outside. Create one, set its size, then Lock it. Or use the Region tool (D) to drag it on the canvas. Remove it any time with the <b>✕</b> on its top-right corner.</div>
         </div>
         <div id="regionCtl" style="display:none">
           <div class="rg-row"><span class="rg-lbl">Size</span>
@@ -865,7 +865,7 @@
             <button id="rgCenter">Center</button>
             <button id="rgRemove" style="background:var(--danger); border-color:var(--danger); color:#fff;" title="Delete the sub-canvas and draw on the whole canvas again (Del)">Remove</button>
           </div>
-          <div class="hint" style="padding:7px 0 0; margin:0">Remove also works with <b>Del</b>, or View ▸ Remove sub-canvas.</div>
+          <div class="hint" style="padding:7px 0 0; margin:0">Tap the <b>✕</b> on its top-right corner to remove it. <b>Del</b> and View ▸ Remove sub-canvas work too.</div>
         </div>
       </div>
     </div>
@@ -1741,6 +1741,12 @@ function composite(){
   paintPlaceOverlay();
   if(selDrag && selDrag.float) drawFloat();
   if(selection) drawSelection();
+  // dismiss badges last, so nothing paints over them. Not while a gesture is in flight, and not
+  // during image placement — that has its own overlay and toolbar.
+  if(!placement){
+    if(region && !regionDrag) drawBadge(region, regionLocked?"#f0a020":"#2ce8f5");
+    if(selection && !selDrag) drawBadge(selection, "#5b8cff");
+  }
   const fr=frames[frameIndex];   // keep the active frame's timeline thumbnail live while drawing
   if(fr && fr._thumb) compositeFrameInto(fr._thumb.getContext("2d"), fr);
 }
@@ -1812,6 +1818,43 @@ function clampRegion(){
   region.x=Math.round(region.x); region.y=Math.round(region.y); region.w=Math.round(region.w); region.h=Math.round(region.h);
   region.w=clamp(region.w,1,W); region.h=clamp(region.h,1,H);
   region.x=clamp(region.x,0,W-region.w); region.y=clamp(region.y,0,H-region.h);
+}
+// ---- on-canvas dismiss badge ------------------------------------------------------------
+// A sub-canvas or a selection is thrown away by tapping the ✕ on its top-right corner. Panels
+// are a poor home for this on a phone — the side panel can be tabbed shut altogether — and it
+// beats reaching for Del on a desktop. The badge sits *outside* its rect, where painting is
+// already blocked by the selection/sub-canvas clip, so it never costs you a reachable pixel.
+// fingers need a bigger target than a mouse pointer; live media query, so a hybrid device
+// that gains or loses a touchscreen keeps up
+const coarsePtr = window.matchMedia ? window.matchMedia("(pointer: coarse)") : {matches:false};
+function badgeR(){ return coarsePtr.matches ? 13 : 9; }        // drawn radius, view pixels
+function badgeOff(){ return badgeR()+7; }                      // diagonal offset from the corner,
+                                                               // far enough to clear the NE handle
+function badgeAt(r){
+  // Clamp into the canvas: a rect flush with the top or right edge would otherwise push its
+  // badge off the view, where nothing can be tapped.
+  const R=badgeR(), o=badgeOff(), VW=W*zoom, VH=H*zoom;
+  const lim=(v,max)=>clamp(v, R+1, Math.max(R+1, max-R-1));
+  return { x:lim((r.x+r.w)*zoom+o, VW), y:lim(r.y*zoom-o, VH) };
+}
+function drawBadge(r, ring){
+  const R=badgeR(), c=badgeAt(r), k=R*0.42;
+  vctx.save();
+  vctx.beginPath(); vctx.arc(c.x,c.y,R,0,Math.PI*2);
+  vctx.fillStyle="rgba(18,21,28,.93)"; vctx.fill();
+  vctx.lineWidth=2; vctx.strokeStyle=ring; vctx.stroke();
+  vctx.beginPath();
+  vctx.moveTo(c.x-k,c.y-k); vctx.lineTo(c.x+k,c.y+k);
+  vctx.moveTo(c.x+k,c.y-k); vctx.lineTo(c.x-k,c.y+k);
+  vctx.lineWidth=2; vctx.lineCap="round"; vctx.strokeStyle="#fff"; vctx.stroke();
+  vctx.restore();
+}
+// A little slop past the drawn circle — but not so much that it swallows the resize handle
+// sitting diagonally inside it (see badgeOff).
+function badgeHit(r,e){
+  const b=view.getBoundingClientRect(), c=badgeAt(r);
+  const tol = badgeR() + (e.pointerType==="mouse" ? 2 : 5);
+  return Math.hypot((e.clientX-b.left)-c.x, (e.clientY-b.top)-c.y) <= tol;
 }
 function rectHandleHitArt(r,a,tol){
   const pts={nw:[r.x,r.y],n:[r.x+r.w/2,r.y],ne:[r.x+r.w,r.y],e:[r.x+r.w,r.y+r.h/2],se:[r.x+r.w,r.y+r.h],s:[r.x+r.w/2,r.y+r.h],sw:[r.x,r.y+r.h],w:[r.x,r.y+r.h/2]};
@@ -2430,6 +2473,12 @@ view.addEventListener("pointerdown",e=>{
   }
   if(placement){ if(e.button===0) placementDown(e); return; }
   if(e.button!==0 && e.button!==2) return;          // left or right button only
+  // the ✕ badges win over every tool: they're how you dismiss a selection / sub-canvas without
+  // hunting through a panel, and they sit in space no tool can paint anyway
+  if(e.button===0){
+    if(selection && !selDrag && badgeHit(selection,e)){ clearSelection(); return; }
+    if(region && !regionDrag && badgeHit(region,e)){ removeRegion(); return; }
+  }
   if(playing) stopPlayback();                        // editing stops playback
   try{ view.setPointerCapture(e.pointerId); }catch(_){}   // never let a capture refusal abort the stroke
   const p=toPixel(e);
@@ -2485,9 +2534,16 @@ window.addEventListener("pointermove",e=>{
 });
 
 // always-on cursor coordinate readout (+ move cursor when hovering inside a selection)
+let overBadge=false;
 view.addEventListener("pointermove",e=>{
   if(pan) return;                       // keep the grabbing cursor while panning
   const p=toPixel(e); $("#cursorInfo").textContent=p.x+", "+p.y;
+  // the ✕ badges are clickable under every tool, so advertise them — and put the tool's own
+  // cursor back the moment you leave, since most tools never touch the cursor after setTool
+  const onBadge = !placement && ((selection && !selDrag && badgeHit(selection,e))
+                              || (region && !regionDrag && badgeHit(region,e)));
+  if(onBadge!==overBadge){ overBadge=onBadge; view.style.cursor = onBadge ? "pointer" : (CURSORS[tool]||"crosshair"); }
+  if(onBadge) return;
   if(tool==="select" && !selDrag && !placement) view.style.cursor=(selection && inSel(p.x,p.y))?"move":"crosshair";
   else if(tool==="region" && !regionDrag && !placement){
     if(regionLocked){ view.style.cursor="not-allowed"; }
@@ -2498,7 +2554,10 @@ view.addEventListener("pointermove",e=>{
     }
   }
 });
-view.addEventListener("pointerleave",()=>{ if(!drawing&&!shaping&&!selDrag&&!xform) $("#cursorInfo").textContent="—"; });
+view.addEventListener("pointerleave",()=>{
+  if(!drawing&&!shaping&&!selDrag&&!xform) $("#cursorInfo").textContent="—";
+  overBadge=false;
+});
 
 window.addEventListener("pointerup",e=>{
   if(pan){ panEnd(); return; }
@@ -3198,7 +3257,7 @@ document.querySelectorAll(".menu-dd").forEach(dd=>dd.addEventListener("click",e=
   runCmd(b.dataset.cmd); closeMenus();
 }));
 function showShortcuts(){
-  showAlert("Tools: B pencil · E eraser · F fill · I pick · L line · R rect · C ellipse · M select · W wand · D sub-canvas\n\nCtrl+Z undo · Ctrl+Y redo · Ctrl+A select all · Ctrl+D deselect · Ctrl+S save · Ctrl+O open\n\n[ ] brush size · + − zoom · G grid · X swap colors · Space play · Alt+click pick color\n\nDel clears the selection, or removes the sub-canvas when nothing is selected.\n\nMouse: scroll = zoom · middle-drag = pan the canvas · right-drag = paint with the background color.\n\nTouch: one finger draws · two fingers drag to pan and pinch to zoom.",{title:"Keyboard shortcuts"});
+  showAlert("Tools: B pencil · E eraser · F fill · I pick · L line · R rect · C ellipse · M select · W wand · D sub-canvas\n\nCtrl+Z undo · Ctrl+Y redo · Ctrl+A select all · Ctrl+D deselect · Ctrl+S save · Ctrl+O open\n\n[ ] brush size · + − zoom · G grid · X swap colors · Space play · Alt+click pick color\n\nA selection or sub-canvas is dismissed by clicking the ✕ on its top-right corner. Del also clears the selection, or removes the sub-canvas when nothing is selected.\n\nMouse: scroll = zoom · middle-drag = pan the canvas · right-drag = paint with the background color.\n\nTouch: one finger draws · two fingers drag to pan and pinch to zoom.",{title:"Keyboard shortcuts"});
 }
 function showAbout(){
   showAlert("PixelPaint — a single-file pixel-art editor.\nDraw, animate, manage layers and palettes, and export PNGs or spritesheets. Works offline and installs as an app.",{title:"About PixelPaint"});
