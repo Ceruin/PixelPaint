@@ -551,7 +551,12 @@
     body[data-ptab="layers"] #colorSection{display:none !important;}
     body[data-ptab="anim"]   #colorSection,
     body[data-ptab="anim"]   #layerSection,
-    body[data-ptab="anim"]   #regionSection{display:none !important;}
+    body[data-ptab="anim"]   #regionSection,
+    /* "none": every panel is tabbed off and the canvas gets the whole screen */
+    body[data-ptab="none"]   #colorSection,
+    body[data-ptab="none"]   #layerSection,
+    body[data-ptab="none"]   #regionSection{display:none !important;}
+    body[data-ptab="none"] .side{overflow:visible; border-bottom:none;}
     body:not([data-ptab="anim"]) #timeline{display:none;}
     /* the tab strip already draws the panel's top edge */
     body[data-ptab="anim"] #timeline{border-top:none; max-height:46vh;}
@@ -3095,14 +3100,21 @@ if(panelBackdropEl) panelBackdropEl.onclick=closeDrawers;
 // ---- mobile panel tabs: Color | Layers | Animation ----------------------------------------
 // The CSS keys off body[data-ptab] and only inside the mobile media query, so on desktop the
 // attribute is inert and every panel stays visible.
-const PANEL_TABS=["color","layers","anim"];
+// "none" is a real state, not a fallback: tapping the open tab closes the panel outright, so the
+// canvas can have the whole screen instead of always surrendering a third of it to one of these.
+const PANEL_TABS=["none","color","layers","anim"];
+const PANEL_NAMES={color:"the color panel", layers:"the layers panel", anim:"frames & groups"};
 const PANEL_TAB_KEY="pp_panelTab";
-let panelTab="color";
+let panelTab="none";
 function setPanelTab(name){
-  if(PANEL_TABS.indexOf(name)<0) name="color";
+  if(PANEL_TABS.indexOf(name)<0) name="none";
   panelTab=name;
   document.body.dataset.ptab=name;
-  document.querySelectorAll("#panelTabs .ptab").forEach(b=>b.classList.toggle("active", b.dataset.ptab===name));
+  document.querySelectorAll("#panelTabs .ptab").forEach(b=>{
+    const on = b.dataset.ptab===name;
+    b.classList.toggle("active", on);
+    b.title = (on?"Hide ":"Show ")+PANEL_NAMES[b.dataset.ptab];
+  });
   try{ localStorage.setItem(PANEL_TAB_KEY, name); }catch(_){}
   // a collapsed timeline behind the Animation tab would look like a broken, empty panel
   if(name==="anim" && tlCollapsed) setTimelineCollapsed(false);
@@ -3110,7 +3122,9 @@ function setPanelTab(name){
   drawRulers();
   if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); }
 }
-document.querySelectorAll("#panelTabs .ptab").forEach(b=>b.onclick=()=>setPanelTab(b.dataset.ptab));
+document.querySelectorAll("#panelTabs .ptab").forEach(b=>{
+  b.onclick=()=>setPanelTab(panelTab===b.dataset.ptab ? "none" : b.dataset.ptab);
+});
 // The tab strip replaces the collapsible headers on mobile, so a section left collapsed on a
 // desktop-width window must not stay hidden once its tab is the only way in.
 function applyPanelLayout(){
@@ -3511,9 +3525,9 @@ setBrush(1);
 let savedTl=null; try{ savedTl=localStorage.getItem("pp_tlCollapsed"); }catch(_){}
 setTimelineCollapsed(savedTl==null ? true : savedTl==="1");
 createDoc(32,32);
-// mobile: one panel at a time, on whichever tab was last used
+// mobile: at most one panel at a time — whichever tab was last used, and closed on a first run
 let savedPT=null; try{ savedPT=localStorage.getItem(PANEL_TAB_KEY); }catch(_){}
-setPanelTab(savedPT||"color");
+setPanelTab(savedPT||"none");
 applyPanelLayout();
 // Re-fit once the browser has finished laying out the stage (boot may run pre-layout).
 requestAnimationFrame(()=>{ fitZoom(); composite(); drawRulers(); });
