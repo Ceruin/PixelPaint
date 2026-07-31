@@ -404,6 +404,21 @@
   @media (max-width: 860px){ .help-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
   @media (max-width: 620px){ .help-grid{grid-template-columns:1fr; gap:14px;} }
 
+  /* ---- spritesheet import: background swatches + a clickable preview ---- */
+  .shi-sw{display:flex; flex-wrap:wrap; align-items:center; gap:5px; flex:1; min-width:0;}
+  .shi-sw .sw{width:24px; height:24px; border-radius:5px; border:1px solid var(--line);
+    cursor:pointer; position:relative;}
+  .shi-sw .sw::after{content:"×"; position:absolute; inset:0; display:none; align-items:center;
+    justify-content:center; color:#fff; font-weight:700; font-size:14px; text-shadow:0 0 3px #000;}
+  .shi-sw .sw:hover{outline:2px solid var(--danger); outline-offset:1px;}
+  .shi-sw .sw:hover::after{display:flex;}
+  .shi-sw .none{color:var(--muted); font-size:12px;}
+  .shi-prev{flex:1; min-width:0; max-height:190px; overflow:auto;
+    border:1px solid var(--line); border-radius:8px;
+    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 16px 16px;}
+  .shi-prev canvas{display:block; width:100%; height:auto; image-rendering:pixelated; cursor:crosshair;}
+  .shi-hint{color:var(--muted); font-size:11px; line-height:1.45;}
+
   /* ---- about sheet ---- */
   .about-head{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
   .about-icon{flex:none; image-rendering:pixelated;}   /* transparent, as the icon is everywhere else */
@@ -1228,7 +1243,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31c";
+const APP_VERSION="2026.07.31d";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -3734,8 +3749,17 @@ function buildSheetImport(d,plan,opts,name){
 async function showSheetImportDialog(img,name){
   const d=sheetImageData(img);
   const autos=detectSheetBGs(d);
-  const sw=c=>'<span style="display:inline-block;width:13px;height:13px;border-radius:3px;border:1px solid var(--line);background:rgb('+c.r+','+c.g+','+c.b+')"></span>';
-  const swatches=autos.length?autos.map(sw).join(" "):"";
+  let bgList=autos.slice();
+  // A nearest-neighbour copy at preview scale: every pixel in it is an exact pixel of the sheet, so
+  // it can be both keyed cheaply on each edit and sampled for colour without lying about it.
+  const pvScale=Math.min(1, 470/d.w);
+  const pv=(()=>{
+    const c=document.createElement("canvas");
+    c.width=Math.max(1,Math.round(d.w*pvScale)); c.height=Math.max(1,Math.round(d.h*pvScale));
+    const x=c.getContext("2d",{willReadFrequently:true});
+    x.imageSmoothingEnabled=false; x.drawImage(d.canvas,0,0,c.width,c.height);
+    return {canvas:c, data:x.getImageData(0,0,c.width,c.height), w:c.width, h:c.height};
+  })();
   const body=`
     <div class="row"><label>Mode</label><select id="shiMode">
       <option value="smart" selected>Smart — find the frames and groups</option>
@@ -3757,7 +3781,14 @@ async function showSheetImportDialog(img,name){
     <div class="row" id="shiDenoiseRow"><label></label>
       <label class="chk" title="Labels are far shorter than the sprites around them, and text blocks far larger — and the largest cell is what sets the canvas size"><input type="checkbox" id="shiDenoise" checked> Ignore bits that aren\'t sprites — labels, text blocks</label></div>
     <div class="row"><label>Background</label>
-      <label class="chk"><input type="checkbox" id="shiKey" checked> Make ${swatches||"the background"} transparent</label></div>
+      <label class="chk"><input type="checkbox" id="shiKey" checked> Make these colours transparent</label></div>
+    <div class="row" id="shiBgRow"><label></label>
+      <span class="shi-sw" id="shiSwatches"></span>
+      <button id="shiBgAuto" data-icon="wand" data-icon-size="14" title="Back to the colours found automatically">Auto</button></div>
+    <div class="row" id="shiPrevRow"><label></label>
+      <div class="shi-prev"><canvas id="shiPreview"></canvas></div></div>
+    <div class="row"><label></label><span class="shi-hint">Click the sheet to add a colour, or click it
+      again to take it back out. The checkerboard is what will be transparent.</span></div>
     <div class="row"><label>Tolerance</label><input type="number" id="shiTol" min="0" max="120" value="24">
       <span style="color:var(--muted)">how close counts as background</span></div>
     <!-- 2 bridges the small holes inside one sprite (a thrown object, a gap between head and
@@ -3768,12 +3799,47 @@ async function showSheetImportDialog(img,name){
   const promise=openModal({title:"Import spritesheet",
     message:d.w+" × "+d.h+" sheet."+(autos.length?"":" No flat background found — it may already be transparent."),
     bodyHTML:body, okText:"Import", mid:true});
+  const sameColour=(a,b,tol)=>{
+    const dr=a.r-b.r, dg=a.g-b.g, db=a.b-b.b;
+    return dr*dr+dg*dg+db*db <= tol*tol*3;
+  };
+  const renderSwatches=()=>{
+    const host=$("#shiSwatches"); host.innerHTML="";
+    if(!bgList.length){ const e=document.createElement("span"); e.className="none";
+      e.textContent="none — nothing will be keyed out"; host.appendChild(e); return; }
+    bgList.forEach((c,i)=>{
+      const b=document.createElement("span"); b.className="sw";
+      b.style.background="rgb("+c.r+","+c.g+","+c.b+")";
+      b.title="rgb("+c.r+", "+c.g+", "+c.b+") — click to remove";
+      b.onclick=()=>{ bgList.splice(i,1); update(); };
+      host.appendChild(b);
+    });
+  };
+  const drawPreview=(o)=>{
+    const cv=$("#shiPreview"); if(!cv) return;
+    cv.width=pv.w; cv.height=pv.h;
+    const x=cv.getContext("2d");
+    const src=pv.data.data, out=x.createImageData(pv.w,pv.h), dst=out.data;
+    const t=o.tol*o.tol*3, list=o.bgs;
+    for(let p=0;p<src.length;p+=4){
+      if(src[p+3]<8) continue;
+      let bg=false;
+      for(const c of list){
+        const dr=src[p]-c.r, dg=src[p+1]-c.g, db=src[p+2]-c.b;
+        if(dr*dr+dg*dg+db*db<=t){ bg=true; break; }
+      }
+      if(bg) continue;
+      dst[p]=src[p]; dst[p+1]=src[p+1]; dst[p+2]=src[p+2]; dst[p+3]=src[p+3];
+    }
+    x.putImageData(out,0,0);
+  };
   const read=()=>({
     mode:$("#shiMode").value, cw:+$("#shiCW").value||1, ch:+$("#shiCH").value||1,
     margin:+$("#shiMargin").value||0, spacing:+$("#shiSpacing").value||0,
     align:$("#shiAlign").value, key:$("#shiKey").checked,
     skipEmpty:$("#shiSkipEmpty").checked, denoise:$("#shiDenoise").checked,
     cellMatte:$("#shiCellMatte").checked,
+    bgs:$("#shiKey").checked ? bgList.slice() : [],
     tol:clamp(+$("#shiTol").value||0,0,120), gap:clamp(+$("#shiGap").value||0,0,64),
   });
   let plan=null;
@@ -3787,6 +3853,10 @@ async function showSheetImportDialog(img,name){
     $("#shiAlignRow").style.display = grid ? "none" : "";
     $("#shiDenoiseRow").style.display = grid ? "none" : "";
     $("#shiTileRow").style.display = o.key ? "" : "none";
+    $("#shiBgRow").style.display = o.key ? "" : "none";
+    $("#shiPrevRow").style.display = o.key ? "" : "none";
+    renderSwatches();
+    drawPreview(o);
     plan=sheetPlan(d,o);
     const n=plan.count, g=plan.groups.length;
     $("#shiSummary").textContent = n
@@ -3798,6 +3868,22 @@ async function showSheetImportDialog(img,name){
   ["#shiMode","#shiCW","#shiCH","#shiMargin","#shiSpacing","#shiAlign","#shiKey","#shiTol","#shiGap",
    "#shiSkipEmpty","#shiDenoise","#shiCellMatte"]
     .forEach(id=>{ const el=$(id); el.oninput=update; el.onchange=update; });
+  hydrateIcons($("#modalBody"));
+  // click the sheet to add the colour under the pointer, or to take it back out
+  $("#shiPreview").onclick=e=>{
+    const cv=e.currentTarget, r=cv.getBoundingClientRect();
+    const sx=clamp(Math.floor((e.clientX-r.left)/r.width*pv.w),0,pv.w-1);
+    const sy=clamp(Math.floor((e.clientY-r.top)/r.height*pv.h),0,pv.h-1);
+    const px=pv.data.data, i=(sy*pv.w+sx)*4;
+    if(px[i+3]<8) return;                            // nothing there to sample
+    const c={r:px[i], g:px[i+1], b:px[i+2]};
+    const tol=clamp(+$("#shiTol").value||0,0,120);
+    const hit=bgList.findIndex(b=>sameColour(b,c,tol));
+    if(hit>=0) bgList.splice(hit,1); else bgList.push(c);
+    if(!$("#shiKey").checked) $("#shiKey").checked=true;
+    update();
+  };
+  $("#shiBgAuto").onclick=()=>{ bgList=autos.slice(); update(); };
   update();
   const ok=await promise;
   if(!ok) return;
