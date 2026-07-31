@@ -368,7 +368,34 @@
   .modal-card #modalBody .row label{color:var(--muted); width:58px; flex:none;}
   .modal-card #modalBody select{flex:1; min-width:0;}
   .modal-card #modalBody input[type=number]{width:72px;}
+  .modal-card.wide{width:min(780px,95vw);}
   .modal-actions{display:flex; justify-content:flex-end; gap:8px;}
+
+  /* ---- help / shortcuts sheet ---- */
+  .modal-card.wide #modalBody{max-height:min(66vh,560px); overflow:auto; margin-right:-6px; padding-right:6px;}
+  .help-grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px 22px;}
+  .help-sec h4{
+    display:flex; align-items:center; gap:7px; margin:0 0 6px;
+    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);
+  }
+  .help-sec h4 svg{opacity:.8;}
+  .help-row{display:flex; align-items:center; gap:9px; padding:3px 0; min-height:24px;}
+  .help-row .ic{flex:none; width:16px; display:inline-flex; justify-content:center; color:var(--muted);}
+  .help-row .lb{flex:1; min-width:0; font-size:12.5px;}
+  .help-row .ks{display:flex; align-items:center; gap:3px; flex:none;}
+  .kbd{
+    display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px;
+    padding:0 6px; background:var(--panel2); border:1px solid var(--line); border-bottom-width:2px;
+    border-radius:5px; color:var(--text); font-size:11px; font-weight:700; line-height:1;
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  .kbd.wide{font-weight:600; font-size:10.5px; text-transform:none;}
+  .ks .plus{color:var(--muted); font-size:10px;}
+  @media (max-width: 860px){ .help-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  @media (max-width: 620px){ .help-grid{grid-template-columns:1fr; gap:14px;} }
+
+  /* the tools rail's tips moved into that sheet; this is all that's left in their place */
+  .helpbtn{width:100%; margin-top:auto;}
   .modal-card .danger{background:var(--danger); border-color:var(--danger); color:#fff;}
   .modal-card .danger:hover{background:#ec6a7c; border-color:#ec6a7c;}
   @keyframes modalIn{from{opacity:0; transform:translateY(10px) scale(.98);} to{opacity:1; transform:none;}}
@@ -401,6 +428,8 @@
   }
   .ctx-menu button:hover{background:var(--panel2); border:none;}
   .ctx-sep{height:1px; background:var(--line); margin:5px 4px;}
+  .ctx-sep + .ctx-sep{display:none;}          /* never draw a doubled divider */
+  .ctx-sep:first-child, .ctx-sep:last-child{display:none;}
 
   /* tighten chrome on smaller windows so the canvas keeps room */
   @media (max-width: 1100px){
@@ -492,6 +521,16 @@
   .menu-dd .dd-zoom{display:flex; align-items:center; gap:6px; padding:6px 10px;}
   .menu-dd .dd-zoom span#zoomReadout{flex:1; text-align:center; font-size:12px;}
   .menu-dd .chk{padding:6px 10px; font-size:13px; color:var(--text);}
+  /* In a dropdown that mixes checkbox rows with plain ones, the plain rows reserve the checkbox's
+     column so every label starts on the same x — otherwise e.g. "Remove sub-canvas" sits a
+     checkbox-width to the left of "Grid". Nested buttons (the zoom steppers) are left alone. */
+  .menu-dd.has-checks > button::before{content:""; width:13px; flex:none;}
+  /* fixed slots, so the alignment is structural rather than a sum of default widths: 13px for the
+     checkbox (or the empty stand-in above), then 16px for the icon, whatever the glyph measures */
+  .menu-dd .chk > input[type=checkbox]{width:13px; height:13px; margin:0; flex:none;}
+  .menu-dd .chk > .mi, .menu-dd.has-checks > button > svg{
+    width:16px; flex:none; display:inline-flex; justify-content:center;
+  }
 
   /* ---- tools as an icon grid ---- */
   .tools .toolgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; width:100%;}
@@ -561,6 +600,7 @@
     .tools .toolhead,.tools #toolOpts,.tools .brush-sec{display:none;}   /* keep the row clean; brush lives in the hamburger */
     .tools .toolgrid{display:flex; grid-template-columns:none; gap:6px; width:auto;}
     .tools .tool{width:44px; height:44px; aspect-ratio:auto; flex:none;}
+    .tools .helpbtn{width:44px; min-width:44px; margin-top:0; padding:0; flex:none;}
     /* side panel becomes an in-flow stack under the canvas */
     .side{
       position:relative; z-index:1; transform:none; width:auto; flex:none;
@@ -702,7 +742,6 @@
     <button data-cmd="addframe" data-icon="add"   data-icon-size="16">New frame</button>
     <button data-cmd="delframe" data-icon="trash" data-icon-size="16">Delete frame</button>
     <div class="ctx-sep"></div>
-    <div class="ctx-sep"></div>
     <button data-cmd="addgroup" data-icon="tag" data-icon-size="16">New frame group…</button>
     <button data-cmd="addtag"   data-icon="tag" data-icon-size="16">Group existing frames…</button>
     <div class="ctx-sep"></div>
@@ -716,7 +755,7 @@
     <button data-cmd="wandtool" data-icon="wand" data-icon-size="16">Magic wand tool</button>
     <button data-cmd="snap" data-icon="palette" data-icon-size="16">Snap to palette</button>
   </div>
-  <div id="menu-view" class="ctx-menu menu-dd" hidden>
+  <div id="menu-view" class="ctx-menu menu-dd has-checks" hidden>
     <div class="dd-zoom">
       <button id="zoomOut" class="iconbtn" title="Zoom out (-)">−</button>
       <span id="zoomReadout">1600%</span>
@@ -724,21 +763,21 @@
     </div>
     <button id="zoomFit" data-cmd="fit" data-icon="center" data-icon-size="16">Fit to window</button>
     <div class="ctx-sep"></div>
-    <label class="chk"><input type="checkbox" id="gridToggle" checked /> <span data-icon="grid" data-icon-size="15"></span> Grid<span class="hk">G</span></label>
-    <label class="chk"><input type="checkbox" id="centerToggle" checked /> <span data-icon="center" data-icon-size="15"></span> Center guide</label>
-    <label class="chk"><input type="checkbox" id="regionToggleMenu" /> <span data-icon="region" data-icon-size="15"></span> Sub-canvas</label>
+    <label class="chk"><input type="checkbox" id="gridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Grid<span class="hk">G</span></label>
+    <label class="chk"><input type="checkbox" id="centerToggle" checked /><span class="mi" data-icon="center" data-icon-size="15"></span>Center guide</label>
+    <label class="chk"><input type="checkbox" id="regionToggleMenu" /><span class="mi" data-icon="region" data-icon-size="15"></span>Sub-canvas</label>
     <button data-cmd="delregion" data-icon="trash" data-icon-size="16">Remove sub-canvas<span class="hk">Del</span></button>
     <div class="ctx-sep"></div>
     <!-- desktop: any dock can be folded away so the canvas gets the window. On mobile these
          panels are already tabs, so the toggles are hidden there. -->
     <div class="dd-docks">
-      <label class="chk"><input type="checkbox" id="dockTools" checked /> <span data-icon="pencil" data-icon-size="15"></span> Tools panel</label>
-      <label class="chk"><input type="checkbox" id="dockSide" checked /> <span data-icon="palette" data-icon-size="15"></span> Color &amp; layers panel</label>
-      <label class="chk"><input type="checkbox" id="dockAnim" checked /> <span data-icon="play" data-icon-size="15"></span> Animation panel</label>
+      <label class="chk"><input type="checkbox" id="dockTools" checked /><span class="mi" data-icon="pencil" data-icon-size="15"></span>Tools panel</label>
+      <label class="chk"><input type="checkbox" id="dockSide" checked /><span class="mi" data-icon="palette" data-icon-size="15"></span>Color &amp; layers panel</label>
+      <label class="chk"><input type="checkbox" id="dockAnim" checked /><span class="mi" data-icon="play" data-icon-size="15"></span>Animation panel</label>
     </div>
   </div>
   <div id="menu-help" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Keyboard shortcuts</button>
+    <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Help &amp; shortcuts<span class="hk">?</span></button>
     <button data-cmd="about" data-icon="info" data-icon-size="16">About PixelPaint</button>
   </div>
 
@@ -804,7 +843,9 @@
       </div>
 
       <input type="file" id="imgInput" accept="image/*" hidden />
-      <div class="hint">Alt+click = quick color pick.<br/>[ ] resize brush. Scroll = zoom.<br/>Middle-drag = pan the canvas.<br/>Touch: two fingers = pan &amp; zoom.</div>
+      <!-- the tips that used to sit here as permanent small print now live in the help sheet -->
+      <button id="helpBtn" class="helpbtn" data-icon="info" data-icon-size="15"
+              title="Shortcuts, mouse and touch gestures (?)"><span class="btxt">Help</span></button>
     </div>
 
     <!-- CANVAS AREA (rulers + stage) -->
@@ -1215,6 +1256,7 @@ function openModal(o){
     const inp=$("#modalInput");
     if(o.input){ inp.style.display=""; inp.value=o.value||""; } else { inp.style.display="none"; }
     $("#modalBody").innerHTML=o.bodyHTML||"";
+    document.querySelector(".modal-card").classList.toggle("wide", !!o.wide);
     const ok=$("#modalOk"); ok.textContent=o.okText||"OK"; ok.classList.toggle("danger", !!o.danger);
     const cancel=$("#modalCancel");
     if(o.cancel===false){ cancel.style.display="none"; } else { cancel.style.display=""; cancel.textContent=o.cancelText||"Cancel"; }
@@ -3387,8 +3429,66 @@ document.querySelectorAll(".menu-dd").forEach(dd=>dd.addEventListener("click",e=
   const b=e.target.closest("[data-cmd]"); if(!b) return;
   runCmd(b.dataset.cmd); closeMenus();
 }));
+// ---- help sheet ---------------------------------------------------------------------------
+// One reference for every shortcut and gesture, laid out from data so the icons match the ones
+// the same actions carry elsewhere in the UI. A key of "" is a row with no shortcut.
+const HELP_SECTIONS=[
+  {title:"Tools", icon:"pencil", rows:[
+    ["pencil","Pencil","B"], ["eraser","Eraser","E"], ["fill","Fill","F"], ["pick","Pick color","I"],
+    ["line","Line","L"], ["rect","Rectangle","R"], ["ellipse","Ellipse","C"],
+    ["select","Rectangle select","M"], ["wand","Magic wand","W"], ["region","Sub-canvas","D"],
+  ]},
+  {title:"Edit", icon:"undo", rows:[
+    ["undo","Undo","Ctrl+Z"], ["redo","Redo","Ctrl+Y"],
+    ["select","Select all","Ctrl+A"], ["clear","Deselect","Ctrl+D"],
+    ["trash","Clear the selection","Del"],
+    ["save","Save project","Ctrl+S"], ["folder","Open project","Ctrl+O"],
+  ]},
+  {title:"Brush & view", icon:"brush", rows:[
+    ["brush","Smaller / bigger brush","[|]"],
+    ["wand","Zoom out / in","-|+"],
+    ["grid","Toggle the grid","G"],
+    ["swap","Swap foreground / background","X"],
+    ["center","Fit the canvas to the window",""],
+  ]},
+  {title:"Animation", icon:"play", rows:[
+    ["play","Play / stop","Space"],
+    ["add","New frame (copies the current one)",""],
+    ["tag","Group frames — idle, walk, jump…",""],
+    ["image","Export a spritesheet of a group",""],
+  ]},
+  {title:"Mouse", icon:"pick", rows:[
+    ["pick","Quick color pick","Alt+click"],
+    ["fill","Paint with the background color","Right-drag"],
+    ["wand","Zoom","Scroll"],
+    ["center","Pan the canvas","Middle-drag"],
+  ]},
+  {title:"Touch", icon:"region", rows:[
+    ["pencil","Draw","One finger"],
+    ["center","Pan the canvas","Two fingers"],
+    ["wand","Zoom","Pinch"],
+    ["clear","Dismiss a selection or sub-canvas","Tap its ✕"],
+  ]},
+];
+function helpKeys(spec){
+  if(!spec) return "";
+  // "[|]" is two alternative keys; "Ctrl+Z" is one chord. Note "+" is itself a key (zoom in), so a
+  // chord only counts when splitting leaves non-empty parts on both sides.
+  return spec.split("|").map(part=>{
+    const chord=part.split("+").filter(Boolean);
+    if(part.indexOf("+")>0 && chord.length>1 && chord.every(k=>k.length<=5))
+      return chord.map(k=>'<span class="kbd">'+k+"</span>").join('<span class="plus">+</span>');
+    return '<span class="kbd'+(part.length>2?" wide":"")+'">'+part+"</span>";
+  }).join('<span class="plus">/</span>');
+}
 function showShortcuts(){
-  showAlert("Tools: B pencil · E eraser · F fill · I pick · L line · R rect · C ellipse · M select · W wand · D sub-canvas\n\nCtrl+Z undo · Ctrl+Y redo · Ctrl+A select all · Ctrl+D deselect · Ctrl+S save · Ctrl+O open\n\n[ ] brush size · + − zoom · G grid · X swap colors · Space play · Alt+click pick color\n\nA selection or sub-canvas is dismissed by clicking the ✕ on its top-right corner. Del also clears the selection, or removes the sub-canvas when nothing is selected.\n\nMouse: scroll = zoom · middle-drag = pan the canvas · right-drag = paint with the background color.\n\nTouch: one finger draws · two fingers drag to pan and pinch to zoom.",{title:"Keyboard shortcuts"});
+  const body='<div class="help-grid">'+HELP_SECTIONS.map(sec=>
+    '<div class="help-sec"><h4>'+iconSVG(sec.icon,13)+sec.title+"</h4>"+
+    sec.rows.map(([ic,label,keys])=>
+      '<div class="help-row"><span class="ic">'+iconSVG(ic,15)+'</span>'+
+      '<span class="lb">'+label+'</span><span class="ks">'+helpKeys(keys)+"</span></div>").join("")+
+    "</div>").join("")+"</div>";
+  openModal({title:"Help & shortcuts", bodyHTML:body, okText:"Close", cancel:false, wide:true});
 }
 function showAbout(){
   showAlert("PixelPaint — a single-file pixel-art editor.\nDraw, animate, manage layers and palettes, and export PNGs or spritesheets. Works offline and installs as an app.",{title:"About PixelPaint"});
@@ -3506,6 +3606,7 @@ $("#rgCenter").onclick=centerRegion;
 $("#rgLock").onchange=e=>{ regionLocked=e.target.checked; composite(); };
 ["#rgW","#rgH","#rgX","#rgY"].forEach(id=>{ $(id).onchange=setRegionFromInputs; });
 
+$("#helpBtn").onclick=showShortcuts;
 $("#undoBtn").onclick=undo;
 $("#redoBtn").onclick=redo;
 
@@ -3658,6 +3759,7 @@ window.addEventListener("keydown",e=>{
       if(selection){ e.preventDefault(); clearSelectionContents(); }
       else if(region){ e.preventDefault(); removeRegion(); }
       break;
+    case "?": showShortcuts(); break;
     case "escape":
       if(toolsPanelEl.classList.contains("open")||sidePanelEl.classList.contains("open")) closeDrawers();
       else if(selection) clearSelection();
