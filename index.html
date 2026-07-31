@@ -103,7 +103,8 @@
   /* ---- frame groups: each tagged run of frames gets its own labelled block ---- */
   /* flex:1+min-height:0 so a crowded control bar squeezes (and scrolls) the frames strip rather
      than the bar itself getting clipped by the timeline's max-height */
-  .tl-frames{display:flex; align-items:flex-start; gap:10px; padding:9px 10px; overflow:auto; flex:1 1 auto; min-height:0;}
+  .tl-frames{display:flex; align-items:flex-start; gap:10px; padding:9px 10px; overflow:auto; flex:1 1 auto; min-height:0;
+    position:relative;}   /* the drop marker is positioned against this */
   .tl-group{flex:none; display:flex; flex-direction:column; gap:5px; padding:5px 6px 6px;
     border:1px solid var(--line); border-radius:9px; background:#0000002e;}
   .tl-group.ungrouped{border-style:dashed;}
@@ -121,7 +122,14 @@
     padding:4px; border:2px solid var(--line); border-radius:8px; background:var(--panel2); cursor:pointer;}
   .tl-frame:hover{border-color:#56607a;}
   .tl-frame.active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
-  .tl-frame .tl-num{font-size:10px; color:var(--muted); line-height:1;}
+  /* the number doubles as the drag grip. touch-action:none only here, so dragging the thumbnail
+     still scrolls the strip on a phone — losing that would make a long strip painful to get around */
+  .tl-frame .tl-num{font-size:10px; color:var(--muted); line-height:1; cursor:grab;
+    padding:1px 7px; border-radius:4px; touch-action:none;}
+  .tl-frame .tl-num:hover{background:#ffffff18; color:var(--text);}
+  .tl-frame.drag-src{opacity:.32;}
+  .tl-drop{position:absolute; width:3px; border-radius:2px; background:var(--accent);
+    box-shadow:0 0 7px var(--accent); pointer-events:none; z-index:4;}
   .tl-frame .tl-thumb{image-rendering:pixelated; display:block; border:1px solid #0006;
     background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 10px 10px;}
   .tl-frame .tl-x{position:absolute; top:-7px; right:-7px; width:16px; height:16px; border-radius:50%;
@@ -398,7 +406,7 @@
 
   /* ---- about sheet ---- */
   .about-head{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
-  .about-icon{flex:none; image-rendering:pixelated; border-radius:11px; border:1px solid var(--line);}
+  .about-icon{flex:none; image-rendering:pixelated;}   /* transparent, as the icon is everywhere else */
   .about-tag{font-size:13px; margin-bottom:3px;}
   .about-ver{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums;}
 
@@ -690,6 +698,7 @@
     input[type=range]{height:30px;}
     .swap{width:28px; height:28px;}
     .tl-frame .tl-x{display:inline-flex;}   /* no hover on touch — always show the delete button */
+    .tl-frame .tl-num{padding:4px 10px; font-size:11px;}   /* a grip a finger can find */
     .ctx-menu button{padding:11px 12px;}
     .tl-tab{height:34px;}                   /* the tabs stay compact, but big enough to hit */
     .panel-tabs .ptab{height:40px; min-height:40px;}
@@ -1073,6 +1082,18 @@
   <button data-action="cancel">Cancel</button>
 </div>
 
+<!-- right-click / long-press menu for a frame in the timeline -->
+<div id="frameMenu" class="ctx-menu" hidden>
+  <button data-action="dup"   data-icon="add"       data-icon-size="16">Duplicate frame</button>
+  <button data-action="copy"  data-icon="copy"      data-icon-size="16">Copy frame</button>
+  <button data-action="paste" data-icon="clipboard" data-icon-size="16">Paste frame after</button>
+  <div class="ctx-sep"></div>
+  <button data-action="left"  data-icon="left"  data-icon-size="16">Move left<span class="hk">⇧←</span></button>
+  <button data-action="right" data-icon="right" data-icon-size="16">Move right<span class="hk">⇧→</span></button>
+  <div class="ctx-sep"></div>
+  <button data-action="del"   data-icon="trash" data-icon-size="16">Delete frame</button>
+</div>
+
 <!-- right-click menu for a selection -->
 <div id="selMenu" class="ctx-menu" hidden>
   <button data-action="fill">Fill with foreground</button>
@@ -1206,7 +1227,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31";
+const APP_VERSION="2026.07.31b";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1245,6 +1266,9 @@ const P = {
   brush:"M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.02 0-1.41z",
   add:"M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
   minus:"M19 13H5v-2h14v2z",
+  left:"M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z",
+  right:"M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
+  clipboard:"M19 2h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z",
   copy:"M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z",
   up:"M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z",
   down:"M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z",
@@ -1559,10 +1583,11 @@ function insertFrameAt(at, src, copyPixels){
 }
 function addFrame(duplicate){
   stopPlayback();
-  const at=frameIndex+1;
-  insertFrameAt(at, frames[frameIndex], duplicate);
-  frameIndex=at; layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
-  renderLayers(); renderTimeline(); composite(); updateDocInfo();
+  const at=frameIndex+1, owner=frameOwners();
+  frames.splice(at,0,makeFrameFrom(frames[frameIndex],duplicate));
+  owner.splice(at,0,owner[frameIndex]);   // joins the group you were standing in, end of it included
+  rebuildTagsFromOwners(owner);
+  afterFrameEdit(at);
 }
 function deleteFrame(i){
   if(frames.length<=1){ showToast("A drawing needs at least one frame.","error"); return; }
@@ -1642,21 +1667,171 @@ function playGroup(ti){
 }
 function setFrameDur(ms){ frames[frameIndex].dur=clamp(ms|0,10,5000); renderTimeline(); }
 
-function frameCell(i){
+// ---- moving, copying and reordering frames ---------------------------------------------
+// Every reorder goes through an owner array — one tag index (or -1) per frame — rather than nudging
+// each tag's from/to by hand. Reorder the owners alongside the frames and rebuild the ranges from
+// them, and a frame dropped into another group simply belongs to it, with no case analysis.
+function frameOwners(){
+  const owner=new Array(frames.length).fill(-1);
+  for(let t=0;t<tags.length;t++)
+    for(let i=tags[t].from;i<=tags[t].to;i++) if(i<owner.length && owner[i]<0) owner[i]=t;
+  return owner;
+}
+function rebuildTagsFromOwners(owner){
+  const keep=[];
+  tags.forEach((t,ti)=>{
+    let from=-1, to=-1;
+    for(let i=0;i<owner.length;i++) if(owner[i]===ti){ if(from<0) from=i; to=i; }
+    if(from>=0){ t.from=from; t.to=to; keep.push(t); }   // a group whose frames all left goes with them
+  });
+  tags=keep;
+}
+function afterFrameEdit(at){
+  frameIndex=clamp(at,0,frames.length-1);
+  layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
+  renderLayers(); renderTimeline(); composite(); updateDocInfo(); captureActiveDoc();
+}
+// Move (or copy) the frame at `from` so it lands at `to` in the current numbering, belonging to
+// group `tag`. `to` may be frames.length, meaning "past the end".
+function reorderFrame(from,to,tag,copy){
+  if(from<0||from>=frames.length) return;
+  stopPlayback();
+  const owner=frameOwners();
+  const fr = copy ? makeFrameFrom(frames[from],true) : frames[from];
+  if(!copy){
+    frames.splice(from,1); owner.splice(from,1);
+    if(to>from) to--;                     // everything after the hole shifted left
+  }
+  to=clamp(to,0,frames.length);
+  frames.splice(to,0,fr); owner.splice(to,0,tag);
+  rebuildTagsFromOwners(owner);
+  afterFrameEdit(to);
+}
+function duplicateFrameAt(i){
+  stopPlayback();
+  const owner=frameOwners();
+  frames.splice(i+1,0,makeFrameFrom(frames[i],true));
+  owner.splice(i+1,0,owner[i]);           // a duplicate belongs to the same group as its original
+  rebuildTagsFromOwners(owner);
+  afterFrameEdit(i+1);
+}
+let frameClip=null;                        // a frame copied from any tab, cloned again on paste
+function copyFrameAt(i){
+  if(!frames[i]) return;
+  frameClip=makeFrameFrom(frames[i],true);
+  showToast("Frame copied.","success",1600);
+}
+function pasteFrameAfter(i){
+  if(!frameClip){ showToast("No frame copied yet.","info"); return; }
+  stopPlayback();
+  const owner=frameOwners();
+  frames.splice(i+1,0,makeFrameFrom(frameClip,true));   // clone, so pasting twice gives two frames
+  owner.splice(i+1,0,owner[i]===undefined?-1:owner[i]);
+  rebuildTagsFromOwners(owner);
+  afterFrameEdit(i+1);
+}
+// Step the current frame one place. Crossing into another group joins it, which is what the strip
+// shows happening and keeps every group's frames contiguous.
+function nudgeFrame(dir){
+  const i=frameIndex, j=i+dir;
+  if(j<0||j>=frames.length) return;
+  const owner=frameOwners();
+  reorderFrame(i, dir>0 ? i+2 : i-1, owner[j], false);
+}
+
+function frameCell(i,num,total){
   const fr=frames[i];
   const cell=document.createElement("div");
   cell.className="tl-frame"+(i===frameIndex?" active":"");
   cell.dataset.fi=i;
-  cell.title="Frame "+(i+1)+" — "+fr.dur+" ms";
-  const num=document.createElement("span"); num.className="tl-num"; num.textContent=(i+1);
+  cell.title="Frame "+num+" of "+total+"  ·  #"+(i+1)+" in the timeline  ·  "+fr.dur+" ms"
+    +"\nDrag the number to reorder · right-click for more";
+  const grip=document.createElement("span"); grip.className="tl-num"; grip.textContent=num;
+  grip.title="Drag to reorder";
   const cv=document.createElement("canvas"); cv.className="tl-thumb"; cv.width=W; cv.height=H; fr._thumb=cv;
   const TH=44, TW=Math.max(8,Math.round(TH*W/H)); cv.style.width=TW+"px"; cv.style.height=TH+"px";
   compositeFrameInto(cv.getContext("2d"), fr);
   const x=document.createElement("span"); x.className="tl-x"; x.innerHTML=iconSVG("clear",12); x.title="Delete frame";
-  cell.append(num,cv,x);
-  cell.onclick=()=>selectFrame(i);
+  cell.append(grip,cv,x);
+  cell.onclick=()=>{ if(!fdragMoved) selectFrame(i); };
   x.onclick=ev=>{ev.stopPropagation(); deleteFrame(i);};
+  cell.oncontextmenu=ev=>{ ev.preventDefault(); ev.stopPropagation(); openFrameMenu(ev.clientX,ev.clientY,i); };
+  // the grip is the drag handle on touch; a mouse can drag from anywhere on the cell
+  grip.addEventListener("pointerdown",ev=>{ ev.stopPropagation(); startFrameDrag(ev,cell,true); });
+  cell.addEventListener("pointerdown",ev=>startFrameDrag(ev,cell,false));
   return cell;
+}
+
+// ---- drag to reorder ----
+let fdrag=null, fdragMoved=false;
+function frameDropAt(x,y){
+  const el=document.elementFromPoint(x,y); if(!el) return null;
+  const box=el.closest(".tl-group"); if(!box) return null;
+  const tag=+box.dataset.tag;
+  const cells=[...box.querySelectorAll(".tl-frame")];
+  if(!cells.length) return null;
+  for(const c of cells){
+    const r=c.getBoundingClientRect();
+    if(x < r.left+r.width/2) return {tag:tag, index:+c.dataset.fi, at:c, before:true};
+  }
+  const last=cells[cells.length-1];
+  return {tag:tag, index:(+last.dataset.fi)+1, at:last, before:false};
+}
+function showFrameDrop(t){
+  const host=$("#tlFrames");
+  let m=document.getElementById("tlDrop");
+  if(!m){ m=document.createElement("div"); m.id="tlDrop"; m.className="tl-drop"; host.appendChild(m); }
+  const hr=host.getBoundingClientRect(), cr=t.at.getBoundingClientRect();
+  m.style.left=((t.before?cr.left-4:cr.right+1)-hr.left+host.scrollLeft)+"px";
+  m.style.top=(cr.top-hr.top+host.scrollTop)+"px";
+  m.style.height=cr.height+"px";
+}
+function hideFrameDrop(){ const m=document.getElementById("tlDrop"); if(m) m.remove(); }
+function startFrameDrag(e,cell,fromGrip){
+  if(e.button!==0 || fdrag) return;
+  if(!fromGrip && e.pointerType!=="mouse") return;   // on touch only the grip drags, so the strip can still scroll
+  fdrag={fi:+cell.dataset.fi, cell:cell, x0:e.clientX, y0:e.clientY, on:false, id:e.pointerId};
+  fdragMoved=false;
+  try{ cell.setPointerCapture(e.pointerId); }catch(_){}
+}
+window.addEventListener("pointermove",e=>{
+  if(!fdrag || e.pointerId!==fdrag.id) return;
+  if(!fdrag.on){
+    if(Math.abs(e.clientX-fdrag.x0)+Math.abs(e.clientY-fdrag.y0)<5) return;
+    fdrag.on=true; fdragMoved=true;
+    fdrag.cell.classList.add("drag-src");
+    stopPlayback();
+  }
+  const t=frameDropAt(e.clientX,e.clientY);
+  if(t) showFrameDrop(t); else hideFrameDrop();
+  fdrag.target=t;
+});
+window.addEventListener("pointerup",e=>{
+  if(!fdrag || e.pointerId!==fdrag.id) return;
+  const d=fdrag, t=d.target; fdrag=null;
+  hideFrameDrop(); d.cell.classList.remove("drag-src");
+  if(!d.on){ fdragMoved=false; return; }
+  // alt or ctrl leaves the original where it is and drops a copy
+  if(t && !(t.index===d.fi || t.index===d.fi+1)) reorderFrame(d.fi, t.index, t.tag, e.altKey||e.ctrlKey||e.metaKey);
+  else if(t && (e.altKey||e.ctrlKey||e.metaKey)) reorderFrame(d.fi, t.index, t.tag, true);
+  setTimeout(()=>{ fdragMoved=false; },0);   // outlive the click this pointerup will fire
+});
+window.addEventListener("pointercancel",e=>{
+  if(!fdrag || e.pointerId!==fdrag.id) return;
+  fdrag.cell.classList.remove("drag-src"); fdrag=null; hideFrameDrop();
+  setTimeout(()=>{ fdragMoved=false; },0);
+});
+
+// ---- the frame menu ----
+let frameMenuAt=-1;
+function openFrameMenu(x,y,i){
+  frameMenuAt=i;
+  const m=$("#frameMenu");
+  m.querySelector('[data-action="paste"]').disabled=!frameClip;
+  m.querySelector('[data-action="left"]').disabled=(i<=0);
+  m.querySelector('[data-action="right"]').disabled=(i>=frames.length-1);
+  m.querySelector('[data-action="del"]').disabled=(frames.length<=1);
+  openMenuAt(m,x,y);
 }
 function groupHead(g){
   const head=document.createElement("div"); head.className="tl-ghead";
@@ -1673,7 +1848,8 @@ function groupHead(g){
     nm.title="Click to rename “"+t.name+"” or change its frame range";
     nm.onclick=()=>editTag(g.tag);
     const ct=document.createElement("span"); ct.className="gcount";
-    ct.textContent=(t.from+1)+"–"+(t.to+1);
+    ct.textContent=(t.to-t.from+1)+"f";                       // cells count from 1 inside the group,
+    ct.title="frames "+(t.from+1)+"–"+(t.to+1)+" in the timeline";   // so show where that sits overall
     head.append(dot, nm, ct, sp,
       btn("play","Play just “"+t.name+"”",()=>playGroup(g.tag)),
       btn("add","Add a frame to “"+t.name+"”",()=>addFrameToGroup(g.tag)),
@@ -1734,8 +1910,10 @@ function renderTimeline(){
   viewGroups().forEach(g=>{
     const box=document.createElement("div");
     box.className="tl-group"+(g.tag<0?" ungrouped":"");
+    box.dataset.tag=g.tag;
     const strip=document.createElement("div"); strip.className="tl-gframes";
-    g.idx.forEach(i=>strip.appendChild(frameCell(i)));
+    // numbered within the group, first frame to last, rather than by position in the whole timeline
+    g.idx.forEach((i,k)=>strip.appendChild(frameCell(i,k+1,g.idx.length)));
     box.append(groupHead(g), strip);
     host.appendChild(box);
   });
@@ -2322,7 +2500,7 @@ function openMenuAt(m,x,y){
 }
 function openCtxMenu(x,y){ openMenuAt($("#ctxMenu"),x,y); }
 function openSelMenu(x,y){ openMenuAt($("#selMenu"),x,y); }
-function closeCtxMenu(){ ["#ctxMenu","#selMenu","#fileMenu"].forEach(id=>{ const m=$(id); if(m) m.hidden=true; }); }
+function closeCtxMenu(){ ["#ctxMenu","#selMenu","#frameMenu"].forEach(id=>{ const m=$(id); if(m) m.hidden=true; }); }
 function cancelPlacement(){ if(!placement) return; endPlacement(); composite(); }
 function commitPlacement(){
   if(!placement) return;
@@ -3822,6 +4000,9 @@ const HELP_SECTIONS=[
   ]},
   {title:"Animation", icon:"play", rows:[
     ["play","Play / stop","Space"],
+    ["left","Previous / next frame","←|→"],
+    ["right","Move the frame along","Shift+←|Shift+→"],
+    ["copy","Reorder by dragging a frame's number",""],
     ["add","New frame (copies the current one)",""],
     ["tag","Group frames — idle, walk, jump…",""],
     ["image","Export a spritesheet of a group",""],
@@ -3869,9 +4050,8 @@ const ABOUT_ROWS=[
   ["download","Works offline, and installs as an app"],
 ];
 function showAbout(){
-  // the icon on white, the way it looks in a browser tab, rather than half-lost on the dark card
   const body='<div class="about-head">'
-    +'<img class="about-icon" width="56" height="56" alt="" src="'+makeIconDataURL(112,"#ffffff")+'">'
+    +'<img class="about-icon" width="56" height="56" alt="" src="'+makeIconDataURL(112)+'">'
     +'<div><div class="about-tag">A single-file pixel-art editor.</div>'
     +'<div class="about-ver">Version '+APP_VERSION+'</div></div></div>'
     +ABOUT_ROWS.map(([ic,txt])=>'<div class="help-row"><span class="ic">'+iconSVG(ic,15)+'</span>'
@@ -3914,6 +4094,19 @@ $("#ctxMenu").addEventListener("click",e=>{
   else if(a==="flipV") placement.flipV=!placement.flipV;
   updatePlaceInfo(); composite();
 });
+$("#frameMenu").addEventListener("click",e=>{
+  const b=e.target.closest("[data-action]"); if(!b || b.disabled) return;
+  const i=frameMenuAt; closeCtxMenu();
+  if(i<0 || !frames[i]) return;
+  switch(b.dataset.action){
+    case "dup":   duplicateFrameAt(i); break;
+    case "copy":  copyFrameAt(i); break;
+    case "paste": pasteFrameAfter(i); break;
+    case "left":  selectFrame(i); nudgeFrame(-1); break;
+    case "right": selectFrame(i); nudgeFrame(1); break;
+    case "del":   deleteFrame(i); break;
+  }
+});
 $("#selMenu").addEventListener("click",e=>{
   const b=e.target.closest("[data-action]"); if(!b) return; const a=b.dataset.action; closeCtxMenu();
   if(a==="selectall"){ selectAll(); return; }
@@ -3930,7 +4123,7 @@ document.addEventListener("pointerdown",e=>{
   if(cpOpen && !e.target.closest("#cpPop") && !e.target.closest("#colorButton")
      && !e.target.closest("#primarySwatch") && !e.target.closest("#secondarySwatch")) cpClose();
   // context menus (image / selection)
-  const menus=[$("#ctxMenu"),$("#selMenu")];
+  const menus=[$("#ctxMenu"),$("#selMenu"),$("#frameMenu")];
   const anyOpen=menus.some(m=>!m.hidden);
   const inside=menus.some(m=>m.contains(e.target));
   if(anyOpen && !inside) closeCtxMenu();
@@ -4141,6 +4334,8 @@ window.addEventListener("keydown",e=>{
     case "w": setTool("wand"); break;
     case "d": setTool("region"); break;
     case " ": e.preventDefault(); startPlayback(); break;
+    case "arrowleft":  e.preventDefault(); if(e.shiftKey) nudgeFrame(-1); else selectFrame(frameIndex-1); break;
+    case "arrowright": e.preventDefault(); if(e.shiftKey) nudgeFrame(1);  else selectFrame(frameIndex+1); break;
     case "delete": case "backspace":
       if(selection){ e.preventDefault(); clearSelectionContents(); }
       else if(region){ e.preventDefault(); removeRegion(); }
