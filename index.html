@@ -518,8 +518,23 @@
   /* the View menu carries the real zoom/grid controls; keep them readable inside the dropdown */
   .menu-dd .dd-row{display:flex; align-items:center; gap:8px; padding:6px 10px;}
   .menu-dd .dd-row .lbl{color:var(--muted); font-size:12px; flex:1; text-transform:none; letter-spacing:0;}
-  .menu-dd .dd-zoom{display:flex; align-items:center; gap:6px; padding:6px 10px;}
-  .menu-dd .dd-zoom span#zoomReadout{flex:1; text-align:center; font-size:12px;}
+  /* One segmented control, not two full-size icon buttons flanking a label: the steppers are flat
+     and only as big as their glyph, so the readout is what carries the row. */
+  .menu-dd .dd-zoom{
+    display:flex; align-items:center; gap:2px;
+    margin:2px 10px 4px; padding:2px;
+    background:var(--panel2); border:1px solid var(--line); border-radius:9px;
+  }
+  .menu-dd .dd-zoom button{
+    flex:none; width:28px; min-width:28px; height:26px; min-height:26px; padding:0;
+    background:transparent; border:none; border-radius:7px;
+    font-size:15px; line-height:1; color:var(--text);
+  }
+  .menu-dd .dd-zoom button:hover{background:#3a4152; border:none;}
+  .menu-dd .dd-zoom button:active{transform:none; background:var(--accent2);}
+  .menu-dd .dd-zoom span#zoomReadout{
+    flex:1; text-align:center; font-size:12.5px; font-variant-numeric:tabular-nums; color:var(--text);
+  }
   .menu-dd .chk{padding:6px 10px; font-size:13px; color:var(--text);}
   /* In a dropdown that mixes checkbox rows with plain ones, the plain rows reserve the checkbox's
      column so every label starts on the same x — otherwise e.g. "Remove sub-canvas" sits a
@@ -663,6 +678,8 @@
     .ctx-menu button{padding:11px 12px;}
     .tl-tab{height:34px;}                   /* the tabs stay compact, but big enough to hit */
     .panel-tabs .ptab{height:40px; min-height:40px;}
+    /* the flat zoom steppers stay flat on touch, just big enough to hit reliably */
+    .menu-dd .dd-zoom button{width:36px; min-width:36px; height:34px; min-height:34px;}
     /* the picker is a floating panel, so it doesn't inherit the panel width — give it the
        screen on a phone, where a 238px saturation square is a poor finger target */
     .cp-pop{width:min(340px, calc(100vw - 16px));}
