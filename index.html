@@ -766,6 +766,7 @@
   </div>
   <div id="menu-sprite" class="ctx-menu menu-dd" hidden>
     <button data-cmd="resize" data-icon="select" data-icon-size="16">Resize canvas…</button>
+    <button data-cmd="trim" data-icon="center" data-icon-size="16">Trim to the artwork</button>
     <button data-cmd="addimage" data-icon="image" data-icon-size="16">Add image…</button>
     <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
     <div class="ctx-sep"></div>
@@ -1022,7 +1023,7 @@
     <span id="cursorInfo">—</span>
     <span id="selInfo" style="color:var(--accent)"></span>
     <span class="sp"></span>
-    <span id="docInfo">32 × 32</span>
+    <span class="sb-btn" id="docInfo" title="Canvas size — click to resize or trim">32 × 32</span>
     <span class="sb-btn" id="zoomStat" title="Zoom to fit"><span data-icon="wand" data-icon-size="14"></span><span id="zoomStatVal">600%</span></span>
     <span class="sb-btn" id="toolStat"><span data-icon="pencil" data-icon-size="14"></span><span id="toolInfo">Pencil</span></span>
   </div>
@@ -1227,7 +1228,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31b";
+const APP_VERSION="2026.07.31c";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1354,26 +1355,42 @@ function showAlert(message,opts){ opts=opts||{}; return openModal({title:opts.ti
 
 const PRESET_SIZES=[8,16,32,48,64,96,128];
 // Ask for a canvas size (preset dropdown + W x H). Returns {w,h} or null.
-async function showSizeDialog(title, w, h, okText, message){
+// opts.resize — this is an existing canvas being changed, so offer where the artwork should sit and
+// a shortcut to the size the artwork actually needs. Returns {w,h,anchor} or null.
+async function showSizeDialog(title, w, h, okText, message, opts){
+  opts=opts||{};
+  const bounds = opts.resize ? contentBounds() : null;
   const sq = PRESET_SIZES.includes(w) && w===h ? String(w) : "custom";
-  const opts = PRESET_SIZES.map(s=>`<option value="${s}"${s+''===sq?" selected":""}>${s} × ${s}</option>`).join("")
+  const pres = PRESET_SIZES.map(s=>`<option value="${s}"${s+''===sq?" selected":""}>${s} × ${s}</option>`).join("")
     + `<option value="custom"${sq==="custom"?" selected":""}>Custom…</option>`;
   const body = `
-    <div class="row"><label>Preset</label><select id="dlgPreset">${opts}</select></div>
+    <div class="row"><label>Preset</label><select id="dlgPreset">${pres}</select></div>
     <div class="row"><label>Size</label>
       <input type="number" id="dlgW" min="1" max="512" value="${w}" />
       <span style="color:var(--muted)">×</span>
       <input type="number" id="dlgH" min="1" max="512" value="${h}" />
       <span style="color:var(--muted)">px</span>
-    </div>`;
-  const p = openModal({title, message, bodyHTML:body, okText:okText||"Create"});
+    </div>`
+    + (opts.resize ? `
+    <div class="row"><label>Anchor</label><select id="dlgAnchor">
+      <option value="topleft" selected>Top left</option>
+      <option value="center">Centre</option></select></div>
+    <div class="row"><label></label>
+      <button id="dlgFit" data-icon="center" data-icon-size="15"${bounds?"":" disabled"}>${
+        bounds ? "Fit to the artwork — "+bounds.w+" × "+bounds.h : "Nothing drawn to fit to"}</button></div>` : "");
+  const p = openModal({title, message, bodyHTML:body, okText:okText||"Create", mid:!!opts.resize});
+  hydrateIcons($("#modalBody"));
   const ps=$("#dlgPreset");
   ps.onchange=()=>{ if(ps.value!=="custom"){ $("#dlgW").value=ps.value; $("#dlgH").value=ps.value; } };
   const mark=()=>{ ps.value="custom"; };
   $("#dlgW").oninput=mark; $("#dlgH").oninput=mark;
+  const fit=$("#dlgFit");
+  if(fit && bounds) fit.onclick=()=>{ $("#dlgW").value=bounds.w; $("#dlgH").value=bounds.h; mark(); closeModal("fit"); };
   const ok=await p;
   if(!ok) return null;
-  return { w:clamp(parseInt($("#dlgW").value,10)||32,1,512), h:clamp(parseInt($("#dlgH").value,10)||32,1,512) };
+  return { w:clamp(parseInt($("#dlgW").value,10)||32,1,512), h:clamp(parseInt($("#dlgH").value,10)||32,1,512),
+           anchor:(fit && $("#dlgAnchor")) ? $("#dlgAnchor").value : "topleft",
+           trim:(ok==="fit") };
 }
 // Ask for an export scale. Returns an integer scale or null.
 async function showExportDialog(){
@@ -1458,14 +1475,17 @@ function newDocument(w,h,makeFirst=true){
 }
 
 // change the current canvas size at will — crops or extends from the top-left (keeps the pixels)
-function resizeCanvas(nw,nh){
+// ox/oy shift the artwork as it moves onto the new canvas: 0,0 keeps the top-left corner pinned
+// (the old behaviour), a negative offset crops from the left/top, a positive one insets it.
+function resizeCanvas(nw,nh,ox,oy){
   nw=clamp(nw,1,512); nh=clamp(nh,1,512);
-  if(nw===W && nh===H) return;
+  ox=ox|0; oy=oy|0;
+  if(nw===W && nh===H && !ox && !oy) return;
   pushUndo();
   W=nw; H=nh; flat.width=W; flat.height=H;
   frames.forEach(f=>f.layers.forEach(l=>{      // resize every frame, not just the active one
     const c=makeLayerCanvas(), ctx=c.getContext("2d");
-    ctx.imageSmoothingEnabled=false; ctx.drawImage(l.canvas,0,0);
+    ctx.imageSmoothingEnabled=false; ctx.drawImage(l.canvas,ox,oy);
     l.canvas=c; l.ctx=ctx;
   }));
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
@@ -1473,6 +1493,38 @@ function resizeCanvas(nw,nh){
   fitZoom(); renderLayers(); renderTimeline(); composite(); updateDocInfo(); renderRegionPanel();
   captureActiveDoc(); renderTabs();
   showToast("Canvas resized to "+W+" × "+H+".","success");
+}
+
+// The union of every visible pixel in every frame. Used by Trim, and offered in the resize dialog,
+// because after a spritesheet import or a rethink the canvas is usually the wrong size and working
+// that out by hand from a 400-frame animation is not reasonable.
+function contentBounds(){
+  let x0=1e9, y0=1e9, x1=-1, y1=-1;
+  const probe=document.createElement("canvas"); probe.width=W; probe.height=H;
+  const pctx=probe.getContext("2d",{willReadFrequently:true});
+  for(const f of frames){
+    pctx.clearRect(0,0,W,H);
+    let drew=false;
+    for(const l of f.layers){ if(!l.visible) continue; pctx.drawImage(l.canvas,0,0); drew=true; }
+    if(!drew) continue;
+    const d=pctx.getImageData(0,0,W,H).data;
+    for(let y=0;y<H;y++){
+      const r=y*W*4;
+      for(let x=0;x<W;x++){
+        if(d[r+x*4+3]<1) continue;
+        if(x<x0) x0=x; if(x>x1) x1=x;
+        if(y<y0) y0=y; if(y>y1) y1=y;
+      }
+    }
+  }
+  if(x1<0) return null;
+  return {x:x0, y:y0, w:x1-x0+1, h:y1-y0+1};
+}
+function trimToContent(){
+  const b=contentBounds();
+  if(!b){ showToast("Nothing drawn yet — nothing to trim to.","info"); return; }
+  if(b.w===W && b.h===H){ showToast("Already trimmed — the artwork fills the canvas.","info"); return; }
+  resizeCanvas(b.w, b.h, -b.x, -b.y);
 }
 
 function fitZoom(){
@@ -2085,7 +2137,15 @@ function renderTabs(){
   }
 }
 async function newCanvasDialog(){ const s=await showSizeDialog("New canvas", lastSize.w, lastSize.h, "Create"); if(s){ lastSize=s; createDoc(s.w, s.h); } }
-async function resizeDialog(){ const s=await showSizeDialog("Resize canvas", W, H, "Resize", "Crops or extends from the top-left corner; your pixels stay put."); if(s) resizeCanvas(s.w, s.h); }
+async function resizeDialog(){
+  const s=await showSizeDialog("Resize canvas", W, H, "Resize",
+    "Every frame is resized, not just this one.", {resize:true});
+  if(!s) return;
+  if(s.trim){ trimToContent(); return; }        // "fit to the artwork" also moves it into place
+  let ox=0, oy=0;
+  if(s.anchor==="center"){ ox=Math.round((s.w-W)/2); oy=Math.round((s.h-H)/2); }
+  resizeCanvas(s.w, s.h, ox, oy);
+}
 
 // ------------------------------------------------------------------ compositing
 function composite(){
@@ -3447,6 +3507,45 @@ function rangesOf(flags,minGap){
   }
   return out;
 }
+// A run several times wider than its band is tall is not one sprite — it is a row of frames whose
+// tiles touch, with the tile colour not recognised as background. Whatever colour dominates such a
+// run is that tile: ignore it and project the columns again. Self-correcting, which beats guessing
+// tile colours from how much of the sheet they cover — that share depends on how much empty page
+// the sheet happens to have around the artwork.
+function resplitWideRun(d,m,x0,x1,y0,y1,opts){
+  const px=d.data.data, w=d.w, tally=new Map();
+  for(let y=y0;y<=y1;y++){
+    const r=y*w;
+    for(let x=x0;x<=x1;x++){
+      if(!m[r+x]) continue;
+      const i=(r+x)*4;
+      const k=(px[i]<<16)|(px[i+1]<<8)|px[i+2];
+      tally.set(k,(tally.get(k)||0)+1);
+    }
+  }
+  let best=-1, n=0, area=0;
+  tally.forEach((v,k)=>{ area+=v; if(v>n){ n=v; best=k; } });
+  // Only believe it is a tile if it behaves like one: a background fills most of the run. A wide
+  // sprite's commonest colour does not, and taking it out would just shatter the sprite.
+  if(best<0 || !area || n/area<0.45) return null;
+  const c=unkey(best), t=opts.tol*opts.tol*3;
+  const span=x1-x0+1, colHas=new Uint8Array(span);
+  for(let y=y0;y<=y1;y++){
+    const r=y*w;
+    for(let x=x0;x<=x1;x++){
+      if(!m[r+x]) continue;
+      const i=(r+x)*4, dr=px[i]-c.r, dg=px[i+1]-c.g, db=px[i+2]-c.b;
+      if(dr*dr+dg*dg+db*db<=t) continue;          // this is the tile, not the sprite on it
+      colHas[x-x0]=1;
+    }
+  }
+  const runs=rangesOf(colHas,opts.gap).map(r=>[r[0]+x0, r[1]+x0]);
+  if(runs.length<2) return null;
+  // frames in a row are much of a muchness; wildly uneven pieces mean we broke something apart
+  const ws=runs.map(r=>r[1]-r[0]+1);
+  if(Math.max(...ws)/Math.max(1,Math.min(...ws))>2.2) return null;
+  return runs;
+}
 function analyzeSheet(d,opts){
   const bgs = opts.key ? (opts.bgs||detectSheetBGs(d)) : [];
   const m = contentMask(d,bgs,opts.tol);
@@ -3457,8 +3556,18 @@ function analyzeSheet(d,opts){
   for(const [y0,y1] of rangesOf(rowHas,opts.gap)){
     const colHas=new Uint8Array(w);
     for(let y=y0;y<=y1;y++){ const r=y*w; for(let x=0;x<w;x++) if(m[r+x]) colHas[x]=1; }
+    // widen-then-resplit: a merged row of touching tiles becomes its individual frames
+    const bandH=y1-y0+1;
+    let runs=[];
+    for(const r of rangesOf(colHas,opts.gap)){
+      if((r[1]-r[0]+1) > bandH*1.5){
+        const sub=resplitWideRun(d,m,r[0],r[1],y0,y1,opts);
+        if(sub){ runs.push(...sub); continue; }
+      }
+      runs.push(r);
+    }
     const cells=[];
-    for(const [x0,x1] of rangesOf(colHas,opts.gap)){
+    for(const [x0,x1] of runs){
       // trim to the sprite's own top and bottom inside this run, so a short sprite in a tall band
       // doesn't inherit the band's height
       let ty0=-1, ty1=-1;
@@ -3479,11 +3588,17 @@ function analyzeSheet(d,opts){
     const hs=groups.flatMap(g=>g.cells.map(c=>c.h)).sort((a,b)=>a-b);
     const ws=groups.flatMap(g=>g.cells.map(c=>c.w)).sort((a,b)=>a-b);
     if(hs.length){
-      const hFloor=Math.max(3, hs[hs.length>>1]*0.3);
+      const mh=hs[hs.length>>1], mw=ws[ws.length>>1];
+      const hFloor=Math.max(3, mh*0.3);
       // the separator bars some rips draw between animations are tall but only a few px wide, so
       // a height floor alone lets them through — measure width against the median too
-      const wFloor=Math.max(4, ws[ws.length>>1]*0.3);
-      groups.forEach(g=>{ g.cells=g.cells.filter(c=>c.h>=hFloor && c.w>=wFloor); });
+      const wFloor=Math.max(4, mw*0.3);
+      // And a ceiling, which matters more than it sounds: the cell size every frame gets is the
+      // largest surviving cell, so one text block or still-merged row makes the canvas enormous and
+      // leaves every real sprite in a corner of it. Nothing 2.5x the median is a sprite.
+      const hCeil=Math.max(mh*2.5, mh+8), wCeil=Math.max(mw*2.5, mw+8);
+      groups.forEach(g=>{ g.cells=g.cells.filter(c=>
+        c.h>=hFloor && c.w>=wFloor && c.h<=hCeil && c.w<=wCeil); });
     }
   }
   return {bgs:bgs, groups:groups.filter(g=>g.cells.length)};
@@ -3558,6 +3673,7 @@ function sheetPlan(d,opts){
   res.groups.forEach(g=>g.cells.forEach(c=>{ if(c.w>cw) cw=c.w; if(c.h>ch) ch=c.h; n++; }));
   res.cell={w:clamp(cw||1,1,512), h:clamp(ch||1,1,512)};
   res.count=n;
+  res.clamped=(cw>512||ch>512);
   return res;
 }
 function buildSheetImport(d,plan,opts,name){
@@ -3639,7 +3755,7 @@ async function showSheetImportDialog(img,name){
     <div class="row" id="shiTileRow"><label></label>
       <label class="chk" title="For sheets that sit every frame on its own coloured tile"><input type="checkbox" id="shiCellMatte" checked> Drop each frame's own tile colour too</label></div>
     <div class="row" id="shiDenoiseRow"><label></label>
-      <label class="chk" title="Row labels and stray marks are much shorter than the sprites around them"><input type="checkbox" id="shiDenoise" checked> Ignore small marks, like row labels</label></div>
+      <label class="chk" title="Labels are far shorter than the sprites around them, and text blocks far larger — and the largest cell is what sets the canvas size"><input type="checkbox" id="shiDenoise" checked> Ignore bits that aren\'t sprites — labels, text blocks</label></div>
     <div class="row"><label>Background</label>
       <label class="chk"><input type="checkbox" id="shiKey" checked> Make ${swatches||"the background"} transparent</label></div>
     <div class="row"><label>Tolerance</label><input type="number" id="shiTol" min="0" max="120" value="24">
@@ -3674,7 +3790,8 @@ async function showSheetImportDialog(img,name){
     plan=sheetPlan(d,o);
     const n=plan.count, g=plan.groups.length;
     $("#shiSummary").textContent = n
-      ? n+" frame"+(n===1?"":"s")+" in "+g+" group"+(g===1?"":"s")+" · "+plan.cell.w+"×"+plan.cell.h+" cells"
+      ? n+" frame"+(n===1?"":"s")+" in "+g+" group"+(g===1?"":"s")+" · "+plan.cell.w+"×"+plan.cell.h+" canvas"
+        +(plan.clamped?" (clamped to 512)":"")
         +(n>MAX_IMPORT_FRAMES?(" · only the first "+MAX_IMPORT_FRAMES+" will import"):"")
       : "Nothing found — try a different tolerance, or grid mode.";
   };
@@ -3951,6 +4068,7 @@ function runCmd(cmd){
     case "redo": redo(); break;
     case "clearlayer": clearActiveLayer(); break;
     case "resize": resizeDialog(); break;
+    case "trim": trimToContent(); break;
     case "addimage": $("#imgInput").click(); break;
     case "addlayer": addLayerCmd(); break;
     case "duplayer": dupLayerCmd(); break;
@@ -3997,6 +4115,8 @@ const HELP_SECTIONS=[
     ["grid","Toggle the grid","G"],
     ["swap","Swap foreground / background","X"],
     ["center","Fit the canvas to the window",""],
+    ["select","Resize the canvas — or click its size in the status bar",""],
+    ["center","Trim the canvas to the artwork",""],
   ]},
   {title:"Animation", icon:"play", rows:[
     ["play","Play / stop","Space"],
@@ -4164,6 +4284,7 @@ $("#zoomFit").onclick=()=>{ fitZoom(); composite(); };
 $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
 $("#centerToggle").onchange=e=>{showCenter=e.target.checked; composite();};
 $("#zoomStat").onclick=()=>{ fitZoom(); composite(); };
+$("#docInfo").onclick=resizeDialog;
 $("#toolStat").onclick=()=>{ if(isMobileLayout()){} };
 // View-menu sub-canvas toggle: create/remove the draw region
 $("#regionToggleMenu").onchange=e=>{ if(e.target.checked){ if(!region) createRegion(); } else { removeRegion(); } };
