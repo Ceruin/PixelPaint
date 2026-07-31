@@ -528,8 +528,15 @@
   .menu-dd .dd-zoom button{
     flex:none; width:28px; min-width:28px; height:26px; min-height:26px; padding:0;
     background:transparent; border:none; border-radius:7px;
+    /* .ctx-menu button left-aligns its contents for the menu rows; these are square, so centre
+       them in both axes or the glyphs hug the pill's inner edges at different distances */
+    justify-content:center; align-items:center;
     font-size:15px; line-height:1; color:var(--text);
   }
+  /* Both glyphs are axis-aligned bars 2 units thick, which lands on 1.33px at this size: the plus
+     survives it because its strokes cross, the minus washes out to grey. Snapping them to the pixel
+     grid costs nothing for rectangles and makes the pair weigh the same. */
+  .menu-dd .dd-zoom button svg{shape-rendering:crispEdges;}
   .menu-dd .dd-zoom button:hover{background:#3a4152; border:none;}
   .menu-dd .dd-zoom button:active{transform:none; background:var(--accent2);}
   .menu-dd .dd-zoom span#zoomReadout{
@@ -774,9 +781,9 @@
   </div>
   <div id="menu-view" class="ctx-menu menu-dd has-checks" hidden>
     <div class="dd-zoom">
-      <button id="zoomOut" class="iconbtn" title="Zoom out (-)">−</button>
+      <button id="zoomOut" data-icon="minus" data-icon-size="16" title="Zoom out (-)"></button>
       <span id="zoomReadout">1600%</span>
-      <button id="zoomIn" class="iconbtn" title="Zoom in (+)">+</button>
+      <button id="zoomIn" data-icon="add" data-icon-size="16" title="Zoom in (+)"></button>
     </div>
     <button id="zoomFit" data-cmd="fit" data-icon="center" data-icon-size="16">Fit to window</button>
     <div class="ctx-sep"></div>
@@ -1223,6 +1230,7 @@ const P = {
   wand:"M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29a.9959.9959 0 0 0-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z",
   brush:"M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.02 0-1.41z",
   add:"M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+  minus:"M19 13H5v-2h14v2z",
   copy:"M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z",
   up:"M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z",
   down:"M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z",
