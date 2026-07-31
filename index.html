@@ -994,39 +994,75 @@
 (function(){
 
 // ------------------------------------------------------------------ palettes
-const PALETTES = {
-  "DawnBringer 32": ["#000000","#222034","#45283c","#663931","#8f563b","#df7126","#d9a066","#eec39a","#fbf236","#99e550","#6abe30","#37946e","#4b692f","#524b24","#323c39","#3f3f74","#306082","#5b6ee1","#639bff","#5fcde4","#cbdbfc","#ffffff","#9badb7","#847e87","#696a6a","#595652","#76428a","#ac3232","#d95763","#d77bba","#8f974a","#8a6f30"],
-  "DawnBringer 16": ["#140c1c","#442434","#30346d","#4e4a4e","#854c30","#346524","#d04648","#757161","#597dce","#d27d2c","#8595a1","#6daa2c","#d2aa99","#6dc2ca","#dad45e","#deeed6"],
-  "NES (Nintendo)": ["#7c7c7c","#0000fc","#0000bc","#4428bc","#940084","#a80020","#a81000","#881400","#503000","#007800","#006800","#005800","#004058","#000000","#bcbcbc","#0078f8","#0058f8","#6844fc","#d800cc","#e40058","#f83800","#e45c10","#ac7c00","#00b800","#00a800","#00a844","#008888","#f8f8f8","#3cbcfc","#6888fc","#9878f8","#f878f8","#f85898","#f87858","#fca044","#f8b800","#b8f818","#58d854","#58f898","#00e8d8","#787878","#fcfcfc","#a4e4fc","#b8b8f8","#d8b8f8","#f8b8f8","#f8a4c0","#f0d0b0","#fce0a8","#f8d878","#d8f878","#b8f8b8","#b8f8d8","#00fcfc","#f8d8f8"],
-  "Game Boy (DMG)": ["#0f380f","#306230","#8bac0f","#9bbc0f"],
-  "Game Boy Pocket": ["#000000","#545454","#a9a9a9","#ffffff"],
-  "Game Boy Color": ["#000000","#2b2b2b","#555555","#808080","#aaaaaa","#d5d5d5","#ffffff","#7a4a1e","#8b1a1a","#e23b2e","#ff8a78","#b45a16","#ff9d28","#ffce85","#b8a014","#ffe331","#fff59a","#1a7a26","#3cc23a","#9bee5e","#157f7f","#27c9cf","#8df0ef","#1d2f9c","#3a6cf0","#86b0ff","#5a1e9e","#9a46e6","#c79bff","#a81f6e","#ef5fa6","#ffb3d6"],
-  "Ice Cream GB": ["#fff6d3","#f9a875","#eb6b6f","#7c3f58"],
-  "Kirokaze GB": ["#332c50","#46878f","#94e344","#e2f3e4"],
-  "Mist GB": ["#2d1b00","#1e606e","#5ab9a8","#c4f0c2"],
-  "Sega Master System": [], // generated below (authentic 64 = 2 bits/channel)
-  "Sega Genesis": [],       // generated below (authentic 512 = 9-bit ramp)
-  "PICO-8": ["#000000","#1d2b53","#7e2553","#008751","#ab5236","#5f574f","#c2c3c7","#fff1e8","#ff004d","#ffa300","#ffec27","#00e436","#29adff","#83769c","#ff77a8","#ffccaa"],
-  "Commodore 64": ["#000000","#ffffff","#880000","#aaffee","#cc44cc","#00cc55","#0000aa","#eeee77","#dd8855","#664400","#ff7777","#333333","#777777","#aaff66","#0088ff","#bbbbbb"],
-  "ZX Spectrum": ["#000000","#0000d7","#d70000","#d700d7","#00d700","#00d7d7","#d7d700","#d7d7d7","#0000ff","#ff0000","#ff00ff","#00ff00","#00ffff","#ffff00","#ffffff"],
-  "CGA": ["#000000","#0000aa","#00aa00","#00aaaa","#aa0000","#aa00aa","#aa5500","#aaaaaa","#555555","#5555ff","#55ff55","#55ffff","#ff5555","#ff55ff","#ffff55","#ffffff"],
-  "Endesga 32": ["#be4a2f","#d77643","#ead4aa","#e4a672","#b86f50","#733e39","#3e2731","#a22633","#e43b44","#f77622","#feae34","#fee761","#63c74d","#3e8948","#265c42","#193c3e","#124e89","#0099db","#2ce8f5","#ffffff","#c0cbdc","#8b9bb4","#5a6988","#3a4466","#262b44","#181425","#ff0044","#68386c","#b55088","#f6757a","#e8b796","#c28569"],
-  "Endesga 16": ["#e4a672","#b86f50","#743f39","#3f2832","#9e2835","#e53b44","#fb922b","#ffe762","#63c64d","#327345","#193d3f","#4f6781","#afbfd2","#ffffff","#2ce8f5","#0484d1"],
-  "NA16": ["#8c8fae","#584563","#3e2137","#9a6348","#d79b7d","#f5edba","#c0c741","#647d34","#e4943a","#9d303b","#d26471","#70377f","#7ec4c1","#34859d","#17434b","#1f0e1c"],
-  "Oil 6": ["#fbf5ef","#f2d3ab","#c69fa5","#8b6d9c","#494d7e","#272744"],
-  "Sweetie 16": ["#1a1c2c","#5d275d","#b13e53","#ef7d57","#ffcd75","#a7f070","#38b764","#257179","#29366f","#3b5dc9","#41a6f6","#73eff7","#f4f4f4","#94b0c2","#566c86","#333c57"],
-  "Grayscale": (()=>{const o=[];for(let i=0;i<16;i++){const v=Math.round(i*255/15).toString(16).padStart(2,"0");o.push("#"+v+v+v);}return o;})(),
-};
-// Generate the authentic Sega palettes: Master System = 2 bits/channel (64),
-// Genesis/Mega Drive = the 9-bit VDP intensity ramp (512).
+// Built-in palettes: [name, group, author, note, colors].
+// The hardware entries are the real color sets those machines could show, so a sprite
+// drawn in one is period-correct; the community entries are the well-known artist
+// palettes (values taken from lospec.com, credited to their authors).
+const BUILTIN_PALETTES = [
+  ["NES", "Consoles & computers", "", "The 2C02's 55 distinct colors, in hardware order", ["#7c7c7c","#0000fc","#0000bc","#4428bc","#940084","#a80020","#a81000","#881400","#503000","#007800","#006800","#005800","#004058","#000000","#bcbcbc","#0078f8","#0058f8","#6844fc","#d800cc","#e40058","#f83800","#e45c10","#ac7c00","#00b800","#00a800","#00a844","#008888","#f8f8f8","#3cbcfc","#6888fc","#9878f8","#f878f8","#f85898","#f87858","#fca044","#f8b800","#b8f818","#58d854","#58f898","#00e8d8","#787878","#fcfcfc","#a4e4fc","#b8b8f8","#d8b8f8","#f8b8f8","#f8a4c0","#f0d0b0","#fce0a8","#f8d878","#d8f878","#b8f8b8","#b8f8d8","#00fcfc","#f8d8f8"]],
+  ["Game Boy (DMG)", "Consoles & computers", "", "The original pea-green LCD", ["#0f380f","#306230","#8bac0f","#9bbc0f"]],
+  ["Game Boy Pocket", "Consoles & computers", "", "The Pocket's grayscale LCD", ["#000000","#545454","#a9a9a9","#ffffff"]],
+  ["Super Game Boy", "Consoles & computers", "", "The SNES adapter's default 4 shades", ["#331e50","#a63725","#d68e49","#f7e7c6"]],
+  ["Sega Master System", "Consoles & computers", "", "All 64 the VDP can show (2 bits per channel)", []],   // generated below
+  ["Sega Genesis", "Consoles & computers", "", "All 512 the VDP can show (9-bit ramp)", []],   // generated below
+  ["Commodore 64", "Consoles & computers", "", "Pepto's measured VIC-II colors", ["#000000","#626262","#898989","#adadad","#ffffff","#9f4e44","#cb7e75","#6d5412","#a1683c","#c9d487","#9ae29b","#5cab5e","#6abfc6","#887ecb","#50459b","#a057a3"]],
+  ["ZX Spectrum", "Consoles & computers", "", "8 hues, normal and bright", ["#000000","#0000d8","#0000ff","#d80000","#ff0000","#d800d8","#ff00ff","#00d800","#00ff00","#00d8d8","#00ffff","#d8d800","#ffff00","#d8d8d8","#ffffff"]],
+  ["CGA", "Consoles & computers", "", "The IBM PC's 16", ["#000000","#555555","#aaaaaa","#ffffff","#0000aa","#5555ff","#00aa00","#55ff55","#00aaaa","#55ffff","#aa0000","#ff5555","#aa00aa","#ff55ff","#aa5500","#ffff55"]],
+  ["EGA", "Consoles & computers", "", "The EGA default 16", ["#000000","#a800a8","#fc5454","#fc54a8","#fc54fc","#fca8fc","#fcfc00","#fcfca8","#fcfcfc","#a8fcfc","#00fcfc","#54a8fc","#0000fc","#0054a8","#000054","#545454"]],
+  ["MSX", "Consoles & computers", "", "The TMS9918's 15", ["#000000","#cacaca","#ffffff","#b75e51","#d96459","#fe877c","#cac15e","#ddce85","#3ca042","#40b64a","#73ce7c","#5955df","#7e75f0","#64daee","#b565b3"]],
+  ["Amstrad CPC", "Consoles & computers", "", "All 27 the CPC can show", ["#040404","#808080","#ffffff","#800000","#ff0000","#ff8080","#ff7f00","#ffff80","#ffff00","#808000","#008000","#01ff00","#80ff00","#80ff80","#01ff80","#008080","#01ffff","#80ffff","#0080ff","#0000ff","#00007f","#7f00ff","#8080ff","#ff80ff","#ff00ff","#ff0080","#800080"]],
+  ["Apple II", "Consoles & computers", "", "Apple II lo-res", ["#000000","#515c16","#843d52","#ea7d27","#514888","#e85def","#f5b7c9","#006752","#00c82c","#919191","#c9d199","#00a6f0","#98dbc9","#c8c1f7","#ffffff"]],
+  ["Atari 2600 (NTSC)", "Consoles & computers", "Arthur Oliveira", "The VCS's NTSC colors", ["#000000","#444400","#702800","#841800","#880000","#78005c","#480078","#140084","#000088","#00187c","#002c5c","#00402c","#003c00","#143800","#2c3000","#442800","#404040","#646410","#844414","#983418","#9c2020","#8c2074","#602090","#302098","#1c209c","#1c3890","#1c4c78","#1c5c48","#205c20","#345c1c","#4c501c","#644818","#6c6c6c","#848424","#985c28","#ac5030","#b03c3c","#a03c88","#783ca4","#4c3cac","#3840b0","#3854a8","#386890","#387c64","#407c40","#507c38","#687034","#846830","#909090","#a0a034","#ac783c","#c06848","#c05858","#b0589c","#8c58b8","#6858c0","#505cc0","#5070bc","#5084ac","#509c80","#5c9c5c","#6c9850","#848c4c","#a08444","#b0b0b0","#b8b840","#bc8c4c","#d0805c","#d07070","#c070b0","#a070cc","#7c70d0","#6874d0","#6888cc","#689cc0","#68b494","#74b474","#84b468","#9ca864","#b89c58","#c8c8c8","#d0d050","#cca05c","#e09470","#e08888","#d084c0","#b484dc","#9488e0","#7c8ce0","#7c9cdc","#7cb4d4","#7cd0ac","#8cd08c","#9ccc7c","#b4c078","#d0b46c","#dcdcdc","#e8e85c","#dcb468","#eca880","#eca0a0","#dc9cd0","#c49cec","#a8a0ec","#90a4ec","#90b4ec","#90cce8","#90e4c0","#ececec","#a4e4a4","#b4e490","#ccd488","#e8cc7c","#fcfc68","#fcbc94","#fcb4b4","#ecb0e0","#d4b0fc","#bcb4fc","#a4b8fc","#a4c8fc","#a4e0fc","#a4fcd4","#b8fcb8","#c8fca4","#e0ec9c","#fce08c"]],
+  ["Intellivision", "Consoles & computers", "", "The STIC's 16", ["#0c0005","#a7a8a8","#fffcff","#ff3e00","#ffa600","#faea27","#00780f","#00a720","#6ccd30","#002dff","#5acbff","#bd95ff","#c81a7d","#ff3276","#3c5800","#c9d464"]],
+  ["Ice Cream GB", "Game Boy (4 shades)", "Kerrie Lake", "", ["#7c3f58","#eb6b6f","#f9a875","#fff6d3"]],
+  ["Kirokaze GB", "Game Boy (4 shades)", "Kirokaze", "", ["#332c50","#46878f","#94e344","#e2f3e4"]],
+  ["Mist GB", "Game Boy (4 shades)", "Kerrie Lake", "", ["#2d1b00","#1e606e","#5ab9a8","#c4f0c2"]],
+  ["Rustic GB", "Game Boy (4 shades)", "Kerrie Lake", "", ["#2c2137","#764462","#edb4a1","#a96868"]],
+  ["Moonlight GB", "Game Boy (4 shades)", "Tofu", "", ["#0f052d","#203671","#36868f","#5fc75d"]],
+  ["Hollow", "Game Boy (4 shades)", "Poltergasm", "", ["#0f0f1b","#565a75","#c6b7be","#fafbf6"]],
+  ["DawnBringer 16", "Community palettes", "DawnBringer", "", ["#140c1c","#442434","#30346d","#4e4a4e","#854c30","#346524","#d04648","#757161","#597dce","#d27d2c","#8595a1","#6daa2c","#d2aa99","#6dc2ca","#dad45e","#deeed6"]],
+  ["DawnBringer 32", "Community palettes", "DawnBringer", "", ["#000000","#222034","#45283c","#663931","#8f563b","#df7126","#d9a066","#eec39a","#fbf236","#99e550","#6abe30","#37946e","#4b692f","#524b24","#323c39","#3f3f74","#306082","#5b6ee1","#639bff","#5fcde4","#cbdbfc","#ffffff","#9badb7","#847e87","#696a6a","#595652","#76428a","#ac3232","#d95763","#d77bba","#8f974a","#8a6f30"]],
+  ["PICO-8", "Community palettes", "Lexaloffle", "", ["#000000","#1d2b53","#7e2553","#008751","#ab5236","#5f574f","#c2c3c7","#fff1e8","#ff004d","#ffa300","#ffec27","#00e436","#29adff","#83769c","#ff77a8","#ffccaa"]],
+  ["Sweetie 16", "Community palettes", "GrafxKid", "", ["#1a1c2c","#5d275d","#b13e53","#ef7d57","#ffcd75","#a7f070","#38b764","#257179","#29366f","#3b5dc9","#41a6f6","#73eff7","#f4f4f4","#94b0c2","#566c86","#333c57"]],
+  ["Endesga 16", "Community palettes", "ENDESGA", "", ["#e4a672","#b86f50","#743f39","#3f2832","#9e2835","#e53b44","#fb922b","#ffe762","#63c64d","#327345","#193d3f","#4f6781","#afbfd2","#ffffff","#2ce8f4","#0484d1"]],
+  ["Endesga 32", "Community palettes", "ENDESGA", "", ["#be4a2f","#d77643","#ead4aa","#e4a672","#b86f50","#733e39","#3e2731","#a22633","#e43b44","#f77622","#feae34","#fee761","#63c74d","#3e8948","#265c42","#193c3e","#124e89","#0099db","#2ce8f5","#ffffff","#c0cbdc","#8b9bb4","#5a6988","#3a4466","#262b44","#181425","#ff0044","#68386c","#b55088","#f6757a","#e8b796","#c28569"]],
+  ["NA16", "Community palettes", "Nauris", "", ["#8c8fae","#584563","#3e2137","#9a6348","#d79b7d","#f5edba","#c0c741","#647d34","#e4943a","#9d303b","#d26471","#70377f","#7ec4c1","#34859d","#17434b","#1f0e1c"]],
+  ["Oil 6", "Community palettes", "GrafxKid", "", ["#fbf5ef","#f2d3ab","#c69fa5","#8b6d9c","#494d7e","#272744"]],
+  ["AAP-64", "Community palettes", "Adigun A. Polack", "", ["#060608","#141013","#3b1725","#73172d","#b4202a","#df3e23","#fa6a0a","#f9a31b","#ffd541","#fffc40","#d6f264","#9cdb43","#59c135","#14a02e","#1a7a3e","#24523b","#122020","#143464","#285cc4","#249fde","#20d6c7","#a6fcdb","#ffffff","#fef3c0","#fad6b8","#f5a097","#e86a73","#bc4a9b","#793a80","#403353","#242234","#221c1a","#322b28","#71413b","#bb7547","#dba463","#f4d29c","#dae0ea","#b3b9d1","#8b93af","#6d758d","#4a5462","#333941","#422433","#5b3138","#8e5252","#ba756a","#e9b5a3","#e3e6ff","#b9bffb","#849be4","#588dbe","#477d85","#23674e","#328464","#5daf8d","#92dcba","#cdf7e2","#e4d2aa","#c7b08b","#a08662","#796755","#5a4e44","#423934"]],
+  ["AAP-Splendor128", "Community palettes", "Adigun A. Polack", "", ["#050403","#0e0c0c","#2d1b1e","#612721","#b9451d","#f1641f","#fca570","#ffe0b7","#ffffff","#fff089","#f8c53a","#e88a36","#b05b2c","#673931","#271f1b","#4c3d2e","#855f39","#d39741","#f8f644","#d5dc1d","#adb834","#7f8e44","#586335","#333c24","#181c19","#293f21","#477238","#61a53f","#8fd032","#c4f129","#d0ffea","#97edca","#59cf93","#42a459","#3d6f43","#27412d","#14121d","#1b2447","#2b4e95","#2789cd","#42bfe8","#73efe8","#f1f2ff","#c9d4fd","#8aa1f6","#4572e3","#494182","#7864c6","#9c8bdb","#ceaaed","#fad6ff","#eeb59c","#d480bb","#9052bc","#171516","#373334","#695b59","#b28b78","#e2b27e","#f6d896","#fcf7be","#ecebe7","#cbc6c1","#a69e9a","#807b7a","#595757","#323232","#4f342f","#8c5b3e","#c68556","#d6a851","#b47538","#724b2c","#452a1b","#61683a","#939446","#c6b858","#efdd91","#b5e7cb","#86c69a","#5d9b79","#486859","#2c3b39","#171819","#2c3438","#465456","#64878c","#8ac4c3","#afe9df","#dceaee","#b8ccd8","#88a3bc","#5e718e","#485262","#282c3c","#464762","#696682","#9a97b9","#c5c7dd","#e6e7f0","#eee6ea","#e3cddf","#bfa5c9","#87738f","#564f5b","#322f35","#36282b","#654956","#966888","#c090a9","#d4b8b8","#eae0dd","#f1ebdb","#ddcebf","#bda499","#886e6a","#594d4d","#33272a","#b29476","#e1bf89","#f8e398","#ffe9e3","#fdc9c9","#f6a2a8","#e27285","#b25266","#64364b","#2a1e23"]],
+  ["Resurrect 64", "Community palettes", "Kerrie Lake", "", ["#2e222f","#3e3546","#625565","#966c6c","#ab947a","#694f62","#7f708a","#9babb2","#c7dcd0","#ffffff","#6e2727","#b33831","#ea4f36","#f57d4a","#ae2334","#e83b3b","#fb6b1d","#f79617","#f9c22b","#7a3045","#9e4539","#cd683d","#e6904e","#fbb954","#4c3e24","#676633","#a2a947","#d5e04b","#fbff86","#165a4c","#239063","#1ebc73","#91db69","#cddf6c","#313638","#374e4a","#547e64","#92a984","#b2ba90","#0b5e65","#0b8a8f","#0eaf9b","#30e1b9","#8ff8e2","#323353","#484a77","#4d65b4","#4d9be6","#8fd3ff","#45293f","#6b3e75","#905ea9","#a884f3","#eaaded","#753c54","#a24b6f","#cf657f","#ed8099","#831c5d","#c32454","#f04f78","#f68181","#fca790","#fdcbb0"]],
+  ["Apollo", "Community palettes", "AdamCYounis", "", ["#172038","#253a5e","#3c5e8b","#4f8fba","#73bed3","#a4dddb","#19332d","#25562e","#468232","#75a743","#a8ca58","#d0da91","#4d2b32","#7a4841","#ad7757","#c09473","#d7b594","#e7d5b3","#341c27","#602c2c","#884b2b","#be772b","#de9e41","#e8c170","#241527","#411d31","#752438","#a53030","#cf573c","#da863e","#1e1d39","#402751","#7a367b","#a23e8c","#c65197","#df84a5","#090a14","#10141f","#151d28","#202e37","#394a50","#577277","#819796","#a8b5b2","#c7cfcc","#ebede9"]],
+  ["Journey", "Community palettes", "PineappleOnPizza", "", ["#050914","#110524","#3b063a","#691749","#9c3247","#d46453","#f5a15d","#ffcf8e","#ff7a7d","#ff417d","#d61a88","#94007a","#42004e","#220029","#100726","#25082c","#3d1132","#73263d","#bd4035","#ed7b39","#ffb84a","#fff540","#c6d831","#77b02a","#429058","#2c645e","#153c4a","#052137","#0e0421","#0c0b42","#032769","#144491","#488bd4","#78d7ff","#b0fff1","#faffff","#c7d4e1","#928fb8","#5b537d","#392946","#24142c","#0e0f2c","#132243","#1a466b","#10908e","#28c074","#3dff6e","#f8ffb8","#f0c297","#cf968c","#8f5765","#52294b","#0f022e","#35003b","#64004c","#9b0e3e","#d41e3c","#ed4c40","#ff9757","#d4662f","#9c341a","#691b22","#450c28","#2d002e"]],
+  ["Pear36", "Community palettes", "PineappleOnPizza", "", ["#5e315b","#8c3f5d","#ba6156","#f2a65e","#ffe478","#cfff70","#8fde5d","#3ca370","#3d6e70","#323e4f","#322947","#473b78","#4b5bab","#4da6ff","#66ffe3","#ffffeb","#c2c2d1","#7e7e8f","#606070","#43434f","#272736","#3e2347","#57294b","#964253","#e36956","#ffb570","#ff9166","#eb564b","#b0305c","#73275c","#422445","#5a265e","#80366b","#bd4882","#ff6b97","#ffb5b5"]],
+  ["Vinik24", "Community palettes", "Vinik", "", ["#000000","#6f6776","#9a9a97","#c5ccb8","#8b5580","#c38890","#a593a5","#666092","#9a4f50","#c28d75","#7ca1c0","#416aa3","#8d6268","#be955c","#68aca9","#387080","#6e6962","#93a167","#6eaa78","#557064","#9d9f7f","#7e9e99","#5d6872","#433455"]],
+  ["Nyx8", "Community palettes", "Javier Guerrero", "", ["#08141e","#0f2a3f","#20394f","#f6d6bd","#c3a38a","#997577","#816271","#4e495f"]],
+  ["Steam Lords", "Community palettes", "Slynyrd", "", ["#213b25","#3a604a","#4f7754","#a19f7c","#77744f","#775c4f","#603b3a","#3b2137","#170e19","#2f213b","#433a60","#4f5277","#65738c","#7c94a1","#a0b9ba","#c0d1cc"]],
+  ["Fantasy 24", "Community palettes", "Never Yield", "", ["#1f240a","#39571c","#a58c27","#efac28","#efd8a1","#ab5c1c","#183f39","#ef692f","#efb775","#a56243","#773421","#724113","#2a1d0d","#392a1c","#684c3c","#927e6a","#276468","#ef3a0c","#45230d","#3c9f9c","#9b1a0a","#36170c","#550f0a","#300f0a"]],
+  ["SLSO8", "Community palettes", "Luis Miguel Maldonado", "", ["#0d2b45","#203c56","#544e68","#8d697a","#d08159","#ffaa5e","#ffd4a3","#ffecd6"]],
+  ["Bubblegum 16", "Community palettes", "PineappleOnPizza", "", ["#16171a","#7f0622","#d62411","#ff8426","#ffd100","#fafdff","#ff80a4","#ff2674","#94216a","#430067","#234975","#68aed4","#bfff3c","#10d275","#007899","#002859"]],
+  ["Lost Century", "Community palettes", "SurrealEmber", "", ["#d1b187","#c77b58","#ae5d40","#79444a","#4b3d44","#ba9158","#927441","#4d4539","#77743b","#b3a555","#d2c9a5","#8caba1","#4b726e","#574852","#847875","#ab9b8e"]],
+  ["CC-29", "Community palettes", "Alpha6", "", ["#f2f0e5","#b8b5b9","#868188","#646365","#45444f","#3a3858","#212123","#352b42","#43436a","#4b80ca","#68c2d3","#a2dcc7","#ede19e","#d3a068","#b45252","#6a536e","#4b4158","#80493a","#a77b5b","#e5ceb4","#c2d368","#8ab060","#567b79","#4e584a","#7b7243","#b2b47e","#edc8c4","#cf8acb","#5f556a"]],
+  ["Island Joy 16", "Community palettes", "Kerrie Lake", "", ["#ffffff","#6df7c1","#11adc1","#606c81","#393457","#1e8875","#5bb361","#a1e55a","#f7e476","#f99252","#cb4d68","#6a3771","#c92464","#f48cb6","#f7b69e","#9b9c82"]],
+  ["Vanilla Milkshake", "Community palettes", "Space Sandwich", "", ["#28282e","#6c5671","#d9c8bf","#f98284","#b0a9e4","#accce4","#b3e3da","#feaae4","#87a889","#b0eb93","#e9f59d","#ffe6c6","#dea38b","#ffc384","#fff7a0","#fff7e4"]],
+  ["Lospec500", "Community palettes", "Lospec community", "", ["#10121c","#2c1e31","#6b2643","#ac2847","#ec273f","#94493a","#de5d3a","#e98537","#f3a833","#4d3533","#6e4c30","#a26d3f","#ce9248","#dab163","#e8d282","#f7f3b7","#1e4044","#006554","#26854c","#5ab552","#9de64e","#008b8b","#62a477","#a6cb96","#d3eed3","#3e3b65","#3859b3","#3388de","#36c5f4","#6dead6","#5e5b8c","#8c78a5","#b0a7b8","#deceed","#9a4d76","#c878af","#cc99ff","#fa6e79","#ffa2ac","#ffd1d5","#f6e8e0","#ffffff"]],
+  ["Twilight 5", "Community palettes", "Star", "", ["#fbbbad","#ee8695","#4a7a96","#333f58","#292831"]],
+  ["Blessing", "Community palettes", "clarigariccus", "", ["#74569b","#96fbc7","#f7ffae","#ffb3cb","#d8bfd8"]],
+  ["1-bit Monitor Glow", "Utility", "Polyducks", "", ["#222323","#f0f6f0"]],
+  ["Grayscale 16", "Utility", "", "A plain 16-step ramp", []],   // generated below
+];
+
+// Order the dropdown's groups the way the list above is written, not by first-seen chance.
+const PAL_GROUPS=["Consoles & computers","Game Boy (4 shades)","Community palettes","Utility"];
+const PALETTES={}, PAL_META={};
+for(const [name,group,by,note,cols] of BUILTIN_PALETTES){ PALETTES[name]=cols; PAL_META[name]={g:group, by:by, note:note}; }
+// The three generated ones: full hardware color spaces, and a plain ramp — too long to spell out.
 (function(){
   const hx=(r,g,b)=>"#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("");
-  const sms=[0,85,170,255], a=[];
-  for(const r of sms)for(const g of sms)for(const b of sms) a.push(hx(r,g,b));
-  PALETTES["Sega Master System"]=a;
-  const gen=[0,52,87,116,144,172,206,255], b2=[];
-  for(const r of gen)for(const g of gen)for(const b of gen) b2.push(hx(r,g,b));
-  PALETTES["Sega Genesis"]=b2;
+  const cube=steps=>{ const o=[]; for(const r of steps)for(const g of steps)for(const b of steps) o.push(hx(r,g,b)); return o; };
+  PALETTES["Sega Master System"]=cube([0,85,170,255]);                    // 2 bits per channel = 64
+  PALETTES["Sega Genesis"]=cube([0,52,87,116,144,172,206,255]);           // the 9-bit VDP ramp = 512
+  const gr=[]; for(let i=0;i<16;i++){ const v=Math.round(i*255/15); gr.push(hx(v,v,v)); }
+  PALETTES["Grayscale 16"]=gr;
 })();
 
 // ------------------------------------------------------------------ state
@@ -2803,7 +2839,9 @@ function renderPaletteSelect(keep){
     sel.appendChild(g);
   };
   group("My palettes", Object.keys(userPalettes));
-  group("Built-in", Object.keys(PALETTES));
+  // one optgroup per built-in family, so ~50 palettes stay navigable
+  PAL_GROUPS.forEach(g=>group(g, Object.keys(PALETTES).filter(n=>PAL_META[n] && PAL_META[n].g===g)));
+  group("Built-in", Object.keys(PALETTES).filter(n=>!PAL_META[n]));   // belt and braces
   sel.value = (want && paletteNameTaken(want)) ? want : "DawnBringer 32";
   try{ localStorage.setItem(PAL_SEL_KEY, sel.value); }catch(_){}
   renderPaletteGrid(sel.value);
@@ -2832,9 +2870,16 @@ function renderPaletteGrid(name){
   });
   // built-ins are read-only; make that obvious rather than letting edits silently fail
   $("#palAddColor").disabled=!mine; $("#palRename").disabled=!mine; $("#palDel").disabled=!mine;
-  $("#palNote").textContent = mine
-    ? cols.length+" color"+(cols.length===1?"":"s")+" · saved in this browser"
-    : "Built-in palette (read-only). Duplicate it to start your own.";
+  if(mine){
+    $("#palNote").textContent = cols.length+" color"+(cols.length===1?"":"s")+" · saved in this browser";
+  }else{
+    // credit the palette's author, and say what a hardware palette actually is
+    const m=PAL_META[name]||{};
+    const bits=[cols.length+" colors"];
+    if(m.by) bits.push("by "+m.by);
+    if(m.note) bits.push(m.note);
+    $("#palNote").textContent = bits.join(" · ")+". Read-only — duplicate it to start your own.";
+  }
 }
 
 function addColorToPalette(hex){
