@@ -3652,15 +3652,16 @@ window.addEventListener("resize",()=>{ if(!isMobileLayout()) closeDrawers(); app
 // ------------------------------------------------------------------ boot
 // Single-file PWA: the icon, favicon and manifest are all generated at runtime,
 // so index.html is the entire app — no sw.js / manifest / icon files needed.
-// The site icon, as pixel art on a 16×16 grid: an outlined brush on white, its handle running
-// white → light blue → blue, and its bristles a rainbow from violet at the ferrule to red at the
-// tip. K is the outline, W/H/h the handle, F/f the ferrule, the rest the paint.
-const ICON_ART=["................","............KKK.","...........KWHhK","..........KWHhK.",".........KWHhK..","........KWHhK...",".......KWHhK....","......KFFffK....",".....KvvvvK.....","....KbbbbK......","...KggggK.......","..KyyyyK........",".KoooKK.........","KrrKK...........",".KK.............","................"];
+// The site icon, as pixel art on a 16×16 grid: an upright artist's brush — a long thin handle
+// shaded white → light blue → blue, a metal ferrule, then a splayed bristle block carrying a
+// rainbow in 2px vertical stripes. Vertical stripes stay solid at every size; diagonal ones
+// break into a checkerboard once the icon is small. K is the outline.
+const ICON_ART=[".......KK.......","......KWHK......",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....","...KKKWHhdKKK...","..KFFFFFFFFFFK..","..KffffffffffK..",".KvvbbggyyoorrK.",".KvvbbggyyoorrK.",".KvvbbggyyoorrK.","..KvbbggyyoorK..","...KKKKKKKKKK..."];
 const ICON_COLS={K:"#22304d",                                       // outline
-                 W:"#f4f9ff", H:"#a8d5ff", h:"#4f8cf5",             // the part you hold
-                 F:"#e3eaf6", f:"#a3b0c6",                          // ferrule
+                 W:"#eaf4ff", H:"#a8d5ff", h:"#4f8cf5", d:"#2f5fd6",// the handle you hold
+                 F:"#eef3fb", f:"#9aa8bf",                          // ferrule
                  v:"#a445ff", b:"#3b7bff", g:"#17c06b",
-                 y:"#ffd23f", o:"#ff9f2b", r:"#ff3b47"};            // the paint
+                 y:"#ffd23f", o:"#ff9f2b", r:"#ff3b47"};            // the bristles
 const ICON_BG="#ffffff";
 function makeIconDataURL(size){
   const c=document.createElement("canvas"); c.width=c.height=size;
