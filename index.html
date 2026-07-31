@@ -32,7 +32,16 @@
     position:relative; z-index:3;   /* chrome always paints above the positioned canvas area */
   }
   .brand{font-weight:700; letter-spacing:.3px; font-size:15px; white-space:nowrap;}
-  .brand b{color:var(--accent);}
+  .brand b{color:var(--accent);}   /* fallback: the per-letter hues below normally win */
+  /* "Paint" wears the app icon's bristle rainbow, a hue per letter — discrete stripes rather than
+     a gradient, to echo the icon. Orange is the one of the six left out: it sits closest to red,
+     so dropping it costs the least separation between letters. */
+  .brand b i{font-style:normal;}
+  .brand b i:nth-child(1){color:#a445ff;}
+  .brand b i:nth-child(2){color:#3b7bff;}
+  .brand b i:nth-child(3){color:#17c06b;}
+  .brand b i:nth-child(4){color:#ffd23f;}
+  .brand b i:nth-child(5){color:#ff3b47;}
 
   /* ---- tab bar ---- */
   .tabbar{display:flex; align-items:flex-end; gap:4px; padding:6px 8px 0; background:var(--panel);
@@ -615,7 +624,7 @@
 <div id="app">
   <!-- TOP BAR: brand + menu bar -->
   <div class="topbar">
-    <div class="brand">Pixel<b>Paint</b></div>
+    <div class="brand">Pixel<b><i>P</i><i>a</i><i>i</i><i>n</i><i>t</i></b></div>
     <button id="menuHamburger" class="iconbtn" data-icon="menu" title="Menu"></button>
     <div class="menubar" id="menubar">
       <div class="menu-item" data-menu="file"   data-icon="folder"  data-icon-size="15">File</div>
