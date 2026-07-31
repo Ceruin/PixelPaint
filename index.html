@@ -396,6 +396,12 @@
   @media (max-width: 860px){ .help-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
   @media (max-width: 620px){ .help-grid{grid-template-columns:1fr; gap:14px;} }
 
+  /* ---- about sheet ---- */
+  .about-head{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
+  .about-icon{flex:none; image-rendering:pixelated; border-radius:11px; border:1px solid var(--line);}
+  .about-tag{font-size:13px; margin-bottom:3px;}
+  .about-ver{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums;}
+
   /* the tools rail's tips moved into that sheet; this is all that's left in their place */
   .helpbtn{width:100%; margin-top:auto;}
   .modal-card .danger{background:var(--danger); border-color:var(--danger); color:#fff;}
@@ -807,7 +813,7 @@
   </div>
   <div id="menu-help" class="ctx-menu menu-dd" hidden>
     <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Help &amp; shortcuts<span class="hk">?</span></button>
-    <button data-cmd="about" data-icon="info" data-icon-size="16">About PixelPaint</button>
+    <button data-cmd="about" data-icon="info" data-icon-size="16">About PixelPaint<span class="hk" id="menuVersion"></span></button>
   </div>
 
   <!-- mobile: hamburger opens a simple stacked menu list. Icons here only — the desktop menu
@@ -1198,6 +1204,10 @@ let regionLocked=false;
 let regionDrag=null;      // active create/move/resize gesture on the region
 
 // ------------------------------------------------------------------ DOM
+// Dated rather than semantic: the question this answers is "has the site updated since I last
+// loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
+const APP_VERSION="2026.07.31";
+
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
 const flat=document.createElement("canvas"), fctx=flat.getContext("2d");
@@ -3850,8 +3860,23 @@ function showShortcuts(){
     "</div>").join("")+"</div>";
   openModal({title:"Help & shortcuts", bodyHTML:body, okText:"Close", cancel:false, wide:true});
 }
+const ABOUT_ROWS=[
+  ["pencil","Pencil, shapes, fill, eyedropper and a magic wand"],
+  ["copy","Layers, each with its own opacity and lock"],
+  ["play","Frame-by-frame animation, grouped into idle, walk, jump…"],
+  ["palette","Built-in palettes: real console sets and community favorites"],
+  ["image","Spritesheets in and out, with an Aseprite-style JSON sidecar"],
+  ["download","Works offline, and installs as an app"],
+];
 function showAbout(){
-  showAlert("PixelPaint — a single-file pixel-art editor.\nDraw, animate, manage layers and palettes, and export PNGs or spritesheets. Works offline and installs as an app.",{title:"About PixelPaint"});
+  // the icon on white, the way it looks in a browser tab, rather than half-lost on the dark card
+  const body='<div class="about-head">'
+    +'<img class="about-icon" width="56" height="56" alt="" src="'+makeIconDataURL(112,"#ffffff")+'">'
+    +'<div><div class="about-tag">A single-file pixel-art editor.</div>'
+    +'<div class="about-ver">Version '+APP_VERSION+'</div></div></div>'
+    +ABOUT_ROWS.map(([ic,txt])=>'<div class="help-row"><span class="ic">'+iconSVG(ic,15)+'</span>'
+      +'<span class="lb">'+txt+'</span></div>').join("");
+  openModal({title:"About PixelPaint", bodyHTML:body, okText:"Close", cancel:false, mid:true});
 }
 
 // ------------------------------------------------------------------ collapsible side sections
@@ -4200,6 +4225,7 @@ window.addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); deferred
 // install is triggered from the File menu (data-fa="install" -> doInstall)
 window.addEventListener("appinstalled", ()=>{ $("#installBtn").style.display="none"; showToast("PixelPaint installed!","success"); });
 
+$("#menuVersion").textContent=APP_VERSION;
 hydrateIcons();
 loadUserPalettes();
 renderPaletteSelect();
