@@ -3652,16 +3652,20 @@ window.addEventListener("resize",()=>{ if(!isMobileLayout()) closeDrawers(); app
 // ------------------------------------------------------------------ boot
 // Single-file PWA: the icon, favicon and manifest are all generated at runtime,
 // so index.html is the entire app — no sw.js / manifest / icon files needed.
-// The original 8×8 pixel brush, recoloured: same silhouette, but the handle is shaded across its
-// width in bright blues (lit upper-left edge, mid, deeper lower-right edge) instead of one flat
-// blue, and the paint end runs a rainbow banded along the brush's axis.
-const ICON_ART=["........",".....Hd.","....Hhd.","...Hhd..","..vHd...",".ygv....",".ryg....","........"];
-const ICON_COLS={H:"#a8d5ff", h:"#5b9cff", d:"#2f5fd6",                      // the part you hold
-                 v:"#a445ff", g:"#17c06b", y:"#ffd23f", r:"#ff3b47"};        // the paint
+// The site icon, as pixel art on a 16×16 grid: an outlined brush on white, its handle running
+// white → light blue → blue, and its bristles a rainbow from violet at the ferrule to red at the
+// tip. K is the outline, W/H/h the handle, F/f the ferrule, the rest the paint.
+const ICON_ART=["................","............KKK.","...........KWHhK","..........KWHhK.",".........KWHhK..","........KWHhK...",".......KWHhK....","......KFFffK....",".....KvvvvK.....","....KbbbbK......","...KggggK.......","..KyyyyK........",".KoooKK.........","KrrKK...........",".KK.............","................"];
+const ICON_COLS={K:"#22304d",                                       // outline
+                 W:"#f4f9ff", H:"#a8d5ff", h:"#4f8cf5",             // the part you hold
+                 F:"#e3eaf6", f:"#a3b0c6",                          // ferrule
+                 v:"#a445ff", b:"#3b7bff", g:"#17c06b",
+                 y:"#ffd23f", o:"#ff9f2b", r:"#ff3b47"};            // the paint
+const ICON_BG="#ffffff";
 function makeIconDataURL(size){
   const c=document.createElement("canvas"); c.width=c.height=size;
   const x=c.getContext("2d"), n=ICON_ART.length, px=size/n;
-  x.fillStyle="#1b1d23"; x.fillRect(0,0,size,size);
+  x.fillStyle=ICON_BG; x.fillRect(0,0,size,size);
   for(let r=0;r<n;r++) for(let q=0;q<n;q++){
     const col=ICON_COLS[ICON_ART[r][q]];
     if(col){ x.fillStyle=col; x.fillRect(Math.floor(q*px),Math.floor(r*px),Math.ceil(px),Math.ceil(px)); }
