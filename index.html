@@ -1238,11 +1238,15 @@ function toolCursor(pathName,hx,hy){
     "<path d='"+P[pathName]+"' fill='black' stroke='white' stroke-width='1' stroke-linejoin='round'/></svg>";
   return "url(\"data:image/svg+xml,"+encodeURIComponent(svg)+"\") "+hx+" "+hy+", crosshair";
 }
+// The hotspot has to sit on each tool's business end, or you can't tell which pixel you're about
+// to hit. The bucket's is the tip of its falling drop, at the lower *right* — the icon pours that
+// way, and pointing at the lower left (where the art is empty) made the fill look like it landed
+// somewhere the bucket wasn't aiming.
 const CURSORS = {
-  pencil:     toolCursor("pencil",3,21),
-  eraser:     toolCursor("eraser",5,20),
-  bucket:     toolCursor("fill",5,20),
-  eyedropper: toolCursor("pick",3,21),
+  pencil:     toolCursor("pencil",3,21),     // pencil tip
+  eraser:     toolCursor("eraser",5,20),     // the corner that rubs
+  bucket:     toolCursor("fill",19,17),      // the bottom of the drop
+  eyedropper: toolCursor("pick",3,21),       // dropper tip
   line:"crosshair", rect:"crosshair", ellipse:"crosshair"
 };
 
