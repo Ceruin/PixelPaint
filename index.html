@@ -155,7 +155,9 @@
     border-radius:4px; padding:1px 5px; line-height:1.45;
   }
   .tool.active::after{color:#fff; border-color:#ffffff55; background:#ffffff22;}
-  .toolhead{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin:9px 2px 2px;}
+  .toolhead{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin:9px 2px 2px;
+    display:flex; align-items:center; gap:5px;}
+  .toolhead svg{opacity:.8;}   /* these are 10px eyebrow labels — the icon stays subordinate */
   .toolhead:first-child{margin-top:0;}
 
   /* z-index:0 makes the stage a stacking context, so #placeOverlay (20) and .place-bar (30)
@@ -197,7 +199,8 @@
     scrollbar-gutter:stable;   /* reserve the scrollbar track so controls never sit under it */
   }
   .section{padding:12px 14px; border-bottom:1px solid var(--line);}
-  .section h3{margin:0 0 10px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);}
+  .section h3{margin:0 0 10px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);
+    display:flex; align-items:center; gap:7px;}   /* flex so the header's icon rides the text's centre line */
   /* Section headers pin to the top of the side panel while their body scrolls under them.
      Negative margins pull the sticky strip out to the section edges so nothing shows through
      beside it; the matching padding puts the text back where it was. */
@@ -206,6 +209,14 @@
       margin:-12px -14px 9px; padding:12px 14px 9px;}
     .side .section.collapsed > h3.sec-h{margin-bottom:-12px;}
   }
+  /* ---- desktop: fold a whole dock away (View menu) so the canvas can have the window ---- */
+  @media (min-width: 769px){
+    body.hide-tools #toolPanel{display:none;}
+    body.hide-side  #sidePanel{display:none;}
+    body.hide-anim  #timeline{display:none;}
+  }
+  @media (max-width: 768px){ .dd-docks{display:none;} }   /* on mobile these are already tabs */
+
   /* ---- mobile: Color / Layers / Animation become tabs, and the strip pins to the top ---- */
   .panel-tabs{display:none; gap:5px; padding:8px 10px; position:sticky; top:0; z-index:6;
     background:var(--panel); border-bottom:1px solid var(--line);}
@@ -446,6 +457,7 @@
   /* ---- menu bar (File / Edit / Sprite / Layer / Frame / Select / View / Help) ---- */
   .menubar{display:flex; align-items:center; gap:1px; flex:1; min-width:0; overflow-x:auto; overflow-y:hidden;}
   .menu-item{
+    display:flex; align-items:center; gap:6px;
     padding:5px 10px; border-radius:6px; color:var(--muted); cursor:pointer;
     font-size:13px; white-space:nowrap; line-height:1.4; user-select:none;
   }
@@ -606,14 +618,14 @@
     <div class="brand">Pixel<b>Paint</b></div>
     <button id="menuHamburger" class="iconbtn" data-icon="menu" title="Menu"></button>
     <div class="menubar" id="menubar">
-      <div class="menu-item" data-menu="file">File</div>
-      <div class="menu-item" data-menu="edit">Edit</div>
-      <div class="menu-item" data-menu="sprite">Sprite</div>
-      <div class="menu-item" data-menu="layer">Layer</div>
-      <div class="menu-item" data-menu="frame">Frame</div>
-      <div class="menu-item" data-menu="select">Select</div>
-      <div class="menu-item" data-menu="view">View</div>
-      <div class="menu-item" data-menu="help">Help</div>
+      <div class="menu-item" data-menu="file"   data-icon="folder"  data-icon-size="15">File</div>
+      <div class="menu-item" data-menu="edit"   data-icon="undo"    data-icon-size="15">Edit</div>
+      <div class="menu-item" data-menu="sprite" data-icon="image"   data-icon-size="15">Sprite</div>
+      <div class="menu-item" data-menu="layer"  data-icon="copy"    data-icon-size="15">Layer</div>
+      <div class="menu-item" data-menu="frame"  data-icon="play"    data-icon-size="15">Frame</div>
+      <div class="menu-item" data-menu="select" data-icon="select"  data-icon-size="15">Select</div>
+      <div class="menu-item" data-menu="view"   data-icon="visible" data-icon-size="15">View</div>
+      <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="15">Help</div>
     </div>
     <div class="group" style="margin-left:auto">
       <button id="undoBtn" class="iconbtn" data-icon="undo" title="Undo (Ctrl+Z)"></button>
@@ -697,6 +709,14 @@
     <label class="chk"><input type="checkbox" id="centerToggle" checked /> <span data-icon="center" data-icon-size="15"></span> Center guide</label>
     <label class="chk"><input type="checkbox" id="regionToggleMenu" /> <span data-icon="region" data-icon-size="15"></span> Sub-canvas</label>
     <button data-cmd="delregion" data-icon="trash" data-icon-size="16">Remove sub-canvas<span class="hk">Del</span></button>
+    <div class="ctx-sep"></div>
+    <!-- desktop: any dock can be folded away so the canvas gets the window. On mobile these
+         panels are already tabs, so the toggles are hidden there. -->
+    <div class="dd-docks">
+      <label class="chk"><input type="checkbox" id="dockTools" checked /> <span data-icon="pencil" data-icon-size="15"></span> Tools panel</label>
+      <label class="chk"><input type="checkbox" id="dockSide" checked /> <span data-icon="palette" data-icon-size="15"></span> Color &amp; layers panel</label>
+      <label class="chk"><input type="checkbox" id="dockAnim" checked /> <span data-icon="play" data-icon-size="15"></span> Animation panel</label>
+    </div>
   </div>
   <div id="menu-help" class="ctx-menu menu-dd" hidden>
     <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Keyboard shortcuts</button>
@@ -720,7 +740,7 @@
   <div class="main">
     <!-- TOOLS -->
     <div class="tools" id="toolPanel">
-      <div class="toolhead">Tools</div>
+      <div class="toolhead" data-icon="pencil" data-icon-size="12">Tools</div>
       <div class="toolgrid">
         <button class="tool" data-tool="pencil"     data-icon="pencil"  title="Pencil (B)"></button>
         <button class="tool" data-tool="eraser"     data-icon="eraser"  title="Eraser (E)"></button>
@@ -735,7 +755,7 @@
       </div>
 
       <div class="brush-sec">
-        <div class="toolhead">Brush</div>
+        <div class="toolhead" data-icon="ellipse" data-icon-size="12">Brush</div>
         <div class="brushbtns">
           <button id="brushDown" class="iconbtn" title="Smaller brush ([)">−</button>
           <span id="brushReadout">1 px</span>
@@ -746,12 +766,12 @@
       <!-- contextual options for the active tool -->
       <div id="toolOpts">
         <div class="opt-shape">
-          <div class="toolhead">Shape</div>
+          <div class="toolhead" data-icon="rect" data-icon-size="12">Shape</div>
           <label class="chk" title="Solid: paint every pixel inside the shape. Off: draw only the 1px outline."><input type="checkbox" id="fillShape" /> Solid fill</label>
           <div class="opt-hint">Off = outline only.</div>
         </div>
         <div class="opt-wand">
-          <div class="toolhead">Wand</div>
+          <div class="toolhead" data-icon="wand" data-icon-size="12">Wand</div>
           <div class="brushbtns">
             <span style="color:var(--muted)">Tol</span>
             <input type="number" id="wandTol" min="0" max="255" value="32" style="flex:1; min-width:0; width:auto" title="Color tolerance: 0 = exact match, higher = looser" />
@@ -759,7 +779,7 @@
           <label class="chk" style="margin-top:8px"><input type="checkbox" id="wandContig" checked /> Contiguous</label>
         </div>
         <div class="opt-region">
-          <div class="toolhead">Sub-canvas</div>
+          <div class="toolhead" data-icon="region" data-icon-size="12">Sub-canvas</div>
           <button id="regionCreate2" style="width:100%" data-icon="region" data-icon-size="15">Create draw area</button>
         </div>
       </div>
@@ -799,7 +819,7 @@
       </div>
       <div class="mobile-cols">
       <div class="section collapsible" id="colorSection">
-        <h3 class="sec-h" data-sec="colorSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span>Color</h3>
+        <h3 class="sec-h" data-sec="colorSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="palette" data-icon-size="14"></span>Color</h3>
         <div class="sec-body">
           <div class="colorrow">
             <div class="dualswatch">
@@ -831,7 +851,7 @@
       </div>
 
       <div class="section collapsible" id="layerSection" style="flex:1 0 auto; display:flex; flex-direction:column;">
-        <h3 class="sec-h" data-sec="layerSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span>Layers</h3>
+        <h3 class="sec-h" data-sec="layerSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="copy" data-icon-size="14"></span>Layers</h3>
         <div class="sec-body" style="flex:1; display:flex; flex-direction:column; min-height:0;">
           <!-- own row rather than crammed into the header: 5 icon buttons + the label overflowed
                the section padding and ended up under the side panel's scrollbar -->
@@ -854,7 +874,7 @@
 
       <!-- Sub-canvas controls (shown when the Region tool is active) -->
       <div class="section" id="regionSection" style="display:none">
-        <h3>Sub-canvas</h3>
+        <h3><span data-icon="region" data-icon-size="14"></span>Sub-canvas</h3>
         <div id="regionNone">
           <button id="regionCreate" data-icon="region" style="width:100%">Create draw area</button>
           <div class="hint" style="padding:7px 0 0; margin:0">A box you can draw inside but not outside. Create one, set its size, then Lock it. Or use the Region tool (D) to drag it on the canvas. Remove it any time with the <b>✕</b> on its top-right corner.</div>
@@ -1255,7 +1275,7 @@ function newDocument(w,h,makeFirst=true){
   W=clamp(w|0,1,512); H=clamp(h|0,1,512);
   layerSeq=1;
   frames=[{layers:[], dur:DEFAULT_DUR}];   // one frame to start
-  frameIndex=0; tags=[]; tlView="__all";
+  frameIndex=0; tags=[]; tlView="__all"; lastFrameCount=null;
   layers=frames[0].layers; activeIndex=0;
   flat.width=W; flat.height=H;
   if(makeFirst) addLayer("Layer 1");       // pushes into frames[0].layers (same array ref)
@@ -1304,13 +1324,26 @@ function setZoom(z, recompose=true){
 function updateDocInfo(){$("#docInfo").textContent=W+" × "+H+(frames&&frames.length>1?("  ·  frame "+(frameIndex+1)+"/"+frames.length):"");}
 
 // ------------------------------------------------------------------ animation: frames, playback, tags
-function setTimelineCollapsed(c){
+// opts.auto — the panel folded itself (see autoCollapseTimeline); don't overwrite the user's
+// stored preference with a decision they didn't make.
+function setTimelineCollapsed(c, opts){
   tlCollapsed=c;
   $("#timeline").classList.toggle("collapsed",c);
   $("#tlCollapseBtn").innerHTML=iconSVG(c?"chevUp":"chevDown",16);
   $("#tlCollapseBtn").title=c?"Expand the animation panel":"Collapse the animation panel";
-  try{ localStorage.setItem("pp_tlCollapsed", c?"1":"0"); }catch(_){}
+  if(!(opts&&opts.auto)){ try{ localStorage.setItem("pp_tlCollapsed", c?"1":"0"); }catch(_){} }
   updateTlSummary();
+}
+// The animation panel looks after itself: a one-frame drawing has nothing to animate, so it folds
+// to its slim bar; adding a second frame opens it again. Only fires when the count crosses that
+// line (or a different document loads), so a manual toggle sticks in between.
+let lastFrameCount=null;
+function autoCollapseTimeline(){
+  const n=frames.length, was=lastFrameCount;
+  lastFrameCount=n;
+  if(isMobileLayout()) return;          // there the panel is a tab, not a collapsible strip
+  const animatable=n>1;
+  if(was===null || animatable!==(was>1)) setTimelineCollapsed(!animatable, {auto:true});
 }
 function updateTlSummary(){
   const n=frames?frames.length:1;
@@ -1557,7 +1590,7 @@ function renderTimeline(){
     box.append(groupHead(g), strip);
     host.appendChild(box);
   });
-  renderTlTabs(); updatePlayUI(); updateTlSummary();
+  renderTlTabs(); updatePlayUI(); autoCollapseTimeline(); updateTlSummary();
 }
 // the selected group tab is the play range, so what you see is what you hear
 function playRange(){
@@ -1658,6 +1691,7 @@ function loadDocIntoGlobals(d){
   W=d.W; H=d.H; flat.width=W; flat.height=H;
   frames=d.frames; frameIndex=clamp(d.frameIndex||0,0,frames.length-1); tags=d.tags||[];
   tlView="__all";           // group views are per-document; a fresh tab starts on All
+  lastFrameCount=null;      // let the animation panel re-decide for this document
   layers=frames[frameIndex].layers; activeIndex=clamp(d.activeIndex||0,0,layers.length-1); layerSeq=d.layerSeq;
   undoStack=d.undo; redoStack=d.redo; selection=d.selection; selMask=d.selMask; selDrag=null; stopAnts();
   region=d.region||null; regionLocked=!!d.regionLocked; regionDrag=null;
@@ -3160,6 +3194,34 @@ function closeDrawers(){
 const sideDrawerBtn=$("#sideDrawerBtn"); if(sideDrawerBtn) sideDrawerBtn.style.display="none";  // side panel is inline now
 if(panelBackdropEl) panelBackdropEl.onclick=closeDrawers;
 
+// ---- desktop docks: fold a whole panel away from the View menu ------------------------------
+// Mobile has its own tab strip for these, so this only does anything at desktop widths (the CSS
+// is behind a min-width query) — but the state is remembered either way.
+const DOCKS={
+  tools:{cls:"hide-tools", chk:"#dockTools", key:"pp_dock_tools"},
+  side: {cls:"hide-side",  chk:"#dockSide",  key:"pp_dock_side"},
+  anim: {cls:"hide-anim",  chk:"#dockAnim",  key:"pp_dock_anim"},
+};
+function setDock(name, show, opts){
+  const d=DOCKS[name]; if(!d) return;
+  document.body.classList.toggle(d.cls, !show);
+  const c=$(d.chk); if(c) c.checked=show;
+  if(!(opts&&opts.quiet)){ try{ localStorage.setItem(d.key, show?"1":"0"); }catch(_){} }
+  // the canvas area just changed size
+  drawRulers();
+  if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); }
+}
+for(const name in DOCKS){
+  const el=$(DOCKS[name].chk);
+  if(el) el.onchange=e=>setDock(name, e.target.checked);
+}
+function restoreDocks(){
+  for(const name in DOCKS){
+    let v=null; try{ v=localStorage.getItem(DOCKS[name].key); }catch(_){}
+    setDock(name, v!=="0", {quiet:true});
+  }
+}
+
 // ---- mobile panel tabs: Color | Layers | Animation ----------------------------------------
 // The CSS keys off body[data-ptab] and only inside the mobile media query, so on desktop the
 // attribute is inert and every panel stays visible.
@@ -3488,6 +3550,11 @@ window.addEventListener("keydown",e=>{
 window.addEventListener("keydown",e=>{
   if(!$("#modalRoot").hidden) return;   // a dialog is open; it handles its own keys
   if(cpOpen && e.key==="Escape"){ e.preventDefault(); cpClose(); return; }   // before the input guard: focus may be in a picker field
+  // Same reason: a menu's own checkboxes take focus, so Escape has to reach past the guard to
+  // shut the frontmost thing on screen.
+  if(e.key==="Escape" && (openMenu || !$("#menuSheet").hidden)){
+    e.preventDefault(); closeMenus(); $("#menuSheet").hidden=true; return;
+  }
   const tag=(e.target.tagName||"").toLowerCase();
   if(tag==="input"||tag==="select"||tag==="textarea") return;
   if(placement){
@@ -3592,6 +3659,7 @@ createDoc(32,32);
 let savedPT=null; try{ savedPT=localStorage.getItem(PANEL_TAB_KEY); }catch(_){}
 setPanelTab(savedPT||"none");
 applyPanelLayout();
+restoreDocks();
 // Re-fit once the browser has finished laying out the stage (boot may run pre-layout).
 requestAnimationFrame(()=>{ fitZoom(); composite(); drawRulers(); });
 
