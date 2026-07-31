@@ -3652,12 +3652,12 @@ window.addEventListener("resize",()=>{ if(!isMobileLayout()) closeDrawers(); app
 // ------------------------------------------------------------------ boot
 // Single-file PWA: the icon, favicon and manifest are all generated at runtime,
 // so index.html is the entire app — no sw.js / manifest / icon files needed.
-// A pixel brush drawn on a 16×16 grid: the handle is shaded bright blues (lit edge, two mids,
-// shadow edge) and the bristles run a rainbow that tapers to a point.
-const ICON_ART=["................","............Hhgd","...........Hhgd.","..........Hhgd..",".........Hhgd...","........Hhgd....",".......Hhgd.....","......FFfff.....",".....66666......","....55555.......","...44444........","..3333..........",".222............","11..............","................","................"];
-const ICON_COLS={H:"#9fd2ff", h:"#5b9cff", g:"#3a6ff0", d:"#22439e",   // handle
-                 F:"#e9f0fa", f:"#8d9cb8",                            // ferrule
-                 "6":"#a445ff","5":"#3b7bff","4":"#17c06b","3":"#ffd23f","2":"#ff8a2b","1":"#ff3b47"};
+// The original 8×8 pixel brush, recoloured: same silhouette, but the handle is shaded across its
+// width in bright blues (lit upper-left edge, mid, deeper lower-right edge) instead of one flat
+// blue, and the paint end runs a rainbow banded along the brush's axis.
+const ICON_ART=["........",".....Hd.","....Hhd.","...Hhd..","..vHd...",".ygv....",".ryg....","........"];
+const ICON_COLS={H:"#a8d5ff", h:"#5b9cff", d:"#2f5fd6",                      // the part you hold
+                 v:"#a445ff", g:"#17c06b", y:"#ffd23f", r:"#ff3b47"};        // the paint
 function makeIconDataURL(size){
   const c=document.createElement("canvas"); c.width=c.height=size;
   const x=c.getContext("2d"), n=ICON_ART.length, px=size/n;
