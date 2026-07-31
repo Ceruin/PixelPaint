@@ -3201,33 +3201,49 @@ function sheetImageData(img){
   x.drawImage(img,0,0);
   return {canvas:c, data:x.getImageData(0,0,c.width,c.height), w:c.width, h:c.height};
 }
-// The background is whichever opaque colour dominates the sheet's border — rips are matted on a
-// flat colour, and the border is the one place the sprites aren't.
-function detectSheetBG(d){
-  const px=d.data.data, w=d.w, h=d.h, tally=new Map();
-  const add=(x,y)=>{
-    const i=(y*w+x)*4;
-    if(px[i+3]<8) return;
-    const k=(px[i]<<16)|(px[i+1]<<8)|px[i+2];
-    tally.set(k,(tally.get(k)||0)+1);
-  };
-  for(let x=0;x<w;x++){ add(x,0); add(x,h-1); }
-  for(let y=0;y<h;y++){ add(0,y); add(w-1,y); }
-  let best=-1, n=0;
-  tally.forEach((v,k)=>{ if(v>n){ n=v; best=k; } });
-  if(best<0) return null;
-  return {r:(best>>16)&255, g:(best>>8)&255, b:best&255};
+// The background is a SET of colours, not one: rips are matted on a flat page colour (whichever
+// opaque colour dominates the border — the one place the sprites aren't), and many also sit every
+// frame on its own tile colour. Tiles routinely touch, so unless the tile colour counts as
+// background too, a whole row of frames reads as one unbroken run and imports as a single strip.
+// Any colour flooding a big share of the sheet is matte, not art — art doesn't spend 6% of a
+// sheet on one exact colour.
+const unkey=k=>({r:(k>>16)&255, g:(k>>8)&255, b:k&255});
+function detectSheetBGs(d){
+  const px=d.data.data, w=d.w, h=d.h, border=new Map(), all=new Map();
+  let opaque=0;
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      if(px[i+3]<8) continue;
+      opaque++;
+      const k=(px[i]<<16)|(px[i+1]<<8)|px[i+2];
+      all.set(k,(all.get(k)||0)+1);
+      if(x===0||y===0||x===w-1||y===h-1) border.set(k,(border.get(k)||0)+1);
+    }
+  }
+  if(!opaque) return [];
+  let page=-1, n=0;
+  border.forEach((v,k)=>{ if(v>n){ n=v; page=k; } });
+  const bgs=[];
+  if(page>=0) bgs.push(page);
+  [...all.entries()].sort((x,y)=>y[1]-x[1]).forEach(([k,v])=>{
+    if(bgs.length<3 && v>=opaque*0.06 && !bgs.includes(k)) bgs.push(k);
+  });
+  return bgs.map(unkey);
 }
-// 1 where the pixel is neither transparent nor within tolerance of the background
-function contentMask(d,bg,tol){
+function detectSheetBG(d){ const b=detectSheetBGs(d); return b.length?b[0]:null; }
+// 1 where the pixel is neither transparent nor within tolerance of any background colour
+function contentMask(d,bgs,tol){
   const px=d.data.data, m=new Uint8Array(d.w*d.h), t=tol*tol*3;
+  const list=bgs||[];
   for(let i=0,p=0;i<m.length;i++,p+=4){
     if(px[p+3]<8) continue;
-    if(bg){
-      const dr=px[p]-bg.r, dg=px[p+1]-bg.g, db=px[p+2]-bg.b;
-      if(dr*dr+dg*dg+db*db<=t) continue;
+    let bg=false;
+    for(const c of list){
+      const dr=px[p]-c.r, dg=px[p+1]-c.g, db=px[p+2]-c.b;
+      if(dr*dr+dg*dg+db*db<=t){ bg=true; break; }
     }
-    m[i]=1;
+    if(!bg) m[i]=1;
   }
   return m;
 }
@@ -3244,8 +3260,8 @@ function rangesOf(flags,minGap){
   return out;
 }
 function analyzeSheet(d,opts){
-  const bg = opts.key ? (opts.bg||detectSheetBG(d)) : null;
-  const m = contentMask(d,bg,opts.tol);
+  const bgs = opts.key ? (opts.bgs||detectSheetBGs(d)) : [];
+  const m = contentMask(d,bgs,opts.tol);
   const w=d.w, h=d.h;
   const rowHas=new Uint8Array(h);
   for(let y=0;y<h;y++){ const r=y*w; for(let x=0;x<w;x++) if(m[r+x]){ rowHas[y]=1; break; } }
@@ -3273,18 +3289,22 @@ function analyzeSheet(d,opts){
   // since a sheet whose rows really do differ that much in height would lose the short ones.
   if(opts.denoise){
     const hs=groups.flatMap(g=>g.cells.map(c=>c.h)).sort((a,b)=>a-b);
+    const ws=groups.flatMap(g=>g.cells.map(c=>c.w)).sort((a,b)=>a-b);
     if(hs.length){
-      const floor=Math.max(3, hs[hs.length>>1]*0.3);
-      groups.forEach(g=>{ g.cells=g.cells.filter(c=>c.h>=floor && c.w>2); });
+      const hFloor=Math.max(3, hs[hs.length>>1]*0.3);
+      // the separator bars some rips draw between animations are tall but only a few px wide, so
+      // a height floor alone lets them through — measure width against the median too
+      const wFloor=Math.max(4, ws[ws.length>>1]*0.3);
+      groups.forEach(g=>{ g.cells=g.cells.filter(c=>c.h>=hFloor && c.w>=wFloor); });
     }
   }
-  return {bg:bg, groups:groups.filter(g=>g.cells.length)};
+  return {bgs:bgs, groups:groups.filter(g=>g.cells.length)};
 }
 // Grid mode: fixed cells, optionally skipping the ones that hold nothing. Each row of the grid
 // becomes a group, which is how character sheets are almost always laid out.
 function gridSheet(d,opts){
-  const bg = opts.key ? (opts.bg||detectSheetBG(d)) : null;
-  const m = opts.skipEmpty ? contentMask(d,bg,opts.tol) : null;
+  const bgs = opts.key ? (opts.bgs||detectSheetBGs(d)) : [];
+  const m = opts.skipEmpty ? contentMask(d,bgs,opts.tol) : null;
   const cw=Math.max(1,opts.cw), ch=Math.max(1,opts.ch), mg=opts.margin|0, sp=opts.spacing|0;
   const groups=[];
   for(let y=mg; y+ch<=d.h; y+=ch+sp){
@@ -3299,7 +3319,7 @@ function gridSheet(d,opts){
     }
     if(cells.length) groups.push({cells:cells});
   }
-  return {bg:bg, groups:groups};
+  return {bgs:bgs, groups:groups};
 }
 // Some rips sit every frame on its own coloured tile inside the page's matte, so keying the page
 // colour alone leaves a rectangle of tile behind. When a cell is ringed by one flat opaque colour it
@@ -3326,15 +3346,19 @@ function cellMatte(kd,w,c){
   return {r:(best>>16)&255, g:(best>>8)&255, b:best&255};
 }
 // One keyed copy of the sheet, so each frame is a plain drawImage of a region
-function keyedSheet(d,bg,tol){
+function keyedSheet(d,bgs,tol){
   const c=document.createElement("canvas"); c.width=d.w; c.height=d.h;
   const x=c.getContext("2d");
-  if(!bg){ x.drawImage(d.canvas,0,0); return c; }
+  if(!bgs || !bgs.length){ x.drawImage(d.canvas,0,0); return c; }
   const src=d.data.data, out=x.createImageData(d.w,d.h), dst=out.data, t=tol*tol*3;
   for(let p=0;p<src.length;p+=4){
     if(src[p+3]<8) continue;
-    const dr=src[p]-bg.r, dg=src[p+1]-bg.g, db=src[p+2]-bg.b;
-    if(dr*dr+dg*dg+db*db<=t) continue;
+    let bg=false;
+    for(const cc of bgs){
+      const dr=src[p]-cc.r, dg=src[p+1]-cc.g, db=src[p+2]-cc.b;
+      if(dr*dr+dg*dg+db*db<=t){ bg=true; break; }
+    }
+    if(bg) continue;
     dst[p]=src[p]; dst[p+1]=src[p+1]; dst[p+2]=src[p+2]; dst[p+3]=src[p+3];
   }
   x.putImageData(out,0,0);
@@ -3349,7 +3373,7 @@ function sheetPlan(d,opts){
   return res;
 }
 function buildSheetImport(d,plan,opts,name){
-  const sheet=keyedSheet(d,plan.bg,opts.tol);
+  const sheet=keyedSheet(d,plan.bgs,opts.tol);
   const kd=sheet.getContext("2d").getImageData(0,0,d.w,d.h);
   const cw=plan.cell.w, ch=plan.cell.h;
   createDoc(cw,ch,name);                     // a new tab, so nothing already open is disturbed
@@ -3382,6 +3406,9 @@ function buildSheetImport(d,plan,opts,name){
           dst[dp]=src[sp]; dst[dp+1]=src[sp+1]; dst[dp+2]=src[sp+2]; dst[dp+3]=src[sp+3];
         }
       }
+      let any=false;
+      for(let i=3;i<dst.length && !any;i+=4) if(dst[i]>0) any=true;
+      if(!any) continue;      // keyed down to nothing (a separator bar, a stray tile) — not a frame
       ctx.putImageData(out, dx, dy);
       frames.push({layers:[{id:layerSeq++, name:"Layer 1", visible:true, opacity:1, locked:false,
                             canvas:canvas, ctx:ctx}], dur:DEFAULT_DUR});
@@ -3402,8 +3429,9 @@ function buildSheetImport(d,plan,opts,name){
 }
 async function showSheetImportDialog(img,name){
   const d=sheetImageData(img);
-  const auto=detectSheetBG(d);
-  const swatch=auto?("rgb("+auto.r+","+auto.g+","+auto.b+")"):"transparent";
+  const autos=detectSheetBGs(d);
+  const sw=c=>'<span style="display:inline-block;width:13px;height:13px;border-radius:3px;border:1px solid var(--line);background:rgb('+c.r+','+c.g+','+c.b+')"></span>';
+  const swatches=autos.length?autos.map(sw).join(" "):"";
   const body=`
     <div class="row"><label>Mode</label><select id="shiMode">
       <option value="smart" selected>Smart — find the frames and groups</option>
@@ -3425,16 +3453,16 @@ async function showSheetImportDialog(img,name){
     <div class="row" id="shiDenoiseRow"><label></label>
       <label class="chk" title="Row labels and stray marks are much shorter than the sprites around them"><input type="checkbox" id="shiDenoise" checked> Ignore small marks, like row labels</label></div>
     <div class="row"><label>Background</label>
-      <label class="chk"><input type="checkbox" id="shiKey" checked> Make
-        <span style="display:inline-block;width:13px;height:13px;border-radius:3px;border:1px solid var(--line);background:${swatch}"></span>
-        transparent</label></div>
+      <label class="chk"><input type="checkbox" id="shiKey" checked> Make ${swatches||"the background"} transparent</label></div>
     <div class="row"><label>Tolerance</label><input type="number" id="shiTol" min="0" max="120" value="24">
       <span style="color:var(--muted)">how close counts as background</span></div>
-    <div class="row" id="shiGapRow"><label>Split on</label><input type="number" id="shiGap" min="0" max="64" value="1">
+    <!-- 2 bridges the small holes inside one sprite (a thrown object, a gap between head and
+         body) without merging neighbouring frames, which sit further apart than that -->
+    <div class="row" id="shiGapRow"><label>Split on</label><input type="number" id="shiGap" min="0" max="64" value="2">
       <span style="color:var(--muted)">px of background between frames</span></div>
     <div class="row"><label></label><span id="shiSummary" style="color:var(--muted); font-size:12px"></span></div>`;
   const promise=openModal({title:"Import spritesheet",
-    message:d.w+" × "+d.h+" sheet."+(auto?"":" No flat background found — it may already be transparent."),
+    message:d.w+" × "+d.h+" sheet."+(autos.length?"":" No flat background found — it may already be transparent."),
     bodyHTML:body, okText:"Import", mid:true});
   const read=()=>({
     mode:$("#shiMode").value, cw:+$("#shiCW").value||1, ch:+$("#shiCH").value||1,
