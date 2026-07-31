@@ -3654,19 +3654,28 @@ window.addEventListener("resize",()=>{ if(!isMobileLayout()) closeDrawers(); app
 // so index.html is the entire app — no sw.js / manifest / icon files needed.
 // The site icon, as pixel art on a 16×16 grid: an upright artist's brush — a long thin handle
 // shaded white → light blue → blue, a metal ferrule, then a splayed bristle block carrying a
-// rainbow in 2px vertical stripes. Vertical stripes stay solid at every size; diagonal ones
-// break into a checkerboard once the icon is small. K is the outline.
-const ICON_ART=[".......KK.......","......KWHK......",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....","...KKKWHhdKKK...","..KFFFFFFFFFFK..","..KffffffffffK..",".KvvbbggyyoorrK.",".KvvbbggyyoorrK.",".KvvbbggyyoorrK.","..KvbbggyyoorK..","...KKKKKKKKKK..."];
-const ICON_COLS={K:"#22304d",                                       // outline
-                 W:"#eaf4ff", H:"#a8d5ff", h:"#4f8cf5", d:"#2f5fd6",// the handle you hold
-                 F:"#eef3fb", f:"#9aa8bf",                          // ferrule
-                 v:"#a445ff", b:"#3b7bff", g:"#17c06b",
-                 y:"#ffd23f", o:"#ff9f2b", r:"#ff3b47"};            // the bristles
-const ICON_BG="#ffffff";
-function makeIconDataURL(size){
+// rainbow in 2px vertical stripes. Vertical stripes stay solid at every size; diagonal ones break
+// into a checkerboard once the icon is small. K is the outline; the ground is transparent.
+// Every hue has three tones — UPPERCASE light, lowercase base, digit dark. The bristles run a
+// vertical ramp (base, highlight, base, shadowed tip) and darken across each stripe's right-hand
+// column, so each bristle reads as rounded rather than as a flat band of colour.
+const ICON_ART=[".......KK.......","......KWHK......",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....",".....KWHhdK.....","...KKKWHhdKKK...","..KFFFFFFFFFFK..","..KffffffffffK..",".Kv6b5g4y3o2r1K.",".KVvBbGgYyOoRrK.",".Kv6b5g4y3o2r1K.","..K6554433221K..","...KKKKKKKKKK..."];
+const ICON_COLS={K:"#22304d",                                        // outline
+                 W:"#eaf4ff", H:"#a8d5ff", h:"#4f8cf5", d:"#2f5fd6", // the handle you hold
+                 F:"#eef3fb", f:"#9aa8bf",                           // ferrule
+                 V:"#c47cff", v:"#a445ff", "6":"#7a25cc",            // bristles, light/base/dark
+                 B:"#6fa4ff", b:"#3b7bff", "5":"#2354c9",
+                 G:"#4bd88f", g:"#17c06b", "4":"#0e8f4e",
+                 Y:"#ffe27a", y:"#ffd23f", "3":"#d9a51f",
+                 O:"#ffb763", o:"#ff9f2b", "2":"#d97615",
+                 R:"#ff6f78", r:"#ff3b47", "1":"#cc2230"};
+const APP_BG="#1b1d23";
+// bg omitted -> transparent, which is what a favicon wants; pass one for the contexts that
+// composite the icon onto something (see the links below).
+function makeIconDataURL(size, bg){
   const c=document.createElement("canvas"); c.width=c.height=size;
   const x=c.getContext("2d"), n=ICON_ART.length, px=size/n;
-  x.fillStyle=ICON_BG; x.fillRect(0,0,size,size);
+  if(bg){ x.fillStyle=bg; x.fillRect(0,0,size,size); }
   for(let r=0;r<n;r++) for(let q=0;q<n;q++){
     const col=ICON_COLS[ICON_ART[r][q]];
     if(col){ x.fillStyle=col; x.fillRect(Math.floor(q*px),Math.floor(r*px),Math.ceil(px),Math.ceil(px)); }
@@ -3674,6 +3683,10 @@ function makeIconDataURL(size){
   return c.toDataURL("image/png");
 }
 const icon192=makeIconDataURL(192), icon512=makeIconDataURL(512);
+// Two contexts can't use a transparent icon: iOS composites an apple-touch-icon onto black, and a
+// maskable icon is meant to be full-bleed under whatever shape the launcher crops it to. Those get
+// the app's own background; the favicons stay transparent.
+const solid192=makeIconDataURL(192, APP_BG), solid512=makeIconDataURL(512, APP_BG);
 {
   // A 32px icon as well as the big one: the tab renders at 16–32px, and 32 halves to 16 exactly,
   // so the art stays crisp instead of being smoothed down from 192.
@@ -3683,16 +3696,16 @@ const icon192=makeIconDataURL(192), icon512=makeIconDataURL(512);
   };
   link("icon", makeIconDataURL(32), "32x32");
   link("icon", icon192, "192x192");
-  link("apple-touch-icon", icon192);
+  link("apple-touch-icon", solid192);
 }
 if(location.protocol.indexOf("http")===0){
   // installable: inject a runtime manifest pointing back at this page (Chrome/Edge accept blob manifests)
   const man={ name:"PixelPaint", short_name:"PixelPaint",
     start_url:location.href, scope:location.href.replace(/[^/]*$/,""),
     display:"standalone", background_color:"#1b1d23", theme_color:"#1b1d23",
-    icons:[ {src:icon192, sizes:"192x192", type:"image/png"},
-            {src:icon512, sizes:"512x512", type:"image/png"},
-            {src:icon512, sizes:"512x512", type:"image/png", purpose:"maskable"} ] };
+    icons:[ {src:icon192, sizes:"192x192", type:"image/png", purpose:"any"},
+            {src:icon512, sizes:"512x512", type:"image/png", purpose:"any"},
+            {src:solid512, sizes:"512x512", type:"image/png", purpose:"maskable"} ] };
   const ml=document.createElement("link"); ml.rel="manifest";
   ml.href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:"application/manifest+json"}));
   document.head.appendChild(ml);
