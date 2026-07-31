@@ -1243,7 +1243,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31d";
+const APP_VERSION="2026.07.31e";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -2617,10 +2617,25 @@ function paintPlaceOverlay(){
   const z=zoom, {ox,oy}=overlayOffset();
   const x=ox+placement.x*z, y=oy+placement.y*z, w=placement.w*z, h=placement.h*z;
   octx.save();
-  octx.strokeStyle="rgba(255,255,255,.28)"; octx.lineWidth=1;   // canvas bounds, for reference
-  octx.strokeRect(ox+0.5, oy+0.5, W*z, H*z);
   octx.imageSmoothingEnabled=false;
   drawImageFlipped(octx, placement.img, x, y, w, h, placement.flipH, placement.flipV);
+  // The image is drawn first and can be far larger than the canvas, so everything that marks where
+  // the canvas is has to come after it. Dimming the outside does double duty: it says where the
+  // canvas is, and it shows which part of the image gets thrown away when you place it.
+  const cw=W*z, chh=H*z;
+  octx.fillStyle="rgba(8,10,16,.58)";
+  octx.beginPath();
+  octx.rect(0,0,placeOverlay.width,placeOverlay.height);
+  octx.rect(ox,oy,cw,chh);
+  octx.fill("evenodd");
+  // two-tone dashes, so the edge reads against artwork of any colour
+  octx.lineWidth=2;
+  octx.setLineDash([7,5]);
+  octx.strokeStyle="rgba(0,0,0,.85)"; octx.lineDashOffset=0;
+  octx.strokeRect(ox+1, oy+1, cw-2, chh-2);
+  octx.strokeStyle="#fff"; octx.lineDashOffset=7;
+  octx.strokeRect(ox+1, oy+1, cw-2, chh-2);
+  octx.setLineDash([]);
   octx.lineWidth=1.5; octx.strokeStyle="#5b8cff"; octx.setLineDash([6,4]);
   octx.strokeRect(x+0.5, y+0.5, w, h);
   octx.setLineDash([]);
