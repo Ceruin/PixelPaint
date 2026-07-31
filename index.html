@@ -1221,9 +1221,17 @@ ICON.line    = '<path d="M5 19L19 5" fill="none" stroke="currentColor" stroke-wi
 ICON.rect    = '<rect x="4" y="6" width="16" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="2.2"/>';
 ICON.ellipse = '<ellipse cx="12" cy="12" rx="8.4" ry="6.6" fill="none" stroke="currentColor" stroke-width="2.2"/>';
 
+// Glyphs that point the wrong way for this app, mirrored horizontally everywhere they are drawn —
+// the toolbar, the status bar, the help sheet and the cursor — so a tool never appears to aim one
+// way in the toolbar and another under the pointer. The bucket pours to its lower left like every
+// other cursor here. Mirroring inside the 24-unit box maps a point at x to 24-x.
+const MIRROR_ICONS={fill:1};
+const MIRROR_G="<g transform='translate(24,0) scale(-1,1)'>";
 function iconSVG(name,size){
   size=size||18;
-  return "<svg viewBox='0 0 24 24' width='"+size+"' height='"+size+"' fill='currentColor' aria-hidden='true'>"+(ICON[name]||"")+"</svg>";
+  const inner=ICON[name]||"";
+  return "<svg viewBox='0 0 24 24' width='"+size+"' height='"+size+"' fill='currentColor' aria-hidden='true'>"
+    +(MIRROR_ICONS[name] ? MIRROR_G+inner+"</g>" : inner)+"</svg>";
 }
 function hydrateIcons(root){
   (root||document).querySelectorAll("[data-icon]").forEach(el=>{
@@ -1234,18 +1242,16 @@ function hydrateIcons(root){
 
 // ------------------------------------------------------------------ tool cursors (SVG data-URI, hotspot at the action point)
 function toolCursor(pathName,hx,hy){
+  const art="<path d='"+P[pathName]+"' fill='black' stroke='white' stroke-width='1' stroke-linejoin='round'/>";
   const svg="<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>"+
-    "<path d='"+P[pathName]+"' fill='black' stroke='white' stroke-width='1' stroke-linejoin='round'/></svg>";
+    (MIRROR_ICONS[pathName] ? MIRROR_G+art+"</g>" : art)+"</svg>";
   return "url(\"data:image/svg+xml,"+encodeURIComponent(svg)+"\") "+hx+" "+hy+", crosshair";
 }
-// The hotspot has to sit on each tool's business end, or you can't tell which pixel you're about
-// to hit. The bucket's is the tip of its falling drop, at the lower *right* — the icon pours that
-// way, and pointing at the lower left (where the art is empty) made the fill look like it landed
-// somewhere the bucket wasn't aiming.
+// Every cursor acts at its lower left, art up and to the right — one habit across the tools.
 const CURSORS = {
   pencil:     toolCursor("pencil",3,21),     // pencil tip
   eraser:     toolCursor("eraser",5,20),     // the corner that rubs
-  bucket:     toolCursor("fill",19,17),      // the bottom of the drop
+  bucket:     toolCursor("fill",5,17),       // the bottom of the drop (mirrored, so 24-19)
   eyedropper: toolCursor("pick",3,21),       // dropper tip
   line:"crosshair", rect:"crosshair", ellipse:"crosshair"
 };
