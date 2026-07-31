@@ -268,7 +268,6 @@
   .palette.editable .sw:hover .swx{display:inline-flex;}
   .palette.editable .sw .swx:hover{background:var(--danger); border-color:var(--danger); color:#fff;}
   .palette .pal-empty{grid-column:1/-1; color:var(--muted); font-size:11px; line-height:1.5; padding:4px 2px;}
-  .pal-note{color:var(--muted); font-size:10px; line-height:1.45; margin-top:7px;}
 
   /* ---- themed color picker (replaces the off-theme OS <input type=color> dialog) ---- */
   .cp-swatch{
@@ -365,9 +364,12 @@
   .modal-card #modalBody:empty{display:none;}
   .modal-card #modalBody .row{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
   .modal-card #modalBody .row:last-child{margin-bottom:0;}
-  .modal-card #modalBody .row label{color:var(--muted); width:58px; flex:none;}
+  .modal-card #modalBody .row > label:not(.chk){color:var(--muted); width:78px; flex:none;}
+  .modal-card #modalBody .row > .chk{flex:1; min-width:0; color:var(--text);}
+  .modal-card #modalBody .row > .chk input{flex:none;}
   .modal-card #modalBody select{flex:1; min-width:0;}
   .modal-card #modalBody input[type=number]{width:72px;}
+  .modal-card.mid{width:min(510px,94vw);}
   .modal-card.wide{width:min(780px,95vw);}
   .modal-actions{display:flex; justify-content:flex-end; gap:8px;}
 
@@ -716,6 +718,7 @@
     </div>
     <button id="sideDrawerBtn" class="iconbtn drawer-btn" data-icon="palette" title="Colors, palette &amp; layers"></button>
     <input type="file" id="openInput" accept=".pxpaint,.json,application/json" style="display:none" />
+    <input type="file" id="sheetInput" accept="image/*" style="display:none" />
   </div>
 
   <!-- TAB BAR (shown only when more than one drawing is open) -->
@@ -729,6 +732,7 @@
     <button data-cmd="new"    data-icon="new"      data-icon-size="16">New canvas…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="open"   data-icon="folder"   data-icon-size="16">Open project…</button>
+    <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
     <button data-cmd="save"   data-icon="save"     data-icon-size="16">Save project<span class="hk">Ctrl+S</span></button>
     <div class="ctx-sep"></div>
     <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
@@ -748,6 +752,7 @@
   <div id="menu-sprite" class="ctx-menu menu-dd" hidden>
     <button data-cmd="resize" data-icon="select" data-icon-size="16">Resize canvas…</button>
     <button data-cmd="addimage" data-icon="image" data-icon-size="16">Add image…</button>
+    <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
     <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
@@ -928,7 +933,6 @@
             <button id="palExport" data-icon="download" data-icon-size="15" title="Export this palette as a .hex list"></button>
             <button id="palDel"    data-icon="trash"    data-icon-size="15" title="Delete this palette"></button>
           </div>
-          <div class="pal-note" id="palNote"></div>
           <button id="applyPaletteBtn" data-icon="palette" style="width:100%; margin-top:8px;" title="Remap the active layer (or the current selection) to the nearest colors in this palette">Snap to this palette</button>
           <input type="file" id="palFileInput" accept=".hex,.txt,.gpl,.json,.pal,text/plain" hidden />
         </div>
@@ -1291,7 +1295,9 @@ function openModal(o){
     const inp=$("#modalInput");
     if(o.input){ inp.style.display=""; inp.value=o.value||""; } else { inp.style.display="none"; }
     $("#modalBody").innerHTML=o.bodyHTML||"";
-    document.querySelector(".modal-card").classList.toggle("wide", !!o.wide);
+    const card=document.querySelector(".modal-card");
+    card.classList.toggle("wide", !!o.wide);
+    card.classList.toggle("mid", !!o.mid);
     const ok=$("#modalOk"); ok.textContent=o.okText||"OK"; ok.classList.toggle("danger", !!o.danger);
     const cancel=$("#modalCancel");
     if(o.cancel===false){ cancel.style.display="none"; } else { cancel.style.display=""; cancel.textContent=o.cancelText||"Cancel"; }
@@ -2967,16 +2973,14 @@ function renderPaletteGrid(name){
   });
   // built-ins are read-only; make that obvious rather than letting edits silently fail
   $("#palAddColor").disabled=!mine; $("#palRename").disabled=!mine; $("#palDel").disabled=!mine;
-  if(mine){
-    $("#palNote").textContent = cols.length+" color"+(cols.length===1?"":"s")+" · saved in this browser";
-  }else{
-    // credit the palette's author, and say what a hardware palette actually is
-    const m=PAL_META[name]||{};
-    const bits=[cols.length+" colors"];
-    if(m.by) bits.push("by "+m.by);
-    if(m.note) bits.push(m.note);
-    $("#palNote").textContent = bits.join(" · ")+". Read-only — duplicate it to start your own.";
-  }
+  // The count is already in the dropdown and the disabled buttons say "read-only", so the credit
+  // and description live in the select's tooltip rather than as a paragraph above Snap.
+  const m=PAL_META[name]||{};
+  const bits=[name, cols.length+" color"+(cols.length===1?"":"s")];
+  if(mine) bits.push("saved in this browser");
+  if(m.by) bits.push("by "+m.by);
+  if(m.note) bits.push(m.note);
+  $("#paletteSelect").title=bits.join(" · ");
 }
 
 function addColorToPalette(hex){
@@ -3181,6 +3185,297 @@ function finishLoad(data){
   renderLayers(); renderTimeline(); composite(); updateUndoButtons(); updateDocInfo();
   captureActiveDoc(); renderTabs();   // persist the loaded state into the active tab
   showToast("Project loaded"+(frames.length>1?(" — "+frames.length+" frames"):"")+".","success");
+}
+
+// ------------------------------------------------------------------ spritesheet import
+// Two ways in. Grid mode cuts the sheet on the cell size you give it. Smart mode reads the sheet:
+// it keys out the background colour, finds the horizontal bands that hold content (one animation
+// per band on most rips), finds the runs of content within each band (the frames), then normalises
+// every sprite onto a single cell size. Bands become frame groups, runs become frames.
+const MAX_IMPORT_FRAMES=400;   // a big rip can hold thousands; each frame here is a live canvas
+
+function sheetImageData(img){
+  const c=document.createElement("canvas");
+  c.width=img.naturalWidth||img.width; c.height=img.naturalHeight||img.height;
+  const x=c.getContext("2d",{willReadFrequently:true});
+  x.drawImage(img,0,0);
+  return {canvas:c, data:x.getImageData(0,0,c.width,c.height), w:c.width, h:c.height};
+}
+// The background is whichever opaque colour dominates the sheet's border — rips are matted on a
+// flat colour, and the border is the one place the sprites aren't.
+function detectSheetBG(d){
+  const px=d.data.data, w=d.w, h=d.h, tally=new Map();
+  const add=(x,y)=>{
+    const i=(y*w+x)*4;
+    if(px[i+3]<8) return;
+    const k=(px[i]<<16)|(px[i+1]<<8)|px[i+2];
+    tally.set(k,(tally.get(k)||0)+1);
+  };
+  for(let x=0;x<w;x++){ add(x,0); add(x,h-1); }
+  for(let y=0;y<h;y++){ add(0,y); add(w-1,y); }
+  let best=-1, n=0;
+  tally.forEach((v,k)=>{ if(v>n){ n=v; best=k; } });
+  if(best<0) return null;
+  return {r:(best>>16)&255, g:(best>>8)&255, b:best&255};
+}
+// 1 where the pixel is neither transparent nor within tolerance of the background
+function contentMask(d,bg,tol){
+  const px=d.data.data, m=new Uint8Array(d.w*d.h), t=tol*tol*3;
+  for(let i=0,p=0;i<m.length;i++,p+=4){
+    if(px[p+3]<8) continue;
+    if(bg){
+      const dr=px[p]-bg.r, dg=px[p+1]-bg.g, db=px[p+2]-bg.b;
+      if(dr*dr+dg*dg+db*db<=t) continue;
+    }
+    m[i]=1;
+  }
+  return m;
+}
+// contiguous true ranges, merging any two separated by no more than minGap
+function rangesOf(flags,minGap){
+  const out=[];
+  for(let i=0;i<flags.length;i++){
+    if(!flags[i]) continue;
+    let j=i; while(j+1<flags.length && flags[j+1]) j++;
+    const last=out[out.length-1];
+    if(last && i-last[1]-1<=minGap) last[1]=j; else out.push([i,j]);
+    i=j;
+  }
+  return out;
+}
+function analyzeSheet(d,opts){
+  const bg = opts.key ? (opts.bg||detectSheetBG(d)) : null;
+  const m = contentMask(d,bg,opts.tol);
+  const w=d.w, h=d.h;
+  const rowHas=new Uint8Array(h);
+  for(let y=0;y<h;y++){ const r=y*w; for(let x=0;x<w;x++) if(m[r+x]){ rowHas[y]=1; break; } }
+  const groups=[];
+  for(const [y0,y1] of rangesOf(rowHas,opts.gap)){
+    const colHas=new Uint8Array(w);
+    for(let y=y0;y<=y1;y++){ const r=y*w; for(let x=0;x<w;x++) if(m[r+x]) colHas[x]=1; }
+    const cells=[];
+    for(const [x0,x1] of rangesOf(colHas,opts.gap)){
+      // trim to the sprite's own top and bottom inside this run, so a short sprite in a tall band
+      // doesn't inherit the band's height
+      let ty0=-1, ty1=-1;
+      for(let y=y0;y<=y1;y++){
+        const r=y*w;
+        for(let x=x0;x<=x1;x++) if(m[r+x]){ if(ty0<0) ty0=y; ty1=y; break; }
+      }
+      if(ty0<0) continue;
+      cells.push({x:x0, y:ty0, w:x1-x0+1, h:ty1-ty0+1});
+    }
+    if(cells.length) groups.push({cells:cells});
+  }
+  // The row labels printed on most rips come through as runs of their own. Height separates them
+  // from sprites far better than area does — a label is a 3px bar, a sprite is tens of pixels tall
+  // — so measure every cell against the median cell height for the whole sheet. Off by request,
+  // since a sheet whose rows really do differ that much in height would lose the short ones.
+  if(opts.denoise){
+    const hs=groups.flatMap(g=>g.cells.map(c=>c.h)).sort((a,b)=>a-b);
+    if(hs.length){
+      const floor=Math.max(3, hs[hs.length>>1]*0.3);
+      groups.forEach(g=>{ g.cells=g.cells.filter(c=>c.h>=floor && c.w>2); });
+    }
+  }
+  return {bg:bg, groups:groups.filter(g=>g.cells.length)};
+}
+// Grid mode: fixed cells, optionally skipping the ones that hold nothing. Each row of the grid
+// becomes a group, which is how character sheets are almost always laid out.
+function gridSheet(d,opts){
+  const bg = opts.key ? (opts.bg||detectSheetBG(d)) : null;
+  const m = opts.skipEmpty ? contentMask(d,bg,opts.tol) : null;
+  const cw=Math.max(1,opts.cw), ch=Math.max(1,opts.ch), mg=opts.margin|0, sp=opts.spacing|0;
+  const groups=[];
+  for(let y=mg; y+ch<=d.h; y+=ch+sp){
+    const cells=[];
+    for(let x=mg; x+cw<=d.w; x+=cw+sp){
+      if(m){
+        let any=false;
+        for(let yy=y; yy<y+ch && !any; yy++){ const r=yy*d.w; for(let xx=x; xx<x+cw; xx++) if(m[r+xx]){ any=true; break; } }
+        if(!any) continue;
+      }
+      cells.push({x:x, y:y, w:cw, h:ch});
+    }
+    if(cells.length) groups.push({cells:cells});
+  }
+  return {bg:bg, groups:groups};
+}
+// Some rips sit every frame on its own coloured tile inside the page's matte, so keying the page
+// colour alone leaves a rectangle of tile behind. When a cell is ringed by one flat opaque colour it
+// is a tile, not art: return that colour so the frame can drop it too. A trimmed sprite fails this
+// test, because its own outline ring is mostly transparent once the page colour is gone.
+function cellMatte(kd,w,c){
+  const px=kd.data, tally=new Map();
+  let ring=0, opaque=0;
+  const look=(x,y)=>{
+    ring++;
+    const i=(y*w+x)*4;
+    if(px[i+3]<8) return;
+    opaque++;
+    const k=(px[i]<<16)|(px[i+1]<<8)|px[i+2];
+    tally.set(k,(tally.get(k)||0)+1);
+  };
+  const x1=c.x+c.w-1, y1=c.y+c.h-1;
+  for(let x=c.x;x<=x1;x++){ look(x,c.y); look(x,y1); }
+  for(let y=c.y+1;y<y1;y++){ look(c.x,y); look(x1,y); }
+  if(!ring || opaque/ring<0.85) return null;      // a real tile is opaque all the way round
+  let best=-1, n=0;
+  tally.forEach((v,k)=>{ if(v>n){ n=v; best=k; } });
+  if(best<0 || n/opaque<0.7) return null;          // ...and overwhelmingly one colour
+  return {r:(best>>16)&255, g:(best>>8)&255, b:best&255};
+}
+// One keyed copy of the sheet, so each frame is a plain drawImage of a region
+function keyedSheet(d,bg,tol){
+  const c=document.createElement("canvas"); c.width=d.w; c.height=d.h;
+  const x=c.getContext("2d");
+  if(!bg){ x.drawImage(d.canvas,0,0); return c; }
+  const src=d.data.data, out=x.createImageData(d.w,d.h), dst=out.data, t=tol*tol*3;
+  for(let p=0;p<src.length;p+=4){
+    if(src[p+3]<8) continue;
+    const dr=src[p]-bg.r, dg=src[p+1]-bg.g, db=src[p+2]-bg.b;
+    if(dr*dr+dg*dg+db*db<=t) continue;
+    dst[p]=src[p]; dst[p+1]=src[p+1]; dst[p+2]=src[p+2]; dst[p+3]=src[p+3];
+  }
+  x.putImageData(out,0,0);
+  return c;
+}
+function sheetPlan(d,opts){
+  const res = opts.mode==="grid" ? gridSheet(d,opts) : analyzeSheet(d,opts);
+  let cw=0, ch=0, n=0;
+  res.groups.forEach(g=>g.cells.forEach(c=>{ if(c.w>cw) cw=c.w; if(c.h>ch) ch=c.h; n++; }));
+  res.cell={w:clamp(cw||1,1,512), h:clamp(ch||1,1,512)};
+  res.count=n;
+  return res;
+}
+function buildSheetImport(d,plan,opts,name){
+  const sheet=keyedSheet(d,plan.bg,opts.tol);
+  const kd=sheet.getContext("2d").getImageData(0,0,d.w,d.h);
+  const cw=plan.cell.w, ch=plan.cell.h;
+  createDoc(cw,ch,name);                     // a new tab, so nothing already open is disturbed
+  frames=[]; tags=[]; tlView="__all"; lastFrameCount=null;
+  let taken=0, clipped=false;
+  plan.groups.forEach((g,gi)=>{
+    const from=frames.length;
+    for(const c of g.cells){
+      if(taken>=MAX_IMPORT_FRAMES){ clipped=true; break; }
+      const canvas=makeLayerCanvas(), ctx=canvas.getContext("2d");
+      ctx.imageSmoothingEnabled=false;
+      // grid cells are already aligned; a smart cut is trimmed to the sprite, so line the sprites
+      // up on the chosen edge — feet-on-the-ground is what you want for a walk cycle
+      let dx=0, dy=0;
+      if(opts.mode!=="grid"){
+        dx = opts.align==="topleft" ? 0 : Math.round((cw-c.w)/2);
+        dy = opts.align==="topleft" ? 0 : (opts.align==="center" ? Math.round((ch-c.h)/2) : ch-c.h);
+      }
+      const tile = opts.cellMatte ? cellMatte(kd,d.w,c) : null;
+      const t2=opts.tol*opts.tol*3;
+      const out=ctx.createImageData(c.w,c.h), src=kd.data, dst=out.data;
+      for(let y=0;y<c.h;y++){
+        for(let x=0;x<c.w;x++){
+          const sp=(((c.y+y)*d.w)+(c.x+x))*4, dp=(y*c.w+x)*4;
+          if(src[sp+3]<8) continue;
+          if(tile){
+            const dr=src[sp]-tile.r, dg=src[sp+1]-tile.g, db=src[sp+2]-tile.b;
+            if(dr*dr+dg*dg+db*db<=t2) continue;
+          }
+          dst[dp]=src[sp]; dst[dp+1]=src[sp+1]; dst[dp+2]=src[sp+2]; dst[dp+3]=src[sp+3];
+        }
+      }
+      ctx.putImageData(out, dx, dy);
+      frames.push({layers:[{id:layerSeq++, name:"Layer 1", visible:true, opacity:1, locked:false,
+                            canvas:canvas, ctx:ctx}], dur:DEFAULT_DUR});
+      taken++;
+    }
+    if(frames.length>from && plan.groups.length>1)
+      tags.push({name:uniqueTagName("anim "+(gi+1)), from:from, to:frames.length-1,
+                 color:TAG_COLORS[tags.length%TAG_COLORS.length]});
+  });
+  if(!frames.length){ showToast("Nothing found to slice — try a lower tolerance or grid mode.","error",4200); return; }
+  frameIndex=0; layers=frames[0].layers; activeIndex=0;
+  undoStack=[]; redoStack=[];
+  fitZoom(); renderLayers(); renderTimeline(); composite(); updateDocInfo();
+  captureActiveDoc(); renderTabs();
+  showToast("Imported "+frames.length+" frame"+(frames.length===1?"":"s")+
+    (tags.length?(" in "+tags.length+" group"+(tags.length===1?"":"s")):"")+" at "+cw+"×"+ch+"."+
+    (clipped?(" Stopped at "+MAX_IMPORT_FRAMES+"."):""),"success",clipped?5200:4200);
+}
+async function showSheetImportDialog(img,name){
+  const d=sheetImageData(img);
+  const auto=detectSheetBG(d);
+  const swatch=auto?("rgb("+auto.r+","+auto.g+","+auto.b+")"):"transparent";
+  const body=`
+    <div class="row"><label>Mode</label><select id="shiMode">
+      <option value="smart" selected>Smart — find the frames and groups</option>
+      <option value="grid">Grid — fixed cell size</option></select></div>
+    <div class="row" id="shiGridRow"><label>Cell</label>
+      <input type="number" id="shiCW" min="1" max="512" value="32"><span style="color:var(--muted)">×</span>
+      <input type="number" id="shiCH" min="1" max="512" value="32"><span style="color:var(--muted)">px</span></div>
+    <div class="row" id="shiPadRow"><label>Spacing</label>
+      <span style="color:var(--muted)">outer</span><input type="number" id="shiMargin" min="0" max="256" value="0">
+      <span style="color:var(--muted)">between</span><input type="number" id="shiSpacing" min="0" max="256" value="0"></div>
+    <div class="row" id="shiAlignRow"><label>Align</label><select id="shiAlign">
+      <option value="bottom" selected>Bottom centre — feet on the ground</option>
+      <option value="center">Centre</option>
+      <option value="topleft">Top left</option></select></div>
+    <div class="row" id="shiSkipRow"><label></label>
+      <label class="chk"><input type="checkbox" id="shiSkipEmpty" checked> Skip cells with nothing in them</label></div>
+    <div class="row" id="shiTileRow"><label></label>
+      <label class="chk" title="For sheets that sit every frame on its own coloured tile"><input type="checkbox" id="shiCellMatte" checked> Drop each frame's own tile colour too</label></div>
+    <div class="row" id="shiDenoiseRow"><label></label>
+      <label class="chk" title="Row labels and stray marks are much shorter than the sprites around them"><input type="checkbox" id="shiDenoise" checked> Ignore small marks, like row labels</label></div>
+    <div class="row"><label>Background</label>
+      <label class="chk"><input type="checkbox" id="shiKey" checked> Make
+        <span style="display:inline-block;width:13px;height:13px;border-radius:3px;border:1px solid var(--line);background:${swatch}"></span>
+        transparent</label></div>
+    <div class="row"><label>Tolerance</label><input type="number" id="shiTol" min="0" max="120" value="24">
+      <span style="color:var(--muted)">how close counts as background</span></div>
+    <div class="row" id="shiGapRow"><label>Split on</label><input type="number" id="shiGap" min="0" max="64" value="1">
+      <span style="color:var(--muted)">px of background between frames</span></div>
+    <div class="row"><label></label><span id="shiSummary" style="color:var(--muted); font-size:12px"></span></div>`;
+  const promise=openModal({title:"Import spritesheet",
+    message:d.w+" × "+d.h+" sheet."+(auto?"":" No flat background found — it may already be transparent."),
+    bodyHTML:body, okText:"Import", mid:true});
+  const read=()=>({
+    mode:$("#shiMode").value, cw:+$("#shiCW").value||1, ch:+$("#shiCH").value||1,
+    margin:+$("#shiMargin").value||0, spacing:+$("#shiSpacing").value||0,
+    align:$("#shiAlign").value, key:$("#shiKey").checked,
+    skipEmpty:$("#shiSkipEmpty").checked, denoise:$("#shiDenoise").checked,
+    cellMatte:$("#shiCellMatte").checked,
+    tol:clamp(+$("#shiTol").value||0,0,120), gap:clamp(+$("#shiGap").value||0,0,64),
+  });
+  let plan=null;
+  const update=()=>{
+    const o=read();
+    const grid = o.mode==="grid";
+    $("#shiGridRow").style.display = grid ? "" : "none";
+    $("#shiPadRow").style.display = grid ? "" : "none";
+    $("#shiGapRow").style.display = grid ? "none" : "";
+    $("#shiSkipRow").style.display = grid ? "" : "none";
+    $("#shiAlignRow").style.display = grid ? "none" : "";
+    $("#shiDenoiseRow").style.display = grid ? "none" : "";
+    $("#shiTileRow").style.display = o.key ? "" : "none";
+    plan=sheetPlan(d,o);
+    const n=plan.count, g=plan.groups.length;
+    $("#shiSummary").textContent = n
+      ? n+" frame"+(n===1?"":"s")+" in "+g+" group"+(g===1?"":"s")+" · "+plan.cell.w+"×"+plan.cell.h+" cells"
+        +(n>MAX_IMPORT_FRAMES?(" · only the first "+MAX_IMPORT_FRAMES+" will import"):"")
+      : "Nothing found — try a different tolerance, or grid mode.";
+  };
+  ["#shiMode","#shiCW","#shiCH","#shiMargin","#shiSpacing","#shiAlign","#shiKey","#shiTol","#shiGap",
+   "#shiSkipEmpty","#shiDenoise","#shiCellMatte"]
+    .forEach(id=>{ const el=$(id); el.oninput=update; el.onchange=update; });
+  update();
+  const ok=await promise;
+  if(!ok) return;
+  const o=read();
+  buildSheetImport(d, sheetPlan(d,o), o, name);
+}
+function openSheetFile(f){
+  const url=URL.createObjectURL(f), img=new Image();
+  img.onload=()=>{ URL.revokeObjectURL(url); showSheetImportDialog(img, f.name.replace(/\.[^.]+$/,"")); };
+  img.onerror=()=>{ URL.revokeObjectURL(url); showToast("Couldn't read that image.","error"); };
+  img.src=url;
 }
 
 // ------------------------------------------------------------------ spritesheet export (+ Aseprite-style JSON sidecar)
@@ -3429,6 +3724,7 @@ function runCmd(cmd){
   switch(cmd){
     case "new": case "newtab": newCanvasDialog(); break;
     case "open": $("#openInput").click(); break;
+    case "importsheet": $("#sheetInput").click(); break;
     case "save": saveProject(); break;
     case "export": showExportDialog().then(s=>{ if(s) exportPNG(s); }); break;
     case "sheet": showSheetDialog().then(o=>{ if(o) exportSpritesheet(o); }); break;
@@ -3491,6 +3787,7 @@ const HELP_SECTIONS=[
     ["add","New frame (copies the current one)",""],
     ["tag","Group frames — idle, walk, jump…",""],
     ["image","Export a spritesheet of a group",""],
+    ["folder","Import a spritesheet — sliced into frames and groups",""],
   ]},
   {title:"Mouse", icon:"pick", rows:[
     ["pick","Quick color pick","Alt+click"],
@@ -3655,6 +3952,7 @@ function doInstall(){
 
 $("#newTabBtn").onclick=newCanvasDialog;
 $("#openInput").onchange=e=>{ const f=e.target.files[0]; if(f) openProjectFile(f); e.target.value=""; };
+$("#sheetInput").onchange=e=>{ const f=e.target.files[0]; if(f) openSheetFile(f); e.target.value=""; };
 
 $("#hexInput").onchange=e=>{
   const v=normHex(e.target.value);
