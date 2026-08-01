@@ -1246,7 +1246,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31f";
+const APP_VERSION="2026.07.31g";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -3426,11 +3426,17 @@ function saveProject(){
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   showToast("Project saved.","success");
 }
-function loadProject(file){
-  const reader=new FileReader();
-  reader.onload=()=>{
-    let data; try{data=JSON.parse(reader.result);}catch(_){ showToast("That file isn't a valid PixelPaint project.","error"); return; }
-    if(!data.w || !(data.frames||data.layers)){ showToast("Unrecognized project format.","error"); return; }
+// A project is only recognised if it carries a canvas size and something to draw. Told apart from
+// the other JSON this app writes — palettes are a bare array of colours — so the message can say
+// which it got rather than "unrecognized".
+function projectProblem(data){
+  if(Array.isArray(data) || (data && Array.isArray(data.colors)))
+    return "That's a palette, not a project — import it from the palette tools under Color.";
+  if(!data || !data.w || !(data.frames||data.layers)) return "That file isn't a PixelPaint project.";
+  return null;
+}
+function applyProject(data){
+  {
     W=clamp(data.w,1,512); H=clamp(data.h,1,512); flat.width=W; flat.height=H;
     layerSeq=1;
     const frameDefs = data.frames || [{dur:DEFAULT_DUR, layers:data.layers||[]}];   // v1 files load as a single frame
@@ -3454,8 +3460,7 @@ function loadProject(file){
         img.src=s.data;
       });
     });
-  };
-  reader.readAsText(file);
+  }
 }
 function finishLoad(data){
   activeIndex=clamp(data.active||0,0,layers.length-1);
@@ -4243,6 +4248,7 @@ const HELP_SECTIONS=[
     ["center","Pan the canvas","Two fingers"],
     ["wand","Zoom","Pinch"],
     ["clear","Dismiss a selection or sub-canvas","Tap its ✕"],
+    ["folder","Drop a .pxpaint project or an image on the canvas",""],
   ]},
 ];
 function helpKeys(spec){
@@ -4368,15 +4374,19 @@ window.addEventListener("paste",e=>{
 });
 window.addEventListener("dragover",e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="copy"; stage.classList.add("dragging"); });
 window.addEventListener("dragleave",e=>{ if(!e.relatedTarget) stage.classList.remove("dragging"); });
+// .pxpaint files reach the browser with no MIME type at all, so they have to be recognised by
+// name — an image-type check alone rejects the app's own save format.
+const isProjectFile=f=>/\.(pxpaint|json)$/i.test(f.name||"") || f.type==="application/json";
 window.addEventListener("drop",e=>{
   e.preventDefault(); stage.classList.remove("dragging");
   const dt=e.dataTransfer; if(!dt) return;
   if(dt.files && dt.files.length){
-    for(let i=0;i<dt.files.length;i++){
-      const f=dt.files[i];
-      if(f.type.indexOf("image")===0){ loadImageFromBlob(f, f.name.replace(/\.[^.]+$/,"")); return; }
-    }
-    showToast("Drop an image file.","error"); return;
+    const files=[...dt.files];
+    const proj=files.find(isProjectFile);
+    if(proj){ openProjectFile(proj); return; }
+    const img=files.find(f=>f.type.indexOf("image")===0);
+    if(img){ loadImageFromBlob(img, img.name.replace(/\.[^.]+$/,"")); return; }
+    showToast("Drop a .pxpaint project or an image.","error"); return;
   }
   const url=dt.getData("text/uri-list")||dt.getData("text/plain");
   if(url) loadImageFromURL(url,"Dropped image");
@@ -4414,7 +4424,20 @@ $("#undoBtn").onclick=undo;
 $("#redoBtn").onclick=redo;
 
 function isLayerEmpty(l){const d=l.ctx.getImageData(0,0,W,H).data; for(let i=3;i<d.length;i+=4) if(d[i]!==0) return false; return true;}
-function openProjectFile(f){ const name=f.name.replace(/\.[^.]+$/,""); createDoc(lastSize.w, lastSize.h, name); loadProject(f); }
+function openProjectFile(f){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    let data;
+    try{ data=JSON.parse(reader.result); }
+    catch(_){ showToast("That file isn't a PixelPaint project.","error"); return; }
+    const bad=projectProblem(data);
+    if(bad){ showToast(bad,"error",4200); return; }
+    createDoc(lastSize.w, lastSize.h, f.name.replace(/\.[^.]+$/,""));
+    applyProject(data);
+  };
+  reader.onerror=()=>showToast("Couldn't read that file.","error");
+  reader.readAsText(f);
+}
 function doInstall(){
   if(!deferredPrompt) return;
   deferredPrompt.prompt();
