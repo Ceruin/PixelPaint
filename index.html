@@ -780,6 +780,11 @@
     <button data-cmd="undo" data-icon="undo" data-icon-size="16">Undo<span class="hk">Ctrl+Z</span></button>
     <button data-cmd="redo" data-icon="redo" data-icon-size="16">Redo<span class="hk">Ctrl+Y</span></button>
     <div class="ctx-sep"></div>
+    <div class="ctx-sep"></div>
+    <button data-cmd="copysel" data-icon="copy"      data-icon-size="16">Copy selection<span class="hk">Ctrl+C</span></button>
+    <button data-cmd="cutsel"  data-icon="clear"     data-icon-size="16">Cut selection<span class="hk">Ctrl+X</span></button>
+    <button data-cmd="pastesel" data-icon="clipboard" data-icon-size="16">Paste<span class="hk">Ctrl+V</span></button>
+    <div class="ctx-sep"></div>
     <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
   </div>
   <div id="menu-sprite" class="ctx-menu menu-dd" hidden>
@@ -1115,6 +1120,9 @@
 
 <!-- right-click menu for a selection -->
 <div id="selMenu" class="ctx-menu" hidden>
+  <button data-action="copy">Copy</button>
+  <button data-action="cut">Cut</button>
+  <div class="ctx-sep"></div>
   <button data-action="fill">Fill with foreground</button>
   <button data-action="snap">Snap to palette</button>
   <button data-action="clear">Clear (delete)</button>
@@ -1246,7 +1254,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31g";
+const APP_VERSION="2026.07.31h";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -2181,9 +2189,8 @@ function composite(){
   if(showGrid && zoom>=4) drawGrid();
   if(showCenter) drawCenterGuide();
   if(region) drawRegion();
-  paintPlaceOverlay();
-  if(selDrag && selDrag.float) drawFloat();
-  if(selection) drawSelection();
+  paintOverlays();
+  if(selection && !(selDrag && selDrag.float)) drawSelection();   // the float draws its own outline
   // dismiss badges last, so nothing paints over them. Not while a gesture is in flight, and not
   // during image placement — that has its own overlay and toolbar.
   if(!placement){
@@ -2611,10 +2618,18 @@ function overlayOffset(){
   const vr=view.getBoundingClientRect(), or=placeOverlay.getBoundingClientRect();
   return {ox:vr.left-or.left, oy:vr.top-or.top};
 }
+// Everything that lives on the stage-wide overlay, in one call: a placement, or a selection being
+// dragged. Scrolling and resizing repaint through here too, so a float doesn't vanish mid-drag.
+function paintOverlays(){
+  const floating = selDrag && selDrag.float;
+  placeOverlay.hidden = !(placement || floating);
+  paintPlaceOverlay();
+  if(floating && !placement) drawFloat();
+}
 // the placement preview + resize handles are drawn across the WHOLE stage, so handles
 // that fall outside the canvas (in the gray area) are still visible and grabbable.
 function paintPlaceOverlay(){
-  if(!placement){ octx.clearRect(0,0,placeOverlay.width,placeOverlay.height); return; }
+  if(!placement){ sizePlaceOverlay(); octx.clearRect(0,0,placeOverlay.width,placeOverlay.height); return; }
   sizePlaceOverlay();
   octx.clearRect(0,0,placeOverlay.width,placeOverlay.height);
   const z=zoom, {ox,oy}=overlayOffset();
@@ -2727,9 +2742,21 @@ function fillSelection(){ const L=activeLayer(); if(!L||!selection) return; push
   if(selMask) eachSelPixel((x,y)=>L.ctx.fillRect(x,y,1,1)); else L.ctx.fillRect(selection.x,selection.y,selection.w,selection.h);
   composite(); refreshThumb(L); }
 
+// A dragged selection is drawn on the stage-wide overlay rather than on the canvas, so the part
+// hanging past the edge stays whole while you move it. It is only cut down when you let go and it
+// lands on the layer, which is the point at which the canvas really can't hold it.
 function drawFloat(){
-  vctx.imageSmoothingEnabled=false;
-  vctx.drawImage(selDrag.float, selDrag.fx*zoom, selDrag.fy*zoom, selDrag.float.width*zoom, selDrag.float.height*zoom);
+  sizePlaceOverlay();
+  const {ox,oy}=overlayOffset(), z=zoom;
+  const x=ox+selDrag.fx*z, y=oy+selDrag.fy*z, w=selDrag.float.width*z, h=selDrag.float.height*z;
+  octx.save();
+  octx.imageSmoothingEnabled=false;
+  octx.drawImage(selDrag.float, x, y, w, h);
+  octx.lineWidth=1; octx.setLineDash([4,4]);
+  octx.strokeStyle="#000"; octx.lineDashOffset=-selAnts; octx.strokeRect(x+0.5,y+0.5,w,h);
+  octx.strokeStyle="#fff"; octx.lineDashOffset=-selAnts+4; octx.strokeRect(x+0.5,y+0.5,w,h);
+  octx.setLineDash([]);
+  octx.restore();
 }
 function drawSelection(){
   if(selMask){ drawMaskOutline(); return; }
@@ -2841,6 +2868,51 @@ function selectUp(){
   if(selection && selection.w>0 && selection.h>0){ if(!selMask) startAnts(); }
   else { selection=null; selMask=null; }
   updateSelStatus(); composite();
+}
+
+// ---- copy / cut / paste of selected pixels ------------------------------------------------
+// Kept in-app as a canvas, and also pushed to the system clipboard when the browser allows it, so
+// the pixels can go to another program. The system write is best effort — it needs a secure
+// context and permission — and the in-app copy is what Ctrl+V here relies on either way.
+let pixelClip=null;
+function selectionToCanvas(){
+  const L=activeLayer(); if(!L || !selection) return null;
+  const r=selection;
+  const c=document.createElement("canvas"); c.width=r.w; c.height=r.h;
+  const cc=c.getContext("2d");
+  cc.drawImage(L.canvas, r.x,r.y,r.w,r.h, 0,0,r.w,r.h);
+  if(selMask){                                   // a wand selection copies its shape, not its box
+    const im=cc.getImageData(0,0,r.w,r.h), d=im.data;
+    for(let y=0;y<r.h;y++) for(let x=0;x<r.w;x++)
+      if(selMask[(r.y+y)*W+(r.x+x)]!==1) d[(y*r.w+x)*4+3]=0;
+    cc.putImageData(im,0,0);
+  }
+  return c;
+}
+function toSystemClipboard(canvas){
+  if(!(navigator.clipboard && window.ClipboardItem && canvas.toBlob)) return;
+  try{
+    canvas.toBlob(b=>{
+      if(!b) return;
+      navigator.clipboard.write([new ClipboardItem({"image/png":b})]).catch(()=>{});
+    },"image/png");
+  }catch(_){ /* not permitted here; the in-app clipboard still works */ }
+}
+function copySelection(cut){
+  if(!selection){ showToast("Select something first — the marquee (M) or the wand (W).","info",3200); return; }
+  const L=activeLayer();
+  if(cut && L && L.locked){ showToast("This layer is locked.","info"); return; }
+  const c=selectionToCanvas();
+  if(!c){ showToast("Nothing to copy.","info"); return; }
+  pixelClip=c;
+  toSystemClipboard(c);
+  if(cut) clearSelectionContents();
+  showToast((cut?"Cut ":"Copied ")+c.width+" × "+c.height+".","success",1800);
+}
+function pastePixelClip(){
+  if(!pixelClip) return false;
+  beginPlacement(pixelClip, "Pasted");
+  return true;
 }
 
 // ------------------------------------------------------------------ snap layer/selection to the active palette
@@ -2971,8 +3043,8 @@ view.addEventListener("pointerdown",e=>{
 // placement gestures arrive on the full-stage overlay, so handles in the gray area work
 placeOverlay.addEventListener("pointerdown",e=>{ if(placement && e.button===0) placementDown(e); });
 placeOverlay.addEventListener("contextmenu",e=>{ if(placement){ e.preventDefault(); openCtxMenu(e.clientX,e.clientY); } });
-window.addEventListener("resize",()=>{ if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); } drawRulers(); });
-stage.addEventListener("scroll",()=>{ if(placement) paintPlaceOverlay(); drawRulers(); });
+window.addEventListener("resize",()=>{ paintOverlays(); drawRulers(); });
+stage.addEventListener("scroll",()=>{ paintOverlays(); drawRulers(); });
 
 window.addEventListener("pointermove",e=>{
   if(pan){ panMove(e); return; }
@@ -4088,7 +4160,7 @@ function setDock(name, show, opts){
   if(!(opts&&opts.quiet)){ try{ localStorage.setItem(d.key, show?"1":"0"); }catch(_){} }
   // the canvas area just changed size
   drawRulers();
-  if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); }
+  paintOverlays();
 }
 for(const name in DOCKS){
   const el=$(DOCKS[name].chk);
@@ -4124,7 +4196,7 @@ function setPanelTab(name){
   if(name==="anim" && tlCollapsed) setTimelineCollapsed(false);
   // showing/hiding a panel resizes the stage, so the rulers and any placement box need a repaint
   drawRulers();
-  if(placement){ sizePlaceOverlay(); paintPlaceOverlay(); }
+  paintOverlays();
 }
 document.querySelectorAll("#panelTabs .ptab").forEach(b=>{
   b.onclick=()=>setPanelTab(panelTab===b.dataset.ptab ? "none" : b.dataset.ptab);
@@ -4176,6 +4248,9 @@ function runCmd(cmd){
     case "undo": undo(); break;
     case "redo": redo(); break;
     case "clearlayer": clearActiveLayer(); break;
+    case "copysel": copySelection(false); break;
+    case "cutsel": copySelection(true); break;
+    case "pastesel": if(!pastePixelClip()) showToast("Nothing copied yet.","info"); break;
     case "resize": resizeDialog(); break;
     case "trim": trimToContent(); break;
     case "addimage": $("#imgInput").click(); break;
@@ -4215,6 +4290,9 @@ const HELP_SECTIONS=[
   {title:"Edit", icon:"undo", rows:[
     ["undo","Undo","Ctrl+Z"], ["redo","Redo","Ctrl+Y"],
     ["select","Select all","Ctrl+A"], ["clear","Deselect","Ctrl+D"],
+    ["copy","Copy the selection","Ctrl+C"],
+    ["clear","Cut the selection","Ctrl+X"],
+    ["clipboard","Paste","Ctrl+V"],
     ["trash","Clear the selection","Del"],
     ["save","Save project","Ctrl+S"], ["folder","Open project","Ctrl+O"],
   ]},
@@ -4341,7 +4419,9 @@ $("#selMenu").addEventListener("click",e=>{
   const b=e.target.closest("[data-action]"); if(!b) return; const a=b.dataset.action; closeCtxMenu();
   if(a==="selectall"){ selectAll(); return; }
   if(!selection) return;
-  if(a==="fill") fillSelection();
+  if(a==="copy") copySelection(false);
+  else if(a==="cut") copySelection(true);
+  else if(a==="fill") fillSelection();
   else if(a==="snap") applyPaletteToLayer();
   else if(a==="clear") clearSelectionContents();
   else if(a==="deselect") clearSelection();
@@ -4362,15 +4442,18 @@ document.addEventListener("pointerdown",e=>{
   if(!inMenu){ closeMenus(); $("#menuSheet").hidden=true; }
 }, true);
 
+// Ctrl+V arrives here rather than through the key handler, so an image copied from another program
+// keeps priority; pixels copied inside the app are the fallback when the system clipboard has none.
 window.addEventListener("paste",e=>{
   if(!$("#modalRoot").hidden) return;
-  const items=e.clipboardData && e.clipboardData.items; if(!items) return;
+  const items=(e.clipboardData && e.clipboardData.items)||[];
   for(let i=0;i<items.length;i++){
     if(items[i].type && items[i].type.indexOf("image")===0){
       const f=items[i].getAsFile();
       if(f){ e.preventDefault(); loadImageFromBlob(f,"Pasted image"); return; }
     }
   }
+  if(pastePixelClip()) e.preventDefault();
 });
 window.addEventListener("dragover",e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="copy"; stage.classList.add("dragging"); });
 window.addEventListener("dragleave",e=>{ if(!e.relatedTarget) stage.classList.remove("dragging"); });
@@ -4562,6 +4645,8 @@ window.addEventListener("keydown",e=>{
     else if(k==="d"){ e.preventDefault(); clearSelection(); }
     else if(k==="s"){ e.preventDefault(); saveProject(); }
     else if(k==="o"){ e.preventDefault(); $("#openInput").click(); }
+    // only swallow copy/cut when there is a selection, so text elsewhere still copies normally
+    else if((k==="c"||k==="x") && selection){ e.preventDefault(); copySelection(k==="x"); }
     return;
   }
   switch(e.key.toLowerCase()){
