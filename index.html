@@ -345,6 +345,11 @@
   button:focus-visible, .tool:focus-visible{outline-offset:1px;}
   button:disabled, button[disabled]{opacity:.38; cursor:default; pointer-events:none; box-shadow:none;}
   button.primary{box-shadow:0 2px 10px -3px var(--accent2);}
+  /* A destructive button is usually .primary too, and .primary owns the glow — so without this it
+     lights up accent-blue under a red face. The compound selector wins whatever the source order. */
+  button.danger{background:var(--danger); border-color:var(--danger); color:#fff;}
+  button.danger:hover{background:#ec6a7c; border-color:#ec6a7c;}
+  button.danger, button.primary.danger{box-shadow:0 2px 10px -3px var(--danger);}
   .tool.active{box-shadow:0 3px 12px -3px var(--accent2);}
   .layer:hover{border-color:#56607a; background:#30343f;}
   .layer .eye{transition:color .1s, opacity .1s;}
@@ -427,8 +432,6 @@
 
   /* the tools rail's tips moved into that sheet; this is all that's left in their place */
   .helpbtn{width:100%; margin-top:auto;}
-  .modal-card .danger{background:var(--danger); border-color:var(--danger); color:#fff;}
-  .modal-card .danger:hover{background:#ec6a7c; border-color:#ec6a7c;}
   @keyframes modalIn{from{opacity:0; transform:translateY(10px) scale(.98);} to{opacity:1; transform:none;}}
 
   /* themed toasts */
@@ -1006,7 +1009,7 @@
           <div class="rg-row" style="gap:8px; margin-top:2px">
             <label class="chk"><input type="checkbox" id="rgLock" /><span data-icon="lock" data-icon-size="14"></span> Lock</label>
             <button id="rgCenter">Center</button>
-            <button id="rgRemove" style="background:var(--danger); border-color:var(--danger); color:#fff;" title="Delete the sub-canvas and draw on the whole canvas again (Del)">Remove</button>
+            <button id="rgRemove" class="danger" title="Delete the sub-canvas and draw on the whole canvas again (Del)">Remove</button>
           </div>
           <div class="hint" style="padding:7px 0 0; margin:0">Tap the <b>✕</b> on its top-right corner to remove it. <b>Del</b> and View ▸ Remove sub-canvas work too.</div>
         </div>
@@ -1243,7 +1246,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31e";
+const APP_VERSION="2026.07.31f";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
