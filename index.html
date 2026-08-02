@@ -1254,7 +1254,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31h";
+const APP_VERSION="2026.07.31i";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -2563,13 +2563,20 @@ function placeFill(){ const s=Math.max(W/placement.natW, H/placement.natH); plac
 function beginPlacement(img, name){
   const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
   placement={img, name:(name||"Image"), natW:iw, natH:ih, ar:iw/ih, flipH:false, flipV:false, x:0, y:0, w:iw, h:ih};
-  placeCenter();   // full (native) size by default, centered on the canvas
+  // Full size by default — but an image far larger than the canvas would land with its corners
+  // (and so its resize handles) miles off-screen, which is no way to start. Those come in fitted;
+  // 1:1 is one button away.
+  const oversize = iw>W || ih>H;
+  if(oversize) placeFit(); else placeCenter();
   xform=null;
   $("#placeBar").hidden=false; updatePlaceInfo();
   placeOverlay.hidden=false; placeOverlay.classList.add("active"); sizePlaceOverlay();
   placeOverlay.style.cursor="move";
   composite();
-  showToast("Pasted at full size. Drag to move, handles to resize, right-click for options (Fit, 1:1…).","info",4400);
+  showToast(oversize
+    ? "Scaled to fit the canvas — press 1:1 for full size. Drag to move, handles to resize."
+    : "Pasted at full size. Drag to move, handles to resize, right-click for options (Fit, 1:1…).",
+    "info",4400);
 }
 function endPlacement(){
   placement=null; xform=null; $("#placeBar").hidden=true; closeCtxMenu();
@@ -2657,26 +2664,50 @@ function paintPlaceOverlay(){
   octx.lineWidth=1.5; octx.strokeStyle="#5b8cff"; octx.setLineDash([6,4]);
   octx.strokeRect(x+0.5, y+0.5, w, h);
   octx.setLineDash([]);
-  const hs=10, pts=placeHandlePoints(x,y,w,h);
-  for(const k in pts){ const [hx,hy]=pts[k];
-    octx.fillStyle="#fff"; octx.fillRect(hx-hs/2, hy-hs/2, hs, hs);
-    octx.strokeStyle="#5b8cff"; octx.strokeRect(hx-hs/2+0.5, hy-hs/2+0.5, hs-1, hs-1);
+  const hs=10, hnd=placementHandles();
+  for(const k in hnd.pts){ const [hx,hy]=hnd.pts[k];
+    // accent-filled = pulled in from a corner that is off-screen, so it isn't mistaken for the edge
+    octx.fillStyle = hnd.pulled[k] ? "#5b8cff" : "#fff";
+    octx.fillRect(hx-hs/2, hy-hs/2, hs, hs);
+    octx.strokeStyle = hnd.pulled[k] ? "#fff" : "#5b8cff";
+    octx.strokeRect(hx-hs/2+0.5, hy-hs/2+0.5, hs-1, hs-1);
   }
   octx.restore();
 }
 function placeHandlePoints(x,y,w,h){
   return {nw:[x,y],n:[x+w/2,y],ne:[x+w,y],e:[x+w,y+h/2],se:[x+w,y+h],s:[x+w/2,y+h],sw:[x,y+h],w:[x,y+h/2]};
 }
-
-function placementHit(a){
-  const {x,y,w,h}=placement, tol=10/zoom;
-  const pts={nw:[x,y],n:[x+w/2,y],ne:[x+w,y],e:[x+w,y+h/2],se:[x+w,y+h],s:[x+w/2,y+h],sw:[x,y+h],w:[x,y+h/2]};
-  for(const k in pts){ if(Math.abs(a.x-pts[k][0])<=tol && Math.abs(a.y-pts[k][1])<=tol) return k; }
-  if(a.x>=x && a.x<=x+w && a.y>=y && a.y<=y+h) return "move";
+// Handle positions in overlay pixels, each pulled back inside the stage if the corner it belongs to
+// lies outside it — an enlarged image otherwise has all eight handles off-screen and no way to
+// resize it back. Drawing and hit-testing both come through here, so they can't disagree.
+function placementHandles(){
+  const z=zoom, {ox,oy}=overlayOffset();
+  const rect={x:ox+placement.x*z, y:oy+placement.y*z, w:placement.w*z, h:placement.h*z};
+  const raw=placeHandlePoints(rect.x,rect.y,rect.w,rect.h);
+  const m=13, ow=placeOverlay.width, oh=placeOverlay.height;
+  const pts={}, pulled={};
+  for(const k in raw){
+    const [hx,hy]=raw[k];
+    const cx=clamp(hx, m, Math.max(m, ow-m)), cy=clamp(hy, m, Math.max(m, oh-m));
+    pts[k]=[cx,cy];
+    pulled[k]=(cx!==hx || cy!==hy);
+  }
+  return {pts:pts, pulled:pulled, rect:rect};
+}
+// hit-test in overlay space, against the same (possibly pulled-in) handles that were drawn
+function placementHitAt(e){
+  if(!placement) return null;
+  const or=placeOverlay.getBoundingClientRect();
+  const px=e.clientX-or.left, py=e.clientY-or.top;
+  const {pts,rect}=placementHandles(), tol=11;
+  for(const k in pts) if(Math.abs(px-pts[k][0])<=tol && Math.abs(py-pts[k][1])<=tol) return k;
+  if(px>=rect.x && px<=rect.x+rect.w && py>=rect.y && py<=rect.y+rect.h) return "move";
   return null;
 }
+
 function placementDown(e){
-  const a=toArtF(e), mode=placementHit(a);   // toArtF works anywhere on the page, incl. off-canvas
+  const mode=placementHitAt(e);              // overlay space, so pulled-in handles are grabbable
+  const a=toArtF(e);                         // the drag maths stay in art coords
   if(!mode) return;
   try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
   xform={mode, start:a, rect:{x:placement.x,y:placement.y,w:placement.w,h:placement.h}};
@@ -2700,7 +2731,7 @@ function placementMove(e){
   updatePlaceInfo(); composite();
 }
 function updatePlacementCursor(e){
-  const m=placementHit(toArtF(e));
+  const m=placementHitAt(e);
   const map={nw:"nwse-resize",se:"nwse-resize",ne:"nesw-resize",sw:"nesw-resize",n:"ns-resize",s:"ns-resize",e:"ew-resize",w:"ew-resize",move:"move"};
   placeOverlay.style.cursor = m ? map[m] : "default";
 }
