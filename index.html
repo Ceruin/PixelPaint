@@ -1051,8 +1051,9 @@
       </div>
 
       <!-- Tilesheet grid (shown when the drawing has a grid, or the Tile tool is picked) -->
-      <div class="section" id="sheetSection" style="display:none">
-        <h3><span data-icon="grid" data-icon-size="14"></span>Tilesheet</h3>
+      <div class="section collapsible" id="sheetSection" style="display:none">
+        <h3 class="sec-h" data-sec="sheetSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="grid" data-icon-size="14"></span>Tilesheet</h3>
+        <div class="sec-body">
         <div id="sheetNone">
           <button id="tsCreate" data-icon="grid" style="width:100%">Set up a tilesheet…</button>
           <div class="hint" style="padding:7px 0 0; margin:0">Cuts this canvas into a grid of named tiles — rows and columns, each with its own size. Pick a tile and the four <b>+</b> buttons around it add a row above or below, or a column left or right.</div>
@@ -1091,11 +1092,13 @@
           </div>
           <button data-cmd="tilesoff" data-icon="clear" data-icon-size="15" style="width:100%; margin-top:7px" title="Keep the artwork, drop the grid">Turn off the tile grid</button>
         </div>
+        </div>
       </div>
 
       <!-- Sub-canvas controls (shown when the Region tool is active) -->
-      <div class="section" id="regionSection" style="display:none">
-        <h3><span data-icon="region" data-icon-size="14"></span>Sub-canvas</h3>
+      <div class="section collapsible" id="regionSection" style="display:none">
+        <h3 class="sec-h" data-sec="regionSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="region" data-icon-size="14"></span>Sub-canvas</h3>
+        <div class="sec-body">
         <div id="regionNone">
           <button id="regionCreate" data-icon="region" style="width:100%">Create draw area</button>
           <div class="hint" style="padding:7px 0 0; margin:0">A box you can draw inside but not outside. Create one, set its size, then Lock it. Or use the Region tool (D) to drag it on the canvas. Remove it any time with the <b>✕</b> on its top-right corner.</div>
@@ -1111,6 +1114,7 @@
             <button id="rgRemove" class="danger" title="Delete the sub-canvas and draw on the whole canvas again (Del)">Remove</button>
           </div>
           <div class="hint" style="padding:7px 0 0; margin:0">Tap the <b>✕</b> on its top-right corner to remove it. <b>Del</b> and View ▸ Remove sub-canvas work too.</div>
+        </div>
         </div>
       </div>
     </div>
@@ -1348,7 +1352,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03b";
+const APP_VERSION="2026.08.03c";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -4905,8 +4909,9 @@ function setPanelTabIfMobile(name){ if(isMobileLayout()) setPanelTab(name); }
 // desktop-width window must not stay hidden once its tab is the only way in.
 function applyPanelLayout(){
   if(!isMobileLayout()) return;
-  $("#colorSection").classList.remove("collapsed");
-  $("#layerSection").classList.remove("collapsed");
+  // the headers are hidden on mobile, so a section folded at desktop width would be unreachable
+  ["#colorSection","#layerSection","#sheetSection","#regionSection"]
+    .forEach(id=>{ const el=$(id); if(el) el.classList.remove("collapsed"); });
 }
 
 // ------------------------------------------------------------------ menu bar (File / Edit / Sprite / … )
