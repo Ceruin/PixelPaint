@@ -223,8 +223,12 @@
     border:1px solid var(--line); border-radius:10px; padding:7px 9px; box-shadow:0 12px 34px #000a;
   }
   .place-bar[hidden]{display:none;}
-  .place-bar .info{color:var(--muted); font-size:12px; margin:0 4px; display:flex; align-items:center; gap:5px;}
+  .place-bar .info{color:var(--muted); font-size:12px; margin:0 4px; display:flex; align-items:center; gap:5px;
+    font-variant-numeric:tabular-nums;}
   .place-bar .info svg{color:var(--accent);}
+  /* a pressed-in look for the toggles in this bar, distinct from .primary's call to action */
+  .place-bar button.on{background:#2b3f6b; border-color:var(--accent2); color:#dce6ff;}
+  .place-bar button.on svg{color:var(--accent);}
   .canvas-wrap{
     box-shadow:0 8px 30px #0008, 0 0 0 1px #0006;
     image-rendering:pixelated;
@@ -872,6 +876,10 @@
     <button data-cmd="tilecolleft"  data-icon="left"  data-icon-size="16">Add a column left</button>
     <button data-cmd="tilecolright" data-icon="right" data-icon-size="16">Add a column right</button>
     <div class="ctx-sep"></div>
+    <button data-cmd="tilejoin"  data-icon="copy"   data-icon-size="16">Join the picked tiles<span class="hk">Shift+click</span></button>
+    <button data-cmd="tilesplit" data-icon="grid"   data-icon-size="16">Split this joined tile</button>
+    <button data-cmd="tileclip"  data-icon="region" data-icon-size="16">Tile clipping on / off</button>
+    <div class="ctx-sep"></div>
     <button data-cmd="tilerename" data-icon="pencil" data-icon-size="16">Rename this tile…</button>
     <button data-cmd="tileclear"  data-icon="clear"  data-icon-size="16">Clear this tile</button>
     <button data-cmd="tiledelrow" data-icon="trash"  data-icon-size="16">Delete this row</button>
@@ -997,6 +1005,7 @@
           <span class="info"><span data-icon="image" data-icon-size="15"></span><span id="placeSize">—</span></span>
           <button id="placeActual" title="Actual size (1:1)">1:1</button>
           <button id="placeFit" title="Fit to canvas">Fit</button>
+          <button id="placeSnapBtn" data-icon="grid" data-icon-size="15" title="Snap to whole pixels while dragging — hold Shift for the other behaviour, or nudge with the arrow keys">Snap</button>
           <button id="placeCommit" class="primary" data-icon="check" title="Place image (Enter)">Place</button>
           <button id="placeCancel" data-icon="clear" title="Cancel / right-click for more (Esc)">Cancel</button>
         </div>
@@ -1097,12 +1106,18 @@
             <button data-cmd="tiledelrow" data-icon="trash"  data-icon-size="15" data-needsel class="danger" title="Delete the row this tile is in"><span class="ts-lb">Row</span></button>
             <button data-cmd="tiledelcol" data-icon="trash"  data-icon-size="15" data-needsel class="danger" title="Delete the column this tile is in"><span class="ts-lb">Col</span></button>
           </div>
+          <!-- one bigger tile out of several cells: pick a corner, Shift-click the far one, Join -->
+          <div class="btnrow" style="margin-top:7px">
+            <button id="tsJoin"  data-cmd="tilejoin"  data-icon="copy" data-icon-size="15" title="Make the picked cells act as one larger tile — one sub-canvas, one name, one file on export"><span class="ts-lb">Join</span></button>
+            <button id="tsSplit" data-cmd="tilesplit" data-icon="grid" data-icon-size="15" title="Break a joined tile back into its cells"><span class="ts-lb">Split</span></button>
+          </div>
+          <div class="hint" style="padding:6px 0 0; margin:0">Shift-click a second tile to pick a block, then <b>Join</b> — a 32×32 tile on a 16×16 grid.</div>
           <div class="rg-row" style="margin-top:9px"><span class="rg-lbl">Gaps</span>
             <input type="number" id="tsGapIn" min="0" max="64" title="Spacing between tiles" />
             <span class="rg-x">/</span>
             <input type="number" id="tsPadIn" min="0" max="64" title="Margin around the whole sheet" />
             <span style="color:var(--muted); font-size:11px">between / around</span></div>
-          <label class="chk" style="margin-top:2px"><input type="checkbox" id="tsClip" /><span data-icon="region" data-icon-size="14"></span> Draw inside the picked tile only</label>
+          <label class="chk" style="margin-top:2px" title="On by default for a tilesheet: a stroke is fenced into the tile it starts in, so neighbours can't be damaged. Click into any tile to work on it."><input type="checkbox" id="tsClip" /><span data-icon="region" data-icon-size="14"></span> Each tile is its own sub-canvas</label>
           <div class="btnrow" style="margin-top:9px">
             <button data-cmd="tilesetup"   data-icon="grid"     data-icon-size="15" title="Grid size, tile size and spacing">Setup</button>
             <button data-cmd="exporttiles" data-icon="download" data-icon-size="15" title="Export the sheet, or one PNG per tile">Export</button>
@@ -1340,6 +1355,10 @@ let recents=[];
 const MAX_RECENTS=16, MAX_UNDO=80;
 let placement=null;  // pending image being positioned: {img, name, x, y, w, h, ar}
 let xform=null;      // active move/resize gesture on the placement
+// Dragging a placed image lands on whole pixels. The commit rounds anyway, so a free-form drag was
+// only ever showing you a position the image wasn't going to take. Shift inverts it for the times
+// you want the in-between values (scaling to an odd ratio, mainly).
+let placeSnap=true;
 let selection=null;  // bounding rect of the selection in art pixels: {x, y, w, h}
 let selMask=null;    // optional Uint8Array(W*H), 1=selected — arbitrary shape (magic wand). null = whole rect.
 let selDrag=null;    // active selection gesture: {mode:'new'|'move', ...}
@@ -1369,7 +1388,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03d";
+const APP_VERSION="2026.08.03e";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -2401,6 +2420,13 @@ function drawRulers(){
 }
 
 // ------------------------------------------------------------------ sub-canvas (draw region)
+// Is the sub-canvas the one tile clipping put there? Tells the overlay how hard to dim, and makes
+// the ✕ on it turn the feature off rather than remove a fence that would come straight back.
+function regionIsTileClip(){
+  if(!sheet || !tileClip || !region) return false;
+  const t=selTileRect();
+  return !!t && region.x===t.x && region.y===t.y && region.w===t.w && region.h===t.h;
+}
 function clampRegion(){
   if(!region) return;
   region.x=Math.round(region.x); region.y=Math.round(region.y); region.w=Math.round(region.w); region.h=Math.round(region.h);
@@ -2453,7 +2479,10 @@ function rectHandleHitArt(r,a,tol){
 function drawRegion(){
   const z=zoom, x=region.x*z, y=region.y*z, w=region.w*z, h=region.h*z, VW=W*z, VH=H*z;
   vctx.save();
-  vctx.fillStyle="rgba(8,10,16,.5)";                  // dim everything outside the draw area
+  // A hand-made sub-canvas is one area you've fenced off, so the rest is dimmed firmly. Tile
+  // clipping moves that fence constantly and you're always reading the neighbouring tiles while
+  // you draw — dimming the whole sheet to a half-tone would make a tileset painful to work on.
+  vctx.fillStyle = regionIsTileClip() ? "rgba(8,10,16,.16)" : "rgba(8,10,16,.5)";
   vctx.beginPath(); vctx.rect(0,0,VW,VH); vctx.rect(x,y,w,h); vctx.fill("evenodd");
   vctx.lineWidth=2; vctx.strokeStyle=regionLocked?"#f0a020":"#2ce8f5";
   vctx.strokeRect(x+1,y+1,Math.max(0,w-2),Math.max(0,h-2));
@@ -2569,18 +2598,21 @@ function renderRegionPanel(){
 // column ended up, and it repaints every tile of every frame into its new home. One code path
 // means the pixels can never drift out of step with the grid the overlay draws.
 const MAX_DIM=512;                 // the canvas cap resizeCanvas enforces
-let sheet=null;                    // {tw,th,gap,pad,cols:[w…],rows:[h…],tiles:[[{name}…]…]}
-let tileSel=null;                  // {r,c} — the tile the Tile tool is pointed at
-let tileClip=false;                // picking a tile also makes it the sub-canvas
+// spans are merged blocks — a 32×32 tile made of four 16×16 cells is one {r,c,rs,cs}. They never
+// overlap, and a 1×1 span is just a cell, so it is never stored.
+let sheet=null;                    // {tw,th,gap,pad,cols:[w…],rows:[h…],tiles:[[{name}…]…],spans:[…]}
+let tileSel=null;                  // {r,c,r2,c2} — the picked cell, or a rectangle of them
+let tileClip=true;                 // each tile is its own sub-canvas: strokes can't cross into a neighbour
 let showTileGrid=true;             // the overlay hides on demand, to see the art clean
 
 function blankSheet(tw,th,cols,rows,gap,pad){
   return {tw:tw, th:th, gap:gap|0, pad:pad|0,
     cols:new Array(cols).fill(tw), rows:new Array(rows).fill(th),
-    tiles:Array.from({length:rows},()=>Array.from({length:cols},()=>({name:""})))};
+    tiles:Array.from({length:rows},()=>Array.from({length:cols},()=>({name:""}))), spans:[]};
 }
 const cloneSheet=s=>s&&{tw:s.tw, th:s.th, gap:s.gap, pad:s.pad, cols:s.cols.slice(), rows:s.rows.slice(),
-  tiles:s.tiles.map(r=>r.map(t=>({name:t.name||""})))};
+  tiles:s.tiles.map(r=>r.map(t=>({name:t.name||""}))),
+  spans:(s.spans||[]).map(p=>({r:p.r, c:p.c, rs:p.rs, cs:p.cs}))};
 function sheetSize(s){
   return { w: s.pad*2 + s.cols.reduce((a,b)=>a+b,0) + s.gap*Math.max(0,s.cols.length-1),
            h: s.pad*2 + s.rows.reduce((a,b)=>a+b,0) + s.gap*Math.max(0,s.rows.length-1) };
@@ -2602,11 +2634,66 @@ function tileRectIn(s,r,c){
   return {x:x, y:y, w:s.cols[c], h:s.rows[r]};
 }
 const tileRect=(r,c)=>tileRectIn(sheet,r,c);
-const selTileRect=()=>tileSel?tileRect(tileSel.r,tileSel.c):null;
+// the rectangle covering a block of cells, gutters between them included — a joined tile is one
+// area to draw in, so the gap inside it stops being a gap
+function blockRectIn(s,r0,c0,r1,c1){
+  const a=tileRectIn(s,r0,c0), b=tileRectIn(s,r1,c1);
+  if(!a||!b) return null;
+  return {x:a.x, y:a.y, w:(b.x+b.w)-a.x, h:(b.y+b.h)-a.y};
+}
+function spanAt(r,c){
+  if(!sheet||!sheet.spans) return null;
+  for(const p of sheet.spans)
+    if(r>=p.r && r<p.r+p.rs && c>=p.c && c<p.c+p.cs) return p;
+  return null;
+}
+// Grow a cell rectangle until it holds every span it touches whole: you cannot pick or clip half of
+// a joined tile, so the marquee snaps outwards to the merge boundaries.
+function expandRange(r0,c0,r1,c1){
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(const p of (sheet.spans||[])){
+      if(p.r+p.rs-1<r0 || p.r>r1 || p.c+p.cs-1<c0 || p.c>c1) continue;
+      const nr0=Math.min(r0,p.r), nc0=Math.min(c0,p.c);
+      const nr1=Math.max(r1,p.r+p.rs-1), nc1=Math.max(c1,p.c+p.cs-1);
+      if(nr0!==r0||nc0!==c0||nr1!==r1||nc1!==c1){ r0=nr0; c0=nc0; r1=nr1; c1=nc1; changed=true; }
+    }
+  }
+  return {r0:r0, c0:c0, r1:r1, c1:c1};
+}
+// what's picked, as cell bounds: one cell, a joined tile, or a marquee dragged across several
+function selRange(){
+  if(!sheet||!tileSel) return null;
+  const r0=Math.min(tileSel.r, tileSel.r2==null?tileSel.r:tileSel.r2);
+  const r1=Math.max(tileSel.r, tileSel.r2==null?tileSel.r:tileSel.r2);
+  const c0=Math.min(tileSel.c, tileSel.c2==null?tileSel.c:tileSel.c2);
+  const c1=Math.max(tileSel.c, tileSel.c2==null?tileSel.c:tileSel.c2);
+  const g=expandRange(clamp(r0,0,sheet.rows.length-1), clamp(c0,0,sheet.cols.length-1),
+                      clamp(r1,0,sheet.rows.length-1), clamp(c1,0,sheet.cols.length-1));
+  return g;
+}
+function selTileRect(){
+  const g=selRange();
+  return g ? blockRectIn(sheet,g.r0,g.c0,g.r1,g.c1) : null;
+}
+const selCells=()=>{ const g=selRange(); return g ? (g.r1-g.r0+1)*(g.c1-g.c0+1) : 0; };
 function tileEntry(r,c){ return sheet && sheet.tiles[r] ? sheet.tiles[r][c] : null; }
 function tileLabel(r,c){
   const t=tileEntry(r,c);
   return (t && t.name) || ("Tile "+(r+1)+"·"+(c+1));   // row·column, both counting from 1
+}
+// A joined tile answers to its top-left cell, so its name and its pixels have one home.
+function blockOrigin(r,c){
+  const p=spanAt(r,c);
+  return p ? {r:p.r, c:p.c} : {r:r, c:c};
+}
+function selLabel(){
+  const g=selRange(); if(!g) return "";
+  const n=(g.r1-g.r0+1)*(g.c1-g.c0+1);
+  const base=tileLabel(g.r0,g.c0);
+  if(n===1) return base;
+  return base+"  ("+(g.c1-g.c0+1)+"×"+(g.r1-g.r0+1)+(spanAt(g.r0,g.c0)?" joined":" picked")+")";
 }
 // the tile under an art pixel, or null when the point lands in a gutter
 function tileAtArt(x,y){
@@ -2615,9 +2702,29 @@ function tileAtArt(x,y){
   let r=-1, c=-1;
   for(let i=0;i<o.ys.length;i++) if(y>=o.ys[i] && y<o.ys[i]+sheet.rows[i]){ r=i; break; }
   for(let i=0;i<o.xs.length;i++) if(x>=o.xs[i] && x<o.xs[i]+sheet.cols[i]){ c=i; break; }
-  return (r<0||c<0) ? null : {r:r,c:c};
+  if(r<0||c<0){
+    // inside a joined tile the internal gutters belong to the tile, so look there before giving up
+    for(const p of (sheet.spans||[])){
+      const b=blockRectIn(sheet,p.r,p.c,p.r+p.rs-1,p.c+p.cs-1);
+      if(b && x>=b.x && x<b.x+b.w && y>=b.y && y<b.y+b.h) return {r:p.r, c:p.c};
+    }
+    return null;
+  }
+  return {r:r,c:c};
 }
-const tileCount=()=>sheet?sheet.rows.length*sheet.cols.length:0;
+// every tile as a block: a span counts once, at its origin
+function tileBlocks(){
+  const out=[];
+  if(!sheet) return out;
+  for(let r=0;r<sheet.rows.length;r++) for(let c=0;c<sheet.cols.length;c++){
+    const p=spanAt(r,c);
+    if(p && (p.r!==r || p.c!==c)) continue;                  // covered by a span that starts elsewhere
+    const r1=p?p.r+p.rs-1:r, c1=p?p.c+p.cs-1:c;
+    out.push({r:r, c:c, r1:r1, c1:c1, rect:blockRectIn(sheet,r,c,r1,c1), span:!!p});
+  }
+  return out;
+}
+const tileCount=()=>tileBlocks().length;
 
 // mapRow/mapCol are sparse by design: pass null for "nothing moved".
 const mapAt=(m,i)=> m ? (m[i]==null?-1:m[i]) : i;
@@ -2653,6 +2760,16 @@ function sheetApply(next, mapRow, mapCol, msg){
     else ctx.drawImage(l.canvas,0,0);       // laying the first grid over an existing drawing
     l.canvas=c; l.ctx=ctx;
   }));
+  // Joined tiles follow their cells: a span keeps the surviving ones and swallows any row or column
+  // inserted through its middle, which is what growing a merged tile looks like.
+  next.spans=(next.spans||[]).map(p=>{
+    const rs=[], cs=[];
+    for(let i=p.r;i<p.r+p.rs;i++){ const v=mapAt(mapRow,i); if(v>=0) rs.push(v); }
+    for(let i=p.c;i<p.c+p.cs;i++){ const v=mapAt(mapCol,i); if(v>=0) cs.push(v); }
+    if(!rs.length||!cs.length) return null;
+    const r0=Math.min(...rs), r1=Math.max(...rs), c0=Math.min(...cs), c1=Math.max(...cs);
+    return {r:r0, c:c0, rs:r1-r0+1, cs:c1-c0+1};
+  }).filter(p=>p && p.rs*p.cs>1);
   sheet=next;
   if(tileSel){                              // follow the selection through the move
     const nr=mapAt(mapRow,tileSel.r), nc=mapAt(mapCol,tileSel.c);
@@ -2704,62 +2821,123 @@ function deleteTileCol(at){
 // selected afterwards — you pressed + because that's where you want to draw next.
 function addTileAt(dir){
   if(!sheet){ tilesheetDialog(); return; }
-  if(!tileSel){ showToast("Pick a tile first — the new one goes next to it.","info"); return; }
-  const r=tileSel.r, c=tileSel.c;
+  const g=selRange();
+  if(!g){ showToast("Pick a tile first — the new one goes next to it.","info"); return; }
   let ok=false, sel=null;
-  if(dir==="up")         { ok=insertTileRow(r,   sheet.rows[r]); sel={r:r,   c:c}; }
-  else if(dir==="down")  { ok=insertTileRow(r+1, sheet.rows[r]); sel={r:r+1, c:c}; }
-  else if(dir==="left")  { ok=insertTileCol(c,   sheet.cols[c]); sel={r:r,   c:c}; }
-  else if(dir==="right") { ok=insertTileCol(c+1, sheet.cols[c]); sel={r:r,   c:c+1}; }
+  if(dir==="up")         { ok=insertTileRow(g.r0,   sheet.rows[g.r0]); sel={r:g.r0,    c:g.c0}; }
+  else if(dir==="down")  { ok=insertTileRow(g.r1+1, sheet.rows[g.r1]); sel={r:g.r1+1,  c:g.c0}; }
+  else if(dir==="left")  { ok=insertTileCol(g.c0,   sheet.cols[g.c0]); sel={r:g.r0,    c:g.c0}; }
+  else if(dir==="right") { ok=insertTileCol(g.c1+1, sheet.cols[g.c1]); sel={r:g.r0,    c:g.c1+1}; }
   if(ok) selectTile(sel.r, sel.c);
 }
 // Deleting the row or column you were standing in leaves nothing picked, and the panel's buttons
 // all grey out. Land on the tile that took its place instead.
 function deleteTileNear(what){
   if(!sheet||!tileSel) return;
-  const r=tileSel.r, c=tileSel.c;
+  const g=selRange(), r=g.r0, c=g.c0;
   const ok = what==="row" ? deleteTileRow(r) : deleteTileCol(c);
   if(ok && !tileSel) selectTile(clamp(r,0,sheet.rows.length-1), clamp(c,0,sheet.cols.length-1));
 }
-function selectTile(r,c){
+// extend=true drags the marquee out from wherever it was anchored, which is how you pick the block
+// of cells that Join turns into one tile
+function selectTile(r,c,extend){
   if(!sheet) return;
   if(r<0||c<0||r>=sheet.rows.length||c>=sheet.cols.length) return;
-  tileSel={r:r,c:c};
+  if(extend && tileSel) tileSel={r:tileSel.r, c:tileSel.c, r2:r, c2:c};
+  else tileSel={r:r, c:c, r2:r, c2:c};
   syncTileClip(); renderSheetPanel(); composite();
 }
 function moveTileSel(dr,dc){
   if(!sheet) return;
   if(!tileSel){ selectTile(0,0); return; }
-  selectTile(clamp(tileSel.r+dr,0,sheet.rows.length-1), clamp(tileSel.c+dc,0,sheet.cols.length-1));
+  const g=selRange();                         // step off the whole block, not out of its middle
+  const r=dr>0?g.r1:g.r0, c=dc>0?g.c1:g.c0;
+  selectTile(clamp(r+dr,0,sheet.rows.length-1), clamp(c+dc,0,sheet.cols.length-1));
 }
-// The sub-canvas already knows how to fence drawing in — pointing it at the selected tile is all
-// "draw inside this tile only" needs to be.
+// ---- joining cells into one larger tile ---------------------------------------------------
+// A 32×32 tile on a 16×16 grid is four cells acting as one: one sub-canvas, one name, one file on
+// export. The cells stay where they are — only their boundary stops counting.
+function joinTiles(){
+  if(!sheet) return;
+  const g=selRange();
+  if(!g || (g.r1===g.r0 && g.c1===g.c0)){
+    showToast("Shift-click a second tile first — Join merges everything between the two.","info",4200);
+    return;
+  }
+  pushUndo();
+  const keep=(sheet.spans||[]).filter(p=>
+    p.r+p.rs-1<g.r0 || p.r>g.r1 || p.c+p.cs-1<g.c0 || p.c>g.c1);   // the ones it swallows are gone
+  // the merged tile keeps the first name it can find, so joining onto a named tile doesn't lose it
+  let name="";
+  for(let r=g.r0;r<=g.r1 && !name;r++) for(let c=g.c0;c<=g.c1 && !name;c++){
+    const e=tileEntry(r,c); if(e && e.name) name=e.name;
+  }
+  for(let r=g.r0;r<=g.r1;r++) for(let c=g.c0;c<=g.c1;c++){
+    const e=tileEntry(r,c); if(e) e.name="";
+  }
+  const o=tileEntry(g.r0,g.c0); if(o) o.name=name;
+  keep.push({r:g.r0, c:g.c0, rs:g.r1-g.r0+1, cs:g.c1-g.c0+1});
+  sheet.spans=keep;
+  const rect=selTileRect();
+  syncTileClip(); renderSheetPanel(); composite(); updateDocInfo(); captureActiveDoc();
+  showToast("Joined "+(g.c1-g.c0+1)+" × "+(g.r1-g.r0+1)+" cells into one "+rect.w+" × "+rect.h+" tile.","success",4200);
+}
+function splitTiles(){
+  if(!sheet) return;
+  const g=selRange(); if(!g) return;
+  const hit=(sheet.spans||[]).filter(p=>!(p.r+p.rs-1<g.r0 || p.r>g.r1 || p.c+p.cs-1<g.c0 || p.c>g.c1));
+  if(!hit.length){ showToast("That tile isn't a joined one — nothing to split.","info"); return; }
+  pushUndo();
+  sheet.spans=(sheet.spans||[]).filter(p=>hit.indexOf(p)<0);
+  tileSel={r:g.r0, c:g.c0, r2:g.r0, c2:g.c0};
+  syncTileClip(); renderSheetPanel(); composite(); updateDocInfo(); captureActiveDoc();
+  showToast("Split back into "+hit.reduce((n,p)=>n+p.rs*p.cs,0)+" separate tiles.","success");
+}
+// The sub-canvas already knows how to fence drawing in — pointing it at the picked tile is all
+// "each tile is its own canvas" needs to be. Auto-on for a tilesheet, since neighbouring tiles
+// touching each other is the whole hazard of drawing a tileset on one canvas.
 function syncTileClip(){
-  if(!tileClip) return;
+  if(!tileClip || !sheet) return;
   const t=selTileRect(); if(!t) return;
   region={x:t.x,y:t.y,w:t.w,h:t.h}; regionLocked=false;
   clampRegion(); renderRegionPanel();
 }
-function setTileClip(on){
+function setTileClip(on, quiet){
   tileClip=!!on;
+  try{ localStorage.setItem("pp_tileClip", tileClip?"1":"0"); }catch(_){}
   if(tileClip) syncTileClip();
   else if(region){                      // only drop the region if it *is* the tile we put there
     const t=selTileRect();
     if(t && region.x===t.x && region.y===t.y && region.w===t.w && region.h===t.h) removeRegion(true);
   }
   renderSheetPanel(); composite();
+  if(!quiet) showToast(tileClip
+    ? "Each tile is its own sub-canvas now — a stroke stays in the tile it started in."
+    : "Tile clipping off — strokes can cross tile boundaries again.", "info", 3800);
 }
-function clearTile(r,c){
-  const t=tileRect(r,c); if(!t) return;
+// A stroke belongs to the tile it starts in. Retargeting the clip on press means you can draw
+// straight into any tile without picking it first, and still never spill into its neighbour.
+function tileClipForStroke(p){
+  if(!sheet || !tileClip) return true;
+  const t=tileAtArt(p.x,p.y);
+  if(!t) return false;                  // pressed in a gutter: no tile owns it, so nothing is drawn
+  const g=selRange();
+  const inside = g && t.r>=g.r0 && t.r<=g.r1 && t.c>=g.c0 && t.c<=g.c1;
+  if(!inside) selectTile(t.r, t.c);     // moves the sub-canvas with the pick
+  return true;
+}
+function clearTile(){
+  const t=selTileRect(); if(!t) return;
   const L=activeLayer(); if(!L) return;
   if(L.locked){ showToast("This layer is locked.","info"); return; }
   pushUndo();
   L.ctx.clearRect(t.x,t.y,t.w,t.h);
   composite(); refreshThumb(L);
-  showToast("Cleared “"+tileLabel(r,c)+"” on this layer.","success");
+  showToast("Cleared “"+selLabel()+"” on this layer.","success");
 }
-async function renameTile(r,c){
-  const e=tileEntry(r,c); if(!e) return;
+async function renameTile(){
+  const g=selRange(); if(!g) return;
+  const e=tileEntry(g.r0,g.c0); if(!e) return;
   const n=await showPrompt("Name for this tile — it becomes the file name when you export tiles separately:",
     e.name||"", {title:"Rename tile", okText:"Rename"});
   if(n==null) return;
@@ -2828,11 +3006,14 @@ function readTsFields(){
 }
 function sheetEnable(g){
   if(sheetApply(g.grid, null, null, null)){
-    if(!tileSel) tileSel={r:0,c:0};
+    if(!tileSel) tileSel={r:0,c:0,r2:0,c2:0};
     setTool("tile");        // the + buttons only exist under this tool, and they're the whole point
+    syncTileClip();         // tiles are sub-canvases from the moment the grid exists
     fitZoom(); renderSheetPanel(); composite();
     setPanelTabIfMobile("tiles");
-    showToast("Tilesheet: "+g.cols+" × "+g.rows+" tiles of "+g.tw+" × "+g.th+". Pick a tile, then use the + arrows to add more.","success",5200);
+    showToast("Tilesheet: "+g.cols+" × "+g.rows+" tiles of "+g.tw+" × "+g.th+"."
+      +(tileClip?" Each tile is its own sub-canvas — click into one to work on it.":"")
+      +" The + arrows add rows and columns.","success",6000);
   }
 }
 function sheetReshape(g){
@@ -2865,6 +3046,16 @@ function sanitizeSheet(s, w, h){
     const t=s.tiles && s.tiles[r] && s.tiles[r][c];
     return {name:(t && typeof t.name==="string") ? t.name.slice(0,64) : ""};
   }));
+  // joined tiles: in bounds, bigger than one cell, and never overlapping each other
+  g.spans=[];
+  (Array.isArray(s.spans)?s.spans:[]).forEach(p=>{
+    const r=int(p&&p.r,-1), c=int(p&&p.c,-1), rs=int(p&&p.rs,0), cs=int(p&&p.cs,0);
+    if(r<0||c<0||rs<1||cs<1) return;
+    if(r+rs>g.rows.length || c+cs>g.cols.length) return;
+    if(rs*cs<2) return;
+    if(g.spans.some(q=>!(q.r+q.rs-1<r || q.r>r+rs-1 || q.c+q.cs-1<c || q.c>c+cs-1))) return;
+    g.spans.push({r:r,c:c,rs:rs,cs:cs});
+  });
   const size=sheetSize(g);
   return (size.w===w && size.h===h) ? g : null;
 }
@@ -2880,9 +3071,6 @@ function drawSheetGrid(){
     vctx.fillStyle="rgba(8,10,16,.45)"; vctx.fill("evenodd");
   }
   // tile edges, dark line under light dashes so they read over both pale and dark artwork
-  const xs=[], ys=[];
-  o.xs.forEach((x,c)=>xs.push(x, x+sheet.cols[c]));
-  o.ys.forEach((y,r)=>ys.push(y, y+sheet.rows[r]));
   const dash=(x,y,w,h,vert)=>{
     const len=vert?h:w, step=4;
     for(let o=0;o<len;o+=step*2){
@@ -2890,22 +3078,37 @@ function drawSheetGrid(){
       vctx.fillRect(vert?x:x+o, vert?y+o:y, vert?w:d, vert?d:h);
     }
   };
-  vctx.fillStyle="rgba(0,0,0,.6)";
-  xs.forEach(x=>vctx.fillRect(Math.round(x*z),0,1,VH));
-  ys.forEach(y=>vctx.fillRect(0,Math.round(y*z),VW,1));
-  vctx.fillStyle="rgba(255,255,255,.5)";
-  xs.forEach(x=>dash(Math.round(x*z),0,1,VH,true));
-  ys.forEach(y=>dash(0,Math.round(y*z),VW,1,false));
+  const line=(x,y,w,h,vert)=>{
+    vctx.fillStyle="rgba(0,0,0,.6)";   vctx.fillRect(x,y,w,h);
+    vctx.fillStyle="rgba(255,255,255,.5)"; dash(x,y,w,h,vert);
+  };
+  if(!sheet.spans || !sheet.spans.length){
+    // fast path: no joined tiles, so every boundary runs the full width or height of the sheet
+    o.xs.forEach((x,c)=>{ line(Math.round(x*z),0,1,VH,true); line(Math.round((x+sheet.cols[c])*z),0,1,VH,true); });
+    o.ys.forEach((y,r)=>{ line(0,Math.round(y*z),VW,1,false); line(0,Math.round((y+sheet.rows[r])*z),VW,1,false); });
+  } else {
+    // a joined tile has no internal boundary, so the edges are drawn per block instead
+    tileBlocks().forEach(b=>{
+      const x=Math.round(b.rect.x*z), y=Math.round(b.rect.y*z);
+      const w=Math.round(b.rect.w*z), h=Math.round(b.rect.h*z);
+      line(x,y,1,h,true); line(x+w,y,1,h,true);
+      line(x,y,w,1,false); line(x,y+h,w,1,false);
+    });
+  }
   // The picked tile. Under the Tile tool it's the thing you're working with, so it gets the full
   // treatment; under a brush it's just a reminder of where you are, and a tint over the artwork
   // would misreport your own colours — outline only.
   const t=selTileRect();
   if(t){
-    const x=t.x*z, y=t.y*z, w=t.w*z, h=t.h*z, active=(tool==="tile");
-    if(active){ vctx.fillStyle="rgba(44,232,245,.10)"; vctx.fillRect(x,y,w,h); }
+    const x=t.x*z, y=t.y*z, w=t.w*z, h=t.h*z;
+    // Clipping makes the picked tile the live sub-canvas whatever tool you hold, so it earns the
+    // full highlight; without clipping it is only a Tile-tool notion.
+    const active=(tool==="tile" || tileClip);
+    if(tool==="tile"){ vctx.fillStyle="rgba(44,232,245,.10)"; vctx.fillRect(x,y,w,h); }
     vctx.lineWidth=2; vctx.strokeStyle=active?"#2ce8f5":"rgba(44,232,245,.55)";
     vctx.strokeRect(x+1,y+1,Math.max(0,w-2),Math.max(0,h-2));
-    const label=active?tileLabel(tileSel.r,tileSel.c):"";
+    const g=selRange();
+    const label=(tool==="tile" && g)?tileLabel(g.r0,g.c0):"";
     vctx.font="600 11px system-ui,sans-serif"; vctx.textBaseline="middle";
     const tw=vctx.measureText(label).width, ch=16;
     if(label && w>tw+14){
@@ -2955,9 +3158,9 @@ function tilePlusHit(e){
   }
   return null;
 }
-function tileDown(p){
+function tileDown(p,e){
   const t=tileAtArt(p.x,p.y);
-  if(t) selectTile(t.r,t.c);
+  if(t) selectTile(t.r, t.c, e && e.shiftKey);     // Shift extends the pick, ready for Join
   else showToast("That's the spacing between tiles — tap inside a tile to pick it.","info",2600);
 }
 // ---- side panel ---------------------------------------------------------------------------
@@ -2979,23 +3182,34 @@ function renderSheetPanel(){
     return;
   }
   const size=sheetSize(sheet);
-  $("#tsSummary").textContent=sheet.cols.length+" × "+sheet.rows.length+" tiles  ·  "+size.w+" × "+size.h+" px";
-  const t=tileSel?tileRect(tileSel.r,tileSel.c):null;
-  $("#tsSel").textContent = tileSel ? tileLabel(tileSel.r,tileSel.c) : "No tile picked";
-  $("#tsName").value = tileSel ? ((tileEntry(tileSel.r,tileSel.c)||{}).name||"") : "";
-  $("#tsName").placeholder = tileSel ? ("Tile "+(tileSel.r+1)+"·"+(tileSel.c+1)) : "";
+  const blocks=tileBlocks(), joined=blocks.filter(b=>b.span).length;
+  $("#tsSummary").textContent=sheet.cols.length+" × "+sheet.rows.length+" cells  ·  "+size.w+" × "+size.h+" px"
+    +(joined?("  ·  "+joined+" joined tile"+(joined>1?"s":"")):"");
+  const g=selRange(), t=selTileRect();
+  $("#tsSel").textContent = g ? selLabel() : "No tile picked";
+  $("#tsName").value = g ? ((tileEntry(g.r0,g.c0)||{}).name||"") : "";
+  $("#tsName").placeholder = g ? ("Tile "+(g.r0+1)+"·"+(g.c0+1)) : "";
   $("#tsTileW").value = t?t.w:"";  $("#tsTileH").value = t?t.h:"";
+  // a joined tile's size comes from several rows and columns, so it isn't one pair of boxes to edit
+  const multi = !g || g.r0!==g.r1 || g.c0!==g.c1;
+  $("#tsTileW").disabled=multi; $("#tsTileH").disabled=multi;
   $("#tsGapIn").value = sheet.gap; $("#tsPadIn").value = sheet.pad;
   $("#tsClip").checked = tileClip;
-  ctl.querySelectorAll("[data-needsel]").forEach(b=>b.disabled=!tileSel);
+  ctl.querySelectorAll("[data-needsel]").forEach(b=>b.disabled=!g);
+  const jb=$("#tsJoin"), sb=$("#tsSplit");
+  if(jb) jb.disabled = !g || (g.r0===g.r1 && g.c0===g.c1);
+  if(sb) sb.disabled = !g || !(sheet.spans||[]).some(p=>
+    !(p.r+p.rs-1<g.r0 || p.r>g.r1 || p.c+p.cs-1<g.c0 || p.c>g.c1));
 }
-// the tile size boxes edit the selected tile's column width and row height — which is exactly
+// the tile size boxes edit the picked tile's column width and row height — which is exactly
 // what "this tile is bigger" means on a grid
 function setSelTileSize(){
   if(!sheet||!tileSel) return;
+  const g=selRange();
+  if(!g || g.r0!==g.r1 || g.c0!==g.c1) return;
   const w=clamp(parseInt($("#tsTileW").value,10)||1,1,MAX_DIM), h=clamp(parseInt($("#tsTileH").value,10)||1,1,MAX_DIM);
-  if(w===sheet.cols[tileSel.c] && h===sheet.rows[tileSel.r]) return;
-  const n=cloneSheet(sheet); n.cols[tileSel.c]=w; n.rows[tileSel.r]=h;
+  if(w===sheet.cols[g.c0] && h===sheet.rows[g.r0]) return;
+  const n=cloneSheet(sheet); n.cols[g.c0]=w; n.rows[g.r0]=h;
   if(!sheetApply(n,null,null,null)) renderSheetPanel();
 }
 function setSheetGutters(){
@@ -3006,14 +3220,11 @@ function setSheetGutters(){
   if(!sheetApply(n,null,null,null)) renderSheetPanel();
 }
 // ---- export -------------------------------------------------------------------------------
+// one entry per tile — a joined block counts once, at the size it actually is
 function tileList(){
-  const out=[];
-  if(!sheet) return out;
-  for(let r=0;r<sheet.rows.length;r++) for(let c=0;c<sheet.cols.length;c++){
-    const t=tileRect(r,c);
-    out.push({row:r, col:c, name:tileLabel(r,c), x:t.x, y:t.y, w:t.w, h:t.h});
-  }
-  return out;
+  return tileBlocks().map(b=>({row:b.r, col:b.c, name:tileLabel(b.r,b.c),
+    x:b.rect.x, y:b.rect.y, w:b.rect.w, h:b.rect.h,
+    cells: b.span ? {rows:b.r1-b.r+1, cols:b.c1-b.c+1} : undefined}));
 }
 async function showTilesExportDialog(){
   if(!sheet){ showToast("This drawing isn't a tilesheet yet — set one up from the Tiles menu.","info"); return null; }
@@ -3273,7 +3484,13 @@ function commitPlacement(){
   renderLayers(); composite(); refreshThumb(L);
   showToast("Image added as a new layer.","success");
 }
-function updatePlaceInfo(){ if(placement) $("#placeSize").textContent=Math.round(placement.w)+" × "+Math.round(placement.h)+" px"; }
+// size *and* position — placing a sprite on an exact pixel is the whole job, and the numbers are
+// the only way to be sure of it
+function updatePlaceInfo(){
+  if(!placement) return;
+  $("#placeSize").textContent=Math.round(placement.w)+" × "+Math.round(placement.h)+" px"
+    +"  at "+Math.round(placement.x)+", "+Math.round(placement.y);
+}
 
 function drawImageFlipped(ctx, img, dx, dy, dw, dh, fh, fv){
   ctx.save();
@@ -3381,21 +3598,41 @@ function placementDown(e){
 }
 function placementMove(e){
   const a=toArtF(e), r=xform.rect, m=xform.mode, dx=a.x-xform.start.x, dy=a.y-xform.start.y;
+  // Shift flips whichever way the Snap button is set, so the modifier always changes something
+  const snap = placeSnap !== !!e.shiftKey;
   let x=r.x, y=r.y, w=r.w, h=r.h;
-  if(m==="move"){ x=r.x+dx; y=r.y+dy; }
+  if(m==="move"){
+    x=r.x+dx; y=r.y+dy;
+    if(snap){ x=Math.round(x); y=Math.round(y); }
+  }
   else{
     if(m.indexOf("e")>=0) w=r.w+dx;
     if(m.indexOf("s")>=0) h=r.h+dy;
     if(m.indexOf("w")>=0){ x=r.x+dx; w=r.w-dx; }
     if(m.indexOf("n")>=0){ y=r.y+dy; h=r.h-dy; }
-    if(e.shiftKey && m.length===2){ // corner: lock aspect ratio
+    const lock = e.shiftKey && m.length===2;      // corner + Shift: lock the aspect ratio
+    if(lock){
       h=w/placement.ar;
       if(m.indexOf("n")>=0) y=(r.y+r.h)-h;
     }
+    // a locked ratio needs the in-between sizes to hold, so snapping stands aside for it
+    else if(snap){ w=Math.round(w); h=Math.round(h); x=Math.round(x); y=Math.round(y); }
     if(w<1) w=1; if(h<1) h=1;
   }
   placement.x=x; placement.y=y; placement.w=w; placement.h=h;
   updatePlaceInfo(); composite();
+}
+// arrow keys while placing: the exact-position tool, one pixel at a time (8 with Shift)
+function nudgePlacement(dx,dy){
+  if(!placement) return;
+  placement.x=Math.round(placement.x)+dx; placement.y=Math.round(placement.y)+dy;
+  updatePlaceInfo(); composite();
+}
+function setPlaceSnap(on){
+  placeSnap=!!on;
+  const b=$("#placeSnapBtn");
+  if(b){ b.classList.toggle("on", placeSnap); b.setAttribute("aria-pressed", placeSnap?"true":"false"); }
+  try{ localStorage.setItem("pp_placeSnap", placeSnap?"1":"0"); }catch(_){}
 }
 function updatePlacementCursor(e){
   const m=placementHitAt(e);
@@ -3705,7 +3942,11 @@ view.addEventListener("pointerdown",e=>{
   // hunting through a panel, and they sit in space no tool can paint anyway
   if(e.button===0){
     if(selection && !selDrag && badgeHit(selection,e)){ clearSelection(); return; }
-    if(region && !regionDrag && badgeHit(region,e)){ removeRegion(); return; }
+    if(region && !regionDrag && badgeHit(region,e)){
+      if(regionIsTileClip()) setTileClip(false);   // else the next stroke would just put it back
+      else removeRegion();
+      return;
+    }
     // the + buttons around the selected tile: same idea, and they only exist under the Tile tool
     const plus=tilePlusHit(e); if(plus){ addTileAt(plus); return; }
   }
@@ -3720,6 +3961,10 @@ view.addEventListener("pointerdown",e=>{
   if(L.locked && tool!=="eyedropper" && tool!=="wand" && tool!=="region" && tool!=="tile"){
     showToast("This layer is locked.","info"); return;
   }
+  // On a tilesheet with clipping on, a stroke belongs to the tile it starts in: the sub-canvas moves
+  // to that tile before the first pixel lands, so you can draw straight into any tile and never
+  // spill over its edge. A press in the spacing between tiles belongs to nothing, so it's dropped.
+  if(PAINT_TOOLS.indexOf(tool)>=0 && !tileClipForStroke(p)) return;
 
   if(tool==="pencil"||tool==="eraser"){
     pushUndo(); drawing=true; last=p;
@@ -3739,7 +3984,7 @@ view.addEventListener("pointerdown",e=>{
     if(e.button===0) regionDown(p,e);
   }else if(tool==="tile"){
     if(e.button!==0) return;
-    if(sheet) tileDown(p);
+    if(sheet) tileDown(p,e);
     else showToast("This drawing isn't a tilesheet yet — set the grid up from the Tiles panel.","info",3400);
   }
 });
@@ -4197,7 +4442,8 @@ function saveProject(){
   const data={app:"PixelPaint",version:2,w:W,h:H,active:activeIndex,frameIndex,
     sheet: sheet ? {tw:sheet.tw, th:sheet.th, gap:sheet.gap, pad:sheet.pad,
                     cols:sheet.cols.slice(), rows:sheet.rows.slice(),
-                    tiles:sheet.tiles.map(r=>r.map(t=>({name:t.name||""})))} : null,
+                    tiles:sheet.tiles.map(r=>r.map(t=>({name:t.name||""}))),
+                    spans:(sheet.spans||[]).map(p=>({r:p.r,c:p.c,rs:p.rs,cs:p.cs}))} : null,
     tags:tags.map(t=>({name:t.name,from:t.from,to:t.to,color:t.color})),
     frames:frames.map(f=>({dur:f.dur, layers:f.layers.map(l=>({name:l.name,visible:l.visible,opacity:l.opacity,data:l.canvas.toDataURL("image/png")}))}))};
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
@@ -4246,7 +4492,9 @@ function applyProject(data){
 function finishLoad(data){
   activeIndex=clamp(data.active||0,0,layers.length-1);
   pruneTags();   // a hand-edited or older project file may carry out-of-range group ranges
-  sheet=sanitizeSheet(data.sheet, W, H); tileSel=null;
+  sheet=sanitizeSheet(data.sheet, W, H);
+  tileSel = sheet ? {r:0,c:0,r2:0,c2:0} : null;   // a loaded tilesheet arrives with its clip in place
+  syncTileClip();
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
   if(frames.length>1 && tlCollapsed) setTimelineCollapsed(false);   // an animated project wants its timeline
   undoStack=[]; redoStack=[]; fitZoom();
@@ -5000,8 +5248,8 @@ function packToDoc(plan, out, name){
   const S=plan.scale;
   const g=blankSheet(plan.cw*S, plan.ch*S, plan.cols, plan.nrows, plan.gap*S, plan.pad*S);
   plan.cells.forEach(c=>{ if(g.tiles[c.r] && g.tiles[c.r][c.c]) g.tiles[c.r][c.c].name=c.s.name; });
-  sheet=g; tileSel={r:0,c:0};
-  setTool("tile"); fitZoom();
+  sheet=g; tileSel={r:0,c:0,r2:0,c2:0};
+  setTool("tile"); syncTileClip(); fitZoom();
   renderLayers(); renderSheetPanel(); composite(); updateDocInfo(); refreshThumb(L);
   captureActiveDoc(); renderTabs(); setPanelTabIfMobile("tiles");
   return true;
@@ -5177,7 +5425,7 @@ function setTool(t){
   renderRegionPanel();   // owns .show-region, #regionSection and the View-menu checkbox
   renderSheetPanel();    // the Tile tool brings the tilesheet panel with it
   if(t==="tile"){
-    if(sheet && !tileSel) tileSel={r:0,c:0};
+    if(sheet && !tileSel){ tileSel={r:0,c:0,r2:0,c2:0}; syncTileClip(); }
     setPanelTabIfMobile("tiles");     // on a phone the panel is only reachable as a tab
   }
   if(frames.length) composite();   // the + buttons appear and disappear with the tool (not at boot,
@@ -5340,8 +5588,11 @@ function runCmd(cmd){
     case "tilecolright": addTileAt("right"); break;
     case "tiledelrow": if(needTile()) deleteTileNear("row"); break;
     case "tiledelcol": if(needTile()) deleteTileNear("col"); break;
-    case "tilerename": if(needTile()) renameTile(tileSel.r,tileSel.c); break;
-    case "tileclear": if(needTile()) clearTile(tileSel.r,tileSel.c); break;
+    case "tilerename": if(needTile()) renameTile(); break;
+    case "tileclear": if(needTile()) clearTile(); break;
+    case "tilejoin": if(needTile()) joinTiles(); break;
+    case "tilesplit": if(needTile()) splitTiles(); break;
+    case "tileclip": setTileClip(!tileClip); break;
     case "exporttiles": showTilesExportDialog().then(o=>{ if(o) exportTiles(o); }); break;
     case "fit": fitZoom(); composite(); break;
     case "shortcuts": showShortcuts(); break;
@@ -5392,6 +5643,8 @@ const HELP_SECTIONS=[
   ]},
   {title:"Tilesheets", icon:"grid", rows:[
     ["grid","Cut the canvas into a grid of tiles",""],
+    ["region","Each tile is its own sub-canvas — draw into one, it can't spill",""],
+    ["copy","Join cells into one bigger tile","Shift+click"],
     ["region","Pick a tile with the Tile tool","T"],
     ["up","Move between tiles","←|→|↑|↓"],
     ["add","Add a row or column — the + around the picked tile",""],
@@ -5399,6 +5652,13 @@ const HELP_SECTIONS=[
     ["select","Give one row or column its own size",""],
     ["download","Export the sheet, or one PNG per tile, with a JSON map",""],
     ["folder","Pack several files or PNGs into one sheet — or drop them on the canvas",""],
+  ]},
+  {title:"Placing an image", icon:"image", rows:[
+    ["grid","Drag lands on whole pixels — Snap in the placing bar",""],
+    ["swap","Free-form drag, or lock the ratio on a corner","Shift+drag"],
+    ["right","Nudge one pixel (eight with Shift)","←|→|↑|↓"],
+    ["check","Place it","Enter"],
+    ["clear","Cancel","Esc"],
   ]},
   {title:"Mouse", icon:"pick", rows:[
     ["pick","Quick color pick","Alt+click"],
@@ -5474,6 +5734,7 @@ $("#placeCommit").onclick=commitPlacement;
 $("#placeCancel").onclick=cancelPlacement;
 $("#placeActual").onclick=()=>{ if(!placement) return; placeActual(); updatePlaceInfo(); composite(); };
 $("#placeFit").onclick=()=>{ if(!placement) return; placeFit(); updatePlaceInfo(); composite(); };
+$("#placeSnapBtn").onclick=()=>setPlaceSnap(!placeSnap);
 
 $("#ctxMenu").addEventListener("click",e=>{
   const b=e.target.closest("[data-action]"); if(!b || !placement) return;
@@ -5745,6 +6006,13 @@ window.addEventListener("keydown",e=>{
   if(placement){
     if(e.key==="Enter"){ e.preventDefault(); commitPlacement(); return; }
     if(e.key==="Escape"){ e.preventDefault(); if(!$("#ctxMenu").hidden) closeCtxMenu(); else cancelPlacement(); return; }
+    // the arrows belong to the image while one is being placed, not to the timeline
+    const step=e.shiftKey?8:1, k=e.key;
+    if(k==="ArrowLeft" ||k==="ArrowRight"||k==="ArrowUp"||k==="ArrowDown"){
+      e.preventDefault();
+      nudgePlacement(k==="ArrowLeft"?-step:k==="ArrowRight"?step:0, k==="ArrowUp"?-step:k==="ArrowDown"?step:0);
+      return;
+    }
   }
   if(e.ctrlKey||e.metaKey){
     const k=e.key.toLowerCase();
@@ -5795,7 +6063,12 @@ window.addEventListener("keydown",e=>{
       if(toolsPanelEl.classList.contains("open")||sidePanelEl.classList.contains("open")) closeDrawers();
       else if(selection) clearSelection();
       else if(region && tool==="region") removeRegion();
-      else if(tool==="tile" && tileSel){ tileSel=null; renderSheetPanel(); composite(); }
+      else if(tool==="tile" && tileSel){
+        const g=selRange();
+        // a marquee collapses to its first cell; a single cell lets go of the tile altogether
+        if(g && (g.r0!==g.r1 || g.c0!==g.c1)) selectTile(g.r0,g.c0);
+        else { tileSel=null; if(tileClip && region) removeRegion(true); renderSheetPanel(); composite(); }
+      }
       break;
   }
 });
@@ -5885,6 +6158,10 @@ let savedTl=null; try{ savedTl=localStorage.getItem("pp_tlCollapsed"); }catch(_)
 setTimelineCollapsed(savedTl==null ? true : savedTl==="1");
 createDoc(32,32);
 // mobile: at most one panel at a time — whichever tab was last used, and closed on a first run
+let savedSnap=null; try{ savedSnap=localStorage.getItem("pp_placeSnap"); }catch(_){}
+setPlaceSnap(savedSnap==null ? true : savedSnap==="1");
+let savedClip=null; try{ savedClip=localStorage.getItem("pp_tileClip"); }catch(_){}
+tileClip = savedClip==null ? true : savedClip==="1";   // tiles fence themselves off unless told not to
 let savedPT=null; try{ savedPT=localStorage.getItem(PANEL_TAB_KEY); }catch(_){}
 setPanelTab(savedPT||"none");
 applyPanelLayout();
