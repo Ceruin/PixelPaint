@@ -1254,7 +1254,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31i";
+const APP_VERSION="2026.07.31j";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1868,15 +1868,20 @@ function hideFrameDrop(){ const m=document.getElementById("tlDrop"); if(m) m.rem
 function startFrameDrag(e,cell,fromGrip){
   if(e.button!==0 || fdrag) return;
   if(!fromGrip && e.pointerType!=="mouse") return;   // on touch only the grip drags, so the strip can still scroll
+  // The delete badge is its own button. Arming a drag here would capture the pointer on the cell,
+  // and a captured pointer retargets the click that follows to the capturing element — so the
+  // badge's own handler would never run and the frame would never be deleted.
+  if(e.target && e.target.closest && e.target.closest(".tl-x")) return;
   fdrag={fi:+cell.dataset.fi, cell:cell, x0:e.clientX, y0:e.clientY, on:false, id:e.pointerId};
   fdragMoved=false;
-  try{ cell.setPointerCapture(e.pointerId); }catch(_){}
 }
 window.addEventListener("pointermove",e=>{
   if(!fdrag || e.pointerId!==fdrag.id) return;
   if(!fdrag.on){
     if(Math.abs(e.clientX-fdrag.x0)+Math.abs(e.clientY-fdrag.y0)<5) return;
     fdrag.on=true; fdragMoved=true;
+    // capture only once this is really a drag, so an ordinary click keeps its own target
+    try{ fdrag.cell.setPointerCapture(fdrag.id); }catch(_){}
     fdrag.cell.classList.add("drag-src");
     stopPlayback();
   }
