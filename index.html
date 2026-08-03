@@ -1254,7 +1254,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.07.31j";
+const APP_VERSION="2026.08.03a";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1629,17 +1629,12 @@ function shiftTagsOnInsert(at){
     if(t.to>=at) t.to++;          // a frame dropped inside a group extends that group
   });
 }
-function shiftTagsOnDelete(at){
-  tags.forEach(t=>{
-    if(t.from>at) t.from--;
-    if(t.to>=at) t.to--;
-  });
-  pruneTags();
-}
 function pruneTags(){
   const last=frames.length-1;
+  // drop collapsed ranges *before* clamping — clamping an empty range back into the timeline
+  // would resurrect the group on top of whichever frames now sit there
+  tags=tags.filter(t=>t.to>=t.from && t.from<=last);   // a group whose frames are all gone goes with them
   tags.forEach(t=>{ t.from=clamp(t.from,0,last); t.to=clamp(t.to,0,last); });
-  tags=tags.filter(t=>t.to>=t.from);   // a group whose frames are all gone goes with them
 }
 function uniqueTagName(base){
   let n=base, i=2;
@@ -1669,12 +1664,15 @@ function addFrame(duplicate){
 }
 function deleteFrame(i){
   if(frames.length<=1){ showToast("A drawing needs at least one frame.","error"); return; }
+  if(i<0||i>=frames.length) return;
   stopPlayback();
-  frames.splice(i,1);
-  shiftTagsOnDelete(i);
-  if(frameIndex>=frames.length) frameIndex=frames.length-1;
-  layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
-  renderLayers(); renderTimeline(); composite(); updateDocInfo();
+  // same owner-array bookkeeping every other frame edit uses: drop the frame and its owner together,
+  // so a group that loses its last frame disappears instead of sliding onto its neighbour's frames
+  const owner=frameOwners();
+  const at = frameIndex>i ? frameIndex-1 : frameIndex;   // stay on the frame you were on
+  frames.splice(i,1); owner.splice(i,1);
+  rebuildTagsFromOwners(owner);
+  afterFrameEdit(at);
 }
 
 // ---- groups --------------------------------------------------------------------------
@@ -1945,8 +1943,11 @@ function groupHead(g){
 // with it, and the strip would then render empty with no way back.
 function normalizeTlView(){
   if(tlView==="__all") return;
-  if(tlView==="__ungrouped"){ if(!frameGroups().some(g=>g.tag<0)) tlView="__all"; return; }
-  if(!tags.some(t=>t.name===tlView)) tlView="__all";
+  const groups=frameGroups();
+  if(tlView==="__ungrouped"){ if(!groups.some(g=>g.tag<0)) tlView="__all"; return; }
+  // the group has to exist *and* still own frames in the strip — a range hidden behind an
+  // overlapping one would render a blank timeline with no obvious way back to the frames
+  if(!groups.some(g=>g.tag>=0 && tags[g.tag] && tags[g.tag].name===tlView)) tlView="__all";
 }
 function viewGroups(){
   const all=frameGroups();
