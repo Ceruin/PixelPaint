@@ -137,6 +137,23 @@
   .tl-frame:hover .tl-x{display:inline-flex;}
   .tl-frame .tl-x:hover{background:var(--danger); color:#fff; border-color:var(--danger);}
 
+  /* ---- tilesheet panel ---- */
+  .ts-sum{color:var(--muted); font-size:11.5px; margin:0 0 5px;}
+  .ts-pick{display:flex; align-items:center; gap:6px; color:var(--accent); font-size:12px;
+    font-weight:600; margin:0 0 9px; overflow:hidden;}
+  .ts-pick span:last-child{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .ts-pick svg{flex:none; opacity:.85;}
+  /* the four inserts sit where they act: row above on top, columns either side, row below beneath */
+  .ts-pad{display:grid; grid-template-columns:1fr 1fr; grid-template-areas:"up up" "left right" "down down";
+    gap:6px; margin-top:9px;}
+  .ts-pad .ts-up{grid-area:up;} .ts-pad .ts-left{grid-area:left;}
+  .ts-pad .ts-right{grid-area:right;} .ts-pad .ts-down{grid-area:down;}
+  .ts-pad button{font-size:11px; color:var(--muted);}
+  .ts-pad button:not(:disabled):hover{color:var(--text);}
+  .ts-lb{font-size:11px;}
+  button:disabled{opacity:.42; cursor:default;}
+  button:disabled:hover{border-color:var(--line); background:var(--panel2);}
+
   /* ---- sub-canvas panel ---- */
   .rg-row{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
   .rg-row:last-child{margin-bottom:0;}
@@ -250,6 +267,9 @@
   .panel-tabs .ptab{flex:1 1 0; min-width:0; gap:5px; height:36px; min-height:36px;
     padding:0 6px; border-radius:8px; font-size:12.5px; color:var(--muted);}
   .panel-tabs .ptab.active{background:var(--accent2); border-color:var(--accent2); color:#fff; font-weight:600;}
+  /* button{display:inline-flex} above is an author rule, so it beats the UA sheet's [hidden] —
+     the Tiles tab has to be told to stay away while there's no grid */
+  .panel-tabs .ptab[hidden]{display:none;}
 
   .colorrow{display:flex; align-items:center; gap:10px;}
   .dualswatch{position:relative; width:66px; height:60px; flex:none;}
@@ -682,10 +702,19 @@
     body[data-ptab="anim"]   #colorSection,
     body[data-ptab="anim"]   #layerSection,
     body[data-ptab="anim"]   #regionSection,
+    body[data-ptab="anim"]   #sheetSection,
+    body[data-ptab="color"]  #sheetSection,
+    body[data-ptab="layers"] #sheetSection,
+    /* the Tiles tab owns the panel outright while it's open */
+    body[data-ptab="tiles"]  #colorSection,
+    body[data-ptab="tiles"]  #layerSection,
+    body[data-ptab="tiles"]  #regionSection,
     /* "none": every panel is tabbed off and the canvas gets the whole screen */
     body[data-ptab="none"]   #colorSection,
     body[data-ptab="none"]   #layerSection,
+    body[data-ptab="none"]   #sheetSection,
     body[data-ptab="none"]   #regionSection{display:none !important;}
+    body[data-ptab="tiles"]  #sheetSection{display:block !important;}
     body[data-ptab="none"] .side{overflow:visible; border-bottom:none;}
     body:not([data-ptab="anim"]) #timeline{display:none;}
     /* the tab strip already draws the panel's top edge */
@@ -741,6 +770,7 @@
       <div class="menu-item" data-menu="sprite" data-icon="image"   data-icon-size="15">Sprite</div>
       <div class="menu-item" data-menu="layer"  data-icon="copy"    data-icon-size="15">Layer</div>
       <div class="menu-item" data-menu="frame"  data-icon="play"    data-icon-size="15">Frame</div>
+      <div class="menu-item" data-menu="tiles"  data-icon="grid"    data-icon-size="15">Tiles</div>
       <div class="menu-item" data-menu="select" data-icon="select"  data-icon-size="15">Select</div>
       <div class="menu-item" data-menu="view"   data-icon="visible" data-icon-size="15">View</div>
       <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="15">Help</div>
@@ -816,6 +846,23 @@
     <button data-cmd="play"   data-icon="play" data-icon-size="16">Play / stop<span class="hk">Space</span></button>
     <button data-cmd="sheet"  data-icon="image" data-icon-size="16">Export spritesheet…</button>
   </div>
+  <div id="menu-tiles" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="tilesetup" data-icon="grid"   data-icon-size="16">Tilesheet setup…</button>
+    <button data-cmd="tiletool"  data-icon="region" data-icon-size="16">Tile tool<span class="hk">T</span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="tilerowup"    data-icon="up"    data-icon-size="16">Add a row above</button>
+    <button data-cmd="tilerowdown"  data-icon="down"  data-icon-size="16">Add a row below</button>
+    <button data-cmd="tilecolleft"  data-icon="left"  data-icon-size="16">Add a column left</button>
+    <button data-cmd="tilecolright" data-icon="right" data-icon-size="16">Add a column right</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="tilerename" data-icon="pencil" data-icon-size="16">Rename this tile…</button>
+    <button data-cmd="tileclear"  data-icon="clear"  data-icon-size="16">Clear this tile</button>
+    <button data-cmd="tiledelrow" data-icon="trash"  data-icon-size="16">Delete this row</button>
+    <button data-cmd="tiledelcol" data-icon="trash"  data-icon-size="16">Delete this column</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="exporttiles" data-icon="download" data-icon-size="16">Export tiles…</button>
+    <button data-cmd="tilesoff"    data-icon="clear"    data-icon-size="16">Turn off the tile grid</button>
+  </div>
   <div id="menu-select" class="ctx-menu menu-dd" hidden>
     <button data-cmd="selectall" data-icon="select" data-icon-size="16">Select all<span class="hk">Ctrl+A</span></button>
     <button data-cmd="deselect"  data-icon="clear"  data-icon-size="16">Deselect<span class="hk">Ctrl+D</span></button>
@@ -833,6 +880,7 @@
     <div class="ctx-sep"></div>
     <label class="chk"><input type="checkbox" id="gridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Grid<span class="hk">G</span></label>
     <label class="chk"><input type="checkbox" id="centerToggle" checked /><span class="mi" data-icon="center" data-icon-size="15"></span>Center guide</label>
+    <label class="chk" id="tileGridRow"><input type="checkbox" id="tileGridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Tile grid</label>
     <label class="chk"><input type="checkbox" id="regionToggleMenu" /><span class="mi" data-icon="region" data-icon-size="15"></span>Sub-canvas</label>
     <button data-cmd="delregion" data-icon="trash" data-icon-size="16">Remove sub-canvas<span class="hk">Del</span></button>
     <div class="ctx-sep"></div>
@@ -857,6 +905,7 @@
     <div class="menu-item" data-menu="sprite" data-icon="image"   data-icon-size="17">Sprite</div>
     <div class="menu-item" data-menu="layer"  data-icon="copy"    data-icon-size="17">Layer</div>
     <div class="menu-item" data-menu="frame"  data-icon="play"    data-icon-size="17">Frame</div>
+    <div class="menu-item" data-menu="tiles"  data-icon="grid"    data-icon-size="17">Tiles</div>
     <div class="menu-item" data-menu="select" data-icon="select"  data-icon-size="17">Select</div>
     <div class="menu-item" data-menu="view"   data-icon="visible" data-icon-size="17">View</div>
     <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="17">Help</div>
@@ -878,6 +927,7 @@
         <button class="tool" data-tool="select"     data-icon="select"  title="Rectangle select (M)"></button>
         <button class="tool" data-tool="wand"       data-icon="wand"    title="Magic wand — select by color (W)"></button>
         <button class="tool" data-tool="region"     data-icon="region"  title="Sub-canvas — drag a draw area (D)"></button>
+        <button class="tool" data-tool="tile"       data-icon="grid"    title="Tiles — pick a tile, then + to add rows and columns (T)"></button>
       </div>
 
       <div class="brush-sec">
@@ -944,6 +994,7 @@
         <button class="ptab" data-ptab="color"  data-icon="palette" data-icon-size="15" title="Color &amp; palette">Color</button>
         <button class="ptab" data-ptab="layers" data-icon="copy"    data-icon-size="15" title="Layers">Layers</button>
         <button class="ptab" data-ptab="anim"   data-icon="play"    data-icon-size="15" title="Frames &amp; groups">Anim</button>
+        <button class="ptab" data-ptab="tiles"  data-icon="grid"    data-icon-size="15" title="Tilesheet grid" hidden>Tiles</button>
       </div>
       <div class="mobile-cols">
       <div class="section collapsible" id="colorSection">
@@ -997,6 +1048,49 @@
           </div>
         </div>
       </div>
+      </div>
+
+      <!-- Tilesheet grid (shown when the drawing has a grid, or the Tile tool is picked) -->
+      <div class="section" id="sheetSection" style="display:none">
+        <h3><span data-icon="grid" data-icon-size="14"></span>Tilesheet</h3>
+        <div id="sheetNone">
+          <button id="tsCreate" data-icon="grid" style="width:100%">Set up a tilesheet…</button>
+          <div class="hint" style="padding:7px 0 0; margin:0">Cuts this canvas into a grid of named tiles — rows and columns, each with its own size. Pick a tile and the four <b>+</b> buttons around it add a row above or below, or a column left or right.</div>
+        </div>
+        <div id="sheetCtl" style="display:none">
+          <div class="ts-sum" id="tsSummary"></div>
+          <div class="ts-pick"><span data-icon="region" data-icon-size="13"></span><span id="tsSel">No tile picked</span></div>
+          <div class="rg-row"><span class="rg-lbl">Name</span>
+            <input type="text" id="tsName" spellcheck="false" data-needsel style="flex:1; min-width:0" title="Name this tile — it becomes the file name when you export tiles separately" /></div>
+          <div class="rg-row"><span class="rg-lbl">Size</span>
+            <input type="number" id="tsTileW" min="1" max="512" data-needsel title="Width of this tile's column" /><span class="rg-x">×</span>
+            <input type="number" id="tsTileH" min="1" max="512" data-needsel title="Height of this tile's row" />
+            <span style="color:var(--muted); font-size:11px">this row / column</span></div>
+          <!-- the four inserts, laid out the way they act -->
+          <div class="ts-pad">
+            <button class="ts-up"    data-cmd="tilerowup"    data-icon="up"    data-icon-size="15" data-needsel title="Add a row above this tile">Row</button>
+            <button class="ts-left"  data-cmd="tilecolleft"  data-icon="left"  data-icon-size="15" data-needsel title="Add a column to the left">Col</button>
+            <button class="ts-right" data-cmd="tilecolright" data-icon="right" data-icon-size="15" data-needsel title="Add a column to the right">Col</button>
+            <button class="ts-down"  data-cmd="tilerowdown"  data-icon="down"  data-icon-size="15" data-needsel title="Add a row below this tile">Row</button>
+          </div>
+          <div class="btnrow" style="margin-top:8px">
+            <button data-cmd="tilerename" data-icon="pencil" data-icon-size="15" data-needsel title="Rename this tile"></button>
+            <button data-cmd="tileclear"  data-icon="clear"  data-icon-size="15" data-needsel title="Clear this tile on the active layer"></button>
+            <button data-cmd="tiledelrow" data-icon="trash"  data-icon-size="15" data-needsel class="danger" title="Delete the row this tile is in"><span class="ts-lb">Row</span></button>
+            <button data-cmd="tiledelcol" data-icon="trash"  data-icon-size="15" data-needsel class="danger" title="Delete the column this tile is in"><span class="ts-lb">Col</span></button>
+          </div>
+          <div class="rg-row" style="margin-top:9px"><span class="rg-lbl">Gaps</span>
+            <input type="number" id="tsGapIn" min="0" max="64" title="Spacing between tiles" />
+            <span class="rg-x">/</span>
+            <input type="number" id="tsPadIn" min="0" max="64" title="Margin around the whole sheet" />
+            <span style="color:var(--muted); font-size:11px">between / around</span></div>
+          <label class="chk" style="margin-top:2px"><input type="checkbox" id="tsClip" /><span data-icon="region" data-icon-size="14"></span> Draw inside the picked tile only</label>
+          <div class="btnrow" style="margin-top:9px">
+            <button data-cmd="tilesetup"   data-icon="grid"     data-icon-size="15" title="Grid size, tile size and spacing">Setup</button>
+            <button data-cmd="exporttiles" data-icon="download" data-icon-size="15" title="Export the sheet, or one PNG per tile">Export</button>
+          </div>
+          <button data-cmd="tilesoff" data-icon="clear" data-icon-size="15" style="width:100%; margin-top:7px" title="Keep the artwork, drop the grid">Turn off the tile grid</button>
+        </div>
       </div>
 
       <!-- Sub-canvas controls (shown when the Region tool is active) -->
@@ -1254,7 +1348,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03a";
+const APP_VERSION="2026.08.03b";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1488,6 +1582,7 @@ function newDocument(w,h,makeFirst=true){
   placement=null; xform=null; const pb=document.getElementById("placeBar"); if(pb) pb.hidden=true;
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
   region=null; regionLocked=false; regionDrag=null;
+  sheet=null; tileSel=null;
   W=clamp(w|0,1,512); H=clamp(h|0,1,512);
   layerSeq=1;
   frames=[{layers:[], dur:DEFAULT_DUR}];   // one frame to start
@@ -1497,7 +1592,7 @@ function newDocument(w,h,makeFirst=true){
   if(makeFirst) addLayer("Layer 1");       // pushes into frames[0].layers (same array ref)
   fitZoom();
   undoStack=[]; redoStack=[];
-  renderLayers(); renderTimeline(); renderRegionPanel(); composite(); updateUndoButtons(); updateDocInfo();
+  renderLayers(); renderTimeline(); renderRegionPanel(); renderSheetPanel(); composite(); updateUndoButtons(); updateDocInfo();
 }
 
 // change the current canvas size at will — crops or extends from the top-left (keeps the pixels)
@@ -1516,9 +1611,17 @@ function resizeCanvas(nw,nh,ox,oy){
   }));
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
   clampRegion();
-  fitZoom(); renderLayers(); renderTimeline(); composite(); updateDocInfo(); renderRegionPanel();
+  // A hand-resized canvas no longer matches the tile grid, and an overlay that lies about where
+  // the tiles are is worse than no overlay. Say so and drop it; the pixels are untouched.
+  let lostGrid=false;
+  if(sheet){
+    const s=sheetSize(sheet);
+    if(s.w!==W || s.h!==H){ sheet=null; tileSel=null; lostGrid=true; }
+  }
+  fitZoom(); renderLayers(); renderTimeline(); composite(); updateDocInfo(); renderRegionPanel(); renderSheetPanel();
   captureActiveDoc(); renderTabs();
-  showToast("Canvas resized to "+W+" × "+H+".","success");
+  showToast("Canvas resized to "+W+" × "+H+"."+(lostGrid?" The tile grid no longer fits, so it was removed.":""),
+    "success", lostGrid?5200:undefined);
 }
 
 // The union of every visible pixel in every frame. Used by Trim, and offered in the resize dialog,
@@ -1572,7 +1675,11 @@ function setZoom(z, recompose=true){
   drawRulers();
 }
 
-function updateDocInfo(){$("#docInfo").textContent=W+" × "+H+(frames&&frames.length>1?("  ·  frame "+(frameIndex+1)+"/"+frames.length):"");}
+function updateDocInfo(){
+  $("#docInfo").textContent = W+" × "+H
+    + (sheet ? ("  ·  "+sheet.cols.length+"×"+sheet.rows.length+" tiles") : "")
+    + (frames&&frames.length>1 ? ("  ·  frame "+(frameIndex+1)+"/"+frames.length) : "");
+}
 
 // ------------------------------------------------------------------ animation: frames, playback, tags
 // opts.auto — the panel folded itself (see autoCollapseTimeline); don't overwrite the user's
@@ -2095,6 +2202,7 @@ function captureActiveDoc(){
   d.activeIndex=activeIndex; d.layerSeq=layerSeq;
   d.zoom=zoom; d.undo=undoStack; d.redo=redoStack; d.selection=selection; d.selMask=selMask;
   d.region=region; d.regionLocked=regionLocked;
+  d.sheet=sheet; d.tileSel=tileSel;
 }
 function loadDocIntoGlobals(d){
   if(placement) cancelPlacement();
@@ -2106,8 +2214,9 @@ function loadDocIntoGlobals(d){
   layers=frames[frameIndex].layers; activeIndex=clamp(d.activeIndex||0,0,layers.length-1); layerSeq=d.layerSeq;
   undoStack=d.undo; redoStack=d.redo; selection=d.selection; selMask=d.selMask; selDrag=null; stopAnts();
   region=d.region||null; regionLocked=!!d.regionLocked; regionDrag=null;
+  sheet=d.sheet||null; tileSel=d.tileSel||null;
   setZoom(d.zoom||16,false);
-  renderLayers(); renderTimeline(); renderRegionPanel(); composite(); updateDocInfo(); updateUndoButtons(); updateSelStatus();
+  renderLayers(); renderTimeline(); renderRegionPanel(); renderSheetPanel(); composite(); updateDocInfo(); updateUndoButtons(); updateSelStatus();
   if(selection && !selMask) startAnts();
 }
 function activateDoc(id){
@@ -2194,12 +2303,14 @@ function composite(){
   vctx.drawImage(flat,0,0,W*zoom,H*zoom);
   if(showGrid && zoom>=4) drawGrid();
   if(showCenter) drawCenterGuide();
+  if(sheet && showTileGrid) drawSheetGrid();
   if(region) drawRegion();
   paintOverlays();
   if(selection && !(selDrag && selDrag.float)) drawSelection();   // the float draws its own outline
   // dismiss badges last, so nothing paints over them. Not while a gesture is in flight, and not
   // during image placement — that has its own overlay and toolbar.
   if(!placement){
+    if(sheet && tool==="tile") drawTilePlus();
     if(region && !regionDrag) drawBadge(region, regionLocked?"#f0a020":"#2ce8f5");
     if(selection && !selDrag) drawBadge(selection, "#5b8cff");
   }
@@ -2426,10 +2537,525 @@ function renderRegionPanel(){
   const opts=$("#toolOpts"); if(opts) opts.classList.toggle("show-region", tool==="region" && !region);
 }
 
+// ------------------------------------------------------------------ tilesheets
+// A tilesheet is one canvas cut into a grid of named tiles — the tileset counterpart of frame
+// groups. Columns carry their own widths and rows their own heights, so "mostly 16×16 with one
+// wide tile" is expressible; and because the tiles share a single canvas you can draw a wall
+// straight across a seam and still name, clear and export each tile on its own.
+//
+// Every structural edit — insert, delete, resize a row or column, change the gutters — goes
+// through sheetApply(): hand it the grid you want plus a map saying where each current row and
+// column ended up, and it repaints every tile of every frame into its new home. One code path
+// means the pixels can never drift out of step with the grid the overlay draws.
+const MAX_DIM=512;                 // the canvas cap resizeCanvas enforces
+let sheet=null;                    // {tw,th,gap,pad,cols:[w…],rows:[h…],tiles:[[{name}…]…]}
+let tileSel=null;                  // {r,c} — the tile the Tile tool is pointed at
+let tileClip=false;                // picking a tile also makes it the sub-canvas
+let showTileGrid=true;             // the overlay hides on demand, to see the art clean
+
+function blankSheet(tw,th,cols,rows,gap,pad){
+  return {tw:tw, th:th, gap:gap|0, pad:pad|0,
+    cols:new Array(cols).fill(tw), rows:new Array(rows).fill(th),
+    tiles:Array.from({length:rows},()=>Array.from({length:cols},()=>({name:""})))};
+}
+const cloneSheet=s=>s&&{tw:s.tw, th:s.th, gap:s.gap, pad:s.pad, cols:s.cols.slice(), rows:s.rows.slice(),
+  tiles:s.tiles.map(r=>r.map(t=>({name:t.name||""})))};
+function sheetSize(s){
+  return { w: s.pad*2 + s.cols.reduce((a,b)=>a+b,0) + s.gap*Math.max(0,s.cols.length-1),
+           h: s.pad*2 + s.rows.reduce((a,b)=>a+b,0) + s.gap*Math.max(0,s.rows.length-1) };
+}
+// Where every column and row starts. Worked out in one pass and handed to the loops that would
+// otherwise re-add the whole grid per tile — a 64 × 64 sheet is 4096 tiles, and the overlay is
+// redrawn on every stroke.
+function tileOffsets(s){
+  const xs=[], ys=[];
+  let x=s.pad; for(let c=0;c<s.cols.length;c++){ xs.push(x); x+=s.cols[c]+s.gap; }
+  let y=s.pad; for(let r=0;r<s.rows.length;r++){ ys.push(y); y+=s.rows[r]+s.gap; }
+  return {xs:xs, ys:ys};
+}
+function tileRectIn(s,r,c){
+  if(!s || s.rows[r]==null || s.cols[c]==null) return null;
+  let x=s.pad, y=s.pad;
+  for(let i=0;i<c;i++) x+=s.cols[i]+s.gap;
+  for(let i=0;i<r;i++) y+=s.rows[i]+s.gap;
+  return {x:x, y:y, w:s.cols[c], h:s.rows[r]};
+}
+const tileRect=(r,c)=>tileRectIn(sheet,r,c);
+const selTileRect=()=>tileSel?tileRect(tileSel.r,tileSel.c):null;
+function tileEntry(r,c){ return sheet && sheet.tiles[r] ? sheet.tiles[r][c] : null; }
+function tileLabel(r,c){
+  const t=tileEntry(r,c);
+  return (t && t.name) || ("Tile "+(r+1)+"·"+(c+1));   // row·column, both counting from 1
+}
+// the tile under an art pixel, or null when the point lands in a gutter
+function tileAtArt(x,y){
+  if(!sheet) return null;
+  const o=tileOffsets(sheet);
+  let r=-1, c=-1;
+  for(let i=0;i<o.ys.length;i++) if(y>=o.ys[i] && y<o.ys[i]+sheet.rows[i]){ r=i; break; }
+  for(let i=0;i<o.xs.length;i++) if(x>=o.xs[i] && x<o.xs[i]+sheet.cols[i]){ c=i; break; }
+  return (r<0||c<0) ? null : {r:r,c:c};
+}
+const tileCount=()=>sheet?sheet.rows.length*sheet.cols.length:0;
+
+// mapRow/mapCol are sparse by design: pass null for "nothing moved".
+const mapAt=(m,i)=> m ? (m[i]==null?-1:m[i]) : i;
+function sheetApply(next, mapRow, mapCol, msg){
+  const size=sheetSize(next);
+  if(size.w<1 || size.h<1) return false;
+  if(size.w>MAX_DIM || size.h>MAX_DIM){
+    showToast("That would make the sheet "+size.w+" × "+size.h+" px — the canvas stops at "+MAX_DIM+".","error",4600);
+    return false;
+  }
+  const old=sheet;
+  pushUndo();
+  // where each surviving tile's pixels have to end up, worked out once against the old grid
+  const moves=[];
+  if(old){
+    for(let r=0;r<old.rows.length;r++){
+      const nr=mapAt(mapRow,r); if(nr<0) continue;
+      for(let c=0;c<old.cols.length;c++){
+        const nc=mapAt(mapCol,c); if(nc<0) continue;
+        const from=tileRectIn(old,r,c), to=tileRectIn(next,nr,nc);
+        if(from&&to) moves.push([from,to]);
+      }
+    }
+  }
+  W=size.w; H=size.h; flat.width=W; flat.height=H;
+  frames.forEach(f=>f.layers.forEach(l=>{
+    const c=makeLayerCanvas(), ctx=c.getContext("2d");
+    ctx.imageSmoothingEnabled=false;
+    if(old) moves.forEach(a=>{
+      const from=a[0], to=a[1], w=Math.min(from.w,to.w), h=Math.min(from.h,to.h);
+      if(w>0&&h>0) ctx.drawImage(l.canvas, from.x,from.y,w,h, to.x,to.y,w,h);   // a shrunk tile keeps its top-left
+    });
+    else ctx.drawImage(l.canvas,0,0);       // laying the first grid over an existing drawing
+    l.canvas=c; l.ctx=ctx;
+  }));
+  sheet=next;
+  if(tileSel){                              // follow the selection through the move
+    const nr=mapAt(mapRow,tileSel.r), nc=mapAt(mapCol,tileSel.c);
+    tileSel = (nr>=0 && nc>=0 && nr<next.rows.length && nc<next.cols.length) ? {r:nr,c:nc} : null;
+  }
+  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
+  clampRegion(); syncTileClip();
+  setZoom(zoom,false);                      // the view canvas has to follow the new size
+  renderLayers(); renderTimeline(); renderRegionPanel(); renderSheetPanel();
+  composite(); updateDocInfo(); captureActiveDoc(); renderTabs();
+  if(msg) showToast(msg,"success");
+  return true;
+}
+// A new row or column takes the sheet's default tile size, so the common case — a grid of
+// same-size tiles — stays uniform however you grow it.
+function insertTileRow(at, h){
+  if(!sheet) return false;
+  const n=cloneSheet(sheet);
+  n.rows.splice(at, 0, clamp(h|0 || n.th, 1, MAX_DIM));
+  n.tiles.splice(at, 0, n.cols.map(()=>({name:""})));
+  return sheetApply(n, sheet.rows.map((_,i)=> i<at ? i : i+1), null,
+    "Row added — "+n.cols.length+" new tile"+(n.cols.length>1?"s":"")+".");
+}
+function insertTileCol(at, w){
+  if(!sheet) return false;
+  const n=cloneSheet(sheet);
+  n.cols.splice(at, 0, clamp(w|0 || n.tw, 1, MAX_DIM));
+  n.tiles.forEach(row=>row.splice(at,0,{name:""}));
+  return sheetApply(n, null, sheet.cols.map((_,i)=> i<at ? i : i+1),
+    "Column added — "+n.rows.length+" new tile"+(n.rows.length>1?"s":"")+".");
+}
+function deleteTileRow(at){
+  if(!sheet) return false;
+  if(sheet.rows.length<=1){ showToast("A tilesheet needs at least one row.","info"); return false; }
+  const n=cloneSheet(sheet);
+  n.rows.splice(at,1); n.tiles.splice(at,1);
+  return sheetApply(n, sheet.rows.map((_,i)=> i===at ? -1 : (i<at?i:i-1)), null,
+    "Row "+(at+1)+" removed.");
+}
+function deleteTileCol(at){
+  if(!sheet) return false;
+  if(sheet.cols.length<=1){ showToast("A tilesheet needs at least one column.","info"); return false; }
+  const n=cloneSheet(sheet);
+  n.cols.splice(at,1); n.tiles.forEach(row=>row.splice(at,1));
+  return sheetApply(n, null, sheet.cols.map((_,i)=> i===at ? -1 : (i<at?i:i-1)),
+    "Column "+(at+1)+" removed.");
+}
+// The four on-canvas + buttons and the panel's insert pad both land here. The new tile is
+// selected afterwards — you pressed + because that's where you want to draw next.
+function addTileAt(dir){
+  if(!sheet){ tilesheetDialog(); return; }
+  if(!tileSel){ showToast("Pick a tile first — the new one goes next to it.","info"); return; }
+  const r=tileSel.r, c=tileSel.c;
+  let ok=false, sel=null;
+  if(dir==="up")         { ok=insertTileRow(r,   sheet.rows[r]); sel={r:r,   c:c}; }
+  else if(dir==="down")  { ok=insertTileRow(r+1, sheet.rows[r]); sel={r:r+1, c:c}; }
+  else if(dir==="left")  { ok=insertTileCol(c,   sheet.cols[c]); sel={r:r,   c:c}; }
+  else if(dir==="right") { ok=insertTileCol(c+1, sheet.cols[c]); sel={r:r,   c:c+1}; }
+  if(ok) selectTile(sel.r, sel.c);
+}
+// Deleting the row or column you were standing in leaves nothing picked, and the panel's buttons
+// all grey out. Land on the tile that took its place instead.
+function deleteTileNear(what){
+  if(!sheet||!tileSel) return;
+  const r=tileSel.r, c=tileSel.c;
+  const ok = what==="row" ? deleteTileRow(r) : deleteTileCol(c);
+  if(ok && !tileSel) selectTile(clamp(r,0,sheet.rows.length-1), clamp(c,0,sheet.cols.length-1));
+}
+function selectTile(r,c){
+  if(!sheet) return;
+  if(r<0||c<0||r>=sheet.rows.length||c>=sheet.cols.length) return;
+  tileSel={r:r,c:c};
+  syncTileClip(); renderSheetPanel(); composite();
+}
+function moveTileSel(dr,dc){
+  if(!sheet) return;
+  if(!tileSel){ selectTile(0,0); return; }
+  selectTile(clamp(tileSel.r+dr,0,sheet.rows.length-1), clamp(tileSel.c+dc,0,sheet.cols.length-1));
+}
+// The sub-canvas already knows how to fence drawing in — pointing it at the selected tile is all
+// "draw inside this tile only" needs to be.
+function syncTileClip(){
+  if(!tileClip) return;
+  const t=selTileRect(); if(!t) return;
+  region={x:t.x,y:t.y,w:t.w,h:t.h}; regionLocked=false;
+  clampRegion(); renderRegionPanel();
+}
+function setTileClip(on){
+  tileClip=!!on;
+  if(tileClip) syncTileClip();
+  else if(region){                      // only drop the region if it *is* the tile we put there
+    const t=selTileRect();
+    if(t && region.x===t.x && region.y===t.y && region.w===t.w && region.h===t.h) removeRegion(true);
+  }
+  renderSheetPanel(); composite();
+}
+function clearTile(r,c){
+  const t=tileRect(r,c); if(!t) return;
+  const L=activeLayer(); if(!L) return;
+  if(L.locked){ showToast("This layer is locked.","info"); return; }
+  pushUndo();
+  L.ctx.clearRect(t.x,t.y,t.w,t.h);
+  composite(); refreshThumb(L);
+  showToast("Cleared “"+tileLabel(r,c)+"” on this layer.","success");
+}
+async function renameTile(r,c){
+  const e=tileEntry(r,c); if(!e) return;
+  const n=await showPrompt("Name for this tile — it becomes the file name when you export tiles separately:",
+    e.name||"", {title:"Rename tile", okText:"Rename"});
+  if(n==null) return;
+  e.name=n.trim();
+  renderSheetPanel(); composite(); captureActiveDoc();
+}
+// Setting up, reshaping and turning the grid off ------------------------------------------
+async function tilesheetDialog(){
+  const s=sheet;
+  const tw=s?s.tw:Math.min(W,16), th=s?s.th:Math.min(H,16);
+  const body=`
+    <div class="row"><label>Tile size</label>
+      <input type="number" id="tsW" min="1" max="${MAX_DIM}" value="${tw}"><span class="rg-x">×</span>
+      <input type="number" id="tsH" min="1" max="${MAX_DIM}" value="${th}">
+      <span style="color:var(--muted)">px</span></div>
+    <div class="row"><label>Grid</label>
+      <input type="number" id="tsCols" min="1" max="64" value="${s?s.cols.length:4}"><span class="rg-x">×</span>
+      <input type="number" id="tsRows" min="1" max="64" value="${s?s.rows.length:4}">
+      <span style="color:var(--muted)">columns × rows</span></div>
+    <div class="row"><label>Spacing</label>
+      <input type="number" id="tsGap" min="0" max="32" value="${s?s.gap:0}">
+      <span style="color:var(--muted)">between tiles</span></div>
+    <div class="row"><label>Margin</label>
+      <input type="number" id="tsPad" min="0" max="32" value="${s?s.pad:0}">
+      <span style="color:var(--muted)">around the sheet</span></div>
+    <div class="row"><label></label><label class="chk"><input type="checkbox" id="tsAll"${s?"":" checked disabled"}>
+      Resize every existing tile to the tile size</label></div>
+    <div class="row"><label></label><span id="tsPreview" style="color:var(--muted)"></span></div>`;
+  const msg = s ? "Rows and columns are added or removed at the end. Individual rows and columns keep their own size unless you tick the box."
+                : "Cuts this canvas into a grid of tiles. Whatever you've drawn stays where it is, in the top-left tile.";
+  const promise=openModal({title: s?"Tilesheet settings":"Turn this into a tilesheet",
+    message:msg, bodyHTML:body, okText: s?"Apply":"Create grid", mid:true});
+  // the body is in the DOM already, so the running total can be wired up before we await
+  const upd=()=>{
+    const p=$("#tsPreview"); if(!p) return;
+    const size=sheetSize(readTsFields().grid);
+    const over=size.w>MAX_DIM||size.h>MAX_DIM;
+    p.textContent="Sheet: "+size.w+" × "+size.h+" px"+(over?"  — over the "+MAX_DIM+" px limit":"");
+    p.style.color=over?"var(--danger)":"var(--muted)";
+  };
+  ["tsW","tsH","tsCols","tsRows","tsGap","tsPad","tsAll"].forEach(id=>{
+    const el=$("#"+id); if(el){ el.oninput=upd; el.onchange=upd; }
+  });
+  upd();
+  const ok=await promise;
+  if(!ok) return;
+  const g=readTsFields();
+  if(!sheet) sheetEnable(g);
+  else sheetReshape(g);
+}
+// Read the setup dialog into a grid, reusing the current column and row sizes where they survive.
+function readTsFields(){
+  const tw=clamp(parseInt($("#tsW").value,10)||1,1,MAX_DIM), th=clamp(parseInt($("#tsH").value,10)||1,1,MAX_DIM);
+  const cols=clamp(parseInt($("#tsCols").value,10)||1,1,64), rows=clamp(parseInt($("#tsRows").value,10)||1,1,64);
+  const gap=clamp(parseInt($("#tsGap").value,10)||0,0,32), pad=clamp(parseInt($("#tsPad").value,10)||0,0,32);
+  const all=$("#tsAll") ? $("#tsAll").checked : true;
+  const grid=blankSheet(tw,th,cols,rows,gap,pad);
+  if(sheet && !all){                       // keep the sizes of the rows and columns that stay
+    for(let c=0;c<cols;c++) if(sheet.cols[c]!=null) grid.cols[c]=sheet.cols[c];
+    for(let r=0;r<rows;r++) if(sheet.rows[r]!=null) grid.rows[r]=sheet.rows[r];
+  }
+  if(sheet) for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const e=tileEntry(r,c); if(e) grid.tiles[r][c]={name:e.name||""};   // names stay with their tile
+  }
+  return {tw:tw,th:th,cols:cols,rows:rows,gap:gap,pad:pad,all:all,grid:grid};
+}
+function sheetEnable(g){
+  if(sheetApply(g.grid, null, null, null)){
+    if(!tileSel) tileSel={r:0,c:0};
+    setTool("tile");        // the + buttons only exist under this tool, and they're the whole point
+    fitZoom(); renderSheetPanel(); composite();
+    setPanelTabIfMobile("tiles");
+    showToast("Tilesheet: "+g.cols+" × "+g.rows+" tiles of "+g.tw+" × "+g.th+". Pick a tile, then use the + arrows to add more.","success",5200);
+  }
+}
+function sheetReshape(g){
+  const rows=sheet.rows.length, cols=sheet.cols.length;
+  sheetApply(g.grid,
+    Array.from({length:rows},(_,i)=> i<g.rows ? i : -1),      // rows and columns are trimmed
+    Array.from({length:cols},(_,i)=> i<g.cols ? i : -1),      // from the end
+    "Tilesheet updated.");
+}
+async function sheetOff(){
+  if(!sheet) return;
+  const ok=await showConfirm("Stop treating this drawing as a tilesheet? The pixels and the canvas size stay exactly as they are — only the grid, the tile names and the + buttons go.",
+    {title:"Turn off the tile grid", okText:"Turn it off"});
+  if(!ok) return;
+  sheet=null; tileSel=null;
+  if(tileClip && region) removeRegion(true);
+  if(tool==="tile") setTool(lastPaintTool||"pencil");
+  renderSheetPanel(); composite(); updateDocInfo(); captureActiveDoc();
+  showToast("Tile grid removed — the artwork is untouched.","success");
+}
+// A project file may carry a grid that no longer matches its canvas (hand-edited, or saved by a
+// future version). Rather than draw a lying overlay, drop it.
+function sanitizeSheet(s, w, h){
+  if(!s || !Array.isArray(s.cols) || !Array.isArray(s.rows) || !s.cols.length || !s.rows.length) return null;
+  const int=(v,d)=>{ const n=parseInt(v,10); return isFinite(n)?n:d; };
+  const g={ tw:clamp(int(s.tw,16),1,MAX_DIM), th:clamp(int(s.th,16),1,MAX_DIM),
+    gap:clamp(int(s.gap,0),0,64), pad:clamp(int(s.pad,0),0,64),
+    cols:s.cols.map(v=>clamp(int(v,1),1,MAX_DIM)), rows:s.rows.map(v=>clamp(int(v,1),1,MAX_DIM)) };
+  g.tiles=Array.from({length:g.rows.length},(_,r)=>Array.from({length:g.cols.length},(_,c)=>{
+    const t=s.tiles && s.tiles[r] && s.tiles[r][c];
+    return {name:(t && typeof t.name==="string") ? t.name.slice(0,64) : ""};
+  }));
+  const size=sheetSize(g);
+  return (size.w===w && size.h===h) ? g : null;
+}
+// ---- on-canvas overlay --------------------------------------------------------------------
+function drawSheetGrid(){
+  const z=zoom, VW=W*z, VH=H*z, o=tileOffsets(sheet);
+  vctx.save();
+  // the margin and the gaps belong to no tile — dim them so the tiles themselves read as the sheet
+  if(sheet.gap>0 || sheet.pad>0){
+    vctx.beginPath(); vctx.rect(0,0,VW,VH);
+    for(let r=0;r<o.ys.length;r++) for(let c=0;c<o.xs.length;c++)
+      vctx.rect(o.xs[c]*z, o.ys[r]*z, sheet.cols[c]*z, sheet.rows[r]*z);
+    vctx.fillStyle="rgba(8,10,16,.45)"; vctx.fill("evenodd");
+  }
+  // tile edges, dark line under light dashes so they read over both pale and dark artwork
+  const xs=[], ys=[];
+  o.xs.forEach((x,c)=>xs.push(x, x+sheet.cols[c]));
+  o.ys.forEach((y,r)=>ys.push(y, y+sheet.rows[r]));
+  const dash=(x,y,w,h,vert)=>{
+    const len=vert?h:w, step=4;
+    for(let o=0;o<len;o+=step*2){
+      const d=Math.min(step,len-o);
+      vctx.fillRect(vert?x:x+o, vert?y+o:y, vert?w:d, vert?d:h);
+    }
+  };
+  vctx.fillStyle="rgba(0,0,0,.6)";
+  xs.forEach(x=>vctx.fillRect(Math.round(x*z),0,1,VH));
+  ys.forEach(y=>vctx.fillRect(0,Math.round(y*z),VW,1));
+  vctx.fillStyle="rgba(255,255,255,.5)";
+  xs.forEach(x=>dash(Math.round(x*z),0,1,VH,true));
+  ys.forEach(y=>dash(0,Math.round(y*z),VW,1,false));
+  // The picked tile. Under the Tile tool it's the thing you're working with, so it gets the full
+  // treatment; under a brush it's just a reminder of where you are, and a tint over the artwork
+  // would misreport your own colours — outline only.
+  const t=selTileRect();
+  if(t){
+    const x=t.x*z, y=t.y*z, w=t.w*z, h=t.h*z, active=(tool==="tile");
+    if(active){ vctx.fillStyle="rgba(44,232,245,.10)"; vctx.fillRect(x,y,w,h); }
+    vctx.lineWidth=2; vctx.strokeStyle=active?"#2ce8f5":"rgba(44,232,245,.55)";
+    vctx.strokeRect(x+1,y+1,Math.max(0,w-2),Math.max(0,h-2));
+    const label=active?tileLabel(tileSel.r,tileSel.c):"";
+    vctx.font="600 11px system-ui,sans-serif"; vctx.textBaseline="middle";
+    const tw=vctx.measureText(label).width, ch=16;
+    if(label && w>tw+14){
+      const cx=x+3, cy=Math.max(ch/2+2, y-ch/2-3);      // above the tile, tucked inside at the top edge
+      vctx.fillStyle="rgba(18,21,28,.92)";
+      vctx.beginPath(); vctx.roundRect ? vctx.roundRect(cx,cy-ch/2,tw+10,ch,5) : vctx.rect(cx,cy-ch/2,tw+10,ch);
+      vctx.fill();
+      vctx.fillStyle="#2ce8f5"; vctx.fillText(label, cx+5, cy+0.5);
+    }
+  }
+  vctx.restore();
+}
+// The four + buttons around the selected tile. Only under the Tile tool — every other tool wants
+// the pixels there — and only when the tile is big enough on screen for them not to pile up.
+function tilePlusPoints(){
+  if(!showTileGrid) return null;      // overlay off means every bit of it, buttons included
+  const t=selTileRect(); if(!t) return null;
+  const z=zoom, R=badgeR(), o=badgeOff(), VW=W*z, VH=H*z;
+  if(t.w*z < R*4 || t.h*z < R*4) return null;
+  const lim=(v,max)=>clamp(v, R+1, Math.max(R+1, max-R-1));
+  const cx=lim((t.x+t.w/2)*z, VW), cy=lim((t.y+t.h/2)*z, VH);
+  return { up:{x:cx, y:lim(t.y*z-o, VH)},        down:{x:cx, y:lim((t.y+t.h)*z+o, VH)},
+           left:{x:lim(t.x*z-o, VW), y:cy},      right:{x:lim((t.x+t.w)*z+o, VW), y:cy} };
+}
+function drawTilePlus(){
+  const pts=tilePlusPoints(); if(!pts) return;
+  const R=badgeR(), k=R*0.46;
+  vctx.save();
+  for(const d in pts){
+    const c=pts[d];
+    vctx.beginPath(); vctx.arc(c.x,c.y,R,0,Math.PI*2);
+    vctx.fillStyle="rgba(18,21,28,.93)"; vctx.fill();
+    vctx.lineWidth=2; vctx.strokeStyle="#2ce8f5"; vctx.stroke();
+    vctx.beginPath();
+    vctx.moveTo(c.x-k,c.y); vctx.lineTo(c.x+k,c.y);
+    vctx.moveTo(c.x,c.y-k); vctx.lineTo(c.x,c.y+k);
+    vctx.lineWidth=2; vctx.lineCap="round"; vctx.strokeStyle="#fff"; vctx.stroke();
+  }
+  vctx.restore();
+}
+function tilePlusHit(e){
+  if(tool!=="tile" || !sheet || placement) return null;
+  const pts=tilePlusPoints(); if(!pts) return null;
+  const b=view.getBoundingClientRect(), tol=badgeR()+(e.pointerType==="mouse"?3:6);
+  for(const d in pts){
+    if(Math.hypot((e.clientX-b.left)-pts[d].x, (e.clientY-b.top)-pts[d].y)<=tol) return d;
+  }
+  return null;
+}
+function tileDown(p){
+  const t=tileAtArt(p.x,p.y);
+  if(t) selectTile(t.r,t.c);
+  else showToast("That's the spacing between tiles — tap inside a tile to pick it.","info",2600);
+}
+// ---- side panel ---------------------------------------------------------------------------
+function renderSheetPanel(){
+  const sec=$("#sheetSection"); if(!sec) return;
+  sec.style.display=(sheet || tool==="tile") ? "" : "none";
+  const none=$("#sheetNone"), ctl=$("#sheetCtl");
+  if(none) none.style.display=sheet?"none":"";
+  if(ctl)  ctl.style.display=sheet?"":"none";
+  // On a phone the panels are tabs, so the Tile tool needs a tab to live in — including the
+  // "no grid yet" state, which is the only route to the setup dialog there.
+  const live=!!sheet || tool==="tile";
+  const tab=document.querySelector('#panelTabs .ptab[data-ptab="tiles"]');
+  if(tab) tab.hidden=!live;
+  const gr=$("#tileGridRow"); if(gr) gr.style.display=sheet?"":"none";   // nothing to toggle without a grid
+  const gt=$("#tileGridToggle"); if(gt) gt.checked=showTileGrid;
+  if(!sheet){
+    if(panelTab==="tiles" && !live) setPanelTab("none");
+    return;
+  }
+  const size=sheetSize(sheet);
+  $("#tsSummary").textContent=sheet.cols.length+" × "+sheet.rows.length+" tiles  ·  "+size.w+" × "+size.h+" px";
+  const t=tileSel?tileRect(tileSel.r,tileSel.c):null;
+  $("#tsSel").textContent = tileSel ? tileLabel(tileSel.r,tileSel.c) : "No tile picked";
+  $("#tsName").value = tileSel ? ((tileEntry(tileSel.r,tileSel.c)||{}).name||"") : "";
+  $("#tsName").placeholder = tileSel ? ("Tile "+(tileSel.r+1)+"·"+(tileSel.c+1)) : "";
+  $("#tsTileW").value = t?t.w:"";  $("#tsTileH").value = t?t.h:"";
+  $("#tsGapIn").value = sheet.gap; $("#tsPadIn").value = sheet.pad;
+  $("#tsClip").checked = tileClip;
+  ctl.querySelectorAll("[data-needsel]").forEach(b=>b.disabled=!tileSel);
+}
+// the tile size boxes edit the selected tile's column width and row height — which is exactly
+// what "this tile is bigger" means on a grid
+function setSelTileSize(){
+  if(!sheet||!tileSel) return;
+  const w=clamp(parseInt($("#tsTileW").value,10)||1,1,MAX_DIM), h=clamp(parseInt($("#tsTileH").value,10)||1,1,MAX_DIM);
+  if(w===sheet.cols[tileSel.c] && h===sheet.rows[tileSel.r]) return;
+  const n=cloneSheet(sheet); n.cols[tileSel.c]=w; n.rows[tileSel.r]=h;
+  if(!sheetApply(n,null,null,null)) renderSheetPanel();
+}
+function setSheetGutters(){
+  if(!sheet) return;
+  const gap=clamp(parseInt($("#tsGapIn").value,10)||0,0,64), pad=clamp(parseInt($("#tsPadIn").value,10)||0,0,64);
+  if(gap===sheet.gap && pad===sheet.pad) return;
+  const n=cloneSheet(sheet); n.gap=gap; n.pad=pad;
+  if(!sheetApply(n,null,null,null)) renderSheetPanel();
+}
+// ---- export -------------------------------------------------------------------------------
+function tileList(){
+  const out=[];
+  if(!sheet) return out;
+  for(let r=0;r<sheet.rows.length;r++) for(let c=0;c<sheet.cols.length;c++){
+    const t=tileRect(r,c);
+    out.push({row:r, col:c, name:tileLabel(r,c), x:t.x, y:t.y, w:t.w, h:t.h});
+  }
+  return out;
+}
+async function showTilesExportDialog(){
+  if(!sheet){ showToast("This drawing isn't a tilesheet yet — set one up from the Tiles menu.","info"); return null; }
+  const n=tileCount();
+  const body=`
+    <div class="row"><label>Scale</label><select id="txScale">
+      <option value="1" selected>1× (true pixel size)</option><option value="2">2×</option>
+      <option value="4">4×</option><option value="8">8×</option></select></div>
+    <div class="row"><label>Output</label><select id="txMode">
+      <option value="sheet" selected>The whole sheet — one PNG</option>
+      <option value="files">One PNG per tile (${n} file${n>1?"s":""})</option></select></div>
+    <div class="row"><label></label><label class="chk"><input type="checkbox" id="txJSON" checked>
+      Also write a JSON map of the tiles</label></div>`;
+  const ok=await openModal({title:"Export tiles",
+    message:(frames.length>1?"The current frame is exported. ":"")+
+      "The JSON map lists every tile's name and its rectangle on the sheet, ready for a game engine to slice.",
+    bodyHTML:body, okText:"Export", mid:true});
+  if(!ok) return null;
+  return {scale:parseInt($("#txScale").value,10)||1, mode:$("#txMode").value, json:$("#txJSON").checked};
+}
+async function exportTiles(o){
+  if(!sheet) return;
+  const scale=o.scale||1, base=spriteBaseName(), list=tileList();
+  composite();                       // `flat` holds the current frame, which is what we cut from
+  if(o.mode==="files"){
+    if(list.length>24){
+      const ok=await showConfirm("That's "+list.length+" separate downloads. Your browser may ask to allow multiple files.",
+        {title:"Export "+list.length+" tiles", okText:"Export them"});
+      if(!ok) return;
+    }
+    list.forEach((t,k)=>{
+      const c=document.createElement("canvas"); c.width=t.w*scale; c.height=t.h*scale;
+      const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
+      cx.drawImage(flat, t.x,t.y,t.w,t.h, 0,0,t.w*scale,t.h*scale);
+      setTimeout(()=>downloadCanvas(c, base+"_"+safeFilePart(t.name)+".png"), k*450);
+    });
+    if(o.json) downloadJSON(tilesJSON(base,null,scale,list), base+"_tiles.json", list.length*450+300);
+    showToast("Exporting "+list.length+" tiles — watch your downloads.","success",4600);
+    return;
+  }
+  const c=document.createElement("canvas"); c.width=W*scale; c.height=H*scale;
+  const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
+  cx.drawImage(flat,0,0,W*scale,H*scale);
+  const img=base+"_tiles.png";
+  downloadCanvas(c, img);
+  if(o.json) downloadJSON(tilesJSON(base,img,scale,list), base+"_tiles.json", 300);
+  showToast("Exported the sheet at "+scale+"× — "+(W*scale)+" × "+(H*scale)+" px"+(o.json?" (PNG + JSON)":"")+".","success",4200);
+}
+function tilesJSON(base, imgName, scale, list){
+  return { app:"PixelPaint", version:APP_VERSION, image:imgName||undefined, scale:scale,
+    sheet:{ w:W*scale, h:H*scale, tileW:sheet.tw*scale, tileH:sheet.th*scale,
+            spacing:sheet.gap*scale, margin:sheet.pad*scale,
+            columns:sheet.cols.length, rows:sheet.rows.length },
+    tiles:list.map((t,i)=>({ index:i, name:t.name, row:t.row, col:t.col,
+      x:t.x*scale, y:t.y*scale, w:t.w*scale, h:t.h*scale,
+      file: imgName ? undefined : base+"_"+safeFilePart(t.name)+".png" })) };
+}
+
 // ------------------------------------------------------------------ undo / redo
 function snapshot(){
   return {
     w:W,h:H,active:activeIndex, fi:frameIndex,
+    sheet:cloneSheet(sheet), tileSel:tileSel?{r:tileSel.r,c:tileSel.c}:null,
     layers:layers.map(l=>({
       name:l.name, visible:l.visible, opacity:l.opacity,
       img:l.ctx.getImageData(0,0,W,H)
@@ -2439,15 +3065,29 @@ function snapshot(){
 function restore(snap){
   W=snap.w; H=snap.h; flat.width=W; flat.height=H;
   if(snap.fi!=null) frameIndex=clamp(snap.fi,0,frames.length-1);
+  sheet=cloneSheet(snap.sheet)||null; tileSel=snap.tileSel||null;
   const arr=snap.layers.map(s=>{
     const c=makeLayerCanvas(); const ctx=c.getContext("2d");
     ctx.putImageData(cloneImg(s.img),0,0);
     return {id:layerSeq++, name:s.name, visible:s.visible, opacity:s.opacity, canvas:c, ctx:ctx};
   });
   frames[frameIndex].layers=arr; layers=arr;      // write back into the current frame
+  // A resize or a tilesheet edit changed every frame, but a snapshot only carries the one you were
+  // on. Bring the others back to the restored size too — best effort, top-left anchored — because
+  // a frame whose layers are the wrong size would draw clipped the next time you stepped onto it.
+  frames.forEach((f,i)=>{ if(i===frameIndex) return;
+    f.layers.forEach(l=>{
+      if(l.canvas.width===W && l.canvas.height===H) return;
+      const c=makeLayerCanvas(), ctx=c.getContext("2d");
+      ctx.imageSmoothingEnabled=false; ctx.drawImage(l.canvas,0,0);
+      l.canvas=c; l.ctx=ctx;
+    });
+  });
   activeIndex=clamp(snap.active,0,layers.length-1);
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
-  setZoom(zoom,false); renderLayers(); renderTimeline(); composite(); updateDocInfo();
+  clampRegion();
+  setZoom(zoom,false); renderLayers(); renderTimeline(); renderRegionPanel(); renderSheetPanel();
+  composite(); updateDocInfo();
 }
 function cloneImg(img){return new ImageData(new Uint8ClampedArray(img.data),img.width,img.height);}
 
@@ -3045,6 +3685,8 @@ view.addEventListener("pointerdown",e=>{
   if(e.button===0){
     if(selection && !selDrag && badgeHit(selection,e)){ clearSelection(); return; }
     if(region && !regionDrag && badgeHit(region,e)){ removeRegion(); return; }
+    // the + buttons around the selected tile: same idea, and they only exist under the Tile tool
+    const plus=tilePlusHit(e); if(plus){ addTileAt(plus); return; }
   }
   if(playing) stopPlayback();                        // editing stops playback
   try{ view.setPointerCapture(e.pointerId); }catch(_){}   // never let a capture refusal abort the stroke
@@ -3053,8 +3695,8 @@ view.addEventListener("pointerdown",e=>{
   if(e.altKey){ pickColor(p.x,p.y,slot); return; }
   drawColor = slot==="bg" ? secondary : primary;     // right-click paints background color
   const L=activeLayer(); if(!L) return;
-  // locked layers block anything that edits pixels (picking / wand / region still work)
-  if(L.locked && tool!=="eyedropper" && tool!=="wand" && tool!=="region"){
+  // locked layers block anything that edits pixels (picking / wand / region / tiles still work)
+  if(L.locked && tool!=="eyedropper" && tool!=="wand" && tool!=="region" && tool!=="tile"){
     showToast("This layer is locked.","info"); return;
   }
 
@@ -3074,6 +3716,10 @@ view.addEventListener("pointerdown",e=>{
     if(e.button===0) magicWand(p);
   }else if(tool==="region"){
     if(e.button===0) regionDown(p,e);
+  }else if(tool==="tile"){
+    if(e.button!==0) return;
+    if(sheet) tileDown(p);
+    else showToast("This drawing isn't a tilesheet yet — set the grid up from the Tiles panel.","info",3400);
   }
 });
 
@@ -3108,7 +3754,8 @@ view.addEventListener("pointermove",e=>{
   // the ✕ badges are clickable under every tool, so advertise them — and put the tool's own
   // cursor back the moment you leave, since most tools never touch the cursor after setTool
   const onBadge = !placement && ((selection && !selDrag && badgeHit(selection,e))
-                              || (region && !regionDrag && badgeHit(region,e)));
+                              || (region && !regionDrag && badgeHit(region,e))
+                              || !!tilePlusHit(e));
   if(onBadge!==overBadge){ overBadge=onBadge; view.style.cursor = onBadge ? "pointer" : (CURSORS[tool]||"crosshair"); }
   if(onBadge) return;
   if(tool==="select" && !selDrag && !placement) view.style.cursor=(selection && inSel(p.x,p.y))?"move":"crosshair";
@@ -3120,6 +3767,7 @@ view.addEventListener("pointermove",e=>{
       view.style.cursor = m ? map[m] : "crosshair";
     }
   }
+  else if(tool==="tile" && !placement) view.style.cursor = (sheet && tileAtArt(p.x,p.y)) ? "pointer" : "crosshair";
 });
 view.addEventListener("pointerleave",()=>{
   if(!drawing&&!shaping&&!selDrag&&!xform) $("#cursorInfo").textContent="—";
@@ -3526,6 +4174,9 @@ function exportPNG(scale){
 }
 function saveProject(){
   const data={app:"PixelPaint",version:2,w:W,h:H,active:activeIndex,frameIndex,
+    sheet: sheet ? {tw:sheet.tw, th:sheet.th, gap:sheet.gap, pad:sheet.pad,
+                    cols:sheet.cols.slice(), rows:sheet.rows.slice(),
+                    tiles:sheet.tiles.map(r=>r.map(t=>({name:t.name||""})))} : null,
     tags:tags.map(t=>({name:t.name,from:t.from,to:t.to,color:t.color})),
     frames:frames.map(f=>({dur:f.dur, layers:f.layers.map(l=>({name:l.name,visible:l.visible,opacity:l.opacity,data:l.canvas.toDataURL("image/png")}))}))};
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
@@ -3574,12 +4225,14 @@ function applyProject(data){
 function finishLoad(data){
   activeIndex=clamp(data.active||0,0,layers.length-1);
   pruneTags();   // a hand-edited or older project file may carry out-of-range group ranges
+  sheet=sanitizeSheet(data.sheet, W, H); tileSel=null;
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
   if(frames.length>1 && tlCollapsed) setTimelineCollapsed(false);   // an animated project wants its timeline
   undoStack=[]; redoStack=[]; fitZoom();
-  renderLayers(); renderTimeline(); composite(); updateUndoButtons(); updateDocInfo();
+  renderLayers(); renderTimeline(); renderSheetPanel(); composite(); updateUndoButtons(); updateDocInfo();
   captureActiveDoc(); renderTabs();   // persist the loaded state into the active tab
-  showToast("Project loaded"+(frames.length>1?(" — "+frames.length+" frames"):"")+".","success");
+  showToast("Project loaded"+(sheet?(" — "+sheet.cols.length+"×"+sheet.rows.length+" tilesheet")
+    :(frames.length>1?(" — "+frames.length+" frames"):""))+".","success");
 }
 
 // ------------------------------------------------------------------ spritesheet import
@@ -4153,7 +4806,7 @@ function exportSpritesheet(opts){
 }
 
 // ------------------------------------------------------------------ tool UI
-const TOOL_ICONS={pencil:"pencil",eraser:"eraser",bucket:"fill",eyedropper:"pick",line:"line",rect:"rect",ellipse:"ellipse",select:"select",wand:"wand",region:"region"};
+const TOOL_ICONS={pencil:"pencil",eraser:"eraser",bucket:"fill",eyedropper:"pick",line:"line",rect:"rect",ellipse:"ellipse",select:"select",wand:"wand",region:"region",tile:"grid"};
 // the last tool that actually paints — where Remove-sub-canvas drops you back to
 const PAINT_TOOLS=["pencil","eraser","bucket","line","rect","ellipse"];
 let lastPaintTool="pencil";
@@ -4161,13 +4814,20 @@ function setTool(t){
   tool=t;
   if(PAINT_TOOLS.indexOf(t)>=0) lastPaintTool=t;
   document.querySelectorAll(".tool").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
-  const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand",region:"Region"};
+  const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand",region:"Region",tile:"Tile"};
   $("#toolInfo").textContent=names[t];
   const ts=$("#toolStat"); if(ts){ ts.firstChild.outerHTML=iconSVG(TOOL_ICONS[t]||"pencil",14); }
   // contextual tool options in the left panel (solid-fill only means something for closed shapes)
   const opts=$("#toolOpts");
   if(opts){ opts.classList.toggle("show-wand",t==="wand"); opts.classList.toggle("show-shape",t==="rect"||t==="ellipse"); }
   renderRegionPanel();   // owns .show-region, #regionSection and the View-menu checkbox
+  renderSheetPanel();    // the Tile tool brings the tilesheet panel with it
+  if(t==="tile"){
+    if(sheet && !tileSel) tileSel={r:0,c:0};
+    setPanelTabIfMobile("tiles");     // on a phone the panel is only reachable as a tab
+  }
+  if(frames.length) composite();   // the + buttons appear and disappear with the tool (not at boot,
+                                   // where setTool runs before the first document exists)
   view.style.cursor = CURSORS[t] || "crosshair";
 }
 function setBrush(n){ const max=Math.max(16, Math.round(Math.max(W,H)/2)); brush=clamp(n,1,max); $("#brushReadout").textContent=brush+" px"; }
@@ -4215,12 +4875,13 @@ function restoreDocks(){
 // attribute is inert and every panel stays visible.
 // "none" is a real state, not a fallback: tapping the open tab closes the panel outright, so the
 // canvas can have the whole screen instead of always surrendering a third of it to one of these.
-const PANEL_TABS=["none","color","layers","anim"];
-const PANEL_NAMES={color:"the color panel", layers:"the layers panel", anim:"frames & groups"};
+const PANEL_TABS=["none","color","layers","anim","tiles"];
+const PANEL_NAMES={color:"the color panel", layers:"the layers panel", anim:"frames & groups", tiles:"the tilesheet grid"};
 const PANEL_TAB_KEY="pp_panelTab";
 let panelTab="none";
 function setPanelTab(name){
   if(PANEL_TABS.indexOf(name)<0) name="none";
+  if(name==="tiles" && !sheet && tool!=="tile") name="none";   // no grid and no Tile tool, no tab
   panelTab=name;
   document.body.dataset.ptab=name;
   document.querySelectorAll("#panelTabs .ptab").forEach(b=>{
@@ -4238,6 +4899,8 @@ function setPanelTab(name){
 document.querySelectorAll("#panelTabs .ptab").forEach(b=>{
   b.onclick=()=>setPanelTab(panelTab===b.dataset.ptab ? "none" : b.dataset.ptab);
 });
+// only meaningful on a phone, where the panels are tabs — on desktop they're all on screen anyway
+function setPanelTabIfMobile(name){ if(isMobileLayout()) setPanelTab(name); }
 // The tab strip replaces the collapsible headers on mobile, so a section left collapsed on a
 // desktop-width window must not stay hidden once its tab is the only way in.
 function applyPanelLayout(){
@@ -4247,7 +4910,7 @@ function applyPanelLayout(){
 }
 
 // ------------------------------------------------------------------ menu bar (File / Edit / Sprite / … )
-const MENUS=["file","edit","sprite","layer","frame","select","view","help"];
+const MENUS=["file","edit","sprite","layer","frame","tiles","select","view","help"];
 let openMenu=null;
 function menuEl(name){ return $("#menu-"+name); }
 function closeMenus(){
@@ -4271,6 +4934,12 @@ document.querySelectorAll("#menubar .menu-item, #menuSheet .menu-item").forEach(
 });
 $("#menuHamburger").onclick=e=>{ e.stopPropagation(); closeMenus(); const s=$("#menuSheet"); s.hidden=!s.hidden; };
 
+// the tile commands all act on the picked tile — say so once rather than failing quietly
+function needTile(){
+  if(!sheet){ showToast("This drawing isn't a tilesheet yet — Tiles ▸ Tilesheet setup.","info",3600); return false; }
+  if(!tileSel){ setTool("tile"); showToast("Pick a tile on the canvas first.","info"); return false; }
+  return true;
+}
 function runCmd(cmd){
   switch(cmd){
     case "new": case "newtab": newCanvasDialog(); break;
@@ -4306,6 +4975,18 @@ function runCmd(cmd){
     case "wandtool": setTool("wand"); break;
     case "snap": applyPaletteToLayer(); break;
     case "delregion": if(region) removeRegion(); else showToast("There's no sub-canvas to remove.","info"); break;
+    case "tilesetup": tilesheetDialog(); break;
+    case "tilesoff": sheetOff(); break;
+    case "tiletool": setTool("tile"); break;
+    case "tilerowup": addTileAt("up"); break;
+    case "tilerowdown": addTileAt("down"); break;
+    case "tilecolleft": addTileAt("left"); break;
+    case "tilecolright": addTileAt("right"); break;
+    case "tiledelrow": if(needTile()) deleteTileNear("row"); break;
+    case "tiledelcol": if(needTile()) deleteTileNear("col"); break;
+    case "tilerename": if(needTile()) renameTile(tileSel.r,tileSel.c); break;
+    case "tileclear": if(needTile()) clearTile(tileSel.r,tileSel.c); break;
+    case "exporttiles": showTilesExportDialog().then(o=>{ if(o) exportTiles(o); }); break;
     case "fit": fitZoom(); composite(); break;
     case "shortcuts": showShortcuts(); break;
     case "about": showAbout(); break;
@@ -4323,6 +5004,7 @@ const HELP_SECTIONS=[
     ["pencil","Pencil","B"], ["eraser","Eraser","E"], ["fill","Fill","F"], ["pick","Pick color","I"],
     ["line","Line","L"], ["rect","Rectangle","R"], ["ellipse","Ellipse","C"],
     ["select","Rectangle select","M"], ["wand","Magic wand","W"], ["region","Sub-canvas","D"],
+    ["grid","Tiles","T"],
   ]},
   {title:"Edit", icon:"undo", rows:[
     ["undo","Undo","Ctrl+Z"], ["redo","Redo","Ctrl+Y"],
@@ -4351,6 +5033,15 @@ const HELP_SECTIONS=[
     ["tag","Group frames — idle, walk, jump…",""],
     ["image","Export a spritesheet of a group",""],
     ["folder","Import a spritesheet — sliced into frames and groups",""],
+  ]},
+  {title:"Tilesheets", icon:"grid", rows:[
+    ["grid","Cut the canvas into a grid of tiles",""],
+    ["region","Pick a tile with the Tile tool","T"],
+    ["up","Move between tiles","←|→|↑|↓"],
+    ["add","Add a row or column — the + around the picked tile",""],
+    ["pencil","Rename a tile, or clear just that tile",""],
+    ["select","Give one row or column its own size",""],
+    ["download","Export the sheet, or one PNG per tile, with a JSON map",""],
   ]},
   {title:"Mouse", icon:"pick", rows:[
     ["pick","Quick color pick","Alt+click"],
@@ -4392,6 +5083,7 @@ const ABOUT_ROWS=[
   ["play","Frame-by-frame animation, grouped into idle, walk, jump…"],
   ["palette","Built-in palettes: real console sets and community favorites"],
   ["image","Spritesheets in and out, with an Aseprite-style JSON sidecar"],
+  ["grid","Tilesheets: a grid of named tiles you grow a row at a time"],
   ["download","Works offline, and installs as an app"],
 ];
 function showAbout(){
@@ -4517,6 +5209,7 @@ $("#zoomOut").onclick=()=>setZoom(zoom-1);
 $("#zoomFit").onclick=()=>{ fitZoom(); composite(); };
 $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
 $("#centerToggle").onchange=e=>{showCenter=e.target.checked; composite();};
+$("#tileGridToggle").onchange=e=>{showTileGrid=e.target.checked; composite();};
 $("#zoomStat").onclick=()=>{ fitZoom(); composite(); };
 $("#docInfo").onclick=resizeDialog;
 $("#toolStat").onclick=()=>{ if(isMobileLayout()){} };
@@ -4538,6 +5231,23 @@ $("#rgRemove").onclick=()=>removeRegion();   // wrapped: the click event must no
 $("#rgCenter").onclick=centerRegion;
 $("#rgLock").onchange=e=>{ regionLocked=e.target.checked; composite(); };
 ["#rgW","#rgH","#rgX","#rgY"].forEach(id=>{ $(id).onchange=setRegionFromInputs; });
+
+// tilesheet panel — the action buttons carry the same data-cmd names as the Tiles menu, so both
+// routes run one implementation
+$("#tsCreate").onclick=tilesheetDialog;
+$("#sheetSection").addEventListener("click",e=>{
+  const b=e.target.closest("[data-cmd]"); if(!b || b.disabled) return;
+  runCmd(b.dataset.cmd);
+});
+$("#tsName").onchange=e=>{
+  if(!tileSel) return;
+  const t=tileEntry(tileSel.r,tileSel.c); if(!t) return;
+  t.name=e.target.value.trim();
+  renderSheetPanel(); composite(); captureActiveDoc();
+};
+["#tsTileW","#tsTileH"].forEach(id=>{ $(id).onchange=setSelTileSize; });
+["#tsGapIn","#tsPadIn"].forEach(id=>{ $(id).onchange=setSheetGutters; });
+$("#tsClip").onchange=e=>setTileClip(e.target.checked);
 
 $("#helpBtn").onclick=showShortcuts;
 $("#undoBtn").onclick=undo;
@@ -4703,9 +5413,17 @@ window.addEventListener("keydown",e=>{
     case "m": setTool("select"); break;
     case "w": setTool("wand"); break;
     case "d": setTool("region"); break;
+    case "t": setTool("tile"); break;
     case " ": e.preventDefault(); startPlayback(); break;
-    case "arrowleft":  e.preventDefault(); if(e.shiftKey) nudgeFrame(-1); else selectFrame(frameIndex-1); break;
-    case "arrowright": e.preventDefault(); if(e.shiftKey) nudgeFrame(1);  else selectFrame(frameIndex+1); break;
+    // under the Tile tool the arrows walk the grid; everywhere else they step through frames
+    case "arrowup":    if(tool==="tile"&&sheet){ e.preventDefault(); moveTileSel(-1,0); } break;
+    case "arrowdown":  if(tool==="tile"&&sheet){ e.preventDefault(); moveTileSel(1,0); } break;
+    case "arrowleft":  e.preventDefault();
+      if(tool==="tile"&&sheet) moveTileSel(0,-1);
+      else if(e.shiftKey) nudgeFrame(-1); else selectFrame(frameIndex-1); break;
+    case "arrowright": e.preventDefault();
+      if(tool==="tile"&&sheet) moveTileSel(0,1);
+      else if(e.shiftKey) nudgeFrame(1);  else selectFrame(frameIndex+1); break;
     case "delete": case "backspace":
       if(selection){ e.preventDefault(); clearSelectionContents(); }
       else if(region){ e.preventDefault(); removeRegion(); }
@@ -4715,6 +5433,7 @@ window.addEventListener("keydown",e=>{
       if(toolsPanelEl.classList.contains("open")||sidePanelEl.classList.contains("open")) closeDrawers();
       else if(selection) clearSelection();
       else if(region && tool==="region") removeRegion();
+      else if(tool==="tile" && tileSel){ tileSel=null; renderSheetPanel(); composite(); }
       break;
   }
 });
