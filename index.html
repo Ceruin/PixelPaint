@@ -443,6 +443,20 @@
     background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 16px 16px;}
   .shi-prev canvas{display:block; width:100%; height:auto; image-rendering:pixelated; cursor:crosshair;}
   .shi-hint{color:var(--muted); font-size:11px; line-height:1.45;}
+  /* A packed sheet is as likely to be square as wide, so the preview fits inside a fixed box
+     rather than filling the width the way the (always wide) spritesheet import preview does. */
+  .pk-prev{display:flex; align-items:center; justify-content:center; flex:1; min-width:0;
+    height:206px; padding:6px; overflow:hidden; border:1px solid var(--line); border-radius:8px;
+    background:var(--panel2);}
+  /* The checkerboard sits on the canvas, not the box, and the canvas is sized in script to the
+     sheet's aspect — so what you see checkered is exactly the sheet, edges and all. */
+  .pk-prev canvas{image-rendering:pixelated; display:block; box-shadow:0 0 0 1px #ffffff2e;
+    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 16px 16px;}
+  /* what went into the pack, as chips — a plain list of 400 names would bury the dialog */
+  .pk-list{display:flex; flex-wrap:wrap; gap:4px; flex:1; min-width:0; max-height:82px; overflow:auto;}
+  .pk-i{font-size:10.5px; color:var(--muted); background:var(--panel2); border:1px solid var(--line);
+    border-radius:5px; padding:2px 6px; white-space:nowrap;}
+  .pk-i.more{color:var(--accent); border-color:var(--accent);}
 
   /* ---- about sheet ---- */
   .about-head{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
@@ -782,6 +796,7 @@
     <button id="sideDrawerBtn" class="iconbtn drawer-btn" data-icon="palette" title="Colors, palette &amp; layers"></button>
     <input type="file" id="openInput" accept=".pxpaint,.json,application/json" style="display:none" />
     <input type="file" id="sheetInput" accept="image/*" style="display:none" />
+    <input type="file" id="packInput" accept="image/*,.pxpaint,.json,application/json" multiple style="display:none" />
   </div>
 
   <!-- TAB BAR (shown only when more than one drawing is open) -->
@@ -796,6 +811,7 @@
     <div class="ctx-sep"></div>
     <button data-cmd="open"   data-icon="folder"   data-icon-size="16">Open project…</button>
     <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
+    <button data-cmd="pack"   data-icon="grid"     data-icon-size="16">Pack files into a sheet…</button>
     <button data-cmd="save"   data-icon="save"     data-icon-size="16">Save project<span class="hk">Ctrl+S</span></button>
     <div class="ctx-sep"></div>
     <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
@@ -849,6 +865,7 @@
   <div id="menu-tiles" class="ctx-menu menu-dd" hidden>
     <button data-cmd="tilesetup" data-icon="grid"   data-icon-size="16">Tilesheet setup…</button>
     <button data-cmd="tiletool"  data-icon="region" data-icon-size="16">Tile tool<span class="hk">T</span></button>
+    <button data-cmd="pack"      data-icon="folder" data-icon-size="16">Pack files into a tilesheet…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="tilerowup"    data-icon="up"    data-icon-size="16">Add a row above</button>
     <button data-cmd="tilerowdown"  data-icon="down"  data-icon-size="16">Add a row below</button>
@@ -1352,7 +1369,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03c";
+const APP_VERSION="2026.08.03d";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -4809,6 +4826,339 @@ function exportSpritesheet(opts){
     +built.sheet.width+"×"+built.sheet.height+" px (PNG + Aseprite JSON).","success",4200);
 }
 
+// ------------------------------------------------------------------ packing many files into one sheet
+// Sprites arrive from wherever they were made: a folder of PNGs, a pile of .pxpaint projects, a
+// tilesheet someone already built. Packing reads them all, normalises them onto one cell size and
+// lays them out in a grid — then either downloads the sheet with a JSON map of what went where, or
+// opens it as a new tilesheet tab, where every cell is already named and editable.
+//
+// Files are read once into "sources" (a project keeps its frames, tags and grid); the layout
+// options then derive sprites from those without touching the disk again, so the live preview can
+// redraw on every keystroke.
+const MAX_PACK=400;
+
+function packBase(f){
+  return (f.name||"sprite").replace(/\.[^.]+$/,"").replace(/[^\w\- ]+/g," ").replace(/\s+/g," ").trim()||"sprite";
+}
+function canvasOf(w,h){ const c=document.createElement("canvas"); c.width=Math.max(1,Math.round(w)); c.height=Math.max(1,Math.round(h)); return c; }
+function blobToImage(blob){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(blob), img=new Image();
+    img.onload=()=>{ URL.revokeObjectURL(url); res(img); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("not an image this browser can read")); };
+    img.src=url;
+  });
+}
+function srcToImage(src){
+  return new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error("bad layer")); i.src=src; });
+}
+function readTextFile(f){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error("could not be read")); r.readAsText(f); });
+}
+// composite a saved frame the way the editor would: visible layers, bottom to top, with opacity
+async function frameToCanvas(fd, w, h){
+  const c=canvasOf(w,h), x=c.getContext("2d");
+  x.imageSmoothingEnabled=false;
+  for(const l of (fd.layers||[])){
+    if(l.visible===false || !l.data) continue;
+    let img; try{ img=await srcToImage(l.data); }catch(_){ continue; }
+    x.globalAlpha=(l.opacity==null?1:l.opacity);
+    x.drawImage(img,0,0);
+  }
+  x.globalAlpha=1;
+  return c;
+}
+function trimSpriteCanvas(c){
+  const x=c.getContext("2d",{willReadFrequently:true});
+  const d=x.getImageData(0,0,c.width,c.height).data;
+  let x0=1e9,y0=1e9,x1=-1,y1=-1;
+  for(let y=0;y<c.height;y++){
+    const r=y*c.width*4;
+    for(let xx=0;xx<c.width;xx++){
+      if(d[r+xx*4+3]<1) continue;
+      if(xx<x0)x0=xx; if(xx>x1)x1=xx; if(y<y0)y0=y; if(y>y1)y1=y;
+    }
+  }
+  if(x1<0) return null;                                                   // nothing drawn at all
+  if(x0===0&&y0===0&&x1===c.width-1&&y1===c.height-1) return c;
+  const o=canvasOf(x1-x0+1, y1-y0+1);
+  o.getContext("2d").drawImage(c, x0,y0,o.width,o.height, 0,0,o.width,o.height);
+  return o;
+}
+async function readPackFile(f){
+  const base=packBase(f);
+  if(isProjectFile(f)){
+    let data;
+    try{ data=JSON.parse(await readTextFile(f)); }catch(_){ throw new Error("isn't readable JSON"); }
+    const p=projectProblem(data); if(p) throw new Error(p.replace(/\.$/,""));
+    const w=clamp(data.w|0,1,4096), h=clamp(data.h|0,1,4096);
+    const defs=data.frames || [{layers:data.layers||[]}];
+    const frames=[];
+    for(const d of defs) frames.push(await frameToCanvas(d,w,h));
+    return {base:base, kind:"project", frames:frames, w:w, h:h,
+      tags:(data.tags||[]).filter(t=>t&&t.name).map(t=>({name:t.name, from:t.from|0, to:t.to|0})),
+      grid:sanitizeSheet(data.sheet, w, h)};
+  }
+  const img=await blobToImage(f);
+  const c=canvasOf(img.naturalWidth||img.width, img.naturalHeight||img.height);
+  c.getContext("2d").drawImage(img,0,0);
+  return {base:base, kind:"image", frames:[c], w:c.width, h:c.height, tags:[], grid:null};
+}
+// sources -> the flat list of named sprites to lay out. A frame group inside a project becomes its
+// own layout group, so "one row per group" gives idle and walk a row each.
+function packSprites(sources, o){
+  const out=[], dropped=[];
+  for(const s of sources){
+    if(s.grid && o.splitTiles){
+      s.frames.forEach((fc,fi)=>{
+        for(let r=0;r<s.grid.rows.length;r++) for(let c=0;c<s.grid.cols.length;c++){
+          const t=tileRectIn(s.grid,r,c);
+          const cv=canvasOf(t.w,t.h);
+          cv.getContext("2d").drawImage(fc, t.x,t.y,t.w,t.h, 0,0,t.w,t.h);
+          const nm=(s.grid.tiles[r][c].name||("tile "+(r+1)+"-"+(c+1)));
+          out.push({name:s.base+" "+nm+(s.frames.length>1?(" f"+(fi+1)):""), canvas:cv, group:s.base});
+        }
+      });
+    } else {
+      s.frames.forEach((fc,fi)=>{
+        const tag=s.tags.find(t=>fi>=t.from && fi<=t.to);
+        const suffix=s.frames.length>1 ? (" "+(tag?tag.name+" ":"")+(fi+1)) : "";
+        out.push({name:s.base+suffix, canvas:fc, group:s.base+(tag?" "+tag.name:"")});
+      });
+    }
+  }
+  const kept=[];
+  let truncated=0;
+  for(const sp of out){
+    // an all-transparent sprite is a blank cell in the middle of the sheet — never what you meant
+    const t=trimSpriteCanvas(sp.canvas);
+    if(!t){ dropped.push(sp.name); continue; }
+    if(kept.length>=MAX_PACK){ truncated++; continue; }
+    kept.push({name:sp.name, canvas:o.trim?t:sp.canvas, group:sp.group});
+  }
+  return {sprites:kept, dropped:dropped, truncated:truncated};
+}
+function packPlan(sprites,o){
+  const cw=clamp(o.cw|0 || Math.max(1,...sprites.map(s=>s.canvas.width)), 1, 2048);
+  const ch=clamp(o.ch|0 || Math.max(1,...sprites.map(s=>s.canvas.height)), 1, 2048);
+  let rows=[];
+  if(o.layout==="rowper"){
+    const by=new Map();
+    sprites.forEach(s=>{ const k=s.group||""; if(!by.has(k)) by.set(k,[]); by.get(k).push(s); });
+    rows=[...by.values()];
+  }
+  else if(o.layout==="row") rows=sprites.length?[sprites.slice()]:[];
+  else if(o.layout==="col") rows=sprites.map(s=>[s]);
+  else {
+    const n=o.cols|0 || Math.max(1,Math.ceil(Math.sqrt(sprites.length)));
+    for(let i=0;i<sprites.length;i+=n) rows.push(sprites.slice(i,i+n));
+  }
+  const cols=rows.reduce((m,r)=>Math.max(m,r.length),0);
+  const gap=clamp(o.gap|0,0,64), pad=clamp(o.pad|0,0,64), S=clamp(o.scale|0||1,1,8);
+  const cells=[];
+  rows.forEach((r,ri)=>r.forEach((s,ci)=>cells.push({s:s, r:ri, c:ci,
+    cx:pad+ci*(cw+gap), cy:pad+ri*(ch+gap)})));
+  return {cells:cells, cols:cols, nrows:rows.length, cw:cw, ch:ch, gap:gap, pad:pad, scale:S,
+    w:pad*2+cols*cw+gap*Math.max(0,cols-1), h:pad*2+rows.length*ch+gap*Math.max(0,rows.length-1)};
+}
+// Each sprite is placed inside its cell and clipped to it, so a sprite bigger than the cell is
+// cropped rather than bleeding over its neighbour.
+function drawPack(plan,o,scale){
+  const S=scale==null?plan.scale:scale;
+  const out=canvasOf(plan.w*S, plan.h*S);
+  const x=out.getContext("2d"); x.imageSmoothingEnabled=false;
+  plan.cells.forEach(cell=>{
+    const sw=cell.s.canvas.width, sh=cell.s.canvas.height;
+    let dx=cell.cx, dy=cell.cy;
+    if(o.align!=="topleft") dx=cell.cx+Math.round((plan.cw-sw)/2);
+    if(o.align==="center")  dy=cell.cy+Math.round((plan.ch-sh)/2);
+    if(o.align==="bottom")  dy=cell.cy+(plan.ch-sh);
+    cell.x=dx; cell.y=dy; cell.w=sw; cell.h=sh;
+    x.save();
+    x.beginPath(); x.rect(cell.cx*S, cell.cy*S, plan.cw*S, plan.ch*S); x.clip();
+    x.drawImage(cell.s.canvas, 0,0,sw,sh, dx*S,dy*S, sw*S,sh*S);
+    x.restore();
+  });
+  return out;
+}
+function packJSON(base, imgName, plan){
+  const S=plan.scale;
+  return { app:"PixelPaint", version:APP_VERSION, image:imgName||undefined, scale:S,
+    sheet:{ w:plan.w*S, h:plan.h*S, cellW:plan.cw*S, cellH:plan.ch*S,
+            spacing:plan.gap*S, margin:plan.pad*S, columns:plan.cols, rows:plan.nrows },
+    sprites:plan.cells.map((c,i)=>({ index:i, name:c.s.name, row:c.r, col:c.c,
+      x:c.cx*S, y:c.cy*S, w:plan.cw*S, h:plan.ch*S,
+      sprite:{x:c.x*S, y:c.y*S, w:c.w*S, h:c.h*S} }))};   // where the artwork sits inside its cell
+}
+// The packed sheet as a live document, with the grid already in place: every cell is a tile
+// carrying the name of the file (and frame, or group) it came from.
+function packToDoc(plan, out, name){
+  if(out.width>MAX_DIM || out.height>MAX_DIM) return false;
+  createDoc(out.width, out.height, name);
+  const L=activeLayer(); if(!L) return false;
+  L.ctx.imageSmoothingEnabled=false; L.ctx.drawImage(out,0,0);
+  const S=plan.scale;
+  const g=blankSheet(plan.cw*S, plan.ch*S, plan.cols, plan.nrows, plan.gap*S, plan.pad*S);
+  plan.cells.forEach(c=>{ if(g.tiles[c.r] && g.tiles[c.r][c.c]) g.tiles[c.r][c.c].name=c.s.name; });
+  sheet=g; tileSel={r:0,c:0};
+  setTool("tile"); fitZoom();
+  renderLayers(); renderSheetPanel(); composite(); updateDocInfo(); refreshThumb(L);
+  captureActiveDoc(); renderTabs(); setPanelTabIfMobile("tiles");
+  return true;
+}
+async function packFiles(files){
+  files=[...files];
+  if(!files.length) return;
+  if(files.length===1 && !isProjectFile(files[0]) && files[0].type.indexOf("image")===0){
+    // packing one image gives a one-cell sheet, which is nobody's goal — point at the right door,
+    // then carry on rather than deciding for them
+    showToast("That's one image, so the sheet will have one cell. Sprite ▸ Add image… puts an image on the canvas instead.","info",5200);
+  }
+  showToast("Reading "+files.length+" file"+(files.length>1?"s":"")+"…","info",1600);
+  const sources=[], bad=[];
+  for(const f of files){
+    try{ sources.push(await readPackFile(f)); }
+    catch(err){ bad.push(f.name+" — "+(err&&err.message||"could not be read")); }
+  }
+  if(!sources.length){
+    showToast("Nothing to pack: "+(bad[0]||"no readable files")+".","error",5200);
+    return;
+  }
+  const o=await showPackDialog(sources, bad);
+  if(!o) return;
+  const got=packSprites(sources,o);
+  if(!got.sprites.length){ showToast("Every sprite in those files was empty.","error",4200); return; }
+  const plan=packPlan(got.sprites,o);
+  const out=drawPack(plan,o);
+  const stem=(sources.length===1?sources[0].base:"packed")+"_sheet";
+  let opened=false;
+  if(o.out==="tab" || o.out==="both"){
+    opened=packToDoc(plan, out, sources.length===1?sources[0].base+" sheet":"Packed sheet");
+    if(!opened && o.out==="tab") o.out="png";     // too big for a document — fall back to the file
+  }
+  if(o.out==="png" || o.out==="both"){
+    downloadCanvas(out, stem+".png");
+    downloadJSON(packJSON(stem, stem+".png", plan), stem+".json", 300);
+  }
+  const bits=[got.sprites.length+" sprite"+(got.sprites.length>1?"s":"")+" from "+sources.length+" file"+(sources.length>1?"s":""),
+              out.width+" × "+out.height+" px"];
+  if(got.dropped.length) bits.push(got.dropped.length+" empty skipped");
+  if(got.truncated) bits.push(got.truncated+" left out past the "+MAX_PACK+"-sprite limit");
+  if(bad.length) bits.push(bad.length+" file"+(bad.length>1?"s":"")+" unreadable");
+  showToast("Packed "+bits.join("  ·  ")
+    +(opened?"" : (out.width>MAX_DIM||out.height>MAX_DIM ? " — too big to open as a tab ("+MAX_DIM+" px max), downloaded instead" : "")),
+    "success", 5600);
+}
+async function showPackDialog(sources, bad){
+  const nImg=sources.filter(s=>s.kind==="image").length;
+  const nProj=sources.length-nImg;
+  const guessCols=Math.max(1,Math.ceil(Math.sqrt(sources.reduce((n,s)=>n+s.frames.length,0))));
+  const anyGrid=sources.some(s=>s.grid);
+  const body=`
+    <div class="row"><label>Layout</label><select id="pkLayout">
+      <option value="grid" selected>Grid — set the number of columns</option>
+      <option value="row">Single row</option>
+      <option value="col">Single column</option>
+      <option value="rowper">One row per file (or frame group)</option></select></div>
+    <div class="row" id="pkColsRow"><label>Columns</label><input type="number" id="pkCols" min="0" max="64" value="${guessCols}">
+      <span class="shi-hint">0 fits them in a square</span></div>
+    <div class="row"><label>Cell</label>
+      <input type="number" id="pkCW" min="1" max="2048"><span class="rg-x">×</span>
+      <input type="number" id="pkCH" min="1" max="2048">
+      <button id="pkAuto" data-icon="wand" data-icon-size="14" title="Back to the largest sprite in the set">Auto</button></div>
+    <div class="row"><label>Align</label><select id="pkAlign">
+      <option value="bottom" selected>Bottom centre — feet on the ground</option>
+      <option value="center">Centre</option>
+      <option value="topleft">Top left</option></select></div>
+    <div class="row"><label>Spacing</label>
+      <span class="shi-hint">between</span><input type="number" id="pkGap" min="0" max="64" value="0">
+      <span class="shi-hint">margin</span><input type="number" id="pkPad" min="0" max="64" value="0"></div>
+    <div class="row"><label>Scale</label><select id="pkScale">
+      <option value="1" selected>1× (true pixel size)</option><option value="2">2×</option>
+      <option value="4">4×</option><option value="8">8×</option></select></div>
+    <div class="row"><label></label><label class="chk"><input type="checkbox" id="pkTrim">
+      Trim each sprite to its own artwork first</label></div>
+    ${anyGrid?`<div class="row"><label></label><label class="chk"><input type="checkbox" id="pkSplit" checked>
+      Split tilesheet projects into their tiles</label></div>`:""}
+    <div class="row"><label>When done</label><select id="pkOut">
+      <option value="tab" selected>Open it as a new tilesheet tab</option>
+      <option value="png">Download the PNG + a JSON map</option>
+      <option value="both">Both</option></select></div>
+    <div class="row"><label></label><span id="pkSummary" class="shi-hint"></span></div>
+    <div class="row"><label></label><div class="pk-prev"><canvas id="pkPrev"></canvas></div></div>
+    <div class="row"><label></label><div class="pk-list" id="pkList"></div></div>`;
+  const src=nProj?(nProj+" project"+(nProj>1?"s":"")):"";
+  const im=nImg?(nImg+" image"+(nImg>1?"s":"")):"";
+  const promise=openModal({title:"Pack files into a sheet",
+    message:[src,im].filter(Boolean).join(" and ")+" loaded."
+      +(bad.length?(" "+bad.length+" file"+(bad.length>1?"s":"")+" couldn't be read."):"")
+      +" Every frame becomes one cell; a project's groups keep their names.",
+    bodyHTML:body, okText:"Pack", wide:true});
+
+  const read=()=>({
+    layout:$("#pkLayout").value,
+    cols:parseInt($("#pkCols").value,10)||0,
+    cw:parseInt($("#pkCW").value,10)||0, ch:parseInt($("#pkCH").value,10)||0,
+    align:$("#pkAlign").value,
+    gap:parseInt($("#pkGap").value,10)||0, pad:parseInt($("#pkPad").value,10)||0,
+    scale:parseInt($("#pkScale").value,10)||1,
+    trim:$("#pkTrim").checked,
+    splitTiles:$("#pkSplit") ? $("#pkSplit").checked : false,
+    out:$("#pkOut").value,
+  });
+  let auto={w:0,h:0};
+  const update=(resize)=>{
+    const o=read();
+    const got=packSprites(sources,o);
+    auto={ w:Math.max(1,...got.sprites.map(s=>s.canvas.width)), h:Math.max(1,...got.sprites.map(s=>s.canvas.height)) };
+    if(resize || !parseInt($("#pkCW").value,10)){ $("#pkCW").value=auto.w; $("#pkCH").value=auto.h; o.cw=auto.w; o.ch=auto.h; }
+    $("#pkColsRow").style.display = o.layout==="grid" ? "" : "none";
+    const plan=packPlan(got.sprites,o);
+    const W2=plan.w*o.scale, H2=plan.h*o.scale;
+    const over=(W2>MAX_DIM||H2>MAX_DIM);
+    const sum=$("#pkSummary");
+    sum.innerHTML=got.sprites.length+" sprite"+(got.sprites.length>1?"s":"")+" · "
+      +plan.cols+" × "+plan.nrows+" cells of "+(plan.cw*o.scale)+" × "+(plan.ch*o.scale)
+      +" · <b>sheet "+W2+" × "+H2+" px</b>"
+      +(got.dropped.length?(" · "+got.dropped.length+" empty skipped"):"")
+      +(got.truncated?(" · <b>"+got.truncated+" past the "+MAX_PACK+"-sprite limit left out</b>"):"")
+      +(over && o.out!=="png" ? " — over "+MAX_DIM+" px, so it can only be downloaded" : "");
+    sum.style.color = (over && o.out!=="png") || got.truncated ? "var(--danger)" : "var(--muted)";
+    // Preview the arrangement, not the output size — and never render more than ~900px of it,
+    // since this redraws on every keystroke.
+    const k=Math.min(1, 900/Math.max(1,plan.w,plan.h));
+    const cv=$("#pkPrev"), prev=drawPack(plan,o,k);
+    cv.width=prev.width; cv.height=prev.height;
+    cv.getContext("2d").drawImage(prev,0,0);
+    // scaled to fit its box in both directions, so a square sheet reads as square
+    const box=cv.parentElement.getBoundingClientRect();
+    const fit=Math.min((box.width-14)/prev.width, (box.height-14)/prev.height);
+    cv.style.width=Math.max(8,Math.round(prev.width*fit))+"px";
+    cv.style.height=Math.max(8,Math.round(prev.height*fit))+"px";
+    const list=$("#pkList"); list.innerHTML="";
+    got.sprites.slice(0,60).forEach(s=>{
+      const d=document.createElement("span"); d.className="pk-i";
+      d.textContent=s.name+" "+s.canvas.width+"×"+s.canvas.height;
+      list.appendChild(d);
+    });
+    if(got.sprites.length>60){
+      const m=document.createElement("span"); m.className="pk-i more";
+      m.textContent="+"+(got.sprites.length-60)+" more";
+      list.appendChild(m);
+    }
+  };
+  ["pkLayout","pkCols","pkCW","pkCH","pkAlign","pkGap","pkPad","pkScale","pkTrim","pkSplit","pkOut"].forEach(id=>{
+    const el=$("#"+id); if(!el) return;
+    el.oninput=()=>update(false); el.onchange=()=>update(false);
+  });
+  // trimming and tile-splitting change what the sprites are, so the auto cell size moves with them
+  ["pkTrim","pkSplit"].forEach(id=>{ const el=$("#"+id); if(el) el.onchange=()=>update(true); });
+  $("#pkAuto").onclick=()=>update(true);
+  update(true);
+  const ok=await promise;
+  return ok ? read() : null;
+}
+
 // ------------------------------------------------------------------ tool UI
 const TOOL_ICONS={pencil:"pencil",eraser:"eraser",bucket:"fill",eyedropper:"pick",line:"line",rect:"rect",ellipse:"ellipse",select:"select",wand:"wand",region:"region",tile:"grid"};
 // the last tool that actually paints — where Remove-sub-canvas drops you back to
@@ -4950,6 +5300,7 @@ function runCmd(cmd){
     case "new": case "newtab": newCanvasDialog(); break;
     case "open": $("#openInput").click(); break;
     case "importsheet": $("#sheetInput").click(); break;
+    case "pack": $("#packInput").click(); break;
     case "save": saveProject(); break;
     case "export": showExportDialog().then(s=>{ if(s) exportPNG(s); }); break;
     case "sheet": showSheetDialog().then(o=>{ if(o) exportSpritesheet(o); }); break;
@@ -5047,6 +5398,7 @@ const HELP_SECTIONS=[
     ["pencil","Rename a tile, or clear just that tile",""],
     ["select","Give one row or column its own size",""],
     ["download","Export the sheet, or one PNG per tile, with a JSON map",""],
+    ["folder","Pack several files or PNGs into one sheet — or drop them on the canvas",""],
   ]},
   {title:"Mouse", icon:"pick", rows:[
     ["pick","Quick color pick","Alt+click"],
@@ -5199,6 +5551,10 @@ window.addEventListener("drop",e=>{
   const dt=e.dataTransfer; if(!dt) return;
   if(dt.files && dt.files.length){
     const files=[...dt.files];
+    // several files at once is a pack: dropping five PNGs to open one of them and ignore the rest
+    // would be a strange reading of the gesture
+    const usable=files.filter(f=>isProjectFile(f) || f.type.indexOf("image")===0);
+    if(usable.length>1){ packFiles(usable); return; }
     const proj=files.find(isProjectFile);
     if(proj){ openProjectFile(proj); return; }
     const img=files.find(f=>f.type.indexOf("image")===0);
@@ -5282,6 +5638,7 @@ function doInstall(){
 $("#newTabBtn").onclick=newCanvasDialog;
 $("#openInput").onchange=e=>{ const f=e.target.files[0]; if(f) openProjectFile(f); e.target.value=""; };
 $("#sheetInput").onchange=e=>{ const f=e.target.files[0]; if(f) openSheetFile(f); e.target.value=""; };
+$("#packInput").onchange=e=>{ const fs=[...e.target.files]; e.target.value=""; if(fs.length) packFiles(fs); };
 
 $("#hexInput").onchange=e=>{
   const v=normHex(e.target.value);
