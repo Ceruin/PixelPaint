@@ -228,6 +228,10 @@
     width:max-content; max-width:calc(100% - 28px);
   }
   .place-bar[hidden]{display:none;}
+  /* The bar floats over the stage at z-index 30, so anything it covers can't be grabbed — including
+     the handles of a box near the top of the canvas. It moves out of their way (see
+     positionPlaceBar) rather than quietly eating the clicks. */
+  .place-bar.low{top:auto; bottom:14px;}
   .place-bar .info{color:var(--muted); font-size:12px; margin:0 4px; display:flex; align-items:center; gap:5px;
     font-variant-numeric:tabular-nums; white-space:nowrap;}
   .place-bar .info svg{color:var(--accent);}
@@ -1403,7 +1407,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03h";
+const APP_VERSION="2026.08.03i";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1496,7 +1500,8 @@ const CURSORS = {
   eraser:     toolCursor("eraser",5,20),     // the corner that rubs
   bucket:     toolCursor("fill",5,17),       // the bottom of the drop (mirrored, so 24-19)
   eyedropper: toolCursor("pick",3,21),       // dropper tip
-  line:"crosshair", rect:"crosshair", ellipse:"crosshair"
+  line:"crosshair", rect:"crosshair", ellipse:"crosshair",
+  rotate:     toolCursor("rotR",12,12),   // acts about its middle, unlike the tools
 };
 
 // ------------------------------------------------------------------ themed dialogs (replace native alert/confirm/prompt)
@@ -3453,7 +3458,7 @@ function pickColor(x,y,slot){
 // ------------------------------------------------------------------ image placement (paste / drop / import)
 function toArtF(e){ const r=view.getBoundingClientRect(); return {x:(e.clientX-r.left)/zoom, y:(e.clientY-r.top)/zoom}; }
 
-function placeCenter(){ placement.x=Math.round((W-placement.w)/2); placement.y=Math.round((H-placement.h)/2); }
+function placeCenter(){ placement.x=Math.round((W-placement.w)/2); placement.y=Math.round((H-placement.h)/2); syncPlaceCentre(); }
 function placeActual(){ placement.w=placement.natW; placement.h=placement.natH; placeCenter(); }   // 1:1 native pixels
 function placeFit(){ const s=Math.min(W/placement.natW, H/placement.natH); placement.w=Math.max(1,Math.round(placement.natW*s)); placement.h=Math.max(1,Math.round(placement.natH*s)); placeCenter(); }
 function placeFill(){ const s=Math.max(W/placement.natW, H/placement.natH); placement.w=Math.max(1,Math.round(placement.natW*s)); placement.h=Math.max(1,Math.round(placement.natH*s)); placeCenter(); }
@@ -3463,7 +3468,8 @@ function placeFill(){ const s=Math.max(W/placement.natW, H/placement.natH); plac
 function beginPlacement(img, name, opts){
   opts=opts||{};
   const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
-  placement={img, name:(name||"Image"), natW:iw, natH:ih, ar:iw/ih, flipH:false, flipV:false, x:0, y:0, w:iw, h:ih};
+  placement={img, src:img, srcW:iw, srcH:ih, deg:0,
+    name:(name||"Image"), natW:iw, natH:ih, ar:iw/ih, flipH:false, flipV:false, x:0, y:0, w:iw, h:ih};
   let oversize=false;
   if(opts.at){
     placement.x=opts.at.x; placement.y=opts.at.y; placement.w=opts.at.w; placement.h=opts.at.h;
@@ -3475,7 +3481,7 @@ function beginPlacement(img, name, opts){
     oversize = iw>W || ih>H;
     if(oversize) placeFit(); else placeCenter();
   }
-  xform=null;
+  xform=null; syncPlaceCentre();
   $("#placeBar").hidden=false; updatePlaceInfo();
   placeOverlay.hidden=false; placeOverlay.classList.add("active"); sizePlaceOverlay();
   placeOverlay.style.cursor="move";
@@ -3487,46 +3493,79 @@ function beginPlacement(img, name, opts){
     "info",4400);
 }
 // ---- rotation, shared by pasted images and lifted selections -------------------------------
-// Flips are applied at draw time, so a pending flip has to be baked into the pixels before a
-// rotation — otherwise "flip then rotate" and "rotate then flip" would land differently.
+// The placement keeps the pixels it arrived with (`src`) alongside the rotated copy it shows
+// (`img`). Every rotation renders from `src`, so turning the box a hundred times during a drag
+// resamples the original once each time instead of resampling its own output into mush.
+//
+// Flips stay live — applied at draw time — but a pending one is baked into `src` before a rotation,
+// since otherwise flip-then-rotate and rotate-then-flip would land differently.
 function bakePlaceFlips(){
   if(!placement.flipH && !placement.flipV) return;
-  const iw=placement.natW, ih=placement.natH, c=canvasOf(iw,ih), x=c.getContext("2d");
+  const sw=placement.srcW, sh=placement.srcH, c=canvasOf(sw,sh), x=c.getContext("2d");
   x.imageSmoothingEnabled=false;
-  drawImageFlipped(x, placement.img, 0,0, iw,ih, placement.flipH, placement.flipV);
-  placement.img=c; placement.flipH=false; placement.flipV=false;
+  drawImageFlipped(x, placement.src, 0,0, sw,sh, placement.flipH, placement.flipV);
+  placement.src=c; placement.flipH=false; placement.flipV=false;
+  if(placement.deg){
+    const r=rotateInto(c, sw, sh, placement.deg);
+    placement.img=r.canvas; placement.natW=r.w; placement.natH=r.h;
+  } else placement.img=c;
+}
+// One image rotated by one angle, nearest neighbour so pixel art doesn't blur. The box grows to
+// hold the turned corners; a quarter turn just swaps the sides.
+function rotateInto(img, iw, ih, deg){
+  const a=deg*Math.PI/180, quarter=(((deg%90)+90)%90===0);
+  const cw = quarter ? (((deg%180)+180)%180===0 ? iw : ih) : Math.ceil(Math.abs(iw*Math.cos(a))+Math.abs(ih*Math.sin(a)));
+  const ch = quarter ? (((deg%180)+180)%180===0 ? ih : iw) : Math.ceil(Math.abs(iw*Math.sin(a))+Math.abs(ih*Math.cos(a)));
+  const c=canvasOf(cw,ch), x=c.getContext("2d");
+  x.imageSmoothingEnabled=false;
+  x.translate(c.width/2, c.height/2); x.rotate(a);
+  x.drawImage(img, -iw/2, -ih/2, iw, ih);
+  return {canvas:c, w:c.width, h:c.height};
+}
+// Everything a rotation needs to stay reversible: the unrotated pixels, where the centre is, and
+// the scale the box is at — held as a ratio against the *rotated* size so the box tracks the
+// growing bounding box instead of jumping, and returns to exactly its old size at the old angle.
+// The centre a rotation turns about, kept as the float it really is and refreshed whenever the box
+// moves or is resized for any other reason. Deriving it from a rounded box instead would walk the
+// centre half a pixel per turn, so rotating right then left wouldn't put the box back — and leaving
+// the box itself on fractional coordinates would make the readout and the handles disagree about
+// where it is.
+function syncPlaceCentre(){
+  if(!placement) return;
+  placement.cx=placement.x+placement.w/2;
+  placement.cy=placement.y+placement.h/2;
+}
+function placeRotateBase(){
+  bakePlaceFlips();
+  if(placement.cx==null) syncPlaceCentre();
+  return {src:placement.src, srcW:placement.srcW, srcH:placement.srcH,
+          scaleX:placement.w/placement.natW, scaleY:placement.h/placement.natH,
+          cx:placement.cx, cy:placement.cy, deg:placement.deg||0};
+}
+function setPlacementRotation(base, deg){
+  const r=rotateInto(base.src, base.srcW, base.srcH, deg);
+  placement.img=r.canvas; placement.natW=r.w; placement.natH=r.h; placement.ar=r.w/r.h;
+  placement.w=Math.max(1,Math.round(r.w*base.scaleX)); placement.h=Math.max(1,Math.round(r.h*base.scaleY));
+  placement.x=Math.round(base.cx-placement.w/2); placement.y=Math.round(base.cy-placement.h/2);
+  placement.deg=((deg%360)+360)%360;
+  updatePlaceInfo(); composite();
 }
 // Rotate about the centre so the box grows outwards evenly, and carry the current scale across.
 function rotatePlacementBy(deg){
-  if(!placement) return;
-  deg=((deg%360)+360)%360;
-  if(!deg) return;
-  bakePlaceFlips();
-  const iw=placement.natW, ih=placement.natH, a=deg*Math.PI/180;
-  const quarter=(deg%90===0);
-  const cw = quarter ? (deg%180===0 ? iw : ih) : Math.ceil(Math.abs(iw*Math.cos(a))+Math.abs(ih*Math.sin(a)));
-  const ch = quarter ? (deg%180===0 ? ih : iw) : Math.ceil(Math.abs(iw*Math.sin(a))+Math.abs(ih*Math.cos(a)));
-  const c=canvasOf(cw,ch), x=c.getContext("2d");
-  x.imageSmoothingEnabled=false;                       // nearest neighbour: no blur on pixel art
-  x.translate(cw/2, ch/2); x.rotate(a);
-  x.drawImage(placement.img, -iw/2, -ih/2, iw, ih);
-  const sx=placement.w/iw, sy=placement.h/ih;          // keep whatever scale was already set
-  const ccx=placement.x+placement.w/2, ccy=placement.y+placement.h/2;
-  placement.img=c; placement.natW=cw; placement.natH=ch; placement.ar=cw/ch;
-  placement.w=Math.max(1,Math.round(cw*sx)); placement.h=Math.max(1,Math.round(ch*sy));
-  // left unrounded on purpose: rounding a half-pixel centre each time would walk the box one pixel
-  // per turn, so rotating right then left wouldn't put it back. The commit rounds.
-  placement.x=ccx-placement.w/2; placement.y=ccy-placement.h/2;
-  updatePlaceInfo(); composite();
+  if(!placement || !deg) return;
+  const base=placeRotateBase();
+  setPlacementRotation(base, base.deg+deg);
 }
+// The exact-angle route, for when a corner grip isn't precise enough. Sets the angle outright
+// rather than adding to it, which is what a number in a box implies.
 async function rotatePlacementPrompt(){
   if(!placement) return;
-  const v=await showPrompt("Rotate by how many degrees? Clockwise; anything other than a multiple of 90 resamples the pixels.",
-    "45", {title:"Rotate", okText:"Rotate"});
+  const v=await showPrompt("Angle in degrees, clockwise. Anything other than a multiple of 90 resamples the pixels.",
+    String(Math.round(placement.deg||0)), {title:"Rotate to an angle", okText:"Rotate"});
   if(v==null) return;
   const deg=parseFloat(v);
   if(!isFinite(deg)){ showToast("That isn't a number of degrees.","error"); return; }
-  rotatePlacementBy(deg);
+  setPlacementRotation(placeRotateBase(), deg);
 }
 // ---- transforming a selection --------------------------------------------------------------
 // The image-placing machinery already does resize handles, flips, snapping, nudging and a
@@ -3551,7 +3590,9 @@ function transformSelection(){
   showToast("Drag to move, handles to resize, ⟲ ⟳ to rotate. Enter places it, Esc puts it back.","info",5200);
 }
 function endPlacement(){
-  placement=null; xform=null; $("#placeBar").hidden=true; closeCtxMenu();
+  placement=null; xform=null;
+  const bar=$("#placeBar"); bar.hidden=true; bar.classList.remove("low");
+  closeCtxMenu();
   placeOverlay.classList.remove("active"); placeOverlay.hidden=true;
   octx.clearRect(0,0,placeOverlay.width,placeOverlay.height);
   view.style.cursor=CURSORS[tool]||"crosshair";
@@ -3611,8 +3652,25 @@ function commitPlacement(){
 // the only way to be sure of it
 function updatePlaceInfo(){
   if(!placement) return;
+  const deg=Math.round(placement.deg||0)%360;
   $("#placeSize").textContent=Math.round(placement.w)+" × "+Math.round(placement.h)+" px"
-    +"  at "+Math.round(placement.x)+", "+Math.round(placement.y);
+    +"  at "+Math.round(placement.x)+", "+Math.round(placement.y)
+    +(deg?("  ·  "+deg+"°"):"");
+  positionPlaceBar();
+}
+// The bar sits on top of the stage, so a box whose handles fall under it loses them — the clicks
+// land on the bar. When that happens the bar moves to the bottom of the stage instead. If the box
+// would cover both places (a full-canvas selection) it stays put: the handles are clamped to the
+// overlay's corners by then, well clear of a centred bar.
+function positionPlaceBar(){
+  const bar=$("#placeBar");
+  if(!bar || bar.hidden || !placement || xform) return;   // never mid-drag: the bar would hop
+  const {ox,oy}=overlayOffset(), z=zoom, pad=28;          // pad = room the grips sit in
+  const bx0=(placeOverlay.width-bar.offsetWidth)/2, bx1=bx0+bar.offsetWidth, bh=bar.offsetHeight;
+  const x0=ox+placement.x*z-pad, x1=x0+placement.w*z+pad*2;
+  const y0=oy+placement.y*z-pad, y1=y0+placement.h*z+pad*2;
+  const hits=(top)=> x1>bx0 && x0<bx1 && y1>top && y0<top+bh;
+  bar.classList.toggle("low", hits(14) && !hits(placeOverlay.height-14-bh));
 }
 
 function drawImageFlipped(ctx, img, dx, dy, dw, dh, fh, fv){
@@ -3679,10 +3737,30 @@ function paintPlaceOverlay(){
     octx.strokeStyle = hnd.pulled[k] ? "#fff" : "#5b8cff";
     octx.strokeRect(hx-hs/2+0.5, hy-hs/2+0.5, hs-1, hs-1);
   }
+  // rotate grips: round, so they never read as one of the square resize handles
+  const rr=rotHandleR();
+  for(const k in hnd.rot){
+    const [hx,hy]=hnd.rot[k];
+    octx.beginPath(); octx.arc(hx,hy,rr,0,Math.PI*2);
+    octx.fillStyle="#5b8cff"; octx.fill();
+    octx.lineWidth=2; octx.strokeStyle="#fff"; octx.stroke();
+    // a nick out of the ring reads as "this one turns" at 7px, where a glyph would just be mud
+    octx.beginPath(); octx.arc(hx,hy,rr-3,-0.6,Math.PI*1.25);
+    octx.lineWidth=1.6; octx.strokeStyle="#fff"; octx.stroke();
+  }
   octx.restore();
 }
 function placeHandlePoints(x,y,w,h){
   return {nw:[x,y],n:[x+w/2,y],ne:[x+w,y],e:[x+w,y+h/2],se:[x+w,y+h],s:[x+w/2,y+h],sw:[x,y+h],w:[x,y+h/2]};
+}
+// A rotate grip sits diagonally outside each corner, so whichever corner you can reach turns the
+// box. Keys are capitalised on purpose: placementMove reads "n"/"s"/"e"/"w" out of a resize mode,
+// and "rotNE" must not look like one.
+function rotHandleR(){ return coarsePtr.matches ? 9 : 7; }
+function placeRotatePoints(x,y,w,h){
+  const o=rotHandleR()+11;
+  const k=o/Math.SQRT2;
+  return {rotNW:[x-k,y-k], rotNE:[x+w+k,y-k], rotSE:[x+w+k,y+h+k], rotSW:[x-k,y+h+k]};
 }
 // Handle positions in overlay pixels, each pulled back inside the stage if the corner it belongs to
 // lies outside it — an enlarged image otherwise has all eight handles off-screen and no way to
@@ -3699,15 +3777,30 @@ function placementHandles(){
     pts[k]=[cx,cy];
     pulled[k]=(cx!==hx || cy!==hy);
   }
-  return {pts:pts, pulled:pulled, rect:rect};
+  // Rotate grips, clamped the same way. One that gets pulled onto a resize handle is dropped
+  // rather than left to fight it for the same pixels — a box hanging off the edge of the stage
+  // still has other corners.
+  const rot={}, rr=rotHandleR();
+  const rawRot=placeRotatePoints(rect.x,rect.y,rect.w,rect.h);
+  for(const k in rawRot){
+    const [hx,hy]=rawRot[k];
+    const cx=clamp(hx, rr+2, Math.max(rr+2, ow-rr-2)), cy=clamp(hy, rr+2, Math.max(rr+2, oh-rr-2));
+    let clash=false;
+    for(const j in pts) if(Math.hypot(cx-pts[j][0], cy-pts[j][1])<rr+8){ clash=true; break; }
+    if(!clash) rot[k]=[cx,cy];
+  }
+  return {pts:pts, pulled:pulled, rot:rot, rect:rect};
 }
 // hit-test in overlay space, against the same (possibly pulled-in) handles that were drawn
 function placementHitAt(e){
   if(!placement) return null;
   const or=placeOverlay.getBoundingClientRect();
   const px=e.clientX-or.left, py=e.clientY-or.top;
-  const {pts,rect}=placementHandles(), tol=11;
+  const {pts,rot,rect}=placementHandles(), tol=11;
+  // resize first: it's the common intent, and the grips sit further out than its tolerance
   for(const k in pts) if(Math.abs(px-pts[k][0])<=tol && Math.abs(py-pts[k][1])<=tol) return k;
+  const rt=rotHandleR()+(e.pointerType==="mouse"?3:6);
+  for(const k in rot) if(Math.hypot(px-rot[k][0], py-rot[k][1])<=rt) return k;
   if(px>=rect.x && px<=rect.x+rect.w && py>=rect.y && py<=rect.y+rect.h) return "move";
   return null;
 }
@@ -3717,9 +3810,23 @@ function placementDown(e){
   const a=toArtF(e);                         // the drag maths stay in art coords
   if(!mode) return;
   try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
+  if(mode.indexOf("rot")===0){
+    const base=placeRotateBase();
+    xform={mode:"rot", base:base, a0:Math.atan2(a.y-base.cy, a.x-base.cx)};
+    return;
+  }
   xform={mode, start:a, rect:{x:placement.x,y:placement.y,w:placement.w,h:placement.h}};
 }
+// Drag a corner grip around the centre. The angle is measured from where the drag started, so
+// grabbing a grip doesn't snap the box to the pointer.
+function placementRotateMove(e){
+  const b=xform.base, a=toArtF(e);
+  let deg=(Math.atan2(a.y-b.cy, a.x-b.cx)-xform.a0)*180/Math.PI + b.deg;
+  if(e.shiftKey) deg=Math.round(deg/15)*15;   // Shift: 15° steps, so 45s and 90s are easy to hit
+  setPlacementRotation(b, deg);
+}
 function placementMove(e){
+  if(xform.mode==="rot"){ placementRotateMove(e); return; }
   const a=toArtF(e), r=xform.rect, m=xform.mode, dx=a.x-xform.start.x, dy=a.y-xform.start.y;
   // Shift flips whichever way the Snap button is set, so the modifier always changes something
   const snap = placeSnap !== !!e.shiftKey;
@@ -3743,12 +3850,14 @@ function placementMove(e){
     if(w<1) w=1; if(h<1) h=1;
   }
   placement.x=x; placement.y=y; placement.w=w; placement.h=h;
+  syncPlaceCentre();                     // moved or resized: rotations turn about the new middle
   updatePlaceInfo(); composite();
 }
 // arrow keys while placing: the exact-position tool, one pixel at a time (8 with Shift)
 function nudgePlacement(dx,dy){
   if(!placement) return;
   placement.x=Math.round(placement.x)+dx; placement.y=Math.round(placement.y)+dy;
+  syncPlaceCentre();
   updatePlaceInfo(); composite();
 }
 function setPlaceSnap(on){
@@ -3760,7 +3869,7 @@ function setPlaceSnap(on){
 function updatePlacementCursor(e){
   const m=placementHitAt(e);
   const map={nw:"nwse-resize",se:"nwse-resize",ne:"nesw-resize",sw:"nesw-resize",n:"ns-resize",s:"ns-resize",e:"ew-resize",w:"ew-resize",move:"move"};
-  placeOverlay.style.cursor = m ? map[m] : "default";
+  placeOverlay.style.cursor = m ? (m.indexOf("rot")===0 ? CURSORS.rotate : map[m]) : "default";
 }
 
 function loadImageFromBlob(blob, name){
@@ -4174,7 +4283,7 @@ window.addEventListener("pointerup",e=>{
   if(pan){ panEnd(); return; }
   touchPtrs.delete(e.pointerId);
   if(pinch){ if(touchPtrs.size<2) pinch=null; else pinchStart(); return; }
-  if(placement){ xform=null; return; }
+  if(placement){ xform=null; positionPlaceBar(); return; }   // the box has settled; the bar can move
   if(regionDrag){ regionUp(); return; }
   if(selDrag){ selectUp(); return; }
   if(shaping){
