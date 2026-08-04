@@ -1388,7 +1388,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03e";
+const APP_VERSION="2026.08.03f";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -5164,14 +5164,17 @@ function packSprites(sources, o){
           const cv=canvasOf(t.w,t.h);
           cv.getContext("2d").drawImage(fc, t.x,t.y,t.w,t.h, 0,0,t.w,t.h);
           const nm=(s.grid.tiles[r][c].name||("tile "+(r+1)+"-"+(c+1)));
-          out.push({name:s.base+" "+nm+(s.frames.length>1?(" f"+(fi+1)):""), canvas:cv, group:s.base});
+          out.push({name:s.base+" "+nm+(s.frames.length>1?(" f"+(fi+1)):""), canvas:cv,
+            file:s.base, group:s.base});
         }
       });
     } else {
       s.frames.forEach((fc,fi)=>{
         const tag=s.tags.find(t=>fi>=t.from && fi<=t.to);
         const suffix=s.frames.length>1 ? (" "+(tag?tag.name+" ":"")+(fi+1)) : "";
-        out.push({name:s.base+suffix, canvas:fc, group:s.base+(tag?" "+tag.name:"")});
+        // two groupings, because they're two different questions: which file a sprite came from,
+        // and which animation inside it
+        out.push({name:s.base+suffix, canvas:fc, file:s.base, group:s.base+(tag?" "+tag.name:"")});
       });
     }
   }
@@ -5182,7 +5185,7 @@ function packSprites(sources, o){
     const t=trimSpriteCanvas(sp.canvas);
     if(!t){ dropped.push(sp.name); continue; }
     if(kept.length>=MAX_PACK){ truncated++; continue; }
-    kept.push({name:sp.name, canvas:o.trim?t:sp.canvas, group:sp.group});
+    kept.push({name:sp.name, canvas:o.trim?t:sp.canvas, file:sp.file, group:sp.group});
   }
   return {sprites:kept, dropped:dropped, truncated:truncated};
 }
@@ -5190,9 +5193,12 @@ function packPlan(sprites,o){
   const cw=clamp(o.cw|0 || Math.max(1,...sprites.map(s=>s.canvas.width)), 1, 2048);
   const ch=clamp(o.ch|0 || Math.max(1,...sprites.map(s=>s.canvas.height)), 1, 2048);
   let rows=[];
-  if(o.layout==="rowper"){
+  // one row per source file, or per animation group inside it — rows come out ragged, and the short
+  // ones just leave empty cells at their right-hand end
+  if(o.layout==="rowfile" || o.layout==="rowper"){
+    const key = o.layout==="rowfile" ? (s=>s.file||"") : (s=>s.group||"");
     const by=new Map();
-    sprites.forEach(s=>{ const k=s.group||""; if(!by.has(k)) by.set(k,[]); by.get(k).push(s); });
+    sprites.forEach(s=>{ const k=key(s); if(!by.has(k)) by.set(k,[]); by.get(k).push(s); });
     rows=[...by.values()];
   }
   else if(o.layout==="row") rows=sprites.length?[sprites.slice()]:[];
@@ -5305,9 +5311,10 @@ async function showPackDialog(sources, bad){
   const body=`
     <div class="row"><label>Layout</label><select id="pkLayout">
       <option value="grid" selected>Grid — set the number of columns</option>
-      <option value="row">Single row</option>
-      <option value="col">Single column</option>
-      <option value="rowper">One row per file (or frame group)</option></select></div>
+      <option value="rowfile">One row per file</option>
+      <option value="rowper">One row per frame group</option>
+      <option value="row">Single row — everything in one line</option>
+      <option value="col">Single column</option></select></div>
     <div class="row" id="pkColsRow"><label>Columns</label><input type="number" id="pkCols" min="0" max="64" value="${guessCols}">
       <span class="shi-hint">0 fits them in a square</span></div>
     <div class="row"><label>Cell</label>
