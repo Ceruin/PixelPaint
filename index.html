@@ -1388,7 +1388,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03f";
+const APP_VERSION="2026.08.03g";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -4430,13 +4430,16 @@ function refreshThumb(l){
 }
 
 // ------------------------------------------------------------------ export / save / load
+// Named after the tab, like every other file this app writes. A folder of pixelpaint_32x32_1x.png
+// tells you nothing about which drawing is which.
 function exportPNG(scale){
   const c=document.createElement("canvas"); c.width=W*scale; c.height=H*scale;
   const ctx=c.getContext("2d"); ctx.imageSmoothingEnabled=false;
   composite(); ctx.drawImage(flat,0,0,W*scale,H*scale);
+  const name=spriteBaseName()+"_"+W+"x"+H+(scale>1?("_"+scale+"x"):"")+".png";
   const a=document.createElement("a");
-  a.download="pixelpaint_"+W+"x"+H+"_"+scale+"x.png"; a.href=c.toDataURL("image/png"); a.click();
-  showToast("Exported PNG at "+scale+"× ("+(W*scale)+" × "+(H*scale)+")","success");
+  a.download=name; a.href=c.toDataURL("image/png"); a.click();
+  showToast("Exported "+name+" at "+scale+"× ("+(W*scale)+" × "+(H*scale)+" px).","success",4200);
 }
 function saveProject(){
   const data={app:"PixelPaint",version:2,w:W,h:H,active:activeIndex,frameIndex,
