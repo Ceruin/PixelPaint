@@ -219,12 +219,17 @@
   .stage.panning{cursor:grabbing;}   /* the canvas itself is set from JS — a child cursor wins */
   .place-bar{
     position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:30;
-    display:flex; align-items:center; gap:8px; background:var(--panel);
+    display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; background:var(--panel);
     border:1px solid var(--line); border-radius:10px; padding:7px 9px; box-shadow:0 12px 34px #000a;
+    /* An absolute box with left:50% and no right shrinks to fit *half* the stage, so the bar was
+       capped at 505px on a 1010px stage: past that, flex squeezed the readout to 35px and wrapped
+       its text over three lines. max-content takes the width the buttons actually need, and the
+       wrap keeps it in tidy rows when the stage really is too narrow for one. */
+    width:max-content; max-width:calc(100% - 28px);
   }
   .place-bar[hidden]{display:none;}
   .place-bar .info{color:var(--muted); font-size:12px; margin:0 4px; display:flex; align-items:center; gap:5px;
-    font-variant-numeric:tabular-nums;}
+    font-variant-numeric:tabular-nums; white-space:nowrap;}
   .place-bar .info svg{color:var(--accent);}
   /* a pressed-in look for the toggles in this bar, distinct from .primary's call to action */
   .place-bar button.on{background:#2b3f6b; border-color:var(--accent2); color:#dce6ff;}
@@ -892,6 +897,8 @@
     <button data-cmd="selectall" data-icon="select" data-icon-size="16">Select all<span class="hk">Ctrl+A</span></button>
     <button data-cmd="deselect"  data-icon="clear"  data-icon-size="16">Deselect<span class="hk">Ctrl+D</span></button>
     <div class="ctx-sep"></div>
+    <button data-cmd="transform" data-icon="select" data-icon-size="16">Resize / rotate the selection<span class="hk">Ctrl+T</span></button>
+    <div class="ctx-sep"></div>
     <button data-cmd="wandtool" data-icon="wand" data-icon-size="16">Magic wand tool</button>
     <button data-cmd="snap" data-icon="palette" data-icon-size="16">Snap to palette</button>
   </div>
@@ -1005,6 +1012,8 @@
           <span class="info"><span data-icon="image" data-icon-size="15"></span><span id="placeSize">—</span></span>
           <button id="placeActual" title="Actual size (1:1)">1:1</button>
           <button id="placeFit" title="Fit to canvas">Fit</button>
+          <button id="placeRotL" class="iconbtn" data-icon="rotL" data-icon-size="17" title="Rotate 90° left"></button>
+          <button id="placeRotR" class="iconbtn" data-icon="rotR" data-icon-size="17" title="Rotate 90° right"></button>
           <button id="placeSnapBtn" data-icon="grid" data-icon-size="15" title="Snap to whole pixels while dragging — hold Shift for the other behaviour, or nudge with the arrow keys">Snap</button>
           <button id="placeCommit" class="primary" data-icon="check" title="Place image (Enter)">Place</button>
           <button id="placeCancel" data-icon="clear" title="Cancel / right-click for more (Esc)">Cancel</button>
@@ -1232,6 +1241,10 @@
   <button data-action="flipH">Flip horizontal</button>
   <button data-action="flipV">Flip vertical</button>
   <div class="ctx-sep"></div>
+  <button data-action="rotL">Rotate 90° left</button>
+  <button data-action="rotR">Rotate 90° right</button>
+  <button data-action="rotAny">Rotate by an angle…</button>
+  <div class="ctx-sep"></div>
   <button data-action="place">Place</button>
   <button data-action="cancel">Cancel</button>
 </div>
@@ -1250,6 +1263,8 @@
 
 <!-- right-click menu for a selection -->
 <div id="selMenu" class="ctx-menu" hidden>
+  <button data-action="transform">Resize / rotate…</button>
+  <div class="ctx-sep"></div>
   <button data-action="copy">Copy</button>
   <button data-action="cut">Cut</button>
   <div class="ctx-sep"></div>
@@ -1388,7 +1403,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03g";
+const APP_VERSION="2026.08.03h";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1427,6 +1442,10 @@ const P = {
   brush:"M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34a.996.996 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.02 0-1.41z",
   add:"M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
   minus:"M19 13H5v-2h14v2z",
+  // rotation gets its own glyphs: in a bar that also holds Snap and Place, the undo/redo arrows
+  // would read as undo and redo
+  rotR:"M15.55 5.55L11 1v3.07C7.06 4.56 4 7.92 4 12s3.05 7.44 7 7.93v-2.02c-2.84-.48-5-2.94-5-5.91s2.16-5.43 5-5.91V10l4.55-4.45zM19.93 11c-.17-1.39-.72-2.73-1.62-3.89l-1.42 1.42c.54.75.88 1.6 1.02 2.47h2.02zM13 17.9v2.02c1.39-.17 2.74-.71 3.9-1.61l-1.44-1.44c-.75.54-1.59.89-2.46 1.03zm3.89-2.42l1.42 1.41c.9-1.16 1.45-2.5 1.62-3.89h-2.02c-.14.87-.48 1.72-1.02 2.48z",
+  rotL:"M7.11 8.53L5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z",
   left:"M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z",
   right:"M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
   clipboard:"M19 2h-4.18C14.4.84 13.3 0 12 0c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z",
@@ -3438,23 +3457,98 @@ function placeCenter(){ placement.x=Math.round((W-placement.w)/2); placement.y=M
 function placeActual(){ placement.w=placement.natW; placement.h=placement.natH; placeCenter(); }   // 1:1 native pixels
 function placeFit(){ const s=Math.min(W/placement.natW, H/placement.natH); placement.w=Math.max(1,Math.round(placement.natW*s)); placement.h=Math.max(1,Math.round(placement.natH*s)); placeCenter(); }
 function placeFill(){ const s=Math.max(W/placement.natW, H/placement.natH); placement.w=Math.max(1,Math.round(placement.natW*s)); placement.h=Math.max(1,Math.round(placement.natH*s)); placeCenter(); }
-function beginPlacement(img, name){
+// opts.at — start in an exact spot at an exact size, rather than centred or fitted. Used when the
+// thing being placed came off the canvas itself (a selection being transformed), where anything
+// other than "exactly where it was" would be a surprise.
+function beginPlacement(img, name, opts){
+  opts=opts||{};
   const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
   placement={img, name:(name||"Image"), natW:iw, natH:ih, ar:iw/ih, flipH:false, flipV:false, x:0, y:0, w:iw, h:ih};
-  // Full size by default — but an image far larger than the canvas would land with its corners
-  // (and so its resize handles) miles off-screen, which is no way to start. Those come in fitted;
-  // 1:1 is one button away.
-  const oversize = iw>W || ih>H;
-  if(oversize) placeFit(); else placeCenter();
+  let oversize=false;
+  if(opts.at){
+    placement.x=opts.at.x; placement.y=opts.at.y; placement.w=opts.at.w; placement.h=opts.at.h;
+    placement.lifted=opts.lifted||null;
+  } else {
+    // Full size by default — but an image far larger than the canvas would land with its corners
+    // (and so its resize handles) miles off-screen, which is no way to start. Those come in fitted;
+    // 1:1 is one button away.
+    oversize = iw>W || ih>H;
+    if(oversize) placeFit(); else placeCenter();
+  }
   xform=null;
   $("#placeBar").hidden=false; updatePlaceInfo();
   placeOverlay.hidden=false; placeOverlay.classList.add("active"); sizePlaceOverlay();
   placeOverlay.style.cursor="move";
   composite();
+  if(opts.quiet) return;
   showToast(oversize
     ? "Scaled to fit the canvas — press 1:1 for full size. Drag to move, handles to resize."
     : "Pasted at full size. Drag to move, handles to resize, right-click for options (Fit, 1:1…).",
     "info",4400);
+}
+// ---- rotation, shared by pasted images and lifted selections -------------------------------
+// Flips are applied at draw time, so a pending flip has to be baked into the pixels before a
+// rotation — otherwise "flip then rotate" and "rotate then flip" would land differently.
+function bakePlaceFlips(){
+  if(!placement.flipH && !placement.flipV) return;
+  const iw=placement.natW, ih=placement.natH, c=canvasOf(iw,ih), x=c.getContext("2d");
+  x.imageSmoothingEnabled=false;
+  drawImageFlipped(x, placement.img, 0,0, iw,ih, placement.flipH, placement.flipV);
+  placement.img=c; placement.flipH=false; placement.flipV=false;
+}
+// Rotate about the centre so the box grows outwards evenly, and carry the current scale across.
+function rotatePlacementBy(deg){
+  if(!placement) return;
+  deg=((deg%360)+360)%360;
+  if(!deg) return;
+  bakePlaceFlips();
+  const iw=placement.natW, ih=placement.natH, a=deg*Math.PI/180;
+  const quarter=(deg%90===0);
+  const cw = quarter ? (deg%180===0 ? iw : ih) : Math.ceil(Math.abs(iw*Math.cos(a))+Math.abs(ih*Math.sin(a)));
+  const ch = quarter ? (deg%180===0 ? ih : iw) : Math.ceil(Math.abs(iw*Math.sin(a))+Math.abs(ih*Math.cos(a)));
+  const c=canvasOf(cw,ch), x=c.getContext("2d");
+  x.imageSmoothingEnabled=false;                       // nearest neighbour: no blur on pixel art
+  x.translate(cw/2, ch/2); x.rotate(a);
+  x.drawImage(placement.img, -iw/2, -ih/2, iw, ih);
+  const sx=placement.w/iw, sy=placement.h/ih;          // keep whatever scale was already set
+  const ccx=placement.x+placement.w/2, ccy=placement.y+placement.h/2;
+  placement.img=c; placement.natW=cw; placement.natH=ch; placement.ar=cw/ch;
+  placement.w=Math.max(1,Math.round(cw*sx)); placement.h=Math.max(1,Math.round(ch*sy));
+  // left unrounded on purpose: rounding a half-pixel centre each time would walk the box one pixel
+  // per turn, so rotating right then left wouldn't put it back. The commit rounds.
+  placement.x=ccx-placement.w/2; placement.y=ccy-placement.h/2;
+  updatePlaceInfo(); composite();
+}
+async function rotatePlacementPrompt(){
+  if(!placement) return;
+  const v=await showPrompt("Rotate by how many degrees? Clockwise; anything other than a multiple of 90 resamples the pixels.",
+    "45", {title:"Rotate", okText:"Rotate"});
+  if(v==null) return;
+  const deg=parseFloat(v);
+  if(!isFinite(deg)){ showToast("That isn't a number of degrees.","error"); return; }
+  rotatePlacementBy(deg);
+}
+// ---- transforming a selection --------------------------------------------------------------
+// The image-placing machinery already does resize handles, flips, snapping, nudging and a
+// commit — so transforming a selection lifts its pixels into exactly that, rather than growing a
+// second set of handles with their own bugs. The pixels leave the layer as it starts, which is
+// what makes moving-and-scaling one operation instead of a copy.
+function transformSelection(){
+  if(placement) return;
+  if(!selection){ showToast("Select something first — then Ctrl+T to resize or rotate it.","info",3600); return; }
+  const L=activeLayer();
+  if(!L) return;
+  if(L.locked){ showToast("This layer is locked.","info"); return; }
+  const src=selectionToCanvas();
+  if(!src) return;
+  const r={x:selection.x, y:selection.y, w:selection.w, h:selection.h};
+  pushUndo();                                  // one entry covers the whole transform
+  const depth=undoStack.length;
+  if(selMask) eachSelPixel((x,y)=>L.ctx.clearRect(x,y,1,1));
+  else L.ctx.clearRect(r.x,r.y,r.w,r.h);
+  clearSelection(); refreshThumb(L);
+  beginPlacement(src, "Selection", {at:r, quiet:true, lifted:{rect:r, src:src, depth:depth}});
+  showToast("Drag to move, handles to resize, ⟲ ⟳ to rotate. Enter places it, Esc puts it back.","info",5200);
 }
 function endPlacement(){
   placement=null; xform=null; $("#placeBar").hidden=true; closeCtxMenu();
@@ -3471,18 +3565,47 @@ function openMenuAt(m,x,y){
 function openCtxMenu(x,y){ openMenuAt($("#ctxMenu"),x,y); }
 function openSelMenu(x,y){ openMenuAt($("#selMenu"),x,y); }
 function closeCtxMenu(){ ["#ctxMenu","#selMenu","#frameMenu"].forEach(id=>{ const m=$(id); if(m) m.hidden=true; }); }
-function cancelPlacement(){ if(!placement) return; endPlacement(); composite(); }
+// Cancelling a lifted selection has to give the pixels back — they left the layer when the
+// transform started. Nothing else changed in between, so the undo entry that covered the lift is
+// popped rather than left behind as a step that does nothing.
+function cancelPlacement(){
+  if(!placement) return;
+  const lift=placement.lifted;
+  if(lift){
+    const L=activeLayer();
+    if(L){
+      L.ctx.imageSmoothingEnabled=false;
+      L.ctx.drawImage(lift.src, lift.rect.x, lift.rect.y);
+      refreshThumb(L);
+    }
+    if(undoStack.length===lift.depth){ undoStack.pop(); updateUndoButtons(); }
+    selection={x:lift.rect.x, y:lift.rect.y, w:lift.rect.w, h:lift.rect.h};
+    updateSelStatus(); startAnts();
+  }
+  endPlacement(); composite();
+  if(lift) showToast("Put back where it was.","info",2600);
+}
 function commitPlacement(){
   if(!placement) return;
-  pushUndo();
+  const lift=placement.lifted;
+  if(!lift) pushUndo();                        // a lifted selection already pushed one
   const nm=placement.name.length>22? placement.name.slice(0,22) : placement.name;
-  const L=addLayer(nm);
+  // a transformed selection belongs on the layer it came from; a pasted image gets its own
+  const L=lift ? activeLayer() : addLayer(nm);
+  if(!L){ endPlacement(); composite(); return; }
   L.ctx.imageSmoothingEnabled=false;
   drawImageFlipped(L.ctx, placement.img, Math.round(placement.x), Math.round(placement.y),
     Math.max(1,Math.round(placement.w)), Math.max(1,Math.round(placement.h)), placement.flipH, placement.flipV);
+  const w=Math.max(1,Math.round(placement.w)), h=Math.max(1,Math.round(placement.h));
+  const at={x:Math.round(placement.x), y:Math.round(placement.y)};
   endPlacement();
   renderLayers(); composite(); refreshThumb(L);
-  showToast("Image added as a new layer.","success");
+  if(lift){
+    selection={x:at.x, y:at.y, w:w, h:h};      // keep it selected, at its new size
+    selMask=null; updateSelStatus(); startAnts(); composite();
+    showToast("Transformed — "+w+" × "+h+" px.","success");
+  }
+  else showToast("Image added as a new layer.","success");
 }
 // size *and* position — placing a sprite on an exact pixel is the whole job, and the numbers are
 // the only way to be sure of it
@@ -4034,6 +4157,13 @@ view.addEventListener("pointermove",e=>{
     }
   }
   else if(tool==="tile" && !placement) view.style.cursor = (sheet && tileAtArt(p.x,p.y)) ? "pointer" : "crosshair";
+});
+// Double-clicking inside a selection starts the transform — the gesture people try first, and it
+// costs no screen furniture.
+view.addEventListener("dblclick",e=>{
+  if(placement || !selection || tool!=="select") return;
+  const p=toPixel(e);
+  if(inSel(p.x,p.y)){ e.preventDefault(); transformSelection(); }
 });
 view.addEventListener("pointerleave",()=>{
   if(!drawing&&!shaping&&!selDrag&&!xform) $("#cursorInfo").textContent="—";
@@ -5586,6 +5716,7 @@ function runCmd(cmd){
     case "addgroup": addGroupDialog(); break;
     case "selectall": selectAll(); break;
     case "deselect": clearSelection(); break;
+    case "transform": transformSelection(); break;
     case "wandtool": setTool("wand"); break;
     case "snap": applyPaletteToLayer(); break;
     case "delregion": if(region) removeRegion(); else showToast("There's no sub-canvas to remove.","info"); break;
@@ -5663,7 +5794,11 @@ const HELP_SECTIONS=[
     ["download","Export the sheet, or one PNG per tile, with a JSON map",""],
     ["folder","Pack several files or PNGs into one sheet — or drop them on the canvas",""],
   ]},
-  {title:"Placing an image", icon:"image", rows:[
+  {title:"Placing & transforming", icon:"image", rows:[
+    ["select","Resize or rotate the selection — or double-click inside it","Ctrl+T"],
+    ["rotR","Rotate 90° either way, from the placing bar",""],
+    ["rotL","Rotate by any angle — right-click while placing",""],
+    ["swap","Flip horizontally or vertically — right-click while placing",""],
     ["grid","Drag lands on whole pixels — Snap in the placing bar",""],
     ["swap","Free-form drag, or lock the ratio on a corner","Shift+drag"],
     ["right","Nudge one pixel (eight with Shift)","←|→|↑|↓"],
@@ -5745,6 +5880,8 @@ $("#placeCancel").onclick=cancelPlacement;
 $("#placeActual").onclick=()=>{ if(!placement) return; placeActual(); updatePlaceInfo(); composite(); };
 $("#placeFit").onclick=()=>{ if(!placement) return; placeFit(); updatePlaceInfo(); composite(); };
 $("#placeSnapBtn").onclick=()=>setPlaceSnap(!placeSnap);
+$("#placeRotL").onclick=()=>rotatePlacementBy(-90);
+$("#placeRotR").onclick=()=>rotatePlacementBy(90);
 
 $("#ctxMenu").addEventListener("click",e=>{
   const b=e.target.closest("[data-action]"); if(!b || !placement) return;
@@ -5757,6 +5894,9 @@ $("#ctxMenu").addEventListener("click",e=>{
   else if(a==="center") placeCenter();
   else if(a==="flipH") placement.flipH=!placement.flipH;
   else if(a==="flipV") placement.flipV=!placement.flipV;
+  else if(a==="rotL"){ rotatePlacementBy(-90); return; }
+  else if(a==="rotR"){ rotatePlacementBy(90); return; }
+  else if(a==="rotAny"){ rotatePlacementPrompt(); return; }
   updatePlaceInfo(); composite();
 });
 $("#frameMenu").addEventListener("click",e=>{
@@ -5776,7 +5916,8 @@ $("#selMenu").addEventListener("click",e=>{
   const b=e.target.closest("[data-action]"); if(!b) return; const a=b.dataset.action; closeCtxMenu();
   if(a==="selectall"){ selectAll(); return; }
   if(!selection) return;
-  if(a==="copy") copySelection(false);
+  if(a==="transform") transformSelection();
+  else if(a==="copy") copySelection(false);
   else if(a==="cut") copySelection(true);
   else if(a==="fill") fillSelection();
   else if(a==="snap") applyPaletteToLayer();
@@ -6034,6 +6175,9 @@ window.addEventListener("keydown",e=>{
     else if(k==="o"){ e.preventDefault(); $("#openInput").click(); }
     // only swallow copy/cut when there is a selection, so text elsewhere still copies normally
     else if((k==="c"||k==="x") && selection){ e.preventDefault(); copySelection(k==="x"); }
+    // always swallowed: Ctrl+T is this app's transform, and with nothing picked it says so rather
+    // than falling through to the browser's new tab
+    else if(k==="t"){ e.preventDefault(); transformSelection(); }
     return;
   }
   switch(e.key.toLowerCase()){
