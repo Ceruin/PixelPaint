@@ -471,6 +471,29 @@
     border-radius:5px; padding:2px 6px; white-space:nowrap;}
   .pk-i.more{color:var(--accent); border-color:var(--accent);}
 
+  /* ---- open recent ---- */
+  .rc-list{display:flex; flex-direction:column; gap:5px; max-height:min(52vh,330px); overflow:auto; margin-bottom:9px;}
+  .rc-i{display:flex; align-items:center; gap:10px; padding:6px 8px; background:var(--panel2);
+    border:1px solid var(--line); border-radius:8px; cursor:pointer; text-align:left; width:100%;}
+  .rc-i:hover{border-color:var(--accent);}
+  .rc-th{flex:0 0 44px; width:44px; height:44px; display:flex; align-items:center; justify-content:center;
+    border-radius:6px; overflow:hidden; color:var(--muted);
+    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 11px 11px;}
+  .rc-th.none{background:var(--panel);}
+  /* blown up to fill the box, pixels kept square: a 8 px sprite is recognisable at 44 px, and
+     nothing is stretched out of shape on the way */
+  .rc-th img{width:100%; height:100%; object-fit:contain; image-rendering:pixelated;}
+  .rc-tx{flex:1; min-width:0;}
+  .rc-nm{display:block; font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .rc-mt{display:block; font-size:10.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .rc-x{flex:none; width:22px; height:22px; display:flex; align-items:center; justify-content:center;
+    border-radius:5px; color:var(--muted);}
+  .rc-x:hover{background:#ffffff14; color:var(--danger);}
+  .rc-empty{padding:20px 12px; text-align:center; color:var(--muted); font-size:12px; line-height:1.5;
+    border:1px dashed var(--line); border-radius:8px;}
+  .rc-foot{display:flex; align-items:center; gap:10px;}
+  .rc-note{flex:1; min-width:0; color:var(--muted); font-size:10.5px; line-height:1.4;}
+
   /* ---- about sheet ---- */
   .about-head{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
   .about-icon{flex:none; image-rendering:pixelated;}   /* transparent, as the icon is everywhere else */
@@ -822,7 +845,8 @@
   <div id="menu-file" class="ctx-menu menu-dd" hidden>
     <button data-cmd="new"    data-icon="new"      data-icon-size="16">New canvas…</button>
     <div class="ctx-sep"></div>
-    <button data-cmd="open"   data-icon="folder"   data-icon-size="16">Open project…</button>
+    <button data-cmd="open"   data-icon="folder"   data-icon-size="16">Open project…<span class="hk">Ctrl+O</span></button>
+    <button data-cmd="openrecent" data-icon="clock" data-icon-size="16">Open recent…<span class="hk">Ctrl+Shift+O</span></button>
     <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
     <button data-cmd="pack"   data-icon="grid"     data-icon-size="16">Pack files into a sheet…</button>
     <button data-cmd="save"   data-icon="save"     data-icon-size="16">Save project<span class="hk">Ctrl+S</span></button>
@@ -1407,7 +1431,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.03i";
+const APP_VERSION="2026.08.06a";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1427,6 +1451,7 @@ const P = {
   download:"M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
   save:"M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",
   folder:"M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z",
+  clock:"M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
   grid:"M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z",
   center:"M5 15H3v4c0 1.1.9 2 2 2h4v-2H5v-4zM5 5h4V3H5c-1.1 0-2 .9-2 2v4h2V5zm14-2h-4v2h4v4h2V5c0-1.1-.9-2-2-2zm0 16h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4zM12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
   play:"M8 5v14l11-7z",
@@ -3872,9 +3897,16 @@ function updatePlacementCursor(e){
   placeOverlay.style.cursor = m ? (m.indexOf("rot")===0 ? CURSORS.rotate : map[m]) : "default";
 }
 
-function loadImageFromBlob(blob, name){
+function loadImageFromBlob(blob, name, opts){
+  opts=opts||{};
   const url=URL.createObjectURL(blob), img=new Image();
-  img.onload=()=>{ URL.revokeObjectURL(url); beginPlacement(img, name); };
+  img.onload=()=>{
+    URL.revokeObjectURL(url); beginPlacement(img, name);
+    // pasted pixels have no file behind them, so only a real file joins the recent list
+    if(opts.remember && opts.file) rememberFile({name:opts.file.name, kind:"image",
+      size:opts.file.size, w:img.naturalWidth, h:img.naturalHeight,
+      thumb:rcThumb(img,img.naturalWidth,img.naturalHeight), handle:opts.handle||null, blob:opts.file});
+  };
   img.onerror=()=>{ URL.revokeObjectURL(url); showToast("Couldn't read that image.","error"); };
   img.src=url;
 }
@@ -4693,6 +4725,10 @@ function saveProject(){
   const fname=((d&&d.name)||"untitled").replace(/[^\w\- ]+/g,"").trim()||"untitled";
   const a=document.createElement("a"); a.download=fname+".pxpaint"; a.href=URL.createObjectURL(blob); a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  // A save lands in the downloads folder, wherever that is — so the bytes just written are kept
+  // here too, and any handle from an earlier open is dropped: it no longer holds what was saved.
+  rememberFile({name:fname+".pxpaint", kind:"project", size:blob.size, w:W, h:H,
+    frames:frames.length, thumb:rcThumb(flat,W,H), blob, dropHandle:true});
   showToast("Project saved.","success");
 }
 // A project is only recognised if it carries a canvas size and something to draw. Told apart from
@@ -4744,6 +4780,222 @@ function finishLoad(data){
   captureActiveDoc(); renderTabs();   // persist the loaded state into the active tab
   showToast("Project loaded"+(sheet?(" — "+sheet.cols.length+"×"+sheet.rows.length+" tilesheet")
     :(frames.length>1?(" — "+frames.length+" frames"):""))+".","success");
+  // the frames' images have decoded by now, so there is finally something to thumbnail
+  if(afterProjectLoad){ const fn=afterProjectLoad; afterProjectLoad=null; try{ fn(); }catch(_){} }
+}
+
+// ------------------------------------------------------------------ recent files
+// A web page gets no standing access to the disk, so "recent" is kept two ways. When the browser
+// hands over a FileSystemFileHandle — from its own file picker, or from a dropped file — the entry
+// points at the file itself, and reopening picks up anything changed since. Otherwise a copy of the
+// bytes goes into IndexedDB, which is what makes the list work at all in browsers with no handles
+// (Firefox, Safari) and after a plain Save, which writes to the downloads folder out of reach.
+const RC_DB="pixelpaint", RC_STORE="recent", RC_MAX=10;
+const RC_ONE_MAX=8*1024*1024;    // past this only the entry is kept, not the copy
+const RC_ALL_MAX=64*1024*1024;   // budget for the copies; the oldest give theirs up first
+const RC_KINDS={project:"Project", image:"Image", sheet:"Spritesheet"};
+let recentFiles=[];                  // newest first, mirrored from IndexedDB
+let rcDBP=null, rcDead=false;    // rcDead: no store available (private windows refuse), session-only
+let afterProjectLoad=null;       // ran once the frames of a just-opened project have decoded
+
+function rcOpen(){
+  if(rcDBP) return rcDBP;
+  rcDBP=new Promise((res,rej)=>{
+    let rq; try{ rq=indexedDB.open(RC_DB,1); }catch(e){ rej(e); return; }
+    rq.onupgradeneeded=()=>{ const db=rq.result;
+      if(!db.objectStoreNames.contains(RC_STORE)) db.createObjectStore(RC_STORE,{keyPath:"key"}); };
+    rq.onsuccess=()=>res(rq.result);
+    rq.onerror=()=>rej(rq.error||new Error("IndexedDB refused to open"));
+    rq.onblocked=()=>rej(new Error("IndexedDB is blocked"));
+  });
+  rcDBP.catch(()=>{ rcDead=true; });
+  return rcDBP;
+}
+function rcTx(mode,fn){
+  return rcOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(RC_STORE,mode), rq=fn(tx.objectStore(RC_STORE));
+    let out; if(rq) rq.onsuccess=()=>{ out=rq.result; };
+    tx.oncomplete=()=>res(out);
+    tx.onabort=tx.onerror=()=>rej(tx.error||new Error("recent store write failed"));
+  }));
+}
+const rcAll =()=>rcTx("readonly",  st=>st.getAll());
+const rcPut = r=>rcTx("readwrite", st=>st.put(r));
+const rcDel = k=>rcTx("readwrite", st=>st.delete(k));
+const rcWipe=()=>rcTx("readwrite", st=>st.clear());
+const rcSort=l=>l.slice().sort((a,b)=>(b.time||0)-(a.time||0));
+let rcBoot=null;   // the first read of the store; a dialog opened early waits for it
+async function loadRecents(){
+  let stored=[];
+  try{ stored=await rcAll(); }catch(_){ return; }
+  // anything opened while this read was in flight is newer than what came back
+  recentFiles=rcSort(stored.filter(r=>!recentFiles.some(x=>x.key===r.key)).concat(recentFiles)).slice(0,RC_MAX);
+}
+// A small copy of the artwork, at most 64 px on its longest side and never enlarged — the list
+// draws it with pixelated scaling, so a 16 px sprite still fills its box without the bytes.
+function rcThumb(src,w,h){
+  try{
+    const k=Math.min(1, 64/Math.max(1,w,h));
+    const c=document.createElement("canvas");
+    c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k));
+    const x=c.getContext("2d"); x.imageSmoothingEnabled=false;
+    x.drawImage(src,0,0,c.width,c.height);
+    return c.toDataURL("image/png");
+  }catch(_){ return ""; }
+}
+// One entry per file name: opening or saving the same file again moves it up the list instead of
+// filling the list with copies of itself.
+async function rememberFile(o){
+  if(!o||!o.name) return;
+  const key=o.kind+":"+o.name;
+  const rec={key, name:o.name, kind:o.kind, size:o.size||0, w:o.w||0, h:o.h||0,
+             frames:o.frames||0, time:Date.now(), thumb:o.thumb||"",
+             handle:o.handle||null, blob:(o.blob && o.blob.size<=RC_ONE_MAX) ? o.blob : null};
+  // the entry being replaced may know things this one doesn't — a thumbnail, or a handle from an
+  // earlier open. A save is the exception: it wrote a *download*, so the old handle now points at
+  // a file that no longer holds what was saved, and only the fresh copy can be trusted.
+  const prev=recentFiles.find(r=>r.key===key);
+  if(prev){
+    if(!rec.thumb) rec.thumb=prev.thumb;
+    if(!rec.handle && !o.dropHandle) rec.handle=prev.handle;
+    if(!rec.blob && !o.dropBlob) rec.blob=prev.blob;
+  }
+  recentFiles=rcSort([rec].concat(recentFiles.filter(r=>r.key!==key)));
+  const gone=recentFiles.slice(RC_MAX); recentFiles=recentFiles.slice(0,RC_MAX);
+  if(rcDead) return;
+  try{
+    await rcPut(rec);
+    for(const g of gone) await rcDel(g.key);
+    await rcTrim();
+  }catch(_){
+    // out of room: keep the entry and lose the copy — the name and its thumbnail are still worth having
+    rec.blob=null;
+    try{ await rcPut(rec); }catch(__){ rcDead=true; }
+  }
+}
+async function rcTrim(){
+  let total=recentFiles.reduce((n,r)=>n+(r.blob?r.blob.size:0),0);
+  for(let i=recentFiles.length-1;i>=0 && total>RC_ALL_MAX;i--){
+    const r=recentFiles[i]; if(!r.blob) continue;
+    total-=r.blob.size; r.blob=null;
+    try{ await rcPut(r); }catch(_){ break; }
+  }
+}
+async function forgetRecent(key){
+  recentFiles=recentFiles.filter(r=>r.key!==key);
+  if(!rcDead) try{ await rcDel(key); }catch(_){}
+}
+async function forgetAllRecent(){
+  recentFiles=[];
+  if(!rcDead) try{ await rcWipe(); }catch(_){}
+}
+// The newest handle we hold, so the browser's own picker opens in the folder last worked in.
+function rcLastHandle(){ const r=recentFiles.find(x=>x.handle); return r?r.handle:null; }
+// Open project… — through the browser's picker when there is one, since that is what yields a
+// handle (and, with an id, a remembered folder). Firefox and Safari fall back to the file input.
+async function pickOpenProject(){
+  if(window.showOpenFilePicker){
+    try{
+      const opts={id:"pxpaintProject", multiple:false,
+        types:[{description:"PixelPaint project", accept:{"application/json":[".pxpaint",".json"]}}]};
+      const start=rcLastHandle(); if(start) opts.startIn=start;
+      const [h]=await window.showOpenFilePicker(opts);
+      if(h) openProjectFile(await h.getFile(), {handle:h});
+      return;                                  // dismissed, or opened — either way, done
+    }catch(err){
+      if(err && (err.name==="AbortError"||err.name==="NotAllowedError")) return;
+    }
+  }
+  $("#openInput").click();
+}
+// Reopen an entry: the live file if its handle still resolves, otherwise this browser's copy.
+async function openRecent(rec){
+  if(rec.handle){
+    try{
+      let perm=await rec.handle.queryPermission({mode:"read"});
+      if(perm!=="granted") perm=await rec.handle.requestPermission({mode:"read"});
+      if(perm==="granted"){ openRecentFile(rec, await rec.handle.getFile(), false); return; }
+    }catch(_){ /* moved, renamed, deleted or refused — the copy is the fallback */ }
+  }
+  if(rec.blob){ openRecentFile(rec, rcAsFile(rec,rec.blob), true); return; }
+  showToast("“"+rec.name+"” was too big to keep a copy of, and the file itself is out of reach now"
+    +" — open it from disk.","error",5600);
+}
+function rcAsFile(rec,blob){
+  try{ return new File([blob], rec.name, {type:blob.type||""}); }catch(_){ return blob; }
+}
+function openRecentFile(rec,file,cached){
+  if(cached) showToast("Opened this browser’s copy of “"+rec.name+"”.","info",3000);
+  const h=rec.handle||null;
+  if(rec.kind==="project") openProjectFile(file,{handle:h});
+  else if(rec.kind==="sheet") openSheetFile(file,{handle:h});
+  else loadImageFromBlob(file, rec.name.replace(/\.[^.]+$/,""), {remember:"image", file, handle:h});
+}
+
+function rcAge(t){
+  const s=Math.max(0,(Date.now()-(t||0))/1000);
+  if(s<90) return "just now";
+  const m=Math.round(s/60); if(m<60) return m+(m===1?" minute ago":" minutes ago");
+  const h=Math.round(m/60); if(h<24) return h+(h===1?" hour ago":" hours ago");
+  const d=Math.round(h/24); if(d<7) return d+(d===1?" day ago":" days ago");
+  try{ return new Date(t).toLocaleDateString(); }catch(_){ return d+" days ago"; }
+}
+function rcBytes(n){
+  if(!n) return "";
+  return n>=1048576 ? (n/1048576).toFixed(1)+" MB" : Math.max(1,Math.round(n/1024))+" KB";
+}
+function rcMeta(r){
+  const bits=[RC_KINDS[r.kind]||"File"];
+  if(r.w&&r.h) bits.push(r.w+" × "+r.h);
+  if(r.frames>1) bits.push(r.frames+" frames");
+  if(r.size) bits.push(rcBytes(r.size));
+  bits.push(rcAge(r.time));
+  bits.push(r.handle ? "on disk" : (r.blob ? "copy in this browser" : "not stored"));
+  return bits.join(" · ");
+}
+async function showRecentDialog(){
+  if(rcBoot){ try{ await rcBoot; }catch(_){} rcBoot=null; }
+  const body=`<div class="rc-list" id="rcList"></div>
+    <div class="rc-foot"><span class="rc-note" id="rcNote"></span>
+      <button id="rcClear" data-icon="trash" data-icon-size="14">Clear the list</button></div>`;
+  openModal({title:"Open recent", bodyHTML:body, okText:"Close", cancel:false, mid:true});
+  const render=()=>{
+    const list=$("#rcList"); list.innerHTML="";
+    if(!recentFiles.length){
+      const e=document.createElement("div"); e.className="rc-empty";
+      e.textContent = rcDead
+        ? "This browser won’t let the page store anything, so there’s no recent list to show."
+        : "Nothing yet. Projects and images you open, drop or save turn up here.";
+      list.appendChild(e);
+    }
+    recentFiles.forEach(r=>{
+      const row=document.createElement("div");
+      row.className="rc-i"; row.dataset.key=r.key; row.title="Open "+r.name;
+      const th=document.createElement("span");
+      th.className="rc-th"+(r.thumb?"":" none");
+      if(r.thumb){ const im=document.createElement("img"); im.alt=""; im.src=r.thumb; th.appendChild(im); }
+      else th.innerHTML=iconSVG(r.kind==="project"?"folder":"image",20);
+      const tx=document.createElement("span"); tx.className="rc-tx";
+      const nm=document.createElement("b"); nm.className="rc-nm"; nm.textContent=r.name;
+      const mt=document.createElement("span"); mt.className="rc-mt"; mt.textContent=rcMeta(r);
+      tx.appendChild(nm); tx.appendChild(mt);
+      const x=document.createElement("span");
+      x.className="rc-x"; x.innerHTML=iconSVG("clear",13); x.title="Forget "+r.name;
+      row.appendChild(th); row.appendChild(tx); row.appendChild(x);
+      // the click is the user gesture a lapsed handle's permission prompt needs, so the modal is
+      // dismissed and the file opened from inside the handler rather than after an await
+      row.onclick=()=>{ closeModal(true); openRecent(r); };
+      x.onclick=ev=>{ ev.stopPropagation(); forgetRecent(r.key).then(render); };
+      list.appendChild(row);
+    });
+    const kept=recentFiles.reduce((n,r)=>n+(r.blob?r.blob.size:0),0);
+    $("#rcNote").textContent = recentFiles.length
+      ? recentFiles.length+" of "+RC_MAX+" · "+(kept?rcBytes(kept)+" of copies kept in this browser":"nothing copied here")
+      : "Kept in this browser only.";
+  };
+  hydrateIcons($("#modalBody"));
+  render();
+  $("#rcClear").onclick=()=>{ forgetAllRecent().then(()=>{ render(); showToast("Recent list cleared.","success"); }); };
 }
 
 // ------------------------------------------------------------------ spritesheet import
@@ -5186,9 +5438,15 @@ async function showSheetImportDialog(img,name){
   const o=read();
   buildSheetImport(d, sheetPlan(d,o), o, name);
 }
-function openSheetFile(f){
+function openSheetFile(f,opts){
+  opts=opts||{};
   const url=URL.createObjectURL(f), img=new Image();
-  img.onload=()=>{ URL.revokeObjectURL(url); showSheetImportDialog(img, f.name.replace(/\.[^.]+$/,"")); };
+  img.onload=()=>{
+    URL.revokeObjectURL(url);
+    rememberFile({name:f.name, kind:"sheet", size:f.size, w:img.naturalWidth, h:img.naturalHeight,
+      thumb:rcThumb(img,img.naturalWidth,img.naturalHeight), handle:opts.handle||null, blob:f});
+    showSheetImportDialog(img, f.name.replace(/\.[^.]+$/,""));
+  };
   img.onerror=()=>{ URL.revokeObjectURL(url); showToast("Couldn't read that image.","error"); };
   img.src=url;
 }
@@ -5795,7 +6053,8 @@ function needTile(){
 function runCmd(cmd){
   switch(cmd){
     case "new": case "newtab": newCanvasDialog(); break;
-    case "open": $("#openInput").click(); break;
+    case "open": pickOpenProject(); break;
+    case "openrecent": showRecentDialog(); break;
     case "importsheet": $("#sheetInput").click(); break;
     case "pack": $("#packInput").click(); break;
     case "save": saveProject(); break;
@@ -5871,6 +6130,7 @@ const HELP_SECTIONS=[
     ["clipboard","Paste","Ctrl+V"],
     ["trash","Clear the selection","Del"],
     ["save","Save project","Ctrl+S"], ["folder","Open project","Ctrl+O"],
+    ["clock","Open one of the last 10 files","Ctrl+Shift+O"],
   ]},
   {title:"Brush & view", icon:"brush", rows:[
     ["brush","Smaller / bigger brush","[|]"],
@@ -5983,7 +6243,9 @@ $("#fillShape").onchange=e=>fillShape=e.target.checked;
 function clearActiveLayer(){ const L=activeLayer(); if(!L)return; if(L.locked){ showToast("This layer is locked.","info"); return; } pushUndo(); L.ctx.clearRect(0,0,W,H); composite(); refreshThumb(L); }
 
 // image import: file dialog, place/cancel, paste, drag-and-drop (import is triggered from the Sprite menu)
-$("#imgInput").onchange=e=>{ const f=e.target.files[0]; if(f) loadImageFromBlob(f, f.name.replace(/\.[^.]+$/,"")); e.target.value=""; };
+$("#imgInput").onchange=e=>{ const f=e.target.files[0];
+  if(f) loadImageFromBlob(f, f.name.replace(/\.[^.]+$/,""), {remember:"image", file:f});
+  e.target.value=""; };
 $("#placeCommit").onclick=commitPlacement;
 $("#placeCancel").onclick=cancelPlacement;
 $("#placeActual").onclick=()=>{ if(!placement) return; placeActual(); updatePlaceInfo(); composite(); };
@@ -6067,19 +6329,42 @@ window.addEventListener("dragleave",e=>{ if(!e.relatedTarget) stage.classList.re
 // .pxpaint files reach the browser with no MIME type at all, so they have to be recognised by
 // name — an image-type check alone rejects the app's own save format.
 const isProjectFile=f=>/\.(pxpaint|json)$/i.test(f.name||"") || f.type==="application/json";
+// dt.items and dt.files list the dropped files in the same order, so the handles line up by index.
+// getAsFileSystemHandle has to be called before the drop event returns, hence the whole map up front.
+function dropHandles(dt,files){
+  const out=new Map();
+  try{
+    [...(dt.items||[])].filter(it=>it.kind==="file").forEach((it,i)=>{
+      if(it.getAsFileSystemHandle && files[i]) out.set(files[i], it.getAsFileSystemHandle().catch(()=>null));
+    });
+  }catch(_){}
+  return out;
+}
+function withHandle(map,file,fn){
+  const p=map.get(file);
+  if(!p){ fn(null); return; }
+  let done=false;
+  const go=h=>{ if(done) return; done=true; fn(h && h.kind==="file" ? h : null); };
+  p.then(go,()=>go(null));
+  setTimeout(()=>go(null),500);   // a handle is a bonus; it never holds up opening the file
+}
 window.addEventListener("drop",e=>{
   e.preventDefault(); stage.classList.remove("dragging");
   const dt=e.dataTransfer; if(!dt) return;
   if(dt.files && dt.files.length){
     const files=[...dt.files];
+    // asked for now, while the drop is still live: a dropped file may come with a handle, and that
+    // is what lets Open recent reopen the file on disk rather than the copy kept here
+    const handles=dropHandles(dt,files);
     // several files at once is a pack: dropping five PNGs to open one of them and ignore the rest
     // would be a strange reading of the gesture
     const usable=files.filter(f=>isProjectFile(f) || f.type.indexOf("image")===0);
     if(usable.length>1){ packFiles(usable); return; }
     const proj=files.find(isProjectFile);
-    if(proj){ openProjectFile(proj); return; }
+    if(proj){ withHandle(handles,proj,h=>openProjectFile(proj,{handle:h})); return; }
     const img=files.find(f=>f.type.indexOf("image")===0);
-    if(img){ loadImageFromBlob(img, img.name.replace(/\.[^.]+$/,"")); return; }
+    if(img){ withHandle(handles,img,h=>loadImageFromBlob(img, img.name.replace(/\.[^.]+$/,""),
+      {remember:"image", file:img, handle:h})); return; }
     showToast("Drop a .pxpaint project or an image.","error"); return;
   }
   const url=dt.getData("text/uri-list")||dt.getData("text/plain");
@@ -6136,7 +6421,8 @@ $("#undoBtn").onclick=undo;
 $("#redoBtn").onclick=redo;
 
 function isLayerEmpty(l){const d=l.ctx.getImageData(0,0,W,H).data; for(let i=3;i<d.length;i+=4) if(d[i]!==0) return false; return true;}
-function openProjectFile(f){
+function openProjectFile(f,opts){
+  opts=opts||{};
   const reader=new FileReader();
   reader.onload=()=>{
     let data;
@@ -6145,6 +6431,9 @@ function openProjectFile(f){
     const bad=projectProblem(data);
     if(bad){ showToast(bad,"error",4200); return; }
     createDoc(lastSize.w, lastSize.h, f.name.replace(/\.[^.]+$/,""));
+    // listed under Open recent once it has drawn itself, which is where the thumbnail comes from
+    afterProjectLoad=()=>rememberFile({name:f.name, kind:"project", size:f.size, w:W, h:H,
+      frames:frames.length, thumb:rcThumb(flat,W,H), handle:opts.handle||null, blob:f});
     applyProject(data);
   };
   reader.onerror=()=>showToast("Couldn't read that file.","error");
@@ -6281,7 +6570,7 @@ window.addEventListener("keydown",e=>{
     else if(k==="a"){ e.preventDefault(); selectAll(); }
     else if(k==="d"){ e.preventDefault(); clearSelection(); }
     else if(k==="s"){ e.preventDefault(); saveProject(); }
-    else if(k==="o"){ e.preventDefault(); $("#openInput").click(); }
+    else if(k==="o"){ e.preventDefault(); e.shiftKey ? showRecentDialog() : pickOpenProject(); }
     // only swallow copy/cut when there is a selection, so text elsewhere still copies normally
     else if((k==="c"||k==="x") && selection){ e.preventDefault(); copySelection(k==="x"); }
     // always swallowed: Ctrl+T is this app's transform, and with nothing picked it says so rather
@@ -6409,6 +6698,7 @@ window.addEventListener("appinstalled", ()=>{ $("#installBtn").style.display="no
 
 $("#menuVersion").textContent=APP_VERSION;
 hydrateIcons();
+rcBoot=loadRecents();   // the recent list is read once, in the background
 loadUserPalettes();
 renderPaletteSelect();
 setColor("#ffffff","bg");
