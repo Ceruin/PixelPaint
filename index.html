@@ -500,6 +500,22 @@
   .about-tag{font-size:13px; margin-bottom:3px;}
   .about-ver{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums;}
 
+  /* ---- contact / suggestions ---- */
+  .ct-lead{font-size:13px; line-height:1.55; margin-bottom:14px;}
+  .ct-card{display:flex; align-items:center; gap:12px; padding:12px 14px; text-decoration:none;
+    color:inherit; background:var(--panel2); border:1px solid var(--line); border-radius:10px;}
+  .ct-card+.ct-card{margin-top:8px;}
+  .ct-card:hover{border-color:var(--accent); background:#5b8cff14;}
+  .ct-card.danger:hover{border-color:var(--danger); background:#e0556a14;}
+  .ct-ic{flex:none; width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+    border-radius:9px; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2));}
+  .ct-card.danger .ct-ic{background:linear-gradient(135deg,#e0556a,#c23a50);}
+  .ct-tx{flex:1; min-width:0;}
+  .ct-tx b{display:block; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted);}
+  .ct-addr{display:block; font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .ct-copy{flex:none;}
+  .ct-note{margin-top:12px; color:var(--muted); font-size:11px; line-height:1.5;}
+
   /* the tools rail's tips moved into that sheet; this is all that's left in their place */
   .helpbtn{width:100%; margin-top:auto;}
   @keyframes modalIn{from{opacity:0; transform:translateY(10px) scale(.98);} to{opacity:1; transform:none;}}
@@ -954,6 +970,7 @@
   </div>
   <div id="menu-help" class="ctx-menu menu-dd" hidden>
     <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Help &amp; shortcuts<span class="hk">?</span></button>
+    <button data-cmd="contact" data-icon="mail" data-icon-size="16">Contact, suggestions &amp; bugs…</button>
     <button data-cmd="about" data-icon="info" data-icon-size="16">About PixelPaint<span class="hk" id="menuVersion"></span></button>
   </div>
 
@@ -1431,7 +1448,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.06a";
+const APP_VERSION="2026.08.06b";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1452,6 +1469,8 @@ const P = {
   save:"M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",
   folder:"M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z",
   clock:"M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
+  mail:"M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z",
+  bug:"M20 8h-2.81a5.985 5.985 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z",
   grid:"M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z",
   center:"M5 15H3v4c0 1.1.9 2 2 2h4v-2H5v-4zM5 5h4V3H5c-1.1 0-2 .9-2 2v4h2V5zm14-2h-4v2h4v4h2V5c0-1.1-.9-2-2-2zm0 16h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4zM12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
   play:"M8 5v14l11-7z",
@@ -6105,6 +6124,7 @@ function runCmd(cmd){
     case "exporttiles": showTilesExportDialog().then(o=>{ if(o) exportTiles(o); }); break;
     case "fit": fitZoom(); composite(); break;
     case "shortcuts": showShortcuts(); break;
+    case "contact": showContact(); break;
     case "about": showAbout(); break;
   }
 }
@@ -6225,6 +6245,54 @@ function showAbout(){
     +ABOUT_ROWS.map(([ic,txt])=>'<div class="help-row"><span class="ic">'+iconSVG(ic,15)+'</span>'
       +'<span class="lb">'+txt+'</span></div>').join("");
   openModal({title:"About PixelPaint", bodyHTML:body, okText:"Close", cancel:false, mid:true});
+}
+
+// ------------------------------------------------------------------ contact / suggestions / bug reports
+// A place to send ideas or report a bug. Each card is a real mailto: link, so a click opens the mail
+// app with the subject already filled in — a suggestion and a bug report land pre-sorted. A Copy
+// button is there for anyone whose browser has no mail handler.
+const CONTACT_EMAIL="fuey500contact@gmail.com";
+function contactHref(subject,preamble){
+  const s=encodeURIComponent(subject);
+  const b=encodeURIComponent((preamble||"")+"\n\n— sent from PixelPaint "+APP_VERSION);
+  return "mailto:"+CONTACT_EMAIL+"?subject="+s+"&body="+b;
+}
+function showContact(){
+  const cards=[
+    {id:"suggest", icon:"mail", label:"Suggest a feature",
+     href:contactHref("PixelPaint suggestion","")},
+    {id:"bug", icon:"bug", label:"Report a bug", danger:true,
+     href:contactHref("PixelPaint bug report",
+       "What happened:\n\nWhat I expected:\n\nSteps to reproduce:\n")},
+  ];
+  const body='<div class="ct-lead">Got an idea, or hit a bug? I’d love to hear it — email goes '
+    +'straight to me and it’s read by a human.</div>'
+    +cards.map(c=>'<a class="ct-card'+(c.danger?" danger":"")+'" href="'+c.href+'">'
+      +'<span class="ct-ic">'+iconSVG(c.icon,20)+'</span>'
+      +'<span class="ct-tx"><b>'+c.label+'</b>'
+      +'<span class="ct-addr">'+CONTACT_EMAIL+'</span></span>'
+      +'<button class="ct-copy" data-copy data-icon="copy" data-icon-size="14" title="Copy the address">Copy</button></a>').join("")
+    +'<div class="ct-note">Opening your mail app fills in the subject for you. No account needed. '
+    +'For a bug, the more you can tell me about what you did, the faster I can fix it.</div>';
+  openModal({title:"Contact & suggestions", bodyHTML:body, okText:"Close", cancel:false, mid:true});
+  hydrateIcons($("#modalBody"));
+  $("#modalBody").querySelectorAll("[data-copy]").forEach(btn=>{
+    btn.onclick=async e=>{
+      e.preventDefault(); e.stopPropagation();   // the card is a link; a copy is not a navigation
+      let ok=false;
+      try{ await navigator.clipboard.writeText(CONTACT_EMAIL); ok=true; }
+      catch(_){
+        // clipboard API is blocked on file:// and older browsers — fall back to a hidden selection
+        try{
+          const ta=document.createElement("textarea"); ta.value=CONTACT_EMAIL;
+          ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+          ta.select(); ok=document.execCommand("copy"); document.body.removeChild(ta);
+        }catch(__){}
+      }
+      showToast(ok?"Address copied — "+CONTACT_EMAIL:"Couldn’t copy — the address is "+CONTACT_EMAIL,
+        ok?"success":"info", 4200);
+    };
+  });
 }
 
 // ------------------------------------------------------------------ collapsible side sections
