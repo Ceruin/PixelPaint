@@ -501,20 +501,22 @@
   .about-ver{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums;}
 
   /* ---- contact / suggestions ---- */
-  .ct-lead{font-size:13px; line-height:1.55; margin-bottom:14px;}
-  .ct-card{display:flex; align-items:center; gap:12px; padding:12px 14px; text-decoration:none;
+  .ct-lead{font-size:13px; margin-bottom:10px;}
+  .ct-card{display:flex; align-items:center; gap:12px; padding:11px 12px 11px 14px; text-decoration:none;
     color:inherit; background:var(--panel2); border:1px solid var(--line); border-radius:10px;}
-  .ct-card+.ct-card{margin-top:8px;}
   .ct-card:hover{border-color:var(--accent); background:#5b8cff14;}
-  .ct-card.danger:hover{border-color:var(--danger); background:#e0556a14;}
-  .ct-ic{flex:none; width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+  .ct-ic{flex:none; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
     border-radius:9px; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2));}
-  .ct-card.danger .ct-ic{background:linear-gradient(135deg,#e0556a,#c23a50);}
-  .ct-tx{flex:1; min-width:0;}
-  .ct-tx b{display:block; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted);}
-  .ct-addr{display:block; font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .ct-addr{flex:1; min-width:0; font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .ct-copy{flex:none;}
-  .ct-note{margin-top:12px; color:var(--muted); font-size:11px; line-height:1.5;}
+  .ct-quick{display:flex; gap:8px; margin-top:10px;}
+  .ct-btn{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    padding:8px 10px; font-size:12.5px; text-decoration:none; color:var(--text);
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px;}
+  .ct-btn svg{opacity:.75;}
+  .ct-btn:hover{border-color:var(--accent);}
+  .ct-btn.danger:hover{border-color:var(--danger); color:var(--danger);}
+  .ct-btn.danger:hover svg{opacity:1;}
 
   /* the tools rail's tips moved into that sheet; this is all that's left in their place */
   .helpbtn{width:100%; margin-top:auto;}
@@ -1448,7 +1450,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.06b";
+const APP_VERSION="2026.08.06c";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -6258,41 +6260,36 @@ function contactHref(subject,preamble){
   return "mailto:"+CONTACT_EMAIL+"?subject="+s+"&body="+b;
 }
 function showContact(){
-  const cards=[
-    {id:"suggest", icon:"mail", label:"Suggest a feature",
-     href:contactHref("PixelPaint suggestion","")},
-    {id:"bug", icon:"bug", label:"Report a bug", danger:true,
-     href:contactHref("PixelPaint bug report",
-       "What happened:\n\nWhat I expected:\n\nSteps to reproduce:\n")},
-  ];
-  const body='<div class="ct-lead">Got an idea, or hit a bug? I’d love to hear it — email goes '
-    +'straight to me and it’s read by a human.</div>'
-    +cards.map(c=>'<a class="ct-card'+(c.danger?" danger":"")+'" href="'+c.href+'">'
-      +'<span class="ct-ic">'+iconSVG(c.icon,20)+'</span>'
-      +'<span class="ct-tx"><b>'+c.label+'</b>'
-      +'<span class="ct-addr">'+CONTACT_EMAIL+'</span></span>'
-      +'<button class="ct-copy" data-copy data-icon="copy" data-icon-size="14" title="Copy the address">Copy</button></a>').join("")
-    +'<div class="ct-note">Opening your mail app fills in the subject for you. No account needed. '
-    +'For a bug, the more you can tell me about what you did, the faster I can fix it.</div>';
+  // one address, shown once. The card opens mail to it; the two buttons open it with a subject
+  // already set, so a suggestion and a bug report still land pre-sorted.
+  const body='<div class="ct-lead">Ideas or bugs? Email me:</div>'
+    +'<a class="ct-card" href="mailto:'+CONTACT_EMAIL+'">'
+    +'<span class="ct-ic">'+iconSVG("mail",20)+'</span>'
+    +'<span class="ct-addr">'+CONTACT_EMAIL+'</span>'
+    +'<button class="ct-copy" data-copy data-icon="copy" data-icon-size="14" title="Copy the address">Copy</button></a>'
+    +'<div class="ct-quick">'
+    +'<a class="ct-btn" href="'+contactHref("PixelPaint suggestion","")+'">'
+      +iconSVG("mail",14)+'Suggest a feature</a>'
+    +'<a class="ct-btn danger" href="'+contactHref("PixelPaint bug report",
+       "What happened:\n\nWhat I expected:\n\nSteps to reproduce:\n")+'">'
+      +iconSVG("bug",14)+'Report a bug</a>'
+    +'</div>';
   openModal({title:"Contact & suggestions", bodyHTML:body, okText:"Close", cancel:false, mid:true});
-  hydrateIcons($("#modalBody"));
-  $("#modalBody").querySelectorAll("[data-copy]").forEach(btn=>{
-    btn.onclick=async e=>{
-      e.preventDefault(); e.stopPropagation();   // the card is a link; a copy is not a navigation
-      let ok=false;
-      try{ await navigator.clipboard.writeText(CONTACT_EMAIL); ok=true; }
-      catch(_){
-        // clipboard API is blocked on file:// and older browsers — fall back to a hidden selection
-        try{
-          const ta=document.createElement("textarea"); ta.value=CONTACT_EMAIL;
-          ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
-          ta.select(); ok=document.execCommand("copy"); document.body.removeChild(ta);
-        }catch(__){}
-      }
-      showToast(ok?"Address copied — "+CONTACT_EMAIL:"Couldn’t copy — the address is "+CONTACT_EMAIL,
-        ok?"success":"info", 4200);
-    };
-  });
+  const copy=$("#modalBody").querySelector("[data-copy]");
+  if(copy) copy.onclick=async e=>{
+    e.preventDefault(); e.stopPropagation();   // the card is a link; a copy is not a navigation
+    let ok=false;
+    try{ await navigator.clipboard.writeText(CONTACT_EMAIL); ok=true; }
+    catch(_){
+      // clipboard API is blocked on file:// and older browsers — fall back to a hidden selection
+      try{
+        const ta=document.createElement("textarea"); ta.value=CONTACT_EMAIL;
+        ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+        ta.select(); ok=document.execCommand("copy"); document.body.removeChild(ta);
+      }catch(__){}
+    }
+    showToast(ok?"Address copied.":"Couldn’t copy — the address is "+CONTACT_EMAIL, ok?"success":"info", 3200);
+  };
 }
 
 // ------------------------------------------------------------------ collapsible side sections
