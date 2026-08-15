@@ -1529,7 +1529,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.08b";
+const APP_VERSION="2026.08.09a";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1759,14 +1759,53 @@ function hsvToRgb(h,s,v){
 
 function makeLayerCanvas(){const c=document.createElement("canvas");c.width=W;c.height=H;return c;}
 
+// All frames share one layer set: the same number of layers in the same order, with the same name,
+// visibility, opacity and lock at each position — only the pixels (the cel) differ per frame. That's
+// the Aseprite model, and what the timeline grid draws: a row per layer, a column per frame. These
+// helpers apply a change to the matching layer in *every* frame so the set never drifts apart. Cells
+// are matched by position, so per-frame layer ids need not agree — only count, order and metadata.
+function eachFrameLayer(i, fn){ for(const f of frames){ if(f.layers[i]) fn(f.layers[i]); } }
+function setLayerVisible(i,v){ eachFrameLayer(i,l=>l.visible=v); }
+function setLayerLocked(i,v){ eachFrameLayer(i,l=>l.locked=v); }
+function setLayerName(i,name){ eachFrameLayer(i,l=>l.name=name); }
+function setLayerOpacity(i,op){ eachFrameLayer(i,l=>l.opacity=op); }
+// Bring every frame to the same layer set — used after loading a file (older ones could carry a
+// different layer list per frame) or pasting a frame from another tab. The frame with the most
+// layers sets the template; each frame keeps its own pixels, padded with blanks where it was short.
+function normalizeLayers(){
+  if(!frames.length) return;
+  let tmpl=frames[0]; for(const f of frames) if(f.layers.length>tmpl.layers.length) tmpl=f;
+  const n=tmpl.layers.length;
+  const meta=[]; for(let k=0;k<n;k++){ const t=tmpl.layers[k];
+    meta.push({name:(t&&t.name)||("Layer "+(k+1)), visible:t?t.visible!==false:true,
+               opacity:t&&t.opacity!=null?t.opacity:1, locked:!!(t&&t.locked)}); }
+  for(const f of frames){
+    const old=f.layers, nl=[];
+    for(let k=0;k<n;k++){
+      const c=makeLayerCanvas(), ctx=c.getContext("2d");
+      if(old[k]&&old[k].canvas) ctx.drawImage(old[k].canvas,0,0);
+      nl.push({id:layerSeq++, name:meta[k].name, visible:meta[k].visible, opacity:meta[k].opacity, locked:meta[k].locked, canvas:c, ctx});
+    }
+    f.layers=nl;
+  }
+  layers=frames[frameIndex].layers;
+  activeIndex=clamp(activeIndex,0,Math.max(0,layers.length-1));
+}
+
+// Add a layer to every frame at the same position, blank on each — so the set stays identical and
+// only the pixels vary. Returns the current frame's new layer.
 function addLayer(name,atTop=true){
-  const c=makeLayerCanvas();
-  const l={id:layerSeq++, name:name||("Layer "+layerSeq), visible:true, opacity:1, locked:false, canvas:c, ctx:c.getContext("2d")};
-  // Insert above the active layer; clamp so the very first layer lands at index 0 (not 1).
+  const nm=name||("Layer "+layerSeq);
   const insertAt = atTop ? Math.min(activeIndex+1, layers.length) : layers.length;
-  layers.splice(insertAt,0,l);
+  let ret=null;
+  frames.forEach(f=>{
+    const c=makeLayerCanvas();
+    const l={id:layerSeq++, name:nm, visible:true, opacity:1, locked:false, canvas:c, ctx:c.getContext("2d")};
+    f.layers.splice(insertAt,0,l);
+    if(f===frames[frameIndex]) ret=l;
+  });
   activeIndex=insertAt;
-  return l;
+  return ret || layers[insertAt];
 }
 
 function activeLayer(){return layers[activeIndex];}
@@ -2105,6 +2144,7 @@ function pasteFrameAfter(i){
   frames.splice(i+1,0,makeFrameFrom(frameClip,true));   // clone, so pasting twice gives two frames
   owner.splice(i+1,0,owner[i]===undefined?-1:owner[i]);
   rebuildTagsFromOwners(owner);
+  normalizeLayers();   // a frame pasted from another tab may bring a different layer set
   afterFrameEdit(i+1);
 }
 // Step the current frame one place. Crossing into another group joins it, which is what the strip
@@ -4940,18 +4980,18 @@ function renderLayers(){
 
     const eye=document.createElement("div");
     eye.className="eye"+(l.visible?"":" off"); eye.innerHTML=iconSVG(l.visible?"visible":"hidden",16); eye.title="Toggle visibility";
-    eye.onclick=ev=>{ev.stopPropagation(); l.visible=!l.visible; composite(); renderLayers();};
+    eye.onclick=ev=>{ev.stopPropagation(); setLayerVisible(i,!l.visible); composite(); renderLayers(); renderTimeline();};
 
     const lock=document.createElement("div");
     lock.className="lock"+(l.locked?" on":""); lock.innerHTML=iconSVG("lock",15);
     lock.title=l.locked?"Locked — click to unlock":"Unlocked — click to lock";
-    lock.onclick=ev=>{ev.stopPropagation(); l.locked=!l.locked; renderLayers();};
+    lock.onclick=ev=>{ev.stopPropagation(); setLayerLocked(i,!l.locked); renderLayers(); renderTimeline();};
 
     const nm=document.createElement("div");
     nm.className="nm"; nm.textContent=l.name; nm.title="Double-click to rename";
     nm.ondblclick=async ev=>{ ev.stopPropagation();
       const n=await showPrompt("New name for this layer:", l.name, {title:"Rename layer"});
-      if(n!=null && n.trim()!==""){ l.name=n.trim(); renderLayers(); } };
+      if(n!=null && n.trim()!==""){ setLayerName(i,n.trim()); renderLayers(); renderTimeline(); } };
 
     const thumb=document.createElement("canvas");
     thumb.className="thumb"; thumb.width=W; thumb.height=H; l._thumb=thumb;
@@ -5176,6 +5216,7 @@ function applyProject(data){
   }
 }
 function finishLoad(data){
+  normalizeLayers();   // older files could carry a different layer list per frame — unify them
   activeIndex=clamp(data.active||0,0,layers.length-1);
   pruneTags();   // a hand-edited or older project file may carry out-of-range group ranges
   sheet=sanitizeSheet(data.sheet, W, H);
@@ -7017,22 +7058,32 @@ $("#palExport").onclick=exportPalette;
 $("#palImport").onclick=()=>$("#palFileInput").click();
 $("#palFileInput").onchange=e=>{ const f=e.target.files[0]; if(f) importPaletteFile(f); e.target.value=""; };
 
-// layer toolbar (shared by the header buttons and the Layer menu)
-function addLayerCmd(){ pushUndo(); addLayer("Layer "+(layers.length+1)); renderLayers(); composite(); }
+// layer toolbar (shared by the header buttons and the Layer menu). A layer is shared by all frames,
+// so adding/removing/reordering one is a whole-document edit (pushUndoAll) applied to every frame.
+function addLayerCmd(){ pushUndoAll(); addLayer("Layer "+(layers.length+1)); renderLayers(); renderTimeline(); composite(); }
 function dupLayerCmd(){
-  const src=activeLayer(); if(!src) return; pushUndo();
-  const l=addLayer(src.name+" copy"); l.ctx.drawImage(src.canvas,0,0); l.opacity=src.opacity; l.locked=src.locked;
-  renderLayers(); composite();
+  const src=activeLayer(); if(!src) return; pushUndoAll();
+  const insertAt=Math.min(activeIndex+1, layers.length);
+  frames.forEach(f=>{
+    const s=f.layers[activeIndex];
+    const c=makeLayerCanvas(), ctx=c.getContext("2d"); if(s) ctx.drawImage(s.canvas,0,0);
+    f.layers.splice(insertAt,0,{id:layerSeq++, name:(s?s.name:"Layer")+" copy",
+      visible:s?s.visible:true, opacity:s?s.opacity:1, locked:s?s.locked:false, canvas:c, ctx});
+  });
+  activeIndex=insertAt; renderLayers(); renderTimeline(); composite();
 }
 function delLayerCmd(){
   if(layers.length<=1){ showToast("At least one layer is required.","error"); return; }
-  pushUndo(); layers.splice(activeIndex,1); activeIndex=clamp(activeIndex,0,layers.length-1);
-  renderLayers(); composite();
+  pushUndoAll(); frames.forEach(f=>f.layers.splice(activeIndex,1));
+  activeIndex=clamp(activeIndex,0,layers.length-1);
+  renderLayers(); renderTimeline(); composite();
 }
-function upLayerCmd(){ if(activeIndex>=layers.length-1) return; pushUndo();
-  [layers[activeIndex],layers[activeIndex+1]]=[layers[activeIndex+1],layers[activeIndex]]; activeIndex++; renderLayers(); composite(); }
-function downLayerCmd(){ if(activeIndex<=0) return; pushUndo();
-  [layers[activeIndex],layers[activeIndex-1]]=[layers[activeIndex-1],layers[activeIndex]]; activeIndex--; renderLayers(); composite(); }
+function upLayerCmd(){ if(activeIndex>=layers.length-1) return; pushUndoAll();
+  frames.forEach(f=>{ [f.layers[activeIndex],f.layers[activeIndex+1]]=[f.layers[activeIndex+1],f.layers[activeIndex]]; });
+  activeIndex++; renderLayers(); renderTimeline(); composite(); }
+function downLayerCmd(){ if(activeIndex<=0) return; pushUndoAll();
+  frames.forEach(f=>{ [f.layers[activeIndex],f.layers[activeIndex-1]]=[f.layers[activeIndex-1],f.layers[activeIndex]]; });
+  activeIndex--; renderLayers(); renderTimeline(); composite(); }
 // ---- flip / merge / flatten / rotate / reverse (Aseprite-style edits) ----
 function flipRegion(ctx, rx, ry, rw, rh, horizontal){
   const t=canvasOf(rw,rh), tc=t.getContext("2d"); tc.imageSmoothingEnabled=false;
@@ -7051,28 +7102,35 @@ function flipFrame(horizontal){
   composite(); renderLayers();
   showToast("Flipped "+(horizontal?"horizontally":"vertically")+(selection?" within the selection":"")+".","success",1500);
 }
-// Merge the active layer down into the one beneath it (lower in the stack = earlier in the array).
+// Merge the active layer down into the one beneath it, in every frame (the layer spans them all).
 function mergeDownCmd(){
   if(!layers.length) return;
   if(activeIndex<=0){ showToast("Nothing below to merge into — this is the bottom layer.","info",2600); return; }
-  pushUndo();
-  const top=layers[activeIndex], below=layers[activeIndex-1];
-  if(top.visible){ below.ctx.save(); below.ctx.imageSmoothingEnabled=false; below.ctx.globalAlpha=top.opacity; below.ctx.drawImage(top.canvas,0,0); below.ctx.restore(); }
-  layers.splice(activeIndex,1); activeIndex--; frames[frameIndex].layers=layers;
-  refreshThumb(below); renderLayers(); composite(); captureActiveDoc();
-  showToast("Merged “"+top.name+"” down into “"+below.name+"”.","success",2000);
+  pushUndoAll();
+  const name=layers[activeIndex].name, belowName=layers[activeIndex-1].name;
+  frames.forEach(f=>{
+    const top=f.layers[activeIndex], below=f.layers[activeIndex-1];
+    if(top && below){
+      if(top.visible){ below.ctx.save(); below.ctx.imageSmoothingEnabled=false; below.ctx.globalAlpha=top.opacity; below.ctx.drawImage(top.canvas,0,0); below.ctx.restore(); }
+      f.layers.splice(activeIndex,1);
+    }
+  });
+  activeIndex--; layers=frames[frameIndex].layers;
+  renderLayers(); renderTimeline(); composite(); captureActiveDoc();
+  showToast("Merged “"+name+"” down into “"+belowName+"”.","success",2000);
 }
-// Composite this frame's visible layers into one. Layers are per-frame here, so it flattens the
-// frame you're on (the toast says so), leaving other frames untouched.
+// Flatten every layer into one, on every frame — each frame keeps its own flattened picture.
 function flattenFrameCmd(){
   if(layers.length<=1){ showToast("Only one layer — nothing to flatten.","info",2200); return; }
-  pushUndo();
-  const base=makeLayerCanvas(), bctx=base.getContext("2d"); bctx.imageSmoothingEnabled=false;
-  for(const l of frames[frameIndex].layers){ if(!l.visible) continue; bctx.save(); bctx.globalAlpha=l.opacity; bctx.drawImage(l.canvas,0,0); bctx.restore(); }
-  const one={id:layerSeq++, name:"Flattened", visible:true, opacity:1, locked:false, canvas:base, ctx:bctx};
-  frames[frameIndex].layers=[one]; layers=frames[frameIndex].layers; activeIndex=0;
-  renderLayers(); composite(); captureActiveDoc();
-  showToast("Flattened this frame’s layers into one.","success",1800);
+  pushUndoAll();
+  frames.forEach(f=>{
+    const base=makeLayerCanvas(), bctx=base.getContext("2d"); bctx.imageSmoothingEnabled=false;
+    for(const l of f.layers){ if(!l.visible) continue; bctx.save(); bctx.globalAlpha=l.opacity; bctx.drawImage(l.canvas,0,0); bctx.restore(); }
+    f.layers=[{id:layerSeq++, name:"Flattened", visible:true, opacity:1, locked:false, canvas:base, ctx:bctx}];
+  });
+  layers=frames[frameIndex].layers; activeIndex=0;
+  renderLayers(); renderTimeline(); composite(); captureActiveDoc();
+  showToast("Flattened every layer into one.","success",1800);
 }
 // Rotate the whole sprite — every layer of every frame — 90°/180°/270°. Undone as one whole-document
 // step so a multi-frame animation comes back intact.
@@ -7113,7 +7171,7 @@ $("#dupLayer").onclick=dupLayerCmd;
 $("#delLayer").onclick=delLayerCmd;
 $("#upLayer").onclick=upLayerCmd;
 $("#downLayer").onclick=downLayerCmd;
-$("#opacitySlider").oninput=e=>{ const L=activeLayer(); if(!L) return; L.opacity=e.target.value/100; $("#opacityVal").textContent=e.target.value; composite(); };
+$("#opacitySlider").oninput=e=>{ if(!activeLayer()) return; setLayerOpacity(activeIndex, e.target.value/100); $("#opacityVal").textContent=e.target.value; composite(); };
 
 // modal / dialog wiring
 $("#modalOk").onclick=()=>{ const inp=$("#modalInput"); closeModal(inp.style.display!=="none"? inp.value : true); };
