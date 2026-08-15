@@ -1024,6 +1024,8 @@
     <div class="ctx-sep"></div>
     <label class="chk"><input type="checkbox" id="gridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Grid<span class="hk">G</span></label>
     <label class="chk"><input type="checkbox" id="centerToggle" checked /><span class="mi" data-icon="center" data-icon-size="15"></span>Center guide</label>
+    <label class="chk"><input type="checkbox" id="onionToggle" /><span class="mi" data-icon="copy" data-icon-size="15"></span>Onion skin<span class="hk">F3</span></label>
+    <label class="chk" id="onionTintRow" style="display:none"><input type="checkbox" id="onionTintToggle" checked /><span class="mi" data-icon="swap" data-icon-size="15"></span>Onion red/blue tint</label>
     <label class="chk" id="tileGridRow"><input type="checkbox" id="tileGridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Tile grid</label>
     <label class="chk"><input type="checkbox" id="regionToggleMenu" /><span class="mi" data-icon="region" data-icon-size="15"></span>Sub-canvas</label>
     <button data-cmd="delregion" data-icon="trash" data-icon-size="16">Remove sub-canvas<span class="hk">Del</span></button>
@@ -1480,6 +1482,10 @@ let brush=1;
 let fillShape=false;
 let showGrid=true;
 let showCenter=true;
+// onion skin: faint ghosts of the neighbouring frames while you draw. Tint mode recolours them the
+// Aseprite way — the frame before in red, the one after in blue — so direction reads at a glance.
+let onion=false, onionTint=true;
+const ONION_OPACITY=0.4;
 let recents=[];
 const MAX_RECENTS=16, MAX_UNDO=80;
 let placement=null;  // pending image being positioned: {img, name, x, y, w, h, ar}
@@ -1517,7 +1523,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.07c";
+const APP_VERSION="2026.08.08a";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -2477,6 +2483,7 @@ function composite(){
 
   vctx.imageSmoothingEnabled=false;
   vctx.clearRect(0,0,view.width,view.height);
+  drawOnionSkin();                        // ghosts sit behind the current frame
   vctx.drawImage(flat,0,0,W*zoom,H*zoom);
   if(showGrid && zoom>=4) drawGrid();
   if(showCenter) drawCenterGuide();
@@ -2495,6 +2502,41 @@ function composite(){
   if(fr && fr._thumb) compositeFrameInto(fr._thumb.getContext("2d"), fr);
 }
 
+// Draw the frame before and the frame after the current one, faded, behind it. Scoped to the
+// current group's frames if it's in one (so a walk cycle's onion doesn't bleed into the idle that
+// follows it). Off while playing or placing, and meaningless without neighbours.
+function ghostFrame(fr, tint){
+  const c=canvasOf(W,H), x=c.getContext("2d"); x.imageSmoothingEnabled=false;
+  compositeFrameInto(x, fr);
+  if(tint){ x.globalCompositeOperation="source-in"; x.fillStyle=tint; x.fillRect(0,0,W,H); }
+  return c;
+}
+function drawOnionSkin(){
+  if(!onion || playing || placement || sheet || frames.length<2) return;
+  const owner=frameOwners(), g=owner[frameIndex];
+  let lo=0, hi=frames.length-1;
+  if(g>=0 && tags[g]){ lo=tags[g].from; hi=tags[g].to; }
+  const prev=frameIndex-1, next=frameIndex+1;
+  vctx.save(); vctx.imageSmoothingEnabled=false;
+  if(prev>=lo){ vctx.globalAlpha=ONION_OPACITY;
+    vctx.drawImage(ghostFrame(frames[prev], onionTint?"#ff3b3b":null), 0,0, W*zoom, H*zoom); }
+  if(next<=hi){ vctx.globalAlpha=ONION_OPACITY;
+    vctx.drawImage(ghostFrame(frames[next], onionTint?"#3b7bff":null), 0,0, W*zoom, H*zoom); }
+  vctx.globalAlpha=1; vctx.restore();
+}
+function setOnion(on){
+  onion=!!on;
+  const b=$("#onionToggle"); if(b) b.checked=onion;
+  const r=$("#onionTintRow"); if(r) r.style.display=onion?"":"none";
+  try{ localStorage.setItem("pp_onion", onion?"1":"0"); }catch(_){}
+  composite();
+}
+function setOnionTint(on){
+  onionTint=!!on;
+  const b=$("#onionTintToggle"); if(b) b.checked=onionTint;
+  try{ localStorage.setItem("pp_onionTint", onionTint?"1":"0"); }catch(_){}
+  composite();
+}
 function drawGrid(){
   vctx.save();
   for(let x=0;x<=W;x++){
@@ -6300,6 +6342,7 @@ const HELP_SECTIONS=[
     ["copy","Reorder by dragging a frame's number",""],
     ["add","New frame (copies the current one)",""],
     ["redo","Reverse a group's frames",""],
+    ["copy","Onion skin — ghost the frames either side","F3"],
     ["tag","Group frames — idle, walk, jump…",""],
     ["image","Export a spritesheet of a group",""],
     ["folder","Import a spritesheet — sliced into frames and groups",""],
@@ -6572,6 +6615,8 @@ $("#zoomOut").onclick=()=>setZoom(zoom-1);
 $("#zoomFit").onclick=()=>{ fitZoom(); composite(); };
 $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
 $("#centerToggle").onchange=e=>{showCenter=e.target.checked; composite();};
+$("#onionToggle").onchange=e=>setOnion(e.target.checked);
+$("#onionTintToggle").onchange=e=>setOnionTint(e.target.checked);
 $("#tileGridToggle").onchange=e=>{showTileGrid=e.target.checked; composite();};
 $("#zoomStat").onclick=()=>{ fitZoom(); composite(); };
 $("#docInfo").onclick=resizeDialog;
@@ -6893,6 +6938,7 @@ window.addEventListener("keydown",e=>{
     case "d": setTool("region"); break;
     case "t": setTool("tile"); break;
     case " ": e.preventDefault(); startPlayback(); break;
+    case "f3": e.preventDefault(); setOnion(!onion); break;
     // under the Tile tool the arrows walk the grid; everywhere else they step through frames
     case "arrowup":    if(tool==="tile"&&sheet){ e.preventDefault(); moveTileSel(-1,0); } break;
     case "arrowdown":  if(tool==="tile"&&sheet){ e.preventDefault(); moveTileSel(1,0); } break;
@@ -7011,6 +7057,8 @@ let savedSnap=null; try{ savedSnap=localStorage.getItem("pp_placeSnap"); }catch(
 setPlaceSnap(savedSnap==null ? true : savedSnap==="1");
 let savedClip=null; try{ savedClip=localStorage.getItem("pp_tileClip"); }catch(_){}
 tileClip = savedClip==null ? true : savedClip==="1";   // tiles fence themselves off unless told not to
+{ let so=null,st=null; try{ so=localStorage.getItem("pp_onion"); st=localStorage.getItem("pp_onionTint"); }catch(_){}
+  onionTint = st==null ? true : st==="1"; setOnionTint(onionTint); setOnion(so==="1"); }
 let savedPT=null; try{ savedPT=localStorage.getItem(PANEL_TAB_KEY); }catch(_){}
 setPanelTab(savedPT||"none");
 applyPanelLayout();
