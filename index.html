@@ -933,11 +933,19 @@
     <button data-cmd="cutsel"  data-icon="clear"     data-icon-size="16">Cut selection<span class="hk">Ctrl+X</span></button>
     <button data-cmd="pastesel" data-icon="clipboard" data-icon-size="16">Paste<span class="hk">Ctrl+V</span></button>
     <div class="ctx-sep"></div>
+    <button data-cmd="fliph" data-icon="swap" data-icon-size="16">Flip horizontal<span class="hk">Shift+H</span></button>
+    <button data-cmd="flipv" data-icon="swap" data-icon-size="16">Flip vertical<span class="hk">Shift+V</span></button>
+    <div class="ctx-sep"></div>
     <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
   </div>
   <div id="menu-sprite" class="ctx-menu menu-dd" hidden>
     <button data-cmd="resize" data-icon="select" data-icon-size="16">Resize canvas…</button>
     <button data-cmd="trim" data-icon="center" data-icon-size="16">Trim to the artwork</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="rotr" data-icon="rotR" data-icon-size="16">Rotate canvas 90° right</button>
+    <button data-cmd="rotl" data-icon="rotL" data-icon-size="16">Rotate canvas 90° left</button>
+    <button data-cmd="rot180" data-icon="redo" data-icon-size="16">Rotate canvas 180°</button>
+    <div class="ctx-sep"></div>
     <button data-cmd="addimage" data-icon="image" data-icon-size="16">Add image…</button>
     <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
     <div class="ctx-sep"></div>
@@ -952,6 +960,9 @@
     <button data-cmd="uplayer"   data-icon="up"   data-icon-size="16">Move up</button>
     <button data-cmd="downlayer" data-icon="down" data-icon-size="16">Move down</button>
     <div class="ctx-sep"></div>
+    <button data-cmd="mergedown" data-icon="down"  data-icon-size="16">Merge down</button>
+    <button data-cmd="flatten"   data-icon="image" data-icon-size="16">Flatten this frame</button>
+    <div class="ctx-sep"></div>
     <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
   </div>
   <div id="menu-frame" class="ctx-menu menu-dd" hidden>
@@ -960,6 +971,8 @@
     <div class="ctx-sep"></div>
     <button data-cmd="addgroup" data-icon="tag" data-icon-size="16">New frame group…</button>
     <button data-cmd="addtag"   data-icon="tag" data-icon-size="16">Group existing frames…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="reverse" data-icon="redo" data-icon-size="16">Reverse frames</button>
     <div class="ctx-sep"></div>
     <button data-cmd="play"   data-icon="play" data-icon-size="16">Play / stop<span class="hk">Space</span></button>
     <button data-cmd="sheet"  data-icon="image" data-icon-size="16">Export spritesheet…</button>
@@ -1498,7 +1511,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.07a";
+const APP_VERSION="2026.08.07b";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -3414,8 +3427,21 @@ function snapshot(){
 }
 function restore(snap){
   W=snap.w; H=snap.h; flat.width=W; flat.height=H;
-  if(snap.fi!=null) frameIndex=clamp(snap.fi,0,frames.length-1);
   sheet=cloneSheet(snap.sheet)||null; tileSel=snap.tileSel||null;
+  // A whole-document snapshot (rotate canvas, and anything else that touches every frame) carries
+  // all frames, so it can put the entire animation back — not just the frame you were on.
+  if(snap.all){
+    frames=snap.all.map(f=>({dur:f.dur, layers:f.layers.map(s=>{
+      const c=makeLayerCanvas(), ctx=c.getContext("2d"); ctx.putImageData(cloneImg(s.img),0,0);
+      return {id:layerSeq++, name:s.name, visible:s.visible, opacity:s.opacity, locked:!!s.locked, canvas:c, ctx:ctx};
+    })}));
+    frameIndex=clamp(snap.fi==null?frameIndex:snap.fi,0,frames.length-1);
+    layers=frames[frameIndex].layers; activeIndex=clamp(snap.active,0,layers.length-1);
+    selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); clampRegion();
+    fitZoom(); renderLayers(); renderTimeline(); renderRegionPanel(); renderSheetPanel();
+    composite(); updateDocInfo(); return;
+  }
+  if(snap.fi!=null) frameIndex=clamp(snap.fi,0,frames.length-1);
   const arr=snap.layers.map(s=>{
     const c=makeLayerCanvas(); const ctx=c.getContext("2d");
     ctx.putImageData(cloneImg(s.img),0,0);
@@ -3447,16 +3473,37 @@ function pushUndo(){
   redoStack=[];
   updateUndoButtons();
 }
+// Every frame's pixels, for edits that change the whole sprite at once (rotate canvas). Costs more
+// memory than a one-frame snapshot, so it's only used where a one-frame snapshot couldn't undo the
+// change. The counterpart in undo()/redo() re-snapshots in the same shape so redo stays exact too.
+function snapshotAll(){
+  return {
+    w:W, h:H, active:activeIndex, fi:frameIndex,
+    sheet:cloneSheet(sheet), tileSel:tileSel?{r:tileSel.r,c:tileSel.c}:null,
+    all:frames.map(f=>({dur:f.dur, layers:f.layers.map(l=>({
+      name:l.name, visible:l.visible, opacity:l.opacity, locked:!!l.locked,
+      img:l.ctx.getImageData(0,0,l.canvas.width,l.canvas.height)
+    }))}))
+  };
+}
+function pushUndoAll(){
+  undoStack.push(snapshotAll());
+  if(undoStack.length>MAX_UNDO) undoStack.shift();
+  redoStack=[];
+  updateUndoButtons();
+}
 function undo(){
   if(!undoStack.length) return;
-  redoStack.push(snapshot());
-  restore(undoStack.pop());
+  const s=undoStack.pop();
+  redoStack.push(s.all?snapshotAll():snapshot());
+  restore(s);
   updateUndoButtons();
 }
 function redo(){
   if(!redoStack.length) return;
-  undoStack.push(snapshot());
-  restore(redoStack.pop());
+  const s=redoStack.pop();
+  undoStack.push(s.all?snapshotAll():snapshot());
+  restore(s);
   updateUndoButtons();
 }
 function updateUndoButtons(){
@@ -6147,6 +6194,14 @@ function runCmd(cmd){
     case "undo": undo(); break;
     case "redo": redo(); break;
     case "clearlayer": clearActiveLayer(); break;
+    case "fliph": flipFrame(true); break;
+    case "flipv": flipFrame(false); break;
+    case "rotr": rotateCanvasCmd(90); break;
+    case "rotl": rotateCanvasCmd(270); break;
+    case "rot180": rotateCanvasCmd(180); break;
+    case "mergedown": mergeDownCmd(); break;
+    case "flatten": flattenFrameCmd(); break;
+    case "reverse": reverseFramesCmd(); break;
     case "copysel": copySelection(false); break;
     case "cutsel": copySelection(true); break;
     case "pastesel": if(!pastePixelClip()) showToast("Nothing copied yet.","info"); break;
@@ -6213,6 +6268,8 @@ const HELP_SECTIONS=[
     ["trash","Clear the selection","Del"],
     ["save","Save project","Ctrl+S"], ["folder","Open project","Ctrl+O"],
     ["clock","Open one of the last 10 files","Ctrl+Shift+O"],
+    ["swap","Flip the frame / selection","Shift+H|Shift+V"],
+    ["rotR","Rotate the whole canvas 90° / 180°",""],
   ]},
   {title:"Brush & view", icon:"brush", rows:[
     ["brush","Smaller / bigger brush","[|]"],
@@ -6229,6 +6286,7 @@ const HELP_SECTIONS=[
     ["right","Move the frame along","Shift+←|Shift+→"],
     ["copy","Reorder by dragging a frame's number",""],
     ["add","New frame (copies the current one)",""],
+    ["redo","Reverse a group's frames",""],
     ["tag","Group frames — idle, walk, jump…",""],
     ["image","Export a spritesheet of a group",""],
     ["folder","Import a spritesheet — sliced into frames and groups",""],
@@ -6667,6 +6725,81 @@ function upLayerCmd(){ if(activeIndex>=layers.length-1) return; pushUndo();
   [layers[activeIndex],layers[activeIndex+1]]=[layers[activeIndex+1],layers[activeIndex]]; activeIndex++; renderLayers(); composite(); }
 function downLayerCmd(){ if(activeIndex<=0) return; pushUndo();
   [layers[activeIndex],layers[activeIndex-1]]=[layers[activeIndex-1],layers[activeIndex]]; activeIndex--; renderLayers(); composite(); }
+// ---- flip / merge / flatten / rotate / reverse (Aseprite-style edits) ----
+function flipRegion(ctx, rx, ry, rw, rh, horizontal){
+  const t=canvasOf(rw,rh), tc=t.getContext("2d"); tc.imageSmoothingEnabled=false;
+  tc.drawImage(ctx.canvas, rx,ry,rw,rh, 0,0,rw,rh);
+  ctx.save(); ctx.imageSmoothingEnabled=false;
+  ctx.clearRect(rx,ry,rw,rh); ctx.translate(rx,ry);
+  if(horizontal){ ctx.translate(rw,0); ctx.scale(-1,1); } else { ctx.translate(0,rh); ctx.scale(1,-1); }
+  ctx.drawImage(t,0,0); ctx.restore();
+}
+// Flip every layer of this frame — or just the selection, if there is one — like Aseprite's Edit ▸ Flip.
+function flipFrame(horizontal){
+  if(!layers.length) return;
+  pushUndo();
+  const rx=selection?selection.x:0, ry=selection?selection.y:0, rw=selection?selection.w:W, rh=selection?selection.h:H;
+  frames[frameIndex].layers.forEach(l=>{ flipRegion(l.ctx, rx,ry,rw,rh, horizontal); refreshThumb(l); });
+  composite(); renderLayers();
+  showToast("Flipped "+(horizontal?"horizontally":"vertically")+(selection?" within the selection":"")+".","success",1500);
+}
+// Merge the active layer down into the one beneath it (lower in the stack = earlier in the array).
+function mergeDownCmd(){
+  if(!layers.length) return;
+  if(activeIndex<=0){ showToast("Nothing below to merge into — this is the bottom layer.","info",2600); return; }
+  pushUndo();
+  const top=layers[activeIndex], below=layers[activeIndex-1];
+  if(top.visible){ below.ctx.save(); below.ctx.imageSmoothingEnabled=false; below.ctx.globalAlpha=top.opacity; below.ctx.drawImage(top.canvas,0,0); below.ctx.restore(); }
+  layers.splice(activeIndex,1); activeIndex--; frames[frameIndex].layers=layers;
+  refreshThumb(below); renderLayers(); composite(); captureActiveDoc();
+  showToast("Merged “"+top.name+"” down into “"+below.name+"”.","success",2000);
+}
+// Composite this frame's visible layers into one. Layers are per-frame here, so it flattens the
+// frame you're on (the toast says so), leaving other frames untouched.
+function flattenFrameCmd(){
+  if(layers.length<=1){ showToast("Only one layer — nothing to flatten.","info",2200); return; }
+  pushUndo();
+  const base=makeLayerCanvas(), bctx=base.getContext("2d"); bctx.imageSmoothingEnabled=false;
+  for(const l of frames[frameIndex].layers){ if(!l.visible) continue; bctx.save(); bctx.globalAlpha=l.opacity; bctx.drawImage(l.canvas,0,0); bctx.restore(); }
+  const one={id:layerSeq++, name:"Flattened", visible:true, opacity:1, locked:false, canvas:base, ctx:bctx};
+  frames[frameIndex].layers=[one]; layers=frames[frameIndex].layers; activeIndex=0;
+  renderLayers(); composite(); captureActiveDoc();
+  showToast("Flattened this frame’s layers into one.","success",1800);
+}
+// Rotate the whole sprite — every layer of every frame — 90°/180°/270°. Undone as one whole-document
+// step so a multi-frame animation comes back intact.
+function rotateCanvasCmd(deg){
+  deg=((deg%360)+360)%360; if(deg===0) return;
+  stopPlayback(); pushUndoAll();
+  frames.forEach(f=>f.layers.forEach(l=>{
+    const r=rotateInto(l.canvas, l.canvas.width, l.canvas.height, deg);
+    l.canvas=r.canvas; l.ctx=r.canvas.getContext("2d"); l.ctx.imageSmoothingEnabled=false;
+  }));
+  if(deg===90||deg===270){ const t=W; W=H; H=t; }
+  flat.width=W; flat.height=H;
+  layers=frames[frameIndex].layers; activeIndex=clamp(activeIndex,0,layers.length-1);
+  selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus();
+  if(sheet){ sheet=null; showToast("The tile grid was dropped — it no longer matched the rotated canvas.","info",3200); }
+  clampRegion();
+  fitZoom(); renderLayers(); renderTimeline(); renderRegionPanel(); renderSheetPanel(); composite(); updateDocInfo(); captureActiveDoc();
+  showToast("Rotated the canvas "+(deg===180?"180°":deg===90?"90° right":"90° left")+".","success",1800);
+}
+// Reverse a run of frames. Scoped to the run that shares the current frame's group (or lack of one),
+// so a group's own frames flip without disturbing the frames or tags around them.
+function reverseFramesCmd(){
+  if(frames.length<2){ showToast("Only one frame — nothing to reverse.","info",2200); return; }
+  stopPlayback();
+  const owner=frameOwners(), cur=owner[frameIndex];
+  let from=frameIndex, to=frameIndex;
+  while(from>0 && owner[from-1]===cur) from--;
+  while(to<frames.length-1 && owner[to+1]===cur) to++;
+  if(to<=from){ showToast("Nothing to reverse here.","info",2000); return; }
+  const seg=frames.slice(from,to+1).reverse();
+  for(let i=from;i<=to;i++) frames[i]=seg[i-from];
+  const scope = cur>=0 && tags[cur] ? "“"+tags[cur].name+"”" : (from===0 && to===frames.length-1 ? "all frames" : "the frames");
+  afterFrameEdit(from+to-frameIndex);   // keep the caret on the same picture, now mirrored
+  showToast("Reversed "+scope+".","success",1800);
+}
 $("#addLayer").onclick=addLayerCmd;
 $("#dupLayer").onclick=dupLayerCmd;
 $("#delLayer").onclick=delLayerCmd;
@@ -6739,6 +6872,9 @@ window.addEventListener("keydown",e=>{
     case "-": case "_": setZoom(zoom-1); break;
     case "g": showGrid=!showGrid; $("#gridToggle").checked=showGrid; composite(); break;
     case "x": swapColors(); break;
+    // Shift+H / Shift+V flip, matching Aseprite (plain h/v are unbound)
+    case "h": if(e.shiftKey){ e.preventDefault(); flipFrame(true); } break;
+    case "v": if(e.shiftKey){ e.preventDefault(); flipFrame(false); } break;
     case "m": setTool("select"); break;
     case "w": setTool("wand"); break;
     case "d": setTool("region"); break;
