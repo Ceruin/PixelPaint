@@ -495,8 +495,14 @@
   .rc-x:hover{background:#ffffff14; color:var(--danger);}
   .rc-empty{padding:20px 12px; text-align:center; color:var(--muted); font-size:12px; line-height:1.5;
     border:1px dashed var(--line); border-radius:8px;}
-  .rc-foot{display:flex; align-items:center; gap:10px;}
+  .rc-foot{display:flex; align-items:center; gap:8px;}
   .rc-note{flex:1; min-width:0; color:var(--muted); font-size:10.5px; line-height:1.4;}
+  /* cache-is-not-a-backup warning at the top of Open recent */
+  .rc-warn{display:flex; gap:9px; align-items:flex-start; margin-bottom:11px; padding:9px 11px;
+    border:1px solid #caa53f55; background:#caa53f1f; border-radius:var(--r,3px);
+    color:#e7d6a3; font-size:11.5px; line-height:1.5;}
+  .rc-warn b{color:#fff2cf;}
+  .rc-warn-ic{flex:none; color:#e0be5a; margin-top:1px;}
 
   /* ---- about sheet ---- */
   .about-head{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
@@ -1511,7 +1517,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.07b";
+const APP_VERSION="2026.08.07c";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -5083,8 +5089,13 @@ function rcMeta(r){
 }
 async function showRecentDialog(){
   if(rcBoot){ try{ await rcBoot; }catch(_){} rcBoot=null; }
-  const body=`<div class="rc-list" id="rcList"></div>
+  const body=`<div class="rc-warn"><span class="rc-warn-ic" data-icon="info" data-icon-size="16"></span>
+      <span>This list lives in <b>this browser's storage</b> — clearing your browsing data (or opening a
+      private window) wipes it. It's a convenience, not a backup: <b>Save your work as a .pxpaint file</b>
+      to keep it for good.</span></div>
+    <div class="rc-list" id="rcList"></div>
     <div class="rc-foot"><span class="rc-note" id="rcNote"></span>
+      <button id="rcSaveNow" class="primary" data-icon="save" data-icon-size="14" title="Download the current drawing as a .pxpaint file">Save current</button>
       <button id="rcClear" data-icon="trash" data-icon-size="14">Clear the list</button></div>`;
   openModal({title:"Open recent", bodyHTML:body, okText:"Close", cancel:false, mid:true});
   const render=()=>{
@@ -5124,6 +5135,8 @@ async function showRecentDialog(){
   hydrateIcons($("#modalBody"));
   render();
   $("#rcClear").onclick=()=>{ forgetAllRecent().then(()=>{ render(); showToast("Recent list cleared.","success"); }); };
+  // right there in the warning's reach: download the current drawing so it survives a cache wipe
+  $("#rcSaveNow").onclick=()=>{ closeModal(true); saveProject(); };
 }
 
 // ------------------------------------------------------------------ spritesheet import
