@@ -141,6 +141,51 @@
   .tl-frame:hover .tl-x{display:inline-flex;}
   .tl-frame .tl-x:hover{background:var(--danger); color:#fff; border-color:var(--danger);}
 
+  /* ---- timeline grid: layers (rows) × frames (columns), tags as bars on top (Aseprite-style) ---- */
+  #tlFrames.tl-grid{display:block; padding:0; overflow:auto;}
+  .tlg{ --tlg-cw:30px; --tlg-lh:134px; --tlg-rh:25px; display:grid; align-content:start; font-size:11px; width:max-content; min-width:100%;}
+  .tlg-corner{position:sticky; left:0; z-index:4; background:var(--panel); border-right:1px solid var(--line);}
+  .tlg-corner.nums{border-bottom:1px solid var(--line); display:flex; align-items:center; gap:6px; padding:0 8px; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.4px;}
+  /* tag bars sit in the top row, each spanning its frame columns */
+  .tlg-tagcell{height:19px; padding:2px 1px 1px;}
+  .tlg-tag{height:100%; border-radius:3px; display:flex; align-items:center; padding:0 6px; font-size:10px;
+    font-weight:600; color:#fff; overflow:hidden; white-space:nowrap; cursor:pointer; box-shadow:inset 0 0 0 1px #0005; text-shadow:0 1px 1px #0006;}
+  .tlg-tag.sel{outline:2px solid #ffffffcc; outline-offset:-2px;}
+  /* frame number header cells (also the drag grip to reorder) */
+  .tlg-num{height:var(--tlg-rh); display:flex; align-items:center; justify-content:center; color:var(--muted);
+    font-variant-numeric:tabular-nums; border-bottom:1px solid var(--line); border-left:1px solid #ffffff0d;
+    cursor:grab; position:sticky; top:0; background:var(--panel); z-index:2; touch-action:none;}
+  .tlg-num:hover{color:var(--text); background:#2b2f39;}
+  .tlg-num .tlg-del{position:absolute; top:0; right:0; width:14px; height:14px; display:none;
+    align-items:center; justify-content:center; color:var(--muted); background:#0007; border-bottom-left-radius:3px;}
+  .tlg-num:hover .tlg-del{display:flex;}
+  .tlg-num .tlg-del:hover{background:var(--danger); color:#fff;}
+  .tlg-num.inview{color:var(--text);}
+  .tlg-num.here{color:#fff; background:var(--accent2);}
+  .tlg-num.drag-src{opacity:.35;}
+  /* layer header cells down the left, sticky so they stay while frames scroll */
+  .tlg-lhead{position:sticky; left:0; z-index:3; display:flex; align-items:center; gap:5px; height:var(--tlg-rh);
+    padding:0 6px; background:var(--panel2); border-right:1px solid var(--line); border-bottom:1px solid #ffffff0d; cursor:pointer;}
+  .tlg-lhead:hover{background:#30343f;}
+  .tlg-lhead.active{background:#2b3f6b; box-shadow:inset 3px 0 0 var(--accent);}
+  .tlg-lhead .eye{width:17px; flex:none; display:inline-flex; opacity:.9; cursor:pointer; color:var(--text);}
+  .tlg-lhead .eye.off{opacity:.32;}
+  .tlg-lhead .eye:hover{color:var(--accent);}
+  .tlg-lhead .lock{width:14px; flex:none; display:inline-flex; opacity:.3; cursor:pointer;}
+  .tlg-lhead .lock.on{opacity:1; color:var(--accent);}
+  .tlg-lhead .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  /* the cel cells */
+  .tlg-cell{height:var(--tlg-rh); border-bottom:1px solid #ffffff0d; border-left:1px solid #ffffff0d;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .tlg-cell.col, .tlg-cell.rowsel{background:#ffffff09;}
+  .tlg-cell.inview{background:#5b8cff12;}
+  .tlg-cell:hover{background:#ffffff17;}
+  .tlg-cell.here{background:#2b3f6b; box-shadow:inset 0 0 0 1px var(--accent);}
+  .tlg-dot{width:9px; height:9px; border-radius:50%;}
+  .tlg-dot.full{background:#cfd6e6; box-shadow:0 0 0 1px #0007;}
+  .tlg-dot.empty{box-shadow:inset 0 0 0 1px #ffffff26;}
+  .tlg-drop{position:absolute; width:3px; border-radius:2px; background:var(--accent); box-shadow:0 0 7px var(--accent); pointer-events:none; z-index:6;}
+
   /* ---- tilesheet panel ---- */
   .ts-sum{color:var(--muted); font-size:11.5px; margin:0 0 5px;}
   .ts-pick{display:flex; align-items:center; gap:6px; color:var(--accent); font-size:12px;
@@ -1529,7 +1574,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.09a";
+const APP_VERSION="2026.08.09b";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1955,10 +2000,28 @@ function selectFrame(i, light){
   composite(); updateDocInfo();
   const di=$("#frameDur"); if(di) di.value=frames[frameIndex].dur;
 }
+// Lightweight highlight update — moves the current-frame column and active-layer row without
+// rebuilding the grid, so it's cheap enough to run on every playback tick.
 function highlightActiveFrame(){
-  const host=$("#tlFrames"); if(!host) return;
-  // cells are nested inside group boxes now, so match on the frame index we stamped on them
-  host.querySelectorAll(".tl-frame").forEach(c=>c.classList.toggle("active", +c.dataset.fi===frameIndex));
+  const host=$("#tlFrames"), grid=host&&host.querySelector(".tlg"); if(!grid) return;
+  const rng=playRange(), scoped=(tlView!=="__all");
+  grid.querySelectorAll(".tlg-num").forEach(n=>{ const f=+n.dataset.fi;
+    n.classList.toggle("here", f===frameIndex);
+    n.classList.toggle("inview", f!==frameIndex && scoped && f>=rng.from && f<=rng.to); });
+  grid.querySelectorAll(".tlg-cell").forEach(c=>{ const f=+c.dataset.fi, li=+c.dataset.li;
+    const here=(f===frameIndex && li===activeIndex);
+    c.classList.toggle("here", here);
+    c.classList.toggle("col", !here && f===frameIndex);
+    c.classList.toggle("rowsel", !here && li===activeIndex);
+    c.classList.toggle("inview", !here && f!==frameIndex && li!==activeIndex && scoped && f>=rng.from && f<=rng.to); });
+  grid.querySelectorAll(".tlg-lhead").forEach(h=>h.classList.toggle("active", +h.dataset.li===activeIndex));
+  ensureActiveCellVisible();
+}
+function ensureActiveCellVisible(){
+  const host=$("#tlFrames"), el=host&&host.querySelector(".tlg-num.here"); if(!el) return;
+  const hr=host.getBoundingClientRect(), er=el.getBoundingClientRect(), lh=134;
+  if(er.left<hr.left+lh) host.scrollLeft-=(hr.left+lh-er.left)+8;
+  else if(er.right>hr.right) host.scrollLeft+=(er.right-hr.right)+8;
 }
 // ---- group (tag) range bookkeeping -------------------------------------------------
 // Inserting or deleting a frame has to move every group range that sits after it, otherwise
@@ -2327,23 +2390,127 @@ function renderTlTabs(){
   if(loose.length) tab("__ungrouped","Ungrouped",null,loose.reduce((s,g)=>s+g.idx.length,0),
     "Frames that aren't in a group yet");
 }
+// Does this frame's layer have any drawn pixel? Decides the filled/empty cel dot. Scanned live
+// (cheap for the small canvases this is for); very large canvases are assumed to hold content
+// rather than scanned on every timeline render.
+function frameLayerFilled(fi, li){
+  const l=frames[fi] && frames[fi].layers[li]; if(!l) return false;
+  const cv=l.canvas; if(cv.width*cv.height>160*160) return true;
+  const d=cv.getContext("2d").getImageData(0,0,cv.width,cv.height).data;
+  for(let p=3;p<d.length;p+=4) if(d[p]!==0) return true;
+  return false;
+}
+// The timeline is a grid: a row per layer (top layer on top), a column per frame, a cel dot in each
+// cell, and the frame tags as coloured bars spanning their columns across the top.
 function renderTimeline(){
   const di=$("#frameDur"); if(di && frames[frameIndex]) di.value=frames[frameIndex].dur;
   const host=$("#tlFrames"); if(!host) return;
   normalizeTlView();
-  host.innerHTML="";
-  viewGroups().forEach(g=>{
-    const box=document.createElement("div");
-    box.className="tl-group"+(g.tag<0?" ungrouped":"");
-    box.dataset.tag=g.tag;
-    const strip=document.createElement("div"); strip.className="tl-gframes";
-    // numbered within the group, first frame to last, rather than by position in the whole timeline
-    g.idx.forEach((i,k)=>strip.appendChild(frameCell(i,k+1,g.idx.length)));
-    box.append(groupHead(g), strip);
-    host.appendChild(box);
+  const tabs=$("#tlTabs"); if(tabs) tabs.hidden=true;   // the tag bars replace the old view tabs
+  host.classList.add("tl-grid"); host.innerHTML="";
+  const N=frames.length, L=layers.length, rng=playRange(), scoped=(tlView!=="__all");
+  const grid=document.createElement("div"); grid.className="tlg";
+  grid.style.gridTemplateColumns="var(--tlg-lh) repeat("+N+", var(--tlg-cw))";
+  const put=(el,r,c,span)=>{ el.style.gridRow=r; el.style.gridColumn = span?(c+" / span "+span):(""+c); grid.appendChild(el); return el; };
+
+  // row 1 — corner + a tag bar over each group's columns
+  put(Object.assign(document.createElement("div"),{className:"tlg-corner"}),1,1);
+  frameGroups().forEach(g=>{
+    const cell=document.createElement("div"); cell.className="tlg-tagcell"; put(cell,1,2+g.idx[0],g.idx.length);
+    if(g.tag>=0 && tags[g.tag]){
+      const t=tags[g.tag], bar=document.createElement("div");
+      bar.className="tlg-tag"+(tlView===t.name?" sel":""); bar.style.background=t.color; bar.textContent=t.name;
+      bar.title="“"+t.name+"” (frames "+(t.from+1)+"–"+(t.to+1)+") — click to play just this group, double-click to edit";
+      bar.onclick=()=>setTlView(tlView===t.name?"__all":t.name);
+      bar.ondblclick=ev=>{ ev.stopPropagation(); editTag(g.tag); };
+      cell.appendChild(bar);
+    }
   });
-  renderTlTabs(); updatePlayUI(); autoCollapseTimeline(); updateTlSummary();
+
+  // row 2 — a small corner label + the frame numbers (each number is also the reorder grip)
+  const nc=document.createElement("div"); nc.className="tlg-corner nums"; nc.textContent=N+" fr · "+L+" lyr"; put(nc,2,1);
+  for(let f=0; f<N; f++){
+    const inview = scoped && f>=rng.from && f<=rng.to;
+    const num=document.createElement("div");
+    num.className="tlg-num"+(f===frameIndex?" here":(inview?" inview":"")); num.textContent=f+1; num.dataset.fi=f;
+    num.title="Frame "+(f+1)+" · "+frames[f].dur+" ms\nClick to select · drag to reorder · right-click for more";
+    num.onclick=()=>{ if(!gDragMoved) selectFrame(f); };
+    num.oncontextmenu=ev=>{ ev.preventDefault(); ev.stopPropagation(); openFrameMenu(ev.clientX,ev.clientY,f); };
+    num.addEventListener("pointerdown",ev=>startGridDrag(ev,f,num));
+    if(N>1){ const del=document.createElement("span"); del.className="tlg-del"; del.innerHTML=iconSVG("clear",10);
+      del.title="Delete frame "+(f+1); del.onclick=ev=>{ ev.stopPropagation(); deleteFrame(f); };
+      num.appendChild(del); }
+    put(num,2,2+f);
+  }
+
+  // one row per layer, top layer first
+  for(let vi=0; vi<L; vi++){
+    const li=L-1-vi, l=layers[li];
+    const head=document.createElement("div"); head.className="tlg-lhead"+(li===activeIndex?" active":""); head.dataset.li=li;
+    const eye=document.createElement("span"); eye.className="eye"+(l.visible?"":" off"); eye.innerHTML=iconSVG(l.visible?"visible":"hidden",15);
+    eye.title="Toggle visibility"; eye.onclick=ev=>{ ev.stopPropagation(); setLayerVisible(li,!l.visible); composite(); renderLayers(); renderTimeline(); };
+    const nm=document.createElement("span"); nm.className="nm"; nm.textContent=l.name; nm.title=l.name+" — double-click to rename";
+    nm.ondblclick=async ev=>{ ev.stopPropagation(); const n=await showPrompt("New name for this layer:", l.name, {title:"Rename layer"}); if(n!=null&&n.trim()){ setLayerName(li,n.trim()); renderLayers(); renderTimeline(); } };
+    const lock=document.createElement("span"); lock.className="lock"+(l.locked?" on":""); lock.innerHTML=iconSVG("lock",13);
+    lock.title=l.locked?"Locked — click to unlock":"Unlocked — click to lock"; lock.onclick=ev=>{ ev.stopPropagation(); setLayerLocked(li,!l.locked); renderLayers(); renderTimeline(); };
+    head.append(eye,nm,lock);
+    head.onclick=()=>{ activeIndex=li; renderLayers(); highlightActiveFrame(); };
+    put(head,3+vi,1);
+    for(let f=0; f<N; f++){
+      const inview = scoped && f>=rng.from && f<=rng.to;
+      const here=(f===frameIndex && li===activeIndex);
+      const cell=document.createElement("div");
+      cell.className="tlg-cell"+(here?" here":((f===frameIndex?" col":"")+(li===activeIndex?" rowsel":"")+(!here&&f!==frameIndex&&li!==activeIndex&&inview?" inview":"")));
+      cell.dataset.fi=f; cell.dataset.li=li; cell.title="Frame "+(f+1)+" · "+l.name;
+      const dot=document.createElement("span"); dot.className="tlg-dot "+(frameLayerFilled(f,li)?"full":"empty"); cell.appendChild(dot);
+      cell.onclick=()=>{ activeIndex=li; selectFrame(f); highlightActiveFrame(); };
+      put(cell,3+vi,2+f);
+    }
+  }
+  host.appendChild(grid);
+  requestAnimationFrame(ensureActiveCellVisible);
+  updatePlayUI(); autoCollapseTimeline(); updateTlSummary();
 }
+// ---- drag a frame number left/right to reorder the column ----
+let gDrag=null, gDragMoved=false;
+function startGridDrag(e,fi,el){
+  if(e.button!==0 || gDrag) return;
+  if(e.target && e.target.closest && e.target.closest(".tlg-del")) return;   // the delete badge is its own button
+  gDrag={fi, el, x0:e.clientX, y0:e.clientY, on:false, id:e.pointerId}; gDragMoved=false;
+}
+function gridDropAt(x){
+  const nums=[...$("#tlFrames").querySelectorAll(".tlg-num")]; if(!nums.length) return null;
+  for(const n of nums){ const r=n.getBoundingClientRect(); if(x < r.left+r.width/2) return {index:+n.dataset.fi, at:n, before:true}; }
+  const last=nums[nums.length-1]; return {index:(+last.dataset.fi)+1, at:last, before:false};
+}
+function showGridDrop(t){
+  const host=$("#tlFrames"); let m=document.getElementById("tlgDrop");
+  if(!m){ m=document.createElement("div"); m.id="tlgDrop"; m.className="tlg-drop"; host.appendChild(m); }
+  const hr=host.getBoundingClientRect(), cr=t.at.getBoundingClientRect();
+  m.style.left=((t.before?cr.left-1:cr.right)-hr.left+host.scrollLeft)+"px";
+  m.style.top="0px"; m.style.height=host.scrollHeight+"px";
+}
+function hideGridDrop(){ const m=document.getElementById("tlgDrop"); if(m) m.remove(); }
+window.addEventListener("pointermove",e=>{
+  if(!gDrag || e.pointerId!==gDrag.id) return;
+  if(!gDrag.on){
+    if(Math.abs(e.clientX-gDrag.x0)+Math.abs(e.clientY-gDrag.y0)<5) return;
+    gDrag.on=true; gDragMoved=true; try{ gDrag.el.setPointerCapture(gDrag.id); }catch(_){}
+    gDrag.el.classList.add("drag-src"); stopPlayback();
+  }
+  const t=gridDropAt(e.clientX); gDrag.target=t; if(t) showGridDrop(t); else hideGridDrop();
+});
+window.addEventListener("pointerup",e=>{
+  if(!gDrag || e.pointerId!==gDrag.id) return;
+  const d=gDrag, t=d.target; gDrag=null; hideGridDrop(); if(d.el) d.el.classList.remove("drag-src");
+  if(!d.on){ gDragMoved=false; return; }
+  if(t && !(t.index===d.fi || t.index===d.fi+1)){
+    const owner=frameOwners(), tag=owner[clamp(t.index-1,0,frames.length-1)];
+    reorderFrame(d.fi, t.index, tag>=0?tag:-1, e.altKey||e.ctrlKey||e.metaKey);
+  }
+  setTimeout(()=>{ gDragMoved=false; },0);
+});
+window.addEventListener("pointercancel",e=>{ if(!gDrag || e.pointerId!==gDrag.id) return; if(gDrag.el) gDrag.el.classList.remove("drag-src"); gDrag=null; hideGridDrop(); setTimeout(()=>{ gDragMoved=false; },0); });
 // the selected group tab is the play range, so what you see is what you hear
 function playRange(){
   if(tlView!=="__all" && tlView!=="__ungrouped"){
@@ -6629,6 +6796,7 @@ const HELP_SECTIONS=[
     ["play","Play / stop","Space"],
     ["left","Previous / next frame","←|→"],
     ["right","Move the frame along","Shift+←|Shift+→"],
+    ["grid","Timeline grid — layers down, frames across; click a cel",""],
     ["copy","Reorder by dragging a frame's number",""],
     ["add","New frame (copies the current one)",""],
     ["redo","Reverse a group's frames",""],
