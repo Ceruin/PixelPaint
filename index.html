@@ -145,7 +145,11 @@
   #tlFrames.tl-grid{display:block; padding:0; overflow:auto;}
   .tlg{ --tlg-cw:30px; --tlg-lh:134px; --tlg-rh:25px; display:grid; align-content:start; font-size:11px; width:max-content; min-width:100%;}
   .tlg-corner{position:sticky; left:0; z-index:4; background:var(--panel); border-right:1px solid var(--line);}
-  .tlg-corner.nums{border-bottom:1px solid var(--line); display:flex; align-items:center; gap:6px; padding:0 8px; color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.4px;}
+  .tlg-corner.tools{display:flex; flex-direction:column; justify-content:center; gap:3px; padding:3px 5px; border-bottom:1px solid var(--line);}
+  .tlg-ltools{display:flex; gap:3px;}
+  .tlg-ltools .iconbtn{min-width:0; flex:1; height:22px; min-height:22px; padding:0; border-radius:3px;}
+  .tlg-ltools .iconbtn.danger-h:hover{background:var(--danger); border-color:var(--danger); color:#fff;}
+  .tlg-count{color:var(--muted); font-size:9.5px; text-transform:uppercase; letter-spacing:.4px; text-align:center;}
   /* tag bars sit in the top row, each spanning its frame columns */
   .tlg-tagcell{height:19px; padding:2px 1px 1px;}
   .tlg-tag{height:100%; border-radius:3px; display:flex; align-items:center; padding:0 6px; font-size:10px;
@@ -1193,8 +1197,7 @@
            Stays pinned while the panel body scrolls under it. -->
       <div class="panel-tabs" id="panelTabs" role="tablist">
         <button class="ptab" data-ptab="color"  data-icon="palette" data-icon-size="15" title="Color &amp; palette">Color</button>
-        <button class="ptab" data-ptab="layers" data-icon="copy"    data-icon-size="15" title="Layers">Layers</button>
-        <button class="ptab" data-ptab="anim"   data-icon="play"    data-icon-size="15" title="Frames &amp; groups">Anim</button>
+        <button class="ptab" data-ptab="anim"   data-icon="play"    data-icon-size="15" title="Frames &amp; layers">Anim</button>
         <button class="ptab" data-ptab="tiles"  data-icon="grid"    data-icon-size="15" title="Tilesheet grid" hidden>Tiles</button>
       </div>
       <div class="mobile-cols">
@@ -1230,26 +1233,8 @@
         </div>
       </div>
 
-      <div class="section collapsible" id="layerSection" style="flex:1 0 auto; display:flex; flex-direction:column;">
-        <h3 class="sec-h" data-sec="layerSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="copy" data-icon-size="14"></span>Layers</h3>
-        <div class="sec-body" style="flex:1; display:flex; flex-direction:column; min-height:0;">
-          <!-- own row rather than crammed into the header: 5 icon buttons + the label overflowed
-               the section padding and ended up under the side panel's scrollbar -->
-          <div class="btnrow" id="layerTools">
-            <button id="addLayer" data-icon="add" data-icon-size="15" title="Add layer"></button>
-            <button id="dupLayer" data-icon="copy" data-icon-size="15" title="Duplicate layer"></button>
-            <button id="upLayer" data-icon="up" data-icon-size="15" title="Move layer up"></button>
-            <button id="downLayer" data-icon="down" data-icon-size="15" title="Move layer down"></button>
-            <button id="delLayer" data-icon="trash" data-icon-size="15" title="Delete layer"></button>
-          </div>
-          <div class="layerlist" id="layerList"></div>
-          <div class="opacity-row">
-            <span class="lbl">Opacity</span>
-            <input type="range" id="opacitySlider" min="0" max="100" value="100" />
-            <span id="opacityVal">100</span>
-          </div>
-        </div>
-      </div>
+      <!-- Layers moved into the timeline grid (rows = layers), with their toolbar in the grid's
+           top-left corner — the side panel keeps only colour & palette. -->
       </div>
 
       <!-- Tilesheet grid (shown when the drawing has a grid, or the Tile tool is picked) -->
@@ -1336,6 +1321,8 @@
       <button id="playBtn" class="iconbtn" title="Play (Space)"></button>
       <label class="chk"><input type="checkbox" id="loopToggle" checked /> Loop</label>
       <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of the current frame" /><span class="muted">ms</span></span>
+      <span class="vsep"></span>
+      <span class="tl-field"><span class="lbl">Opacity</span><input type="range" id="opacitySlider" min="0" max="100" value="100" title="Opacity of the active layer" style="width:88px" /><span id="opacityVal" class="muted">100</span></span>
       <span class="vsep"></span>
       <button id="addGroupBtn" data-icon="tag" data-icon-size="15" title="Add a group of frames (idle, walk, jump…) you can play and export on its own">Group</button>
       <span class="tl-grow"></span>
@@ -1574,7 +1561,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.09b";
+const APP_VERSION="2026.08.09c";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -2413,8 +2400,20 @@ function renderTimeline(){
   grid.style.gridTemplateColumns="var(--tlg-lh) repeat("+N+", var(--tlg-cw))";
   const put=(el,r,c,span)=>{ el.style.gridRow=r; el.style.gridColumn = span?(c+" / span "+span):(""+c); grid.appendChild(el); return el; };
 
-  // row 1 — corner + a tag bar over each group's columns
-  put(Object.assign(document.createElement("div"),{className:"tlg-corner"}),1,1);
+  // top-left corner (spans both header rows): the layer toolbar + a small count, so every layer
+  // control lives with the layers instead of in a separate side panel
+  const corner=document.createElement("div"); corner.className="tlg-corner tools"; corner.style.gridRow="1 / span 2"; corner.style.gridColumn="1";
+  const bar=document.createElement("div"); bar.className="tlg-ltools";
+  const lbtn=(icon,title,fn,cls)=>{ const b=document.createElement("button"); b.className="iconbtn"+(cls?(" "+cls):"");
+    b.innerHTML=iconSVG(icon,14); b.title=title; b.onclick=fn; return b; };
+  bar.append(
+    lbtn("add","Add layer",addLayerCmd),
+    lbtn("copy","Duplicate layer",dupLayerCmd),
+    lbtn("up","Move layer up",upLayerCmd),
+    lbtn("down","Move layer down",downLayerCmd),
+    lbtn("trash","Delete layer",delLayerCmd,"danger-h"));
+  const lbl=document.createElement("div"); lbl.className="tlg-count"; lbl.textContent=N+" fr · "+L+" lyr";
+  corner.append(bar,lbl); grid.appendChild(corner);
   frameGroups().forEach(g=>{
     const cell=document.createElement("div"); cell.className="tlg-tagcell"; put(cell,1,2+g.idx[0],g.idx.length);
     if(g.tag>=0 && tags[g.tag]){
@@ -2427,8 +2426,7 @@ function renderTimeline(){
     }
   });
 
-  // row 2 — a small corner label + the frame numbers (each number is also the reorder grip)
-  const nc=document.createElement("div"); nc.className="tlg-corner nums"; nc.textContent=N+" fr · "+L+" lyr"; put(nc,2,1);
+  // row 2 — the frame numbers (each number is also the reorder grip); col 1 is the corner above
   for(let f=0; f<N; f++){
     const inview = scoped && f>=rng.from && f<=rng.to;
     const num=document.createElement("div");
@@ -5137,8 +5135,11 @@ function importPaletteFile(file){
 }
 
 // ------------------------------------------------------------------ layers UI
+// The layer list itself now lives in the timeline grid (rows). This still runs to keep the opacity
+// control and status in sync, and rebuilds the optional #layerList only if that element exists.
 function renderLayers(){
-  const list=$("#layerList"); list.innerHTML="";
+  const list=$("#layerList");
+  if(list){ list.innerHTML="";
   for(let i=layers.length-1;i>=0;i--){
     const l=layers[i];
     const row=document.createElement("div");
@@ -5166,6 +5167,7 @@ function renderLayers(){
 
     row.append(eye,lock,nm,thumb);
     list.appendChild(row);
+  }
   }
   // single opacity slider + status reflect the active layer
   const AL=activeLayer();
@@ -6623,11 +6625,12 @@ function restoreDocks(){
 // attribute is inert and every panel stays visible.
 // "none" is a real state, not a fallback: tapping the open tab closes the panel outright, so the
 // canvas can have the whole screen instead of always surrendering a third of it to one of these.
-const PANEL_TABS=["none","color","layers","anim","tiles"];
-const PANEL_NAMES={color:"the color panel", layers:"the layers panel", anim:"frames & groups", tiles:"the tilesheet grid"};
+const PANEL_TABS=["none","color","anim","tiles"];
+const PANEL_NAMES={color:"the color panel", anim:"frames & layers", tiles:"the tilesheet grid"};
 const PANEL_TAB_KEY="pp_panelTab";
 let panelTab="none";
 function setPanelTab(name){
+  if(name==="layers") name="anim";                 // layers live in the timeline grid now
   if(PANEL_TABS.indexOf(name)<0) name="none";
   if(name==="tiles" && !sheet && tool!=="tile") name="none";   // no grid and no Tile tool, no tab
   panelTab=name;
@@ -7334,11 +7337,7 @@ function reverseFramesCmd(){
   afterFrameEdit(from+to-frameIndex);   // keep the caret on the same picture, now mirrored
   showToast("Reversed "+scope+".","success",1800);
 }
-$("#addLayer").onclick=addLayerCmd;
-$("#dupLayer").onclick=dupLayerCmd;
-$("#delLayer").onclick=delLayerCmd;
-$("#upLayer").onclick=upLayerCmd;
-$("#downLayer").onclick=downLayerCmd;
+// (the layer add/dup/move/delete buttons live in the timeline grid corner now, wired inline there)
 $("#opacitySlider").oninput=e=>{ if(!activeLayer()) return; setLayerOpacity(activeIndex, e.target.value/100); $("#opacityVal").textContent=e.target.value; composite(); };
 
 // modal / dialog wiring
