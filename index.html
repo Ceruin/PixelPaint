@@ -912,10 +912,18 @@
   .tool.active, button.primary{ box-shadow:inset 0 1px 0 #ffffff2b, inset 0 -1px 0 #00000047; }
 
   /* ---- Aseprite-style palette: a tight seamless grid you resize by the grip below it ---- */
+  /* By default the palette grows to fill the panel (no dead space now the Layers dock is gone);
+     dragging the grip switches it to an explicit height set inline by JS. */
   #paletteGrid.palette{ gap:0; padding:0; margin-top:10px; overflow:auto; background:#00000040;
     border:1px solid var(--line); border-radius:var(--r) var(--r) 0 0;
     grid-template-columns:repeat(auto-fill, minmax(18px,1fr)); grid-auto-rows:20px; align-content:start;
-    height:var(--pal-h,176px); max-height:none; }
+    flex:1 1 auto; min-height:70px; max-height:none; }
+  /* the Color section fills the side panel so the palette can take the slack */
+  @media (min-width:769px){
+    #sidePanel > .mobile-cols{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
+    #colorSection{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
+    #colorSection > .sec-body{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
+  }
   /* fill the whole cell so the grid is seamless — square-ish rather than forced square, the way a
      tight palette reads in Aseprite */
   #paletteGrid.palette .sw{ width:100%; height:100%; aspect-ratio:auto; min-height:0;
@@ -1563,7 +1571,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.09d";
+const APP_VERSION="2026.08.09e";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -7201,27 +7209,35 @@ $("#paletteSelect").onchange=e=>{
   renderPaletteGrid(e.target.value);
   try{ localStorage.setItem(PAL_SEL_KEY, e.target.value); }catch(_){}
 };
-// ---- draggable palette splitter: sets the grid's height, persisted like Aseprite's resizable palette
+// ---- draggable palette splitter ----
+// By default the palette fills the panel (flex, no inline height). Dragging the grip pins it to an
+// explicit height; double-clicking clears that and returns it to filling the space.
 const PAL_H_KEY="pp_palH", PAL_H_MIN=52, PAL_H_MAX=560;
 function setPaletteHeight(px, save){
   const h=clamp(Math.round(px), PAL_H_MIN, PAL_H_MAX);
-  $("#paletteGrid").style.setProperty("--pal-h", h+"px");
+  const g=$("#paletteGrid"); g.style.height=h+"px"; g.style.flex="0 0 auto";
   if(save){ try{ localStorage.setItem(PAL_H_KEY, h); }catch(_){} }
+}
+function fillPalette(save){
+  const g=$("#paletteGrid"); g.style.height=""; g.style.flex="";   // back to flex:1 (fills)
+  if(save){ try{ localStorage.removeItem(PAL_H_KEY); }catch(_){} }
 }
 {
   let savedH=null; try{ savedH=localStorage.getItem(PAL_H_KEY); }catch(_){}
-  setPaletteHeight(savedH?+savedH:176, false);
+  if(savedH) setPaletteHeight(+savedH,false);   // otherwise leave it filling the panel
   const grip=$("#palResize"); let drag=null;
   grip.addEventListener("pointerdown",e=>{
     e.preventDefault(); grip.setPointerCapture(e.pointerId); grip.classList.add("drag");
-    drag={y:e.clientY, h:$("#paletteGrid").getBoundingClientRect().height};
+    drag={y:e.clientY, h:$("#paletteGrid").getBoundingClientRect().height, moved:false};
   });
-  grip.addEventListener("pointermove",e=>{ if(drag) setPaletteHeight(drag.h+(e.clientY-drag.y), false); });
-  const end=e=>{ if(!drag) return; drag=null; grip.classList.remove("drag");
-    setPaletteHeight($("#paletteGrid").getBoundingClientRect().height, true); };
+  grip.addEventListener("pointermove",e=>{ if(!drag) return;
+    if(Math.abs(e.clientY-drag.y)>2) drag.moved=true;
+    if(drag.moved) setPaletteHeight(drag.h+(e.clientY-drag.y), false); });
+  const end=()=>{ if(!drag) return; const moved=drag.moved; drag=null; grip.classList.remove("drag");
+    if(moved) setPaletteHeight($("#paletteGrid").getBoundingClientRect().height, true); };  // a click (no drag) leaves it as-is, so double-click can restore fill
   grip.addEventListener("pointerup",end); grip.addEventListener("pointercancel",end);
-  // double-click the grip to snap back to the default height
-  grip.addEventListener("dblclick",()=>setPaletteHeight(176, true));
+  // double-click the grip to go back to filling the panel
+  grip.addEventListener("dblclick",()=>fillPalette(true));
 }
 $("#palAddColor").onclick=()=>addColorToPalette(primary);
 $("#palNew").onclick=newPalette;
