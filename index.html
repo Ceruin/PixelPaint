@@ -833,6 +833,11 @@
        screen on a phone, where a 238px saturation square is a poor finger target */
     .cp-pop{width:min(340px, calc(100vw - 16px));}
     .cp-sv{height:158px;}
+    /* Anchor dialogs near the top rather than dead-centre: when the on-screen keyboard opens it eats
+       the lower half of the screen, and a centred dialog would sit behind it. Top-aligned and
+       scrollable, the dialog and its buttons stay reachable above the keyboard. */
+    .modal-root{align-items:flex-start; justify-content:center; padding:10px; overflow-y:auto;}
+    .modal-card{margin:max(8px, env(safe-area-inset-top)) 0 8px; max-height:none;}
   }
   /* ===================== retro / pixel-tool pass ===================== */
   /* Evolves the dark theme toward a pixel-art tool: blocky corners, matte (no gloss), a chunky
@@ -1642,7 +1647,12 @@ function openModal(o){
     $("#modalRoot").hidden=false;
     setTimeout(()=>{
       const f = o.bodyHTML ? $("#modalBody").querySelector("input,select") : (o.input?inp:ok);
-      if(f){ f.focus(); if(f.select) f.select(); }
+      if(!f) return;
+      // On touch, auto-focusing a text field throws the on-screen keyboard up over the dialog. Focus
+      // the OK button instead so the whole dialog stays in view; the user taps the field to type.
+      const textField = f.tagName==="INPUT" && !["checkbox","radio","button","submit"].includes(f.type);
+      if(coarsePtr.matches && textField){ ok.focus(); }
+      else { f.focus(); if(f.select) f.select(); }
     },0);
   });
 }
@@ -3515,6 +3525,53 @@ function restore(snap){
 }
 function cloneImg(img){return new ImageData(new Uint8ClampedArray(img.data),img.width,img.height);}
 
+// ---- undo/redo persistence ----
+// The undo and redo stacks are snapshots holding raw ImageData, which JSON can't carry. These turn a
+// stack into (and back from) the same PNG-data-URL shape a saved project already uses for layers, so
+// a reopened .pxpaint keeps every earlier edit reachable through Undo/Redo.
+function imgToURL(img){
+  const c=document.createElement("canvas"); c.width=img.width; c.height=img.height;
+  c.getContext("2d").putImageData(img,0,0);
+  return c.toDataURL("image/png");
+}
+function urlToImg(url,w,h){
+  return new Promise(res=>{
+    const im=new Image();
+    im.onload=()=>{ const c=document.createElement("canvas"); c.width=w; c.height=h;
+      const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false; cx.drawImage(im,0,0);
+      res(cx.getImageData(0,0,w,h)); };
+    im.onerror=()=>res(new ImageData(w,h));
+    im.src=url;
+  });
+}
+function serializeSnap(s){
+  const packL=l=>({name:l.name, visible:l.visible, opacity:l.opacity, locked:!!l.locked,
+                   w:l.img.width, h:l.img.height, data:imgToURL(l.img)});
+  const o={ w:s.w, h:s.h, active:s.active, fi:s.fi,
+            sheet:s.sheet?cloneSheet(s.sheet):null, tileSel:s.tileSel||null };
+  if(s.all) o.all=s.all.map(f=>({dur:f.dur, layers:f.layers.map(packL)}));
+  else o.layers=s.layers.map(packL);
+  return o;
+}
+async function deserializeSnap(o){
+  const unpack=async l=>({name:l.name, visible:l.visible, opacity:l.opacity, locked:!!l.locked,
+                          img:await urlToImg(l.data, l.w||o.w, l.h||o.h)});
+  const s={ w:o.w, h:o.h, active:o.active, fi:o.fi,
+            sheet:o.sheet?cloneSheet(o.sheet):null, tileSel:o.tileSel||null };
+  if(o.all){
+    s.all=[];
+    for(const f of o.all){ const layers=[]; for(const l of f.layers) layers.push(await unpack(l));
+      s.all.push({dur:f.dur, layers}); }
+  }else{
+    s.layers=[]; for(const l of (o.layers||[])) s.layers.push(await unpack(l));
+  }
+  return s;
+}
+function serializeStack(stack){ return (stack||[]).map(serializeSnap); }
+async function deserializeStack(arr){
+  const out=[]; for(const o of (arr||[])) out.push(await deserializeSnap(o)); return out;
+}
+
 function pushUndo(){
   undoStack.push(snapshot());
   if(undoStack.length>MAX_UNDO) undoStack.shift();
@@ -4326,6 +4383,13 @@ function panEnd(){
 // touch: track active fingers on the canvas so a second finger becomes pinch-zoom + drag-to-pan
 const touchPtrs=new Map();
 let pinch=null;   // {d0: starting distance, z0: starting zoom, ax/ay: art pixel under the fingers}
+// A single finger's tool action is held for a beat (or until the finger clearly moves) so that a
+// second finger landing right after turns the gesture into pinch-zoom / pan with nothing painted.
+const TOUCH_HOLD=130;   // ms to wait for a possible second finger before a stationary tap paints
+const TOUCH_MOVE=6;     // px of finger travel that commits the held stroke immediately (a real draw)
+let touchDefer=null;    // {ev, timer} — the first finger's pending tool action
+let touchCommitted=false;   // an immediate first-finger commit (a bucket fill) a 2nd finger can roll back
+function cancelDeferredStroke(){ if(touchDefer){ clearTimeout(touchDefer.timer); touchDefer=null; } }
 function pinchDist(){ const v=[...touchPtrs.values()]; return Math.hypot(v[0].x-v[1].x, v[0].y-v[1].y); }
 function pinchMid(){ const v=[...touchPtrs.values()]; return {x:(v[0].x+v[1].x)/2, y:(v[0].y+v[1].y)/2}; }
 // Baseline the gesture on the art pixel sitting under the midpoint of the two fingers. Re-baselined
@@ -4347,6 +4411,7 @@ function pinchApply(){
 }
 function cancelActiveOps(){
   if(drawing){ drawing=false; undo(); }                 // revert the accidental first-finger dot
+  if(touchCommitted){ touchCommitted=false; undo(); }   // revert an immediate first-finger fill
   if(shaping){ shaping=false; composite(); }
   if(selDrag){ selDrag=null; composite(); }
   if(regionDrag) abortRegionDrag();
@@ -4362,7 +4427,7 @@ function toPixel(e){
 view.addEventListener("pointerdown",e=>{
   if(e.pointerType==="touch"){
     touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(touchPtrs.size>=2){ cancelActiveOps(); pinchStart(); return; }
+    if(touchPtrs.size>=2){ cancelDeferredStroke(); cancelActiveOps(); pinchStart(); return; }
   }
   if(placement){ if(e.button===0) placementDown(e); return; }
   if(e.button!==0 && e.button!==2) return;          // left or right button only
@@ -4378,6 +4443,22 @@ view.addEventListener("pointerdown",e=>{
     // the + buttons around the selected tile: same idea, and they only exist under the Tile tool
     const plus=tilePlusHit(e); if(plus){ addTileAt(plus); return; }
   }
+  // Touch: hold the tool action briefly. A second finger arriving in that window (see the size>=2
+  // branch above) cancels it, so pinch-zoom / two-finger pan never paints. Once the finger travels
+  // TOUCH_MOVE px it's plainly a draw, so pointermove commits it early with no felt lag.
+  if(e.pointerType==="touch"){
+    const ev={clientX:e.clientX, clientY:e.clientY, button:e.button, altKey:e.altKey,
+              pointerId:e.pointerId, pointerType:"touch"};
+    touchDefer={ ev, timer:setTimeout(()=>{ touchDefer=null; beginStroke(ev); }, TOUCH_HOLD) };
+    return;
+  }
+  beginStroke(e);
+});
+
+// The actual tool action for a press. Runs immediately for mouse/pen; for touch it runs only once
+// the press has proven itself a draw (finger held past TOUCH_HOLD, or moved past TOUCH_MOVE) rather
+// than the first half of a pinch.
+function beginStroke(e){
   if(playing) stopPlayback();                        // editing stops playback
   try{ view.setPointerCapture(e.pointerId); }catch(_){}   // never let a capture refusal abort the stroke
   const p=toPixel(e);
@@ -4399,6 +4480,7 @@ view.addEventListener("pointerdown",e=>{
     stamp(L.ctx,p.x,p.y,tool==="eraser"); composite();
   }else if(tool==="bucket"){
     pushUndo(); floodFill(L.ctx,p.x,p.y,drawColor); composite(); refreshThumb(L);
+    if(e.pointerType==="touch") touchCommitted=true;   // a 2nd finger (pinch) can still roll it back
   }else if(tool==="eyedropper"){
     pickColor(p.x,p.y,slot);
   }else if(tool==="line"||tool==="rect"||tool==="ellipse"){
@@ -4415,7 +4497,7 @@ view.addEventListener("pointerdown",e=>{
     if(sheet) tileDown(p,e);
     else showToast("This drawing isn't a tilesheet yet — set the grid up from the Tiles panel.","info",3400);
   }
-});
+}
 
 // placement gestures arrive on the full-stage overlay, so handles in the gray area work
 placeOverlay.addEventListener("pointerdown",e=>{ if(placement && e.button===0) placementDown(e); });
@@ -4427,6 +4509,12 @@ window.addEventListener("pointermove",e=>{
   if(pan){ panMove(e); return; }
   if(touchPtrs.has(e.pointerId)) touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pinch){ pinchApply(); return; }
+  // a first finger held from pointerdown: once it travels it's clearly a stroke, so start it now and
+  // let this same move extend it. Below the slop we wait — the tap might still become a pinch.
+  if(touchDefer && e.pointerId===touchDefer.ev.pointerId){
+    if(Math.abs(e.clientX-touchDefer.ev.clientX)+Math.abs(e.clientY-touchDefer.ev.clientY) < TOUCH_MOVE) return;
+    const ev=touchDefer.ev; clearTimeout(touchDefer.timer); touchDefer=null; beginStroke(ev);
+  }
   if(placement){ if(xform) placementMove(e); else updatePlacementCursor(e); return; }
   if(regionDrag){ regionMove(e); return; }
   if(selDrag){ selectMove(e); return; }
@@ -4477,6 +4565,11 @@ view.addEventListener("pointerleave",()=>{
 
 window.addEventListener("pointerup",e=>{
   if(pan){ panEnd(); return; }
+  // a quick tap that lifted before the hold elapsed: fire it now so a single tap still paints a dot
+  if(touchDefer && e.pointerId===touchDefer.ev.pointerId){
+    const ev=touchDefer.ev; clearTimeout(touchDefer.timer); touchDefer=null; beginStroke(ev);
+  }
+  touchCommitted=false;
   touchPtrs.delete(e.pointerId);
   if(pinch){ if(touchPtrs.size<2) pinch=null; else pinchStart(); return; }
   if(placement){ xform=null; positionPlaceBar(); return; }   // the box has settled; the bar can move
@@ -4494,6 +4587,8 @@ window.addEventListener("pointerup",e=>{
 // touch gestures can be cancelled by the OS (edge swipes etc.) — tidy up any half-finished op
 window.addEventListener("pointercancel",e=>{
   panEnd();
+  cancelDeferredStroke();
+  touchCommitted=false;
   touchPtrs.delete(e.pointerId);
   if(touchPtrs.size<2) pinch=null; else if(pinch) pinchStart();
   xform=null;
@@ -4895,6 +4990,8 @@ function saveProject(){
                     tiles:sheet.tiles.map(r=>r.map(t=>({name:t.name||""}))),
                     spans:(sheet.spans||[]).map(p=>({r:p.r,c:p.c,rs:p.rs,cs:p.cs}))} : null,
     tags:tags.map(t=>({name:t.name,from:t.from,to:t.to,color:t.color})),
+    // the edit history travels with the file, so a reopened project can still undo/redo every prior stroke
+    undo:serializeStack(undoStack), redo:serializeStack(redoStack),
     frames:frames.map(f=>({dur:f.dur, layers:f.layers.map(l=>({name:l.name,visible:l.visible,opacity:l.opacity,data:l.canvas.toDataURL("image/png")}))}))};
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
   const d=docs.find(x=>x.id===activeDocId);
@@ -4954,10 +5051,26 @@ function finishLoad(data){
   undoStack=[]; redoStack=[]; fitZoom();
   renderLayers(); renderTimeline(); renderSheetPanel(); composite(); updateUndoButtons(); updateDocInfo();
   captureActiveDoc(); renderTabs();   // persist the loaded state into the active tab
+  // A saved project carries its edit history; decode it in the background (each entry is a PNG per
+  // layer) and hand it back once ready, so the file reopens with Undo/Redo pointing where it left off.
+  if(data.undo||data.redo) restoreHistory(data);
   showToast("Project loaded"+(sheet?(" — "+sheet.cols.length+"×"+sheet.rows.length+" tilesheet")
     :(frames.length>1?(" — "+frames.length+" frames"):""))+".","success");
   // the frames' images have decoded by now, so there is finally something to thumbnail
   if(afterProjectLoad){ const fn=afterProjectLoad; afterProjectLoad=null; try{ fn(); }catch(_){} }
+}
+// Rebuild the undo/redo stacks a project was saved with. Async because every entry is a set of PNGs
+// to decode; the load that requested it is captured so a late-arriving history lands on the right tab
+// even if the user has since switched away.
+async function restoreHistory(data){
+  const docId=activeDocId;
+  const u=await deserializeStack(data.undo);
+  const r=await deserializeStack(data.redo);
+  if(activeDocId===docId){                 // still the active tab — apply to the live stacks
+    undoStack=u; redoStack=r; updateUndoButtons();
+  }
+  const d=docs.find(x=>x.id===docId);       // and into the tab's stored state, wherever it sits now
+  if(d){ d.undo=u; d.redo=r; }
 }
 
 // ------------------------------------------------------------------ recent files
