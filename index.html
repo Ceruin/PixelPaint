@@ -929,6 +929,7 @@
     <div class="ctx-sep"></div>
     <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
     <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
+    <button data-cmd="aseprite" data-icon="grid"   data-icon-size="16">Export .aseprite…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="newtab"   data-icon="add"    data-icon-size="16">New tab</button>
     <button data-cmd="rename" data-icon="pencil"   data-icon-size="16">Rename tab…</button>
@@ -1528,7 +1529,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.08a";
+const APP_VERSION="2026.08.08b";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -4983,6 +4984,140 @@ function exportPNG(scale){
   a.download=name; a.href=c.toDataURL("image/png"); a.click();
   showToast("Exported "+name+" at "+scale+"× ("+(W*scale)+" × "+(H*scale)+" px).","success",4200);
 }
+// ------------------------------------------------------------------ .aseprite export
+// A real Aseprite file: little-endian, 32-bit RGBA, one cel per layer per frame (zlib-compressed
+// through the browser's CompressionStream, which is the zlib wrapper the format wants), plus the
+// palette and the frame tags. Aseprite's layers are global with a cel in each frame, while here
+// each frame carries its own layer list — so when every frame shares the same layers (the usual
+// case, built by duplicating frames) they're exported as-is; otherwise each frame is flattened to a
+// single layer, which is the only thing that maps cleanly.
+class AseBuf{
+  constructor(){ this.b=new Uint8Array(4096); this.p=0; }
+  _e(n){ if(this.p+n>this.b.length){ const nb=new Uint8Array(Math.max(this.b.length*2,this.p+n)); nb.set(this.b); this.b=nb; } }
+  u8(v){ this._e(1); this.b[this.p++]=v&255; }
+  u16(v){ this._e(2); this.b[this.p++]=v&255; this.b[this.p++]=(v>>>8)&255; }
+  u32(v){ this._e(4); this.b[this.p++]=v&255; this.b[this.p++]=(v>>>8)&255; this.b[this.p++]=(v>>>16)&255; this.b[this.p++]=(v>>>24)&255; }
+  i16(v){ this.u16(v<0?v+0x10000:v); }
+  bytes(a){ this._e(a.length); this.b.set(a,this.p); this.p+=a.length; }
+  str(s){ const e=new TextEncoder().encode(s); this.u16(e.length); this.bytes(e); }
+  skip(n){ this._e(n); this.p+=n; }
+  at(pos,v){ this.b[pos]=v&255; this.b[pos+1]=(v>>>8)&255; this.b[pos+2]=(v>>>16)&255; this.b[pos+3]=(v>>>24)&255; }
+  done(){ return this.b.subarray(0,this.p); }
+}
+function aseZlib(bytes){
+  const cs=new CompressionStream("deflate");   // "deflate" = zlib-wrapped, which .aseprite cels use
+  const w=cs.writable.getWriter(); w.write(bytes); w.close();
+  return new Response(cs.readable).arrayBuffer().then(b=>new Uint8Array(b));
+}
+function aseCelBBox(cv){
+  const d=cv.getContext("2d").getImageData(0,0,cv.width,cv.height).data;
+  let minx=cv.width,miny=cv.height,maxx=-1,maxy=-1;
+  for(let y=0;y<cv.height;y++) for(let x=0;x<cv.width;x++){
+    if(d[(y*cv.width+x)*4+3]!==0){ if(x<minx)minx=x; if(x>maxx)maxx=x; if(y<miny)miny=y; if(y>maxy)maxy=y; }
+  }
+  return maxx<0 ? null : {x:minx,y:miny,w:maxx-minx+1,h:maxy-miny+1};
+}
+function aseFramesSameLayers(){
+  const sig=f=>f.layers.map(l=>l.name).join("\u0001");
+  const first=sig(frames[0]);
+  return frames.every(f=>f.layers.length===frames[0].layers.length && sig(f)===first);
+}
+function asePaletteEntries(){
+  let cols=[]; try{ cols=paletteColors(activePaletteName())||[]; }catch(_){}
+  const out=cols.slice(0,256).map(c=>{ const h=normHex(c)||"#000000";
+    return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16), 255]; });
+  if(!out.length) out.push([0,0,0,0],[0,0,0,255],[255,255,255,255]);   // a file always carries a palette
+  return out;
+}
+async function exportAseprite(){
+  if(typeof CompressionStream==="undefined"){
+    showToast("This browser can't compress the file (no CompressionStream). Try a current Chrome, Edge or Firefox.","error",5200); return;
+  }
+  stopPlayback();
+  const perLayer=aseFramesSameLayers();
+  const layerDefs = perLayer ? frames[0].layers.map((l,i)=>({name:l.name||("Layer "+(i+1)), visible:l.visible!==false, opacity:l.opacity==null?1:l.opacity}))
+                             : [{name:"Flattened", visible:true, opacity:1}];
+  const pal=asePaletteEntries();
+  const buf=new AseBuf();
+  // ---- header (128 bytes) ----
+  const fileSizePos=buf.p; buf.u32(0);        // patched at the end
+  buf.u16(0xA5E0); buf.u16(frames.length); buf.u16(W); buf.u16(H);
+  buf.u16(32);                                // 32bpp RGBA
+  buf.u32(1);                                 // flags: layer opacity is valid
+  buf.u16(frames[0].dur||100);                // deprecated speed
+  buf.u32(0); buf.u32(0);
+  buf.u8(0); buf.u8(0); buf.u8(0); buf.u8(0); // transparent index + 3 ignore
+  buf.u16(pal.length); buf.u8(1); buf.u8(1);  // colors, pixel w/h
+  buf.i16(0); buf.i16(0); buf.u16(16); buf.u16(16);  // grid x,y,w,h
+  buf.skip(84);                               // reserved -> 128 total
+
+  // gather the compressed cel payloads up front (compression is async)
+  async function celFor(cv){
+    const bb=aseCelBBox(cv); if(!bb) return null;
+    const px=cv.getContext("2d").getImageData(bb.x,bb.y,bb.w,bb.h).data;
+    return {bb, data:await aseZlib(new Uint8Array(px.buffer, px.byteOffset, px.byteLength))};
+  }
+  // a flattened copy of a frame, when we're not preserving layers
+  function flatOf(fr){ const c=makeLayerCanvas(); compositeFrameInto(c.getContext("2d"), fr); return c; }
+
+  for(let fi=0; fi<frames.length; fi++){
+    const fr=frames[fi];
+    const frameStart=buf.p;
+    const frameSizePos=buf.p; buf.u32(0);     // frame bytes, patched below
+    buf.u16(0xF1FA); buf.u16(0xFFFF);         // magic + old-chunk-count sentinel
+    buf.u16(fr.dur||100); buf.skip(2);
+    const chunkCountPos=buf.p; buf.u32(0);    // patched below
+    let chunks=0;
+    const chunk=(type, write)=>{
+      const start=buf.p; buf.u32(0); buf.u16(type); write();
+      buf.at(start, buf.p-start); chunks++;
+    };
+    if(fi===0){
+      // layers (bottom to top, matching Aseprite's index order)
+      layerDefs.forEach(l=>chunk(0x2004, ()=>{
+        buf.u16((l.visible?1:0)|2); buf.u16(0); buf.u16(0); buf.u16(0); buf.u16(0); buf.u16(0);
+        buf.u8(Math.round(clamp(l.opacity,0,1)*255)); buf.u8(0); buf.u8(0); buf.u8(0); buf.str(l.name);
+      }));
+      // palette
+      chunk(0x2019, ()=>{
+        buf.u32(pal.length); buf.u32(0); buf.u32(pal.length-1); buf.skip(8);
+        pal.forEach(c=>{ buf.u16(0); buf.u8(c[0]); buf.u8(c[1]); buf.u8(c[2]); buf.u8(c[3]); });
+      });
+      // tags
+      if(tags.length) chunk(0x2018, ()=>{
+        buf.u16(tags.length); buf.skip(8);
+        tags.forEach(t=>{
+          buf.u16(clamp(t.from,0,frames.length-1)); buf.u16(clamp(t.to,0,frames.length-1));
+          buf.u8(0); buf.u16(0); buf.skip(6);
+          const h=normHex(t.color)||"#5b8cff";
+          buf.u8(parseInt(h.slice(1,3),16)); buf.u8(parseInt(h.slice(3,5),16)); buf.u8(parseInt(h.slice(5,7),16));
+          buf.u8(0); buf.str(t.name||"Tag");
+        });
+      });
+    }
+    // cels for this frame
+    for(let li=0; li<layerDefs.length; li++){
+      const cv = perLayer ? fr.layers[li].canvas : flatOf(fr);
+      const cel=await celFor(cv);
+      if(!cel) continue;
+      chunk(0x2005, ()=>{
+        buf.u16(li); buf.i16(cel.bb.x); buf.i16(cel.bb.y); buf.u8(255);
+        buf.u16(2); buf.i16(0); buf.skip(5);       // compressed image, z-index 0
+        buf.u16(cel.bb.w); buf.u16(cel.bb.h); buf.bytes(cel.data);
+      });
+    }
+    buf.at(frameSizePos, buf.p-frameStart);
+    buf.at(chunkCountPos, chunks);
+  }
+  buf.at(fileSizePos, buf.p);
+  const out=buf.done();
+  const blob=new Blob([out], {type:"application/octet-stream"});
+  const name=spriteBaseName()+".aseprite";
+  const a=document.createElement("a"); a.download=name; a.href=URL.createObjectURL(blob); a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  showToast("Exported "+name+" — "+frames.length+" frame"+(frames.length>1?"s":"")+", "
+    +layerDefs.length+" layer"+(layerDefs.length>1?"s":"")+(perLayer?"":" (flattened per frame)")+".","success",4200);
+}
 function saveProject(){
   const data={app:"PixelPaint",version:2,w:W,h:H,active:activeIndex,frameIndex,
     sheet: sheet ? {tw:sheet.tw, th:sheet.th, gap:sheet.gap, pad:sheet.pad,
@@ -6356,6 +6491,7 @@ function runCmd(cmd){
     case "save": saveProject(); break;
     case "export": showExportDialog().then(s=>{ if(s) exportPNG(s); }); break;
     case "sheet": showSheetDialog().then(o=>{ if(o) exportSpritesheet(o); }); break;
+    case "aseprite": exportAseprite(); break;
     case "rename": renameDoc(activeDocId); break;
     case "closetab": closeDoc(activeDocId); break;
     case "install": doInstall(); break;
@@ -6458,6 +6594,7 @@ const HELP_SECTIONS=[
     ["copy","Onion skin — ghost the frames either side","F3"],
     ["tag","Group frames — idle, walk, jump…",""],
     ["image","Export a spritesheet of a group",""],
+    ["grid","Export a real .aseprite file (layers, frames, tags)",""],
     ["folder","Import a spritesheet — sliced into frames and groups",""],
   ]},
   {title:"Tilesheets", icon:"grid", rows:[
