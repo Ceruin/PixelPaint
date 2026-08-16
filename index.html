@@ -88,6 +88,13 @@
   .timeline.collapsed .tl-bar > #tlSummary{display:inline-flex; align-items:center;}
   .tl-bar .vsep{width:1px; height:22px; background:var(--line);}
   .tl-bar .tl-grow{flex:1 1 12px;}
+  /* transport cluster: first / prev / play / next / last, kept tight together */
+  .tl-transport{display:inline-flex; align-items:center; gap:2px;}
+  .tl-transport .iconbtn{min-width:28px;}
+  .tl-transport #playBtn{min-width:34px;}
+  /* left-panel option buttons must not overflow the narrow tools rail */
+  #toolOpts button{max-width:100%; overflow:hidden;}
+  #toolOpts button span{overflow:hidden; text-overflow:ellipsis;}
   /* ---- group tabs: pick which animation the strip shows / plays / exports ---- */
   .tl-tabs{display:flex; align-items:center; gap:5px; padding:7px 10px 0; flex:none;
     overflow-x:auto; overflow-y:hidden;}
@@ -1038,7 +1045,10 @@
   </div>
   <div id="menu-frame" class="ctx-menu menu-dd" hidden>
     <button data-cmd="addframe" data-icon="add"   data-icon-size="16">New frame</button>
+    <button data-cmd="addempty" data-icon="new"   data-icon-size="16">New empty frame</button>
     <button data-cmd="delframe" data-icon="trash" data-icon-size="16">Delete frame</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="framerate" data-icon="clock" data-icon-size="16">Frame rate…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="addgroup" data-icon="tag" data-icon-size="16">New frame group…</button>
     <button data-cmd="addtag"   data-icon="tag" data-icon-size="16">Group existing frames…</button>
@@ -1168,7 +1178,7 @@
         </div>
         <div class="opt-region">
           <div class="toolhead" data-icon="region" data-icon-size="12">Sub-canvas</div>
-          <button id="regionCreate2" style="width:100%" data-icon="region" data-icon-size="15">Create draw area</button>
+          <button id="regionCreate2" style="width:100%" data-icon="region" data-icon-size="15">Draw area</button>
         </div>
       </div>
 
@@ -1328,9 +1338,16 @@
     <div class="tl-bar">
       <button id="tlCollapseBtn" class="iconbtn" title="Collapse / expand the animation panel"></button>
       <span id="tlSummary" title="Expand the animation panel">Animation</span>
-      <button id="playBtn" class="iconbtn" title="Play (Space)"></button>
+      <span class="tl-transport">
+        <button id="firstFrameBtn" class="iconbtn" data-icon="first" data-icon-size="16" title="First frame (Home)"></button>
+        <button id="prevFrameBtn"  class="iconbtn" data-icon="left"  data-icon-size="16" title="Previous frame (←)"></button>
+        <button id="playBtn" class="iconbtn" title="Play / stop (Space)"></button>
+        <button id="nextFrameBtn"  class="iconbtn" data-icon="right" data-icon-size="16" title="Next frame (→)"></button>
+        <button id="lastFrameBtn"  class="iconbtn" data-icon="last"  data-icon-size="16" title="Last frame (End)"></button>
+      </span>
       <label class="chk"><input type="checkbox" id="loopToggle" checked /> Loop</label>
-      <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of the current frame" /><span class="muted">ms</span></span>
+      <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of this frame (right-click a frame ▸ Frame rate to set them all)" /><span class="muted">ms</span></span>
+      <button id="fpsBtn" data-icon="clock" data-icon-size="15" title="Set the frame rate for every frame (FPS)">FPS…</button>
       <span class="vsep"></span>
       <span class="tl-field"><span class="lbl">Opacity</span><input type="range" id="opacitySlider" min="0" max="100" value="100" title="Opacity of the active layer" style="width:88px" /><span id="opacityVal" class="muted">100</span></span>
       <span class="vsep"></span>
@@ -1415,14 +1432,40 @@
 
 <!-- right-click / long-press menu for a frame in the timeline -->
 <div id="frameMenu" class="ctx-menu" hidden>
-  <button data-action="dup"   data-icon="add"       data-icon-size="16">Duplicate frame</button>
+  <button data-action="newframe" data-icon="add"   data-icon-size="16">New frame</button>
+  <button data-action="newempty" data-icon="new"   data-icon-size="16">New empty frame</button>
+  <button data-action="dup"   data-icon="copy"      data-icon-size="16">Duplicate frame</button>
+  <div class="ctx-sep"></div>
   <button data-action="copy"  data-icon="copy"      data-icon-size="16">Copy frame</button>
   <button data-action="paste" data-icon="clipboard" data-icon-size="16">Paste frame after</button>
   <div class="ctx-sep"></div>
   <button data-action="left"  data-icon="left"  data-icon-size="16">Move left<span class="hk">⇧←</span></button>
   <button data-action="right" data-icon="right" data-icon-size="16">Move right<span class="hk">⇧→</span></button>
+  <button data-action="reverse" data-icon="redo" data-icon-size="16">Reverse frames</button>
+  <div class="ctx-sep"></div>
+  <button data-action="tag"  data-icon="tag"   data-icon-size="16">New tag…</button>
+  <button data-action="fps"  data-icon="clock" data-icon-size="16">Frame rate (all)…</button>
+  <button data-action="dur"  data-icon="clock" data-icon-size="16">This frame's duration…</button>
   <div class="ctx-sep"></div>
   <button data-action="del"   data-icon="trash" data-icon-size="16">Delete frame</button>
+</div>
+
+<!-- right-click menu for a layer row in the timeline grid -->
+<div id="layerMenu" class="ctx-menu" hidden>
+  <button data-action="add"  data-icon="add"  data-icon-size="16">New layer</button>
+  <button data-action="dup"  data-icon="copy" data-icon-size="16">Duplicate layer</button>
+  <div class="ctx-sep"></div>
+  <button data-action="up"   data-icon="up"   data-icon-size="16">Move up</button>
+  <button data-action="down" data-icon="down" data-icon-size="16">Move down</button>
+  <button data-action="merge" data-icon="down" data-icon-size="16">Merge down</button>
+  <button data-action="flatten" data-icon="image" data-icon-size="16">Flatten all</button>
+  <div class="ctx-sep"></div>
+  <button data-action="rename" data-icon="pencil"  data-icon-size="16">Rename…</button>
+  <button data-action="visible" data-icon="visible" data-icon-size="16">Show / hide</button>
+  <button data-action="lock" data-icon="lock" data-icon-size="16">Lock / unlock</button>
+  <button data-action="clear" data-icon="clear" data-icon-size="16">Clear layer</button>
+  <div class="ctx-sep"></div>
+  <button data-action="del"  data-icon="trash" data-icon-size="16">Delete layer</button>
 </div>
 
 <!-- right-click menu for a selection -->
@@ -1571,7 +1614,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.09e";
+const APP_VERSION="2026.08.10a";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -1593,6 +1636,8 @@ const P = {
   folder:"M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z",
   clock:"M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
   mail:"M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z",
+  first:"M6 6h2v12H6zm3.5 6l8.5 6V6z",
+  last:"M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z",
   bug:"M20 8h-2.81a5.985 5.985 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z",
   grid:"M20 2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM8 20H4v-4h4v4zm0-6H4v-4h4v4zm0-6H4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4zm6 12h-4v-4h4v4zm0-6h-4v-4h4v4zm0-6h-4V4h4v4z",
   center:"M5 15H3v4c0 1.1.9 2 2 2h4v-2H5v-4zM5 5h4V3H5c-1.1 0-2 .9-2 2v4h2V5zm14-2h-4v2h4v4h2V5c0-1.1-.9-2-2-2zm0 16h-4v2h4c1.1 0 2-.9 2-2v-4h-2v4zM12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
@@ -2464,6 +2509,7 @@ function renderTimeline(){
     lock.title=l.locked?"Locked — click to unlock":"Unlocked — click to lock"; lock.onclick=ev=>{ ev.stopPropagation(); setLayerLocked(li,!l.locked); renderLayers(); renderTimeline(); };
     head.append(eye,nm,lock);
     head.onclick=()=>{ activeIndex=li; renderLayers(); highlightActiveFrame(); };
+    head.oncontextmenu=ev=>{ ev.preventDefault(); ev.stopPropagation(); openLayerMenu(ev.clientX,ev.clientY,li); };
     put(head,row0+vi,1);
     for(let f=0; f<N; f++){
       const inview = scoped && f>=rng.from && f<=rng.to;
@@ -4068,7 +4114,7 @@ function openMenuAt(m,x,y){
 }
 function openCtxMenu(x,y){ openMenuAt($("#ctxMenu"),x,y); }
 function openSelMenu(x,y){ openMenuAt($("#selMenu"),x,y); }
-function closeCtxMenu(){ ["#ctxMenu","#selMenu","#frameMenu"].forEach(id=>{ const m=$(id); if(m) m.hidden=true; }); }
+function closeCtxMenu(){ ["#ctxMenu","#selMenu","#frameMenu","#layerMenu"].forEach(id=>{ const m=$(id); if(m) m.hidden=true; }); }
 // Cancelling a lifted selection has to give the pixels back — they left the layer when the
 // transform started. Nothing else changed in between, so the undo entry that covered the lift is
 // popped rather than left behind as a step that does nothing.
@@ -6740,6 +6786,8 @@ function runCmd(cmd){
     case "uplayer": upLayerCmd(); break;
     case "downlayer": downLayerCmd(); break;
     case "addframe": addFrame(true); break;
+    case "addempty": addFrame(false); break;
+    case "framerate": setFrameRateDialog(); break;
     case "delframe": deleteFrame(frameIndex); break;
     case "play": startPlayback(); break;
     case "addtag": addTag(); break;
@@ -6987,14 +7035,77 @@ $("#frameMenu").addEventListener("click",e=>{
   const i=frameMenuAt; closeCtxMenu();
   if(i<0 || !frames[i]) return;
   switch(b.dataset.action){
+    case "newframe": selectFrame(i); addFrame(true); break;
+    case "newempty": selectFrame(i); addFrame(false); break;
     case "dup":   duplicateFrameAt(i); break;
     case "copy":  copyFrameAt(i); break;
     case "paste": pasteFrameAfter(i); break;
     case "left":  selectFrame(i); nudgeFrame(-1); break;
     case "right": selectFrame(i); nudgeFrame(1); break;
+    case "reverse": selectFrame(i); reverseFramesCmd(); break;
+    case "tag":   selectFrame(i); addTag(); break;
+    case "fps":   setFrameRateDialog(); break;
+    case "dur":   setFrameDurDialog(i); break;
     case "del":   deleteFrame(i); break;
   }
 });
+let layerMenuAt=-1;
+function openLayerMenu(x,y,li){
+  layerMenuAt=li; activeIndex=clamp(li,0,layers.length-1); renderLayers(); highlightActiveFrame();
+  const m=$("#layerMenu");
+  m.querySelector('[data-action="up"]').disabled=(li>=layers.length-1);
+  m.querySelector('[data-action="down"]').disabled=(li<=0);
+  m.querySelector('[data-action="merge"]').disabled=(li<=0);
+  m.querySelector('[data-action="del"]').disabled=(layers.length<=1);
+  m.querySelector('[data-action="flatten"]').disabled=(layers.length<=1);
+  openMenuAt(m,x,y);
+}
+$("#layerMenu").addEventListener("click",e=>{
+  const b=e.target.closest("[data-action]"); if(!b || b.disabled) return;
+  const li=layerMenuAt; closeCtxMenu();
+  if(li<0 || !layers[li]) return; activeIndex=clamp(li,0,layers.length-1);
+  switch(b.dataset.action){
+    case "add":     addLayerCmd(); break;
+    case "dup":     dupLayerCmd(); break;
+    case "up":      upLayerCmd(); break;
+    case "down":    downLayerCmd(); break;
+    case "merge":   mergeDownCmd(); break;
+    case "flatten": flattenFrameCmd(); break;
+    case "rename":  renameActiveLayer(); break;
+    case "visible": setLayerVisible(li,!layers[li].visible); composite(); renderLayers(); renderTimeline(); break;
+    case "lock":    setLayerLocked(li,!layers[li].locked); renderLayers(); renderTimeline(); break;
+    case "clear":   clearActiveLayer(); break;
+    case "del":     delLayerCmd(); break;
+  }
+});
+async function renameActiveLayer(){
+  const l=activeLayer(); if(!l) return;
+  const n=await showPrompt("New name for this layer:", l.name, {title:"Rename layer"});
+  if(n!=null && n.trim()){ setLayerName(activeIndex, n.trim()); renderLayers(); renderTimeline(); }
+}
+// Frame rate applied to every frame at once, entered as FPS (the friendlier unit).
+async function setFrameRateDialog(){
+  const cur=frames[frameIndex]?frames[frameIndex].dur:DEFAULT_DUR;
+  const body=`<div class="row"><label>Frames / sec</label>
+      <input type="number" id="fpsIn" min="1" max="60" step="1" value="${Math.max(1,Math.round(1000/cur))}">
+      <span class="shi-hint">fps</span></div>
+    <div class="row"><label></label><span class="shi-hint">Sets one duration on all ${frames.length} frame${frames.length>1?"s":""}.</span></div>`;
+  const ok=await openModal({title:"Frame rate", bodyHTML:body, okText:"Apply to all frames"});
+  if(!ok) return;
+  const fps=clamp(parseInt($("#fpsIn").value,10)||12,1,120), ms=clamp(Math.round(1000/fps),10,5000);
+  frames.forEach(f=>f.dur=ms);
+  if($("#frameDur")) $("#frameDur").value=ms;
+  renderTimeline();
+  showToast("Set "+fps+" fps ("+ms+" ms) on all "+frames.length+" frame"+(frames.length>1?"s":"")+".","success");
+}
+async function setFrameDurDialog(i){
+  if(!frames[i]) return;
+  const n=await showPrompt("Duration for frame "+(i+1)+" (ms):", String(frames[i].dur), {title:"Frame duration"});
+  if(n==null) return;
+  frames[i].dur=clamp(parseInt(n,10)||DEFAULT_DUR,10,5000);
+  if(i===frameIndex && $("#frameDur")) $("#frameDur").value=frames[i].dur;
+  renderTimeline();
+}
 $("#selMenu").addEventListener("click",e=>{
   const b=e.target.closest("[data-action]"); if(!b) return; const a=b.dataset.action; closeCtxMenu();
   if(a==="selectall"){ selectAll(); return; }
@@ -7014,7 +7125,7 @@ document.addEventListener("pointerdown",e=>{
   if(cpOpen && !e.target.closest("#cpPop") && !e.target.closest("#colorButton")
      && !e.target.closest("#primarySwatch") && !e.target.closest("#secondarySwatch")) cpClose();
   // context menus (image / selection)
-  const menus=[$("#ctxMenu"),$("#selMenu"),$("#frameMenu")];
+  const menus=[$("#ctxMenu"),$("#selMenu"),$("#frameMenu"),$("#layerMenu")];
   const anyOpen=menus.some(m=>!m.hidden);
   const inside=menus.some(m=>m.contains(e.target));
   if(anyOpen && !inside) closeCtxMenu();
@@ -7101,6 +7212,11 @@ $("#regionToggleMenu").onchange=e=>{ if(e.target.checked){ if(!region) createReg
 $("#tlCollapseBtn").onclick=()=>setTimelineCollapsed(!tlCollapsed);
 $("#tlSummary").onclick=()=>setTimelineCollapsed(false);
 $("#playBtn").onclick=startPlayback;
+$("#firstFrameBtn").onclick=()=>selectFrame(0);
+$("#prevFrameBtn").onclick=()=>selectFrame(frameIndex-1);
+$("#nextFrameBtn").onclick=()=>selectFrame(frameIndex+1);
+$("#lastFrameBtn").onclick=()=>selectFrame(frames.length-1);
+$("#fpsBtn").onclick=setFrameRateDialog;
 $("#addFrameBtn").onclick=()=>addFrame(true);
 $("#addGroupBtn").onclick=addGroupDialog;
 $("#frameDur").onchange=e=>setFrameDur(parseInt(e.target.value,10)||DEFAULT_DUR);
@@ -7442,6 +7558,8 @@ window.addEventListener("keydown",e=>{
     case "arrowright": e.preventDefault();
       if(tool==="tile"&&sheet) moveTileSel(0,1);
       else if(e.shiftKey) nudgeFrame(1);  else selectFrame(frameIndex+1); break;
+    case "home": e.preventDefault(); selectFrame(0); break;
+    case "end":  e.preventDefault(); selectFrame(frames.length-1); break;
     case "delete": case "backspace":
       if(selection){ e.preventDefault(); clearSelectionContents(); }
       else if(region){ e.preventDefault(); removeRegion(); }
