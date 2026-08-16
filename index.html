@@ -356,6 +356,11 @@
   .swap{position:absolute; right:0; top:0; z-index:4; width:22px; height:22px;
     min-width:0; min-height:0; padding:0; border-radius:6px;}
   .colorrow .col{display:flex; flex-direction:column; gap:6px; flex:1; min-width:0;}
+  .hexrow{display:flex; gap:6px; align-items:center;}
+  .hexrow #hexInput{flex:1; min-width:0;}
+  .hexrow .iconbtn{flex:none;}
+  /* the docked picker sits under the swatch row */
+  #colorSection .cp-sv{margin-top:10px; height:150px;}
   .recents{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; min-height:18px;}
   .recents .rc{width:18px; height:18px; border-radius:4px; border:1px solid #0006; cursor:pointer;}
 
@@ -1231,9 +1236,19 @@
               <button class="swap" id="swapColors" data-icon="swap" data-icon-size="14" title="Swap foreground / background (X)"></button>
             </div>
             <div class="col">
-              <button class="cp-swatch" id="colorButton" title="Open the color picker"></button>
-              <input type="text" id="hexInput" value="#000000" spellcheck="false" />
+              <div class="hexrow">
+                <input type="text" id="hexInput" value="#000000" spellcheck="false" />
+                <button id="cpEyedrop" class="iconbtn" data-icon="pick" data-icon-size="16" title="Pick a color from anywhere on screen"></button>
+              </div>
             </div>
+          </div>
+          <!-- Aseprite-style inline colour picker: SV field, hue bar and RGB, always visible -->
+          <div class="cp-sv" id="cpSV"><div class="cp-dot" id="cpSVDot"></div></div>
+          <div class="cp-hue" id="cpHue"><div class="cp-dot" id="cpHueDot"></div></div>
+          <div class="cp-rgb">
+            <label>R<input type="number" id="cpR" min="0" max="255" /></label>
+            <label>G<input type="number" id="cpG" min="0" max="255" /></label>
+            <label>B<input type="number" id="cpB" min="0" max="255" /></label>
           </div>
           <div class="recents" id="recents"></div>
           <select id="paletteSelect" style="width:100%; margin-top:10px"></select>
@@ -1393,24 +1408,7 @@
 <div id="toastRoot" class="toast-root"></div>
 
 <!-- themed color picker (in-app, so it matches the rest of the UI) -->
-<div id="cpPop" class="cp-pop" hidden>
-  <div class="cp-sv" id="cpSV"><div class="cp-dot" id="cpSVDot"></div></div>
-  <div class="cp-hue" id="cpHue"><div class="cp-dot" id="cpHueDot"></div></div>
-  <div class="cp-row">
-    <div class="cp-prev" id="cpPrev"></div>
-    <input type="text" id="cpHex" spellcheck="false" maxlength="7" />
-    <button id="cpEyedrop" data-icon="pick" data-icon-size="16" title="Pick a color from anywhere on screen"></button>
-  </div>
-  <div class="cp-rgb">
-    <label>R<input type="number" id="cpR" min="0" max="255" /></label>
-    <label>G<input type="number" id="cpG" min="0" max="255" /></label>
-    <label>B<input type="number" id="cpB" min="0" max="255" /></label>
-  </div>
-  <div class="btnrow" style="margin-bottom:0">
-    <button id="cpAddPal" data-icon="add" data-icon-size="15" title="Add this color to the active palette"></button>
-    <button id="cpDone" class="primary" data-icon="check" data-icon-size="15" title="Close">Done</button>
-  </div>
-</div>
+<!-- (the colour picker is now docked inline in the Color panel) -->
 
 <!-- right-click menu for a pasted/dropped image -->
 <div id="ctxMenu" class="ctx-menu" hidden>
@@ -1614,7 +1612,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.10a";
+const APP_VERSION="2026.08.10b";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -4944,8 +4942,7 @@ function renderRecents(){
 // ------------------------------------------------------------------ themed color picker
 // An in-app HSV popover: the native <input type="color"> opens the OS dialog, which is light-themed
 // and looks nothing like the rest of the app.
-const cpPop=$("#cpPop");
-let cpHSV={h:0,s:0,v:0}, cpOpen=false, cpDrag=null;
+let cpHSV={h:0,s:0,v:0}, cpOpen=true, cpDrag=null;   // the picker is docked, so it's always "open"
 
 function cpRender(){
   const [r,g,b]=hsvToRgb(cpHSV.h,cpHSV.s,cpHSV.v), hex=rgbToHex(r,g,b);
@@ -4954,9 +4951,9 @@ function cpRender(){
   $("#cpSVDot").style.left=(cpHSV.s*100)+"%";
   $("#cpSVDot").style.top=((1-cpHSV.v)*100)+"%";
   $("#cpHueDot").style.left=(cpHSV.h/360*100)+"%";
-  $("#cpPrev").style.background=hex;
-  const hx=$("#cpHex"); if(document.activeElement!==hx) hx.value=hex.toUpperCase();
-  [["#cpR",r],["#cpG",g],["#cpB",b]].forEach(p=>{ const el=$(p[0]); if(document.activeElement!==el) el.value=p[1]; });
+  const pv=$("#cpPrev"); if(pv) pv.style.background=hex;
+  const hx=$("#cpHex"); if(hx && document.activeElement!==hx) hx.value=hex.toUpperCase();
+  [["#cpR",r],["#cpG",g],["#cpB",b]].forEach(p=>{ const el=$(p[0]); if(el && document.activeElement!==el) el.value=p[1]; });
   return hex;
 }
 function cpApply(){ setColor(cpRender(), activeSlot, {noRecent:true, fromPicker:true}); }
@@ -4966,21 +4963,10 @@ function cpSetHSVFromHex(hex){
   const rgb=hexToRgb(hex), h=rgbToHsv(rgb[0],rgb[1],rgb[2]);
   cpHSV={h:(h.s<0.001 ? cpHSV.h : h.h), s:h.s, v:h.v};
 }
-function cpSyncFrom(hex){ if(!cpOpen||cpDrag) return; const n=normHex(hex); if(!n) return; cpSetHSVFromHex(n); cpRender(); }
-function cpOpenAt(anchor){
-  cpOpen=true; cpPop.hidden=false;
-  cpSetHSVFromHex(currentColor()); cpRender();
-  const a=anchor.getBoundingClientRect(), p=cpPop.getBoundingClientRect();
-  let top=a.bottom+6;
-  if(top+p.height > window.innerHeight-8) top=Math.max(8, a.top-p.height-6);
-  cpPop.style.left=clamp(a.right-p.width, 8, Math.max(8, window.innerWidth-p.width-8))+"px";
-  cpPop.style.top=top+"px";
-}
-function cpClose(){
-  if(!cpOpen) return;
-  cpOpen=false; cpPop.hidden=true; cpDrag=null;
-  pushRecent(currentColor());   // log the color you actually settled on, not every drag step
-}
+function cpSyncFrom(hex){ if(cpDrag) return; const n=normHex(hex); if(!n) return; cpSetHSVFromHex(n); cpRender(); }
+// The picker lives inline in the Color panel now, so there's nothing to open or close.
+function cpOpenAt(){ /* docked — no popup */ }
+function cpClose(){ /* docked — no popup */ }
 function cpFromSV(e){
   const r=$("#cpSV").getBoundingClientRect();
   cpHSV.s=clamp((e.clientX-r.left)/r.width,0,1);
@@ -7121,9 +7107,6 @@ $("#selMenu").addEventListener("click",e=>{
 $("#applyPaletteBtn").onclick=applyPaletteToLayer;
 
 document.addEventListener("pointerdown",e=>{
-  // the color picker closes when you click away from it (but not on its own anchor buttons)
-  if(cpOpen && !e.target.closest("#cpPop") && !e.target.closest("#colorButton")
-     && !e.target.closest("#primarySwatch") && !e.target.closest("#secondarySwatch")) cpClose();
   // context menus (image / selection)
   const menus=[$("#ctxMenu"),$("#selMenu"),$("#frameMenu"),$("#layerMenu")];
   const anyOpen=menus.some(m=>!m.hidden);
@@ -7286,12 +7269,9 @@ $("#hexInput").onchange=e=>{
 };
 $("#primarySwatch").onclick=()=>setActiveSlot("fg");
 $("#secondarySwatch").onclick=()=>setActiveSlot("bg");
-$("#primarySwatch").ondblclick=()=>{ setActiveSlot("fg"); cpOpenAt($("#primarySwatch")); };
-$("#secondarySwatch").ondblclick=()=>{ setActiveSlot("bg"); cpOpenAt($("#secondarySwatch")); };
 $("#swapColors").onclick=swapColors;
 
-// ---- themed color picker wiring ----
-$("#colorButton").onclick=()=>{ if(cpOpen) cpClose(); else cpOpenAt($("#colorButton")); };
+// ---- inline (docked) color picker wiring ----
 $("#cpSV").addEventListener("pointerdown",e=>{
   e.preventDefault(); cpDrag="sv";
   try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(_){}
@@ -7304,13 +7284,10 @@ $("#cpHue").addEventListener("pointerdown",e=>{
 });
 window.addEventListener("pointermove",e=>{ if(cpDrag) (cpDrag==="sv"?cpFromSV:cpFromHue)(e); });
 window.addEventListener("pointerup",()=>{ if(cpDrag){ cpDrag=null; pushRecent(currentColor()); } });
-$("#cpHex").onchange=e=>{ const v=normHex(e.target.value); if(v) setColor(v, activeSlot); else cpRender(); };
 ["#cpR","#cpG","#cpB"].forEach(id=>{
   $(id).oninput=cpRGBInput;
   $(id).onchange=()=>{ cpRGBInput(); pushRecent(currentColor()); };
 });
-$("#cpAddPal").onclick=()=>addColorToPalette(currentColor());
-$("#cpDone").onclick=cpClose;
 $("#cpEyedrop").onclick=async()=>{
   if(!window.EyeDropper){ showToast("This browser has no screen eyedropper — use the Pick tool (I) on the canvas instead.","info",4200); return; }
   try{
@@ -7492,7 +7469,6 @@ window.addEventListener("keydown",e=>{
 // keyboard
 window.addEventListener("keydown",e=>{
   if(!$("#modalRoot").hidden) return;   // a dialog is open; it handles its own keys
-  if(cpOpen && e.key==="Escape"){ e.preventDefault(); cpClose(); return; }   // before the input guard: focus may be in a picker field
   // Same reason: a menu's own checkboxes take focus, so Escape has to reach past the guard to
   // shut the frontmost thing on screen.
   if(e.key==="Escape" && (openMenu || !$("#menuSheet").hidden)){
