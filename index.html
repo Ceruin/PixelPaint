@@ -553,6 +553,18 @@
   .vx-dir{width:100%; height:auto; image-rendering:pixelated; background:#0003; border:1px solid var(--line); border-radius:3px; cursor:pointer;}
   .vx-dir:hover{border-color:#56607a;}
   .vx-dir.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
+  .st-wrap{display:flex; gap:12px;}
+  .st-view{position:relative; flex:1; min-width:0; height:420px; display:flex; align-items:center; justify-content:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; touch-action:none;}
+  .st-view canvas{image-rendering:pixelated; cursor:crosshair;}
+  .st-hint{position:absolute; bottom:5px; right:7px; font-size:10px; color:var(--muted); pointer-events:none;}
+  .st-side{width:210px; flex:none; display:flex; flex-direction:column; gap:10px;}
+  .st-side .row{display:flex; align-items:center; gap:8px;}
+  .st-side .row > label:first-child{width:56px; flex:none; color:var(--muted); font-size:11px;}
+  .st-tools{display:flex; gap:4px;}
+  .st-tool{flex:1; padding:6px 0;}
+  .st-tool.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
+  .st-swatch{width:20px; height:20px; border-radius:3px; border:1px solid var(--line); display:inline-block;}
 
   /* ---- open recent ---- */
   .rc-list{display:flex; flex-direction:column; gap:5px; max-height:min(52vh,330px); overflow:auto; margin-bottom:9px;}
@@ -1054,6 +1066,7 @@
     <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="voxel3d" data-icon="grid" data-icon-size="16">Pseudo-3D…</button>
+    <button data-cmd="voxelstudio" data-icon="grid" data-icon-size="16">3D Voxel Studio…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
     <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
@@ -6647,6 +6660,7 @@ async function showVoxelDialog(){
         <label class="chk" style="gap:6px"><input type="checkbox" id="vxMirror" checked>Mirror the back</label>
         <div class="vx-dirs" id="vxDirs"></div>
         <div class="shi-hint" id="vxHint" style="line-height:1.5"></div>
+        <button id="vxStudio" style="width:100%">Edit in 3D Voxel Studio…</button>
       </div>
     </div>
     <input type="file" id="vxBackFile" accept="image/*" hidden>
@@ -6697,8 +6711,133 @@ async function showVoxelDialog(){
     if(v==="none"){ setVoxSide(null); rebuild(); }
     else if(v.startsWith("frame:")){ setVoxSide(frameToVoxCanvas(frames[+v.slice(6)])); rebuild(); }
     else if(v==="file"){ loadImg(c=>{ setVoxSide(c); rebuild(); }); } };
+  $("#vxStudio").onclick=()=>{ const m=vx.model||buildVoxels(); if(!m){ showToast("Nothing to build a model from.","error"); return; }
+    closeModal(false); openVoxelStudio(m); };
   const ok=await p;
   if(ok) exportVoxelDirections();
+}
+
+/* ---------------- 3D Voxel Studio ---------------- */
+// A live, editable voxel model: orbit to view, click to add/erase/paint voxels, then bake to sprites.
+let studio={ model:null, yaw:32, pitch:20, tool:"add", mirror:true, brush:1, _n:[0,0,-1], undo:[], redo:[] };
+function packHex(hex){ const [r,g,b]=hexToRgb(hex); return ((r&255)|((g&255)<<8)|((b&255)<<16)|(255<<24))>>>0; }
+function cloneModel(m){ return {vox:new Uint32Array(m.vox), W:m.W, H:m.H, D:m.D}; }
+function voxViewOf(model, yawDeg, pitchDeg){
+  const r=renderVoxel(model, yawDeg, pitchDeg), OUT=r.OUT, c=canvasOf(OUT,OUT), x=c.getContext("2d");
+  x.imageSmoothingEnabled=false; x.drawImage(r.canvas,0,0,OUT*r.S,OUT*r.S,0,0,OUT,OUT);
+  return c;
+}
+// Render + a pick buffer (which voxel each screen pixel belongs to) + the toward-camera direction for Add.
+function studioRender(m, yawDeg, pitchDeg, S){
+  const {vox,W,H,D}=m, cx=(W-1)/2, cy=(H-1)/2, cz=(D-1)/2;
+  const yaw=yawDeg*Math.PI/180, pit=pitchDeg*Math.PI/180;
+  const cyaw=Math.cos(yaw),syaw=Math.sin(yaw),cpit=Math.cos(pit),spit=Math.sin(pit);
+  const OUT=Math.ceil(Math.sqrt(W*W+H*H+D*D))+2; S=S||3; const SW=OUT*S, off=OUT/2;
+  const zbuf=new Float32Array(SW*SW).fill(1e9), col=new Uint32Array(SW*SW), pick=new Int32Array(SW*SW).fill(-1);
+  for(let z=0;z<D;z++) for(let y=0;y<H;y++){ const row=(z*H+y)*W;
+    for(let x=0;x<W;x++){ const v=vox[row+x]; if(!v) continue;
+      const px=x-cx, py=y-cy, pz=z-cz;
+      const rx=px*cyaw+pz*syaw, rz=-px*syaw+pz*cyaw;
+      const ry2=py*cpit-rz*spit, rz2=py*spit+rz*cpit;
+      const sx=Math.round((rx+off)*S), sy=Math.round((ry2+off)*S);
+      for(let dy=0;dy<S;dy++){ const yy=sy+dy; if(yy<0||yy>=SW) continue;
+        for(let dx=0;dx<S;dx++){ const xx=sx+dx; if(xx<0||xx>=SW) continue;
+          const idx=yy*SW+xx; if(rz2<zbuf[idx]){ zbuf[idx]=rz2; col[idx]=v; pick[idx]=row+x; } } }
+    }}
+  const c=canvasOf(SW,SW), ctx=c.getContext("2d"), id=ctx.createImageData(SW,SW), dd=id.data;
+  for(let i=0;i<col.length;i++){ const v=col[i]; if(!v) continue; const o=i*4;
+    dd[o]=v&255; dd[o+1]=(v>>8)&255; dd[o+2]=(v>>16)&255; dd[o+3]=255; }
+  ctx.putImageData(id,0,0);
+  const n=[syaw*cpit, -spit, -cyaw*cpit];  // world-space direction toward the camera (for placing new voxels on the near face)
+  return {canvas:c, col, pick, SW, S, OUT, n};
+}
+function addAxis(n){ const ax=Math.abs(n[0]),ay=Math.abs(n[1]),az=Math.abs(n[2]);
+  if(ax>=ay&&ax>=az) return [Math.sign(n[0])||1,0,0];
+  if(ay>=az) return [0,Math.sign(n[1])||1,0];
+  return [0,0,Math.sign(n[2])||1]; }
+function studioCount(){ const v=studio.model?studio.model.vox:null; if(!v) return 0; let n=0; for(let i=0;i<v.length;i++) if(v[i]) n++; return n; }
+function studioPush(){ if(!studio.model) return; studio.undo.push(new Uint32Array(studio.model.vox)); if(studio.undo.length>40) studio.undo.shift(); studio.redo.length=0; }
+function studioUndo(){ if(!studio.undo.length) return; studio.redo.push(new Uint32Array(studio.model.vox)); studio.model.vox=studio.undo.pop(); }
+function studioRedo(){ if(!studio.redo.length) return; studio.undo.push(new Uint32Array(studio.model.vox)); studio.model.vox=studio.redo.pop(); }
+function studioBake(){ const m=studio.model; if(!m||!studioCount()){ showToast("The model is empty.","info"); return; }
+  const views=[]; for(let i=0;i<8;i++) views.push(voxViewOf(m, i*45, studio.pitch));
+  const OUT=views[0].width; createDoc(OUT, OUT, "3D "+spriteBaseName());
+  for(let i=0;i<8;i++){ if(i>0) addFrame(false); const L=activeLayer();
+    if(L){ L.ctx.imageSmoothingEnabled=false; L.ctx.clearRect(0,0,OUT,OUT); L.ctx.drawImage(views[i],0,0); refreshThumb(L); } }
+  selectFrame(0); renderLayers(); renderTimeline(); composite(); updateDocInfo(); captureActiveDoc(); renderTabs();
+  showToast("Baked 8 directions from the studio model.","success",4200);
+}
+function openStudioFromSprite(){
+  if(!frames.length){ showToast("Draw a front view first.","info"); return; }
+  composite(); vx.front=imgDataOf(flat); vx.depth=clamp(Math.round(W*0.4),3,24);
+  vx.mode="round"; vx.side=null; vx.useOutline=true; setVoxBack(null);
+  const m=buildVoxels(); if(!m){ showToast("Nothing to build a model from.","error"); return; }
+  openVoxelStudio(m);
+}
+function openVoxelStudio(model){
+  studio.model=cloneModel(model); studio.undo.length=0; studio.redo.length=0;
+  if(studio.tool!=="add"&&studio.tool!=="erase"&&studio.tool!=="paint") studio.tool="add";
+  const body=`<div class="st-wrap">
+      <div class="st-view" id="stView"><canvas id="stCanvas"></canvas><span class="st-hint">drag = orbit · click = edit</span></div>
+      <div class="st-side">
+        <div class="st-tools">
+          <button class="st-tool" data-st="add">Add</button>
+          <button class="st-tool" data-st="paint">Paint</button>
+          <button class="st-tool" data-st="erase">Erase</button>
+        </div>
+        <label class="chk" style="gap:6px"><input type="checkbox" id="stMirror" checked>Mirror across X</label>
+        <div class="row"><label>Color</label><span id="stSwatch" class="st-swatch"></span><span id="stHex" class="shi-hint"></span></div>
+        <div class="row"><button id="stUndo" style="flex:1">Undo</button><button id="stRedo" style="flex:1">Redo</button></div>
+        <div class="row"><label>Voxels</label><span id="stCount" class="shi-hint"></span></div>
+        <div class="shi-hint" style="line-height:1.5">Add places a voxel on the face you're looking at. Paint recolours it with the current colour. Erase removes it. Orbit to reach the sides and back.</div>
+        <div style="flex:1"></div>
+        <button id="stBake" class="primary" style="width:100%">Bake 8 directions</button>
+      </div>
+    </div>`;
+  const p=openModal({title:"3D Voxel Studio", bodyHTML:body, okText:"Done", cancel:false, wide:true});
+  const cv=$("#stCanvas");
+  const setTool=t=>{ studio.tool=t; document.querySelectorAll(".st-tool").forEach(b=>b.classList.toggle("on", b.dataset.st===t)); };
+  const syncInfo=()=>{ $("#stSwatch").style.background=primary; $("#stHex").textContent=primary; $("#stCount").textContent=studioCount(); };
+  const draw=()=>{
+    const r=studioRender(studio.model, studio.yaw, studio.pitch, 3); studio._last=r; studio._n=r.n;
+    const box=$("#stView"), s=Math.max(1,Math.floor(Math.min((box.clientWidth-16)/r.OUT,(box.clientHeight-16)/r.OUT)));
+    cv.width=r.SW; cv.height=r.SW; cv.getContext("2d").drawImage(r.canvas,0,0);
+    cv.style.width=(r.OUT*s)+"px"; cv.style.height=(r.OUT*s)+"px"; syncInfo();
+  };
+  const idxToXYZ=(i,W,H)=>({z:Math.floor(i/(W*H)), y:Math.floor((i%(W*H))/W), x:i%W});
+  const editAt=(clientX,clientY)=>{
+    const r=studio._last; if(!r) return; const m=studio.model, {W,H,D}=m;
+    const b=cv.getBoundingClientRect(); const sx=Math.floor((clientX-b.left)/b.width*r.SW), sy=Math.floor((clientY-b.top)/b.height*r.SW);
+    if(sx<0||sy<0||sx>=r.SW||sy>=r.SW) return;
+    const hit=r.pick[sy*r.SW+sx];
+    const setV=(x,y,z,v)=>{ if(x<0||y<0||z<0||x>=W||y>=H||z>=D) return; m.vox[(z*H+y)*W+x]=v; };
+    const has=(x,y,z)=> x>=0&&y>=0&&z>=0&&x<W&&y<H&&z<D && m.vox[(z*H+y)*W+x]!==0;
+    if(hit<0){ return; }                        // clicked empty space — nothing to anchor to
+    const {x,y,z}=idxToXYZ(hit,W,H);
+    studioPush();
+    if(studio.tool==="erase"){ setV(x,y,z,0); if(studio.mirror) setV(W-1-x,y,z,0); }
+    else if(studio.tool==="paint"){ const c=packHex(primary); setV(x,y,z,c); if(studio.mirror) setV(W-1-x,y,z,c); }
+    else { const a=addAxis(studio._n), c=packHex(primary), nx=x+a[0], ny=y+a[1], nz=z+a[2];
+      if(!has(nx,ny,nz)) setV(nx,ny,nz,c);
+      if(studio.mirror){ const mx=W-1-nx; if(!has(mx,ny,nz)) setV(mx,ny,nz,c); } }
+    draw();
+  };
+  // drag = orbit, click (little movement) = edit
+  let dn=null;
+  cv.addEventListener("pointerdown",e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    dn={x:e.clientX,y:e.clientY,yaw:studio.yaw,pitch:studio.pitch,moved:false}; });
+  cv.addEventListener("pointermove",e=>{ if(!dn) return; const dx=e.clientX-dn.x, dy=e.clientY-dn.y;
+    if(!dn.moved && Math.abs(dx)+Math.abs(dy)<4) return; dn.moved=true;
+    studio.yaw=dn.yaw+dx*0.8; studio.pitch=clamp(dn.pitch-dy*0.6,-85,85); draw(); });
+  cv.addEventListener("pointerup",e=>{ if(dn && !dn.moved) editAt(e.clientX,e.clientY); dn=null; });
+  document.querySelectorAll(".st-tool").forEach(b=> b.onclick=()=>setTool(b.dataset.st));
+  $("#stMirror").onchange=e=>{ studio.mirror=e.target.checked; };
+  $("#stMirror").checked=studio.mirror;
+  $("#stUndo").onclick=()=>{ studioUndo(); draw(); };
+  $("#stRedo").onclick=()=>{ studioRedo(); draw(); };
+  $("#stBake").onclick=()=>studioBake();
+  setTool(studio.tool); requestAnimationFrame(draw);
+  return p;
 }
 function packToDoc(plan, out, name){
   if(out.width>MAX_DIM || out.height>MAX_DIM) return false;
@@ -7036,6 +7175,7 @@ function runCmd(cmd){
     case "resize": resizeDialog(); break;
     case "trim": trimToContent(); break;
     case "voxel3d": showVoxelDialog(); break;
+    case "voxelstudio": openStudioFromSprite(); break;
     case "addimage": $("#imgInput").click(); break;
     case "addlayer": addLayerCmd(); break;
     case "duplayer": dupLayerCmd(); break;
