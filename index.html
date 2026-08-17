@@ -550,7 +550,9 @@
   .vx-ctl .row{display:flex; align-items:center; gap:8px;}
   .vx-ctl .row > label:first-child{width:56px; flex:none; color:var(--muted); font-size:11px;}
   .vx-dirs{display:grid; grid-template-columns:repeat(8,1fr); gap:3px; margin-top:2px;}
-  .vx-dir{width:100%; height:auto; image-rendering:pixelated; background:#0003; border:1px solid var(--line); border-radius:3px;}
+  .vx-dir{width:100%; height:auto; image-rendering:pixelated; background:#0003; border:1px solid var(--line); border-radius:3px; cursor:pointer;}
+  .vx-dir:hover{border-color:#56607a;}
+  .vx-dir.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
 
   /* ---- open recent ---- */
   .rc-list{display:flex; flex-direction:column; gap:5px; max-height:min(52vh,330px); overflow:auto; margin-bottom:9px;}
@@ -1633,7 +1635,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.11a";
+const APP_VERSION="2026.08.11b";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -5603,11 +5605,12 @@ function rcLastHandle(){ const r=recentFiles.find(x=>x.handle); return r?r.handl
 async function pickOpenProject(){
   if(window.showOpenFilePicker){
     try{
-      const opts={id:"pxpaintProject", multiple:false,
-        types:[{description:"PixelPaint project", accept:{"application/json":[".pxpaint",".json"]}}]};
+      const opts={id:"pxpaintProject", multiple:false, types:[
+        {description:"PixelPaint project", accept:{"application/json":[".pxpaint",".json"]}},
+        {description:"Image", accept:{"image/*":[".png",".jpg",".jpeg",".gif",".webp",".bmp"]}}]};
       const start=rcLastHandle(); if(start) opts.startIn=start;
       const [h]=await window.showOpenFilePicker(opts);
-      if(h) openProjectFile(await h.getFile(), {handle:h});
+      if(h) openAnyFile(await h.getFile(), {handle:h});
       return;                                  // dismissed, or opened — either way, done
     }catch(err){
       if(err && (err.name==="AbortError"||err.name==="NotAllowedError")) return;
@@ -6465,7 +6468,7 @@ function packJSON(base, imgName, plan){
 // The outline is treated as a 2D convention, not geometry: it's kept on the front/back faces but never
 // packed through the depth (which would smear it into a black slab along the sides), and a clean 1px
 // outline is redrawn around the rendered silhouette instead — so edges stay sharp from any angle.
-let vx={front:null, back:null, backName:"front, mirrored", model:null, yaw:32, pitch:18,
+let vx={front:null, back:null, side:null, mode:"round", model:null, yaw:32, pitch:30,
         outline:[0,0,0], useOutline:true, reoutline:true, mirror:true, depth:12};
 function imgDataOf(cv){ return cv.getContext("2d").getImageData(0,0,cv.width,cv.height); }
 function vxIsOutline(r,g,b,a){ if(!vx.useOutline||a<8) return false; const o=vx.outline;
@@ -6499,32 +6502,71 @@ function vxDeoutline(data,W,H){
   }
   return out;
 }
+// distance from each masked pixel to the nearest edge (chamfer 3-4 style) — used to inflate the body
+function vxDistanceTransform(mask,W,H){
+  const d=new Float32Array(W*H); for(let i=0;i<W*H;i++) d[i]=mask[i]?1e6:0;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){ const i=y*W+x; if(!mask[i]) continue; let v=d[i];
+    if(x>0) v=Math.min(v,d[i-1]+1); if(y>0) v=Math.min(v,d[i-W]+1);
+    if(x>0&&y>0) v=Math.min(v,d[i-W-1]+1.414); if(x<W-1&&y>0) v=Math.min(v,d[i-W+1]+1.414); d[i]=v; }
+  for(let y=H-1;y>=0;y--)for(let x=W-1;x>=0;x--){ const i=y*W+x; if(!mask[i]) continue; let v=d[i];
+    if(x<W-1) v=Math.min(v,d[i+1]+1); if(y<H-1) v=Math.min(v,d[i+W]+1);
+    if(x<W-1&&y<H-1) v=Math.min(v,d[i+W+1]+1.414); if(x>0&&y<H-1) v=Math.min(v,d[i+W-1]+1.414); d[i]=v; }
+  return d;
+}
+// Modes: "flat" — straight front→back extrusion (a slab). "round" — inflate the silhouette by its
+// distance to the edge, so cross-sections bulge instead of being a slab (a best guess with no side).
+// "side" — carve the volume against a side profile you draw/pick (front ∩ side), a real visual hull.
 function buildVoxels(){
-  const F=vx.front, B=vx.back; if(!F) return null;
-  const W=F.width, H=F.height, D=clamp(vx.depth,2,96), fd=F.data, bd=B?B.data:fd;
-  const dF=vxDeoutline(fd,W,H), dB=vxDeoutline(bd,W,H);        // clean body colour, outline flooded over
-  const vox=new Uint32Array(W*H*D);
+  const F=vx.front; if(!F) return null;
+  const W=F.width, H=F.height, fd=F.data, B=vx.back, bd=B?B.data:fd;
+  const dF=vxDeoutline(fd,W,H), dB=vxDeoutline(bd,W,H);
   const pack=(r,g,b)=> ((r&255)|((g&255)<<8)|((b&255)<<16)|(255<<24))>>>0;
-  const at=(x,y,z)=> (z*H+y)*W+x;
   const opaque=(d,x,y)=> x>=0&&y>=0&&x<W&&y<H && d[(y*W+x)*4+3]>=8;
-  // an outline pixel on the silhouette edge (touching transparent) is what a side view would show as a
-  // black slab, so it's stripped to body colour; an *internal* outline pixel (eyes, seams) is kept on
-  // the face, where from other angles it's a thin line, not a wall.
-  const keepFace=(d,x,y)=>{ const i=(y*W+x)*4;
-    if(!vxIsOutline(d[i],d[i+1],d[i+2],d[i+3])) return true;
+  // silhouette-edge outline pixels would read as a black slab from the side, so they're stripped to
+  // body colour; internal outline (eyes, seams) is kept on the face.
+  const keepFace=(d,x,y)=>{ const i=(y*W+x)*4; if(!vxIsOutline(d[i],d[i+1],d[i+2],d[i+3])) return true;
     return opaque(d,x-1,y)&&opaque(d,x+1,y)&&opaque(d,x,y-1)&&opaque(d,x,y+1); };
-  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-    const i=(y*W+x)*4, fa=fd[i+3], ba=bd[i+3];
-    if(fa<8 && ba<8) continue;
-    if(fa>=8) vox[at(x,y,0)]   = keepFace(fd,x,y) ? pack(fd[i],fd[i+1],fd[i+2]) : pack(dF[i],dF[i+1],dF[i+2]);
-    if(ba>=8) vox[at(x,y,D-1)] = keepFace(bd,x,y) ? pack(bd[i],bd[i+1],bd[i+2]) : pack(dB[i],dB[i+1],dB[i+2]);
-    if(fa>=8 && ba>=8){                                        // solid where both agree — clean body colour through the middle
-      for(let z=1;z<D-1;z++){ const t=z/(D-1);
-        vox[at(x,y,z)]=pack(Math.round(dF[i]+(dB[i]-dF[i])*t), Math.round(dF[i+1]+(dB[i+1]-dF[i+1])*t), Math.round(dF[i+2]+(dB[i+2]-dF[i+2])*t)); }
+  const faceCol=(d,dd,x,y)=>{ const i=(y*W+x)*4; return keepFace(d,x,y)?pack(d[i],d[i+1],d[i+2]):pack(dd[i],dd[i+1],dd[i+2]); };
+  const blend=(i,t)=> pack(Math.round(dF[i]+(dB[i]-dF[i])*t), Math.round(dF[i+1]+(dB[i+1]-dF[i+1])*t), Math.round(dF[i+2]+(dB[i+2]-dF[i+2])*t));
+  const mode=vx.mode||"flat";
+  let D;
+
+  if(mode==="side" && vx.side){
+    const sd=vx.side.data, sw=vx.side.width; D=clamp(sw,2,96);
+    const vox=new Uint32Array(W*H*D), at=(x,y,z)=>(z*H+y)*W+x;
+    const sideOp=(z,y)=> z>=0&&y>=0&&z<sw&&y<H && sd[(y*sw+z)*4+3]>=8;
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){ const i=(y*W+x)*4; if(fd[i+3]<8 && bd[i+3]<8) continue;
+      let z0=-1,z1=-1; for(let z=0;z<D;z++) if(sideOp(z,y)){ if(z0<0)z0=z; z1=z; }
+      if(z0<0){ z0=z1=Math.floor((D-1)/2); }                    // row with no side coverage: a thin core so nothing vanishes
+      for(let z=z0;z<=z1;z++){ const t=D>1?z/(D-1):0;
+        vox[at(x,y,z)] = (z===z0 && fd[i+3]>=8) ? faceCol(fd,dF,x,y) : (z===z1 && bd[i+3]>=8) ? faceCol(bd,dB,x,y) : blend(i,t); }
     }
+    return {vox,W,H,D};
+  }
+  if(mode==="round"){
+    D=clamp(vx.depth,2,96); const vox=new Uint32Array(W*H*D), at=(x,y,z)=>(z*H+y)*W+x;
+    const mask=new Uint8Array(W*H); for(let i=0;i<W*H;i++) mask[i]=(fd[i*4+3]>=8||bd[i*4+3]>=8)?1:0;
+    const dist=vxDistanceTransform(mask,W,H), center=(D-1)/2, maxHalf=Math.floor((D-1)/2);
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){ const p=y*W+x, i=p*4; if(!mask[p]) continue;
+      const half=Math.min(maxHalf, Math.max(1, Math.round(dist[p]))), z0=Math.round(center-half), z1=Math.round(center+half);
+      for(let z=z0;z<=z1;z++){ const t=D>1?z/(D-1):0;
+        vox[at(x,y,z)] = (z===z0 && fd[i+3]>=8) ? faceCol(fd,dF,x,y) : (z===z1 && bd[i+3]>=8) ? faceCol(bd,dB,x,y) : blend(i,t); }
+    }
+    return {vox,W,H,D};
+  }
+  // flat slab
+  D=clamp(vx.depth,2,96); const vox=new Uint32Array(W*H*D), at=(x,y,z)=>(z*H+y)*W+x;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){ const i=(y*W+x)*4, fa=fd[i+3], ba=bd[i+3]; if(fa<8&&ba<8) continue;
+    if(fa>=8) vox[at(x,y,0)]=faceCol(fd,dF,x,y);
+    if(ba>=8) vox[at(x,y,D-1)]=faceCol(bd,dB,x,y);
+    if(fa>=8&&ba>=8) for(let z=1;z<D-1;z++) vox[at(x,y,z)]=blend(i,z/(D-1));
   }
   return {vox,W,H,D};
 }
+function frameToVoxCanvas(fr){ const c=canvasOf(W,H); compositeFrameInto(c.getContext("2d"), fr); return c; }
+function setVoxSide(cv){ if(!cv||!vx.front){ vx.side=null; return; }
+  const H=vx.front.height, sw=clamp(cv.width,2,96), c=canvasOf(sw,H), x=c.getContext("2d");
+  x.imageSmoothingEnabled=false; x.drawImage(cv,0,0,sw,H); vx.side=imgDataOf(c); }
 // Orthographic point-splat render with a small footprint (fills the gaps rotation opens up) + z-buffer.
 function renderVoxel(m, yawDeg, pitchDeg){
   const {vox,W,H,D}=m, cx=(W-1)/2, cy=(H-1)/2, cz=(D-1)/2;
@@ -6575,36 +6617,51 @@ function exportVoxelDirections(){
   selectFrame(0); renderLayers(); renderTimeline(); composite(); updateDocInfo(); captureActiveDoc(); renderTabs();
   showToast("Baked 8 directions ("+OUT+"×"+OUT+"), one per frame — export a spritesheet when ready.","success",5200);
 }
+function voxFrameOptions(){ return frames.map((f,i)=>`<option value="frame:${i}">Frame ${i+1}</option>`).join(""); }
 async function showVoxelDialog(){
   if(!frames.length){ showToast("Draw a front view first.","info"); return; }
   composite();
   vx.front=imgDataOf(flat);
   vx.depth=clamp(Math.round(W*0.4),3,24);
-  vx.mirror=true; vx.useOutline=true; vx.reoutline=true; vx.backName="front, mirrored"; vx.yaw=32; vx.pitch=18;
+  vx.mirror=true; vx.useOutline=true; vx.reoutline=true; vx.mode="round"; vx.side=null; vx.yaw=32; vx.pitch=30;
   setVoxBack(null); vx.model=buildVoxels();
-  let backCanvas=null;
+  const frOpts=voxFrameOptions();
   const body=`<div class="vx-wrap">
       <div class="vx-prev" id="vxPrevBox"><canvas id="vxPrev"></canvas><span class="vx-drag">drag to spin</span></div>
       <div class="vx-ctl">
-        <div class="row"><label>Back view</label>
-          <button id="vxBackBtn" data-icon="image" data-icon-size="14">Choose…</button>
-          <span id="vxBackName" class="shi-hint" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${vx.backName}</span></div>
-        <div class="row"><label>Depth</label>
+        <div class="row"><label>Shape</label><select id="vxMode" style="flex:1">
+          <option value="flat">Flat slab</option>
+          <option value="round" selected>Rounded (guess)</option>
+          <option value="side">Carve with side view</option></select></div>
+        <div class="row"><label>Back view</label><select id="vxBack" style="flex:1">
+          <option value="mirror">Front, mirrored</option>${frOpts}<option value="file">Image file…</option></select></div>
+        <div class="row" id="vxSideRow" style="display:none"><label>Side view</label><select id="vxSideSrc" style="flex:1">
+          <option value="none">— none (draw one as a frame) —</option>${frOpts}<option value="file">Image file…</option></select></div>
+        <div class="row" id="vxDepthRow"><label>Depth</label>
           <input type="range" id="vxDepth" min="2" max="48" value="${vx.depth}" style="flex:1">
           <span id="vxDepthV" class="shi-hint" style="width:22px;text-align:right">${vx.depth}</span></div>
+        <div class="row"><label>Tilt</label>
+          <input type="range" id="vxPitch" min="0" max="70" value="${vx.pitch}" style="flex:1">
+          <span id="vxPitchV" class="shi-hint" style="width:26px;text-align:right">${vx.pitch}°</span></div>
         <div class="row"><label>Outline</label>
-          <input type="text" id="vxOutline" value="#000000" spellcheck="false" style="width:88px">
+          <input type="text" id="vxOutline" value="#000000" spellcheck="false" style="width:82px">
           <label class="chk" style="gap:4px"><input type="checkbox" id="vxReout" checked>redraw edge</label></div>
         <div class="row"><label></label><label class="chk" style="gap:4px"><input type="checkbox" id="vxUseOut" checked>keep the outline off the sides</label></div>
         <div class="row"><label></label><label class="chk" style="gap:4px"><input type="checkbox" id="vxMirror" checked>mirror the back view</label></div>
         <div class="vx-dirs" id="vxDirs"></div>
-        <div class="shi-hint" style="line-height:1.5">Front and back can't tell the sides apart, so ¾ and side views are approximate and blocky — best for chunky characters. Grouping voxels into bones comes next.</div>
+        <div class="shi-hint" id="vxHint" style="line-height:1.5"></div>
       </div>
     </div>
-    <input type="file" id="vxBackFile" accept="image/*" hidden>`;
-  const p=openModal({title:"Pseudo-3D from front + back", bodyHTML:body, okText:"Export 8 directions", wide:true});
+    <input type="file" id="vxBackFile" accept="image/*" hidden>
+    <input type="file" id="vxSideFile" accept="image/*" hidden>`;
+  const p=openModal({title:"Pseudo-3D → 8 directions", bodyHTML:body, okText:"Export 8 directions", wide:true});
   hydrateIcons($("#modalBody"));
   const prev=$("#vxPrev");
+  const hints={flat:"Flat extrusion front→back — a slab. Fast, but ¾ views look thin.",
+    round:"Inflates the silhouette by its distance to the edge, so the body bulges instead of being a slab — a best guess with no side art.",
+    side:"Carves the volume against a side profile (front ∩ side) — a real hull. Draw a side view on another frame, then pick it here."};
+  const syncRows=()=>{ $("#vxSideRow").style.display=vx.mode==="side"?"":"none";
+    $("#vxDepthRow").style.display=vx.mode==="side"?"none":""; $("#vxHint").textContent=hints[vx.mode]||""; };
   const rebuild=()=>{ vx.model=buildVoxels(); draw(); };
   const draw=()=>{
     const c=voxView(vx.yaw, vx.pitch), box=$("#vxPrevBox"), s=Math.max(1,Math.floor(Math.min((box.clientWidth-16)/c.width,(box.clientHeight-16)/c.height)));
@@ -6612,28 +6669,38 @@ async function showVoxelDialog(){
     prev.style.width=(c.width*s)+"px"; prev.style.height=(c.height*s)+"px";
     const dirs=$("#vxDirs"); dirs.innerHTML="";
     for(let i=0;i<8;i++){ const dc=voxView(i*45, vx.pitch), t=document.createElement("canvas");
-      t.width=dc.width; t.height=dc.height; t.className="vx-dir"; t.getContext("2d").drawImage(dc,0,0);
-      t.title="Direction "+(i+1); dirs.appendChild(t); }
+      t.width=dc.width; t.height=dc.height; t.className="vx-dir"+(Math.round(((vx.yaw%360)+360)%360/45)%8===i?" on":"");
+      t.getContext("2d").drawImage(dc,0,0); t.title="Face direction "+(i+1)+" (click)";
+      t.onclick=()=>{ vx.yaw=i*45; draw(); }; dirs.appendChild(t); }
   };
-  requestAnimationFrame(draw);
+  syncRows(); requestAnimationFrame(draw);
   // spin the preview by dragging
   let drag=null;
   prev.addEventListener("pointerdown",e=>{ e.preventDefault(); prev.setPointerCapture(e.pointerId); drag={x:e.clientX,y:e.clientY,yaw:vx.yaw,pitch:vx.pitch}; });
   prev.addEventListener("pointermove",e=>{ if(!drag) return;
-    vx.yaw=drag.yaw+(e.clientX-drag.x)*0.8; vx.pitch=clamp(drag.pitch-(e.clientY-drag.y)*0.6,-80,80); draw(); });
+    vx.yaw=drag.yaw+(e.clientX-drag.x)*0.8; vx.pitch=clamp(drag.pitch-(e.clientY-drag.y)*0.6,0,80); draw(); });
   prev.addEventListener("pointerup",()=>{ drag=null; });
+  let backCanvas=null;
+  const loadImg=(cb)=>{ const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*";
+    inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const url=URL.createObjectURL(f), img=new Image();
+      img.onload=()=>{ URL.revokeObjectURL(url); const c=canvasOf(img.naturalWidth,img.naturalHeight); c.getContext("2d").drawImage(img,0,0); cb(c); };
+      img.onerror=()=>{ URL.revokeObjectURL(url); showToast("Couldn't read that image.","error"); }; img.src=url; };
+    inp.click(); };
+  $("#vxMode").onchange=e=>{ vx.mode=e.target.value; syncRows(); rebuild(); };
   $("#vxDepth").oninput=e=>{ vx.depth=+e.target.value; $("#vxDepthV").textContent=vx.depth; rebuild(); };
+  $("#vxPitch").oninput=e=>{ vx.pitch=+e.target.value; $("#vxPitchV").textContent=vx.pitch+"°"; draw(); };
   $("#vxOutline").onchange=e=>{ const h=normHex(e.target.value); if(h){ vx.outline=hexToRgb(h); rebuild(); } };
   $("#vxReout").onchange=e=>{ vx.reoutline=e.target.checked; draw(); };
   $("#vxUseOut").onchange=e=>{ vx.useOutline=e.target.checked; rebuild(); };
   $("#vxMirror").onchange=e=>{ vx.mirror=e.target.checked; setVoxBack(backCanvas); rebuild(); };
-  $("#vxBackBtn").onclick=()=>$("#vxBackFile").click();
-  $("#vxBackFile").onchange=e=>{ const f=e.target.files[0]; if(!f) return;
-    const url=URL.createObjectURL(f), img=new Image();
-    img.onload=()=>{ URL.revokeObjectURL(url); const c=canvasOf(img.naturalWidth,img.naturalHeight); c.getContext("2d").drawImage(img,0,0);
-      backCanvas=c; vx.backName=f.name; $("#vxBackName").textContent=f.name; setVoxBack(c); rebuild(); };
-    img.onerror=()=>{ URL.revokeObjectURL(url); showToast("Couldn't read that image.","error"); };
-    img.src=url; e.target.value=""; };
+  $("#vxBack").onchange=e=>{ const v=e.target.value;
+    if(v==="mirror"){ backCanvas=null; setVoxBack(null); rebuild(); }
+    else if(v.startsWith("frame:")){ backCanvas=frameToVoxCanvas(frames[+v.slice(6)]); setVoxBack(backCanvas); rebuild(); }
+    else if(v==="file"){ loadImg(c=>{ backCanvas=c; setVoxBack(c); rebuild(); }); } };
+  $("#vxSideSrc").onchange=e=>{ const v=e.target.value;
+    if(v==="none"){ setVoxSide(null); rebuild(); }
+    else if(v.startsWith("frame:")){ setVoxSide(frameToVoxCanvas(frames[+v.slice(6)])); rebuild(); }
+    else if(v==="file"){ loadImg(c=>{ setVoxSide(c); rebuild(); }); } };
   const ok=await p;
   if(ok) exportVoxelDirections();
 }
@@ -7460,6 +7527,28 @@ function openProjectFile(f,opts){
   reader.onerror=()=>showToast("Couldn't read that file.","error");
   reader.readAsText(f);
 }
+// Open an image (PNG/JPG/…) as a fresh drawing — a new tab sized to the image, the image drawn in.
+// Bigger than the 512 canvas cap? It's scaled to fit and we say so.
+function openImageAsDoc(file, handle){
+  const url=URL.createObjectURL(file), img=new Image();
+  img.onload=()=>{ URL.revokeObjectURL(url);
+    const iw=img.naturalWidth, ih=img.naturalHeight, w=clamp(iw,1,512), h=clamp(ih,1,512);
+    createDoc(w,h, (file.name||"image").replace(/\.[^.]+$/,""));
+    const L=activeLayer(); if(L){ L.ctx.imageSmoothingEnabled=false; L.ctx.drawImage(img,0,0,w,h); refreshThumb(L); composite(); }
+    rememberFile({name:file.name||"image", kind:"image", size:file.size||0, w, h,
+      thumb:rcThumb(img,iw,ih), handle:handle||null, blob:file});
+    showToast("Opened "+(file.name||"image")+" ("+w+"×"+h+")"+((iw>512||ih>512)?" — scaled to fit "+w+"×"+h:"")+".","success",4200);
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(url); showToast("Couldn't read that image.","error"); };
+  img.src=url;
+}
+// Route an opened file: a .pxpaint/.json is a project, an image opens as a new drawing.
+function openAnyFile(f, opts){
+  if(!f) return;
+  if(/\.(pxpaint|json)$/i.test(f.name||"") || f.type==="application/json") return openProjectFile(f, opts);
+  if((f.type||"").indexOf("image")===0 || /\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name||"")) return openImageAsDoc(f, opts&&opts.handle);
+  return openProjectFile(f, opts);   // last resort: try to read it as a project
+}
 function doInstall(){
   if(!deferredPrompt) return;
   deferredPrompt.prompt();
@@ -7467,7 +7556,7 @@ function doInstall(){
 }
 
 $("#newTabBtn").onclick=newCanvasDialog;
-$("#openInput").onchange=e=>{ const f=e.target.files[0]; if(f) openProjectFile(f); e.target.value=""; };
+$("#openInput").onchange=e=>{ const f=e.target.files[0]; if(f) openAnyFile(f); e.target.value=""; };
 $("#sheetInput").onchange=e=>{ const f=e.target.files[0]; if(f) openSheetFile(f); e.target.value=""; };
 $("#packInput").onchange=e=>{ const fs=[...e.target.files]; e.target.value=""; if(fs.length) packFiles(fs); };
 
