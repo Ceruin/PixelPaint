@@ -565,6 +565,17 @@
   .st-tool{flex:1; padding:6px 0;}
   .st-tool.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
   .st-swatch{width:20px; height:20px; border-radius:3px; border:1px solid var(--line); display:inline-block;}
+  .st-tabs{display:flex; gap:4px; margin-bottom:8px;}
+  .st-mode{flex:1; padding:6px 0;}
+  .st-mode.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
+  .st-side .row{margin-top:6px;}
+  .st-bones{display:flex; flex-direction:column; gap:3px; max-height:150px; overflow:auto;}
+  .st-bone{display:flex; align-items:center; gap:6px; padding:4px 6px; border:1px solid var(--line); border-radius:var(--r); cursor:pointer; font-size:12px;}
+  .st-bone.on{border-color:var(--accent); background:var(--panel);}
+  .st-bdot{width:11px; height:11px; border-radius:2px; border:1px solid var(--line); flex:none;}
+  .st-keys{display:flex; flex-wrap:wrap; gap:3px;}
+  .st-key{width:26px; height:24px; padding:0;}
+  .st-key.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
 
   /* ---- open recent ---- */
   .rc-list{display:flex; flex-direction:column; gap:5px; max-height:min(52vh,330px); overflow:auto; margin-bottom:9px;}
@@ -6719,7 +6730,8 @@ async function showVoxelDialog(){
 
 /* ---------------- 3D Voxel Studio ---------------- */
 // A live, editable voxel model: orbit to view, click to add/erase/paint voxels, then bake to sprites.
-let studio={ model:null, yaw:32, pitch:20, tool:"add", mirror:true, brush:1, _n:[0,0,-1], undo:[], redo:[] };
+let studio={ model:null, yaw:32, pitch:20, tool:"add", mirror:true, brush:1, _n:[0,0,-1], undo:[], redo:[],
+  mode:"sculpt", bones:[], keys:[], key:0, rigBone:0, frameMs:120, _play:null };
 function packHex(hex){ const [r,g,b]=hexToRgb(hex); return ((r&255)|((g&255)<<8)|((b&255)<<16)|(255<<24))>>>0; }
 function cloneModel(m){ return {vox:new Uint32Array(m.vox), W:m.W, H:m.H, D:m.D}; }
 function voxViewOf(model, yawDeg, pitchDeg){
@@ -6759,6 +6771,68 @@ function studioCount(){ const v=studio.model?studio.model.vox:null; if(!v) retur
 function studioPush(){ if(!studio.model) return; studio.undo.push(new Uint32Array(studio.model.vox)); if(studio.undo.length>40) studio.undo.shift(); studio.redo.length=0; }
 function studioUndo(){ if(!studio.undo.length) return; studio.redo.push(new Uint32Array(studio.model.vox)); studio.model.vox=studio.undo.pop(); }
 function studioRedo(){ if(!studio.redo.length) return; studio.undo.push(new Uint32Array(studio.model.vox)); studio.model.vox=studio.redo.pop(); }
+// --- bones / posing ---
+const BONE_COLS=[null,[86,170,255],[255,120,80],[120,220,120],[235,205,70],[205,120,235],[90,222,222],[240,140,185],[170,170,170]];
+function boneTint(b){ const c=BONE_COLS[((b-1)%(BONE_COLS.length-1))+1]||[160,160,160]; return c; }
+function ensureRig(m){ if(!m.bone) m.bone=new Int16Array(m.vox.length); }
+function centroidOf(m, b){ const {vox,W,H,D,bone}=m; let sx=0,sy=0,sz=0,n=0;
+  for(let z=0;z<D;z++)for(let y=0;y<H;y++)for(let x=0;x<W;x++){ const i=(z*H+y)*W+x; if(vox[i]&&(b<0||bone[i]===b)){ sx+=x;sy+=y;sz+=z;n++; } }
+  return n?[sx/n,sy/n,sz/n]:[(W-1)/2,(H-1)/2,(D-1)/2]; }
+// Per-bone world matrices (voxel space) from a rotation table [[rx,ry,rz],…]. Parents must precede children.
+function boneMatrices(bones, rotArr){
+  const world=new Array(bones.length);
+  function build(b){ if(world[b]) return world[b]; const bn=bones[b], r=rotArr[b]||[0,0,0];
+    let local=new DOMMatrix();
+    local=local.translate(bn.pivot[0],bn.pivot[1],bn.pivot[2]).rotate(r[0],r[1],r[2]).translate(-bn.pivot[0],-bn.pivot[1],-bn.pivot[2]);
+    const par=(bn.parent<0||bn.parent>=b)?new DOMMatrix():build(bn.parent);
+    return world[b]=par.multiply(local); }
+  for(let b=0;b<bones.length;b++) build(b);
+  return world;
+}
+// Render with optional per-bone deformation (mats) and optional rig-colour tint. pick keeps the ORIGINAL
+// voxel index so editing/assignment always map back to rest-pose voxels.
+function studioRenderPosed(m, yawDeg, pitchDeg, S, mats, tint){
+  const {vox,W,H,D}=m, bone=m.bone, cx=(W-1)/2, cy=(H-1)/2, cz=(D-1)/2;
+  const yaw=yawDeg*Math.PI/180, pit=pitchDeg*Math.PI/180;
+  const cyaw=Math.cos(yaw),syaw=Math.sin(yaw),cpit=Math.cos(pit),spit=Math.sin(pit);
+  const margin=mats?Math.round(Math.max(W,H,D)*0.6):0;
+  const OUT=Math.ceil(Math.sqrt(W*W+H*H+D*D))+margin+2; S=S||3; const SW=OUT*S, off=OUT/2;
+  const zbuf=new Float32Array(SW*SW).fill(1e9), col=new Uint32Array(SW*SW), pick=new Int32Array(SW*SW).fill(-1);
+  const P=(mats)?new DOMPoint():null;
+  for(let z=0;z<D;z++) for(let y=0;y<H;y++){ const row=(z*H+y)*W;
+    for(let x=0;x<W;x++){ const oi=row+x, v=vox[oi]; if(!v) continue;
+      let X=x,Y=y,Z=z, b=bone?bone[oi]:0;
+      if(mats && mats[b]){ P.x=x;P.y=y;P.z=z;P.w=1; const q=mats[b].transformPoint(P); X=q.x;Y=q.y;Z=q.z; }
+      const px=X-cx, py=Y-cy, pz=Z-cz;
+      const rx=px*cyaw+pz*syaw, rz=-px*syaw+pz*cyaw;
+      const ry2=py*cpit-rz*spit, rz2=py*spit+rz*cpit;
+      const sx=Math.round((rx+off)*S), sy=Math.round((ry2+off)*S);
+      let cvl=v;
+      if(tint && b>0){ const t=boneTint(b); cvl=(( (v&255)+t[0]>>1 &255) | (((v>>8&255)+t[1]>>1 &255)<<8) | (((v>>16&255)+t[2]>>1 &255)<<16) | (255<<24))>>>0; }
+      for(let dy=0;dy<S;dy++){ const yy=sy+dy; if(yy<0||yy>=SW) continue;
+        for(let dx=0;dx<S;dx++){ const xx=sx+dx; if(xx<0||xx>=SW) continue;
+          const idx=yy*SW+xx; if(rz2<zbuf[idx]){ zbuf[idx]=rz2; col[idx]=cvl; pick[idx]=oi; } } }
+    }}
+  const c=canvasOf(SW,SW), ctx=c.getContext("2d"), id=ctx.createImageData(SW,SW), dd=id.data;
+  for(let i=0;i<col.length;i++){ const v=col[i]; if(!v) continue; const o=i*4; dd[o]=v&255; dd[o+1]=(v>>8)&255; dd[o+2]=(v>>16)&255; dd[o+3]=255; }
+  ctx.putImageData(id,0,0);
+  const n=[syaw*cpit, -spit, -cyaw*cpit];
+  return {canvas:c, col, pick, SW, S, OUT, n};
+}
+function voxViewPosed(m, yawDeg, pitchDeg, mats){
+  const r=studioRenderPosed(m, yawDeg, pitchDeg, 3, mats, false), OUT=r.OUT, c=canvasOf(OUT,OUT), x=c.getContext("2d");
+  x.imageSmoothingEnabled=false; x.drawImage(r.canvas,0,0,OUT*r.S,OUT*r.S,0,0,OUT,OUT);
+  return c;
+}
+function studioBakeAnim(){ const m=studio.model; if(!m||!studioCount()){ showToast("The model is empty.","info"); return; }
+  const keys=studio.keys, views=keys.map(k=> voxViewPosed(m, studio.yaw, studio.pitch, boneMatrices(studio.bones, k.rot)));
+  const OUT=views[0].width; createDoc(OUT, OUT, "Anim "+spriteBaseName());
+  for(let i=0;i<views.length;i++){ if(i>0) addFrame(false); const L=activeLayer();
+    if(L){ L.ctx.imageSmoothingEnabled=false; L.ctx.clearRect(0,0,OUT,OUT); L.ctx.drawImage(views[i],0,0); refreshThumb(L); }
+    if(frames[i]) frames[i].dur=studio.frameMs||120; }
+  selectFrame(0); renderLayers(); renderTimeline(); composite(); updateDocInfo(); captureActiveDoc(); renderTabs();
+  showToast("Baked "+views.length+"-frame animation from the studio pose.","success",4200);
+}
 function studioBake(){ const m=studio.model; if(!m||!studioCount()){ showToast("The model is empty.","info"); return; }
   const views=[]; for(let i=0;i<8;i++) views.push(voxViewOf(m, i*45, studio.pitch));
   const OUT=views[0].width; createDoc(OUT, OUT, "3D "+spriteBaseName());
@@ -6775,68 +6849,153 @@ function openStudioFromSprite(){
   openVoxelStudio(m);
 }
 function openVoxelStudio(model){
-  studio.model=cloneModel(model); studio.undo.length=0; studio.redo.length=0;
-  if(studio.tool!=="add"&&studio.tool!=="erase"&&studio.tool!=="paint") studio.tool="add";
+  studio.model=cloneModel(model); ensureRig(studio.model);
+  studio.undo.length=0; studio.redo.length=0;
+  studio.bones=[{name:"Root", parent:-1, pivot:centroidOf(studio.model,-1)}];
+  studio.keys=[{rot:[[0,0,0]]}]; studio.key=0; studio.rigBone=0; studio.mode="sculpt";
+  if(studio._play){ clearInterval(studio._play); studio._play=null; }
+  if(!["add","erase","paint"].includes(studio.tool)) studio.tool="add";
   const body=`<div class="st-wrap">
-      <div class="st-view" id="stView"><canvas id="stCanvas"></canvas><span class="st-hint">drag = orbit · click = edit</span></div>
+      <div class="st-view" id="stView"><canvas id="stCanvas"></canvas><span class="st-hint" id="stHintTxt">drag = orbit · click = edit</span></div>
       <div class="st-side">
-        <div class="st-tools">
-          <button class="st-tool" data-st="add">Add</button>
-          <button class="st-tool" data-st="paint">Paint</button>
-          <button class="st-tool" data-st="erase">Erase</button>
+        <div class="st-tabs">
+          <button class="st-mode" data-mode="sculpt">Sculpt</button>
+          <button class="st-mode" data-mode="rig">Rig</button>
+          <button class="st-mode" data-mode="anim">Animate</button>
         </div>
-        <label class="chk" style="gap:6px"><input type="checkbox" id="stMirror" checked>Mirror across X</label>
-        <div class="row"><label>Color</label><span id="stSwatch" class="st-swatch"></span><span id="stHex" class="shi-hint"></span></div>
-        <div class="row"><button id="stUndo" style="flex:1">Undo</button><button id="stRedo" style="flex:1">Redo</button></div>
-        <div class="row"><label>Voxels</label><span id="stCount" class="shi-hint"></span></div>
-        <div class="shi-hint" style="line-height:1.5">Add places a voxel on the face you're looking at. Paint recolours it with the current colour. Erase removes it. Orbit to reach the sides and back.</div>
+        <div id="stSculpt">
+          <div class="st-tools">
+            <button class="st-tool" data-st="add">Add</button>
+            <button class="st-tool" data-st="paint">Paint</button>
+            <button class="st-tool" data-st="erase">Erase</button>
+          </div>
+          <label class="chk" style="gap:6px;margin-top:8px"><input type="checkbox" id="stMirror">Mirror across X</label>
+          <div class="row" style="margin-top:8px"><label>Color</label><span id="stSwatch" class="st-swatch"></span><span id="stHex" class="shi-hint"></span></div>
+          <div class="row"><button id="stUndo" style="flex:1">Undo</button><button id="stRedo" style="flex:1">Redo</button></div>
+          <div class="row"><label>Voxels</label><span id="stCount" class="shi-hint"></span></div>
+        </div>
+        <div id="stRig" style="display:none">
+          <div class="shi-hint" style="margin-bottom:6px">Pick a bone, then click voxels to assign them. Root holds everything you don't assign.</div>
+          <div id="stBoneList" class="st-bones"></div>
+          <div class="row" style="margin-top:6px"><button id="stAddBone" style="flex:1">+ Bone</button><button id="stDelBone" style="flex:1">Delete</button></div>
+          <div class="row"><label>Parent</label><select id="stParent" style="flex:1"></select></div>
+          <label class="chk" style="gap:6px;margin-top:6px"><input type="checkbox" id="stMirror2">Mirror across X</label>
+        </div>
+        <div id="stAnim" style="display:none">
+          <div class="row"><label>Bone</label><select id="stPoseBone" style="flex:1"></select></div>
+          <div class="row"><label>Rot X</label><input type="range" id="stRX" min="-180" max="180" value="0" style="flex:1"><span id="stRXv" class="shi-hint" style="width:30px;text-align:right">0</span></div>
+          <div class="row"><label>Rot Y</label><input type="range" id="stRY" min="-180" max="180" value="0" style="flex:1"><span id="stRYv" class="shi-hint" style="width:30px;text-align:right">0</span></div>
+          <div class="row"><label>Rot Z</label><input type="range" id="stRZ" min="-180" max="180" value="0" style="flex:1"><span id="stRZv" class="shi-hint" style="width:30px;text-align:right">0</span></div>
+          <div class="shi-hint" style="margin:6px 0 2px">Keyframes</div>
+          <div id="stKeys" class="st-keys"></div>
+          <div class="row" style="margin-top:6px"><button id="stAddKey" style="flex:1">+ Key</button><button id="stDelKey" style="flex:1">Delete</button></div>
+          <div class="row"><button id="stPlay" style="flex:1">Play</button><label>ms</label><input type="number" id="stMs" value="120" min="20" step="10" style="width:56px"></div>
+        </div>
         <div style="flex:1"></div>
+        <button id="stBakeAnim" class="primary" style="width:100%;display:none">Bake animation</button>
         <button id="stBake" class="primary" style="width:100%">Bake 8 directions</button>
       </div>
     </div>`;
   const p=openModal({title:"3D Voxel Studio", bodyHTML:body, okText:"Done", cancel:false, wide:true});
+  p.then(()=>{ if(studio._play){ clearInterval(studio._play); studio._play=null; } });
   const cv=$("#stCanvas");
-  const setTool=t=>{ studio.tool=t; document.querySelectorAll(".st-tool").forEach(b=>b.classList.toggle("on", b.dataset.st===t)); };
-  const syncInfo=()=>{ $("#stSwatch").style.background=primary; $("#stHex").textContent=primary; $("#stCount").textContent=studioCount(); };
+  const idxToXYZ=(i,W,H)=>({z:Math.floor(i/(W*H)), y:Math.floor((i%(W*H))/W), x:i%W});
+  const curRot=()=>studio.keys[studio.key].rot;
+  const posedMats=()=> boneMatrices(studio.bones, curRot());
   const draw=()=>{
-    const r=studioRender(studio.model, studio.yaw, studio.pitch, 3); studio._last=r; studio._n=r.n;
+    const m=studio.model, posed=(studio.mode==="anim"), tint=(studio.mode==="rig");
+    const r=studioRenderPosed(m, studio.yaw, studio.pitch, 3, posed?posedMats():null, tint);
+    studio._last=r; studio._n=r.n;
     const box=$("#stView"), s=Math.max(1,Math.floor(Math.min((box.clientWidth-16)/r.OUT,(box.clientHeight-16)/r.OUT)));
     cv.width=r.SW; cv.height=r.SW; cv.getContext("2d").drawImage(r.canvas,0,0);
-    cv.style.width=(r.OUT*s)+"px"; cv.style.height=(r.OUT*s)+"px"; syncInfo();
+    cv.style.width=(r.OUT*s)+"px"; cv.style.height=(r.OUT*s)+"px";
+    $("#stSwatch").style.background=primary; $("#stHex").textContent=primary; $("#stCount").textContent=studioCount();
   };
-  const idxToXYZ=(i,W,H)=>({z:Math.floor(i/(W*H)), y:Math.floor((i%(W*H))/W), x:i%W});
-  const editAt=(clientX,clientY)=>{
-    const r=studio._last; if(!r) return; const m=studio.model, {W,H,D}=m;
-    const b=cv.getBoundingClientRect(); const sx=Math.floor((clientX-b.left)/b.width*r.SW), sy=Math.floor((clientY-b.top)/b.height*r.SW);
-    if(sx<0||sy<0||sx>=r.SW||sy>=r.SW) return;
-    const hit=r.pick[sy*r.SW+sx];
+  // ---- Sculpt ----
+  const setTool=t=>{ studio.tool=t; document.querySelectorAll(".st-tool").forEach(b=>b.classList.toggle("on", b.dataset.st===t)); };
+  const sculptAt=(hit)=>{ const m=studio.model, {W,H,D}=m;
     const setV=(x,y,z,v)=>{ if(x<0||y<0||z<0||x>=W||y>=H||z>=D) return; m.vox[(z*H+y)*W+x]=v; };
     const has=(x,y,z)=> x>=0&&y>=0&&z>=0&&x<W&&y<H&&z<D && m.vox[(z*H+y)*W+x]!==0;
-    if(hit<0){ return; }                        // clicked empty space — nothing to anchor to
-    const {x,y,z}=idxToXYZ(hit,W,H);
-    studioPush();
-    if(studio.tool==="erase"){ setV(x,y,z,0); if(studio.mirror) setV(W-1-x,y,z,0); }
+    if(hit<0) return; const {x,y,z}=idxToXYZ(hit,W,H); studioPush();
+    if(studio.tool==="erase"){ setV(x,y,z,0); m.bone[(z*H+y)*W+x]=0; if(studio.mirror) setV(W-1-x,y,z,0); }
     else if(studio.tool==="paint"){ const c=packHex(primary); setV(x,y,z,c); if(studio.mirror) setV(W-1-x,y,z,c); }
     else { const a=addAxis(studio._n), c=packHex(primary), nx=x+a[0], ny=y+a[1], nz=z+a[2];
-      if(!has(nx,ny,nz)) setV(nx,ny,nz,c);
-      if(studio.mirror){ const mx=W-1-nx; if(!has(mx,ny,nz)) setV(mx,ny,nz,c); } }
-    draw();
-  };
-  // drag = orbit, click (little movement) = edit
+      if(!has(nx,ny,nz)) setV(nx,ny,nz,c); if(studio.mirror){ const mx=W-1-nx; if(!has(mx,ny,nz)) setV(mx,ny,nz,c); } } };
+  // ---- Rig ----
+  const assignAt=(hit)=>{ if(hit<0) return; const m=studio.model, {W,H}=m; const {x,y,z}=idxToXYZ(hit,W,H);
+    m.bone[(z*m.H+y)*W+x]=studio.rigBone; if(studio.mirror){ const mx=W-1-x; if(m.vox[(z*m.H+y)*W+mx]) m.bone[(z*m.H+y)*W+mx]=studio.rigBone; }
+    studio.bones[studio.rigBone].pivot=centroidOf(m, studio.rigBone); };
+  const renderBoneList=()=>{ const el=$("#stBoneList"); el.innerHTML="";
+    studio.bones.forEach((bn,i)=>{ const d=document.createElement("div"); d.className="st-bone"+(i===studio.rigBone?" on":"");
+      const sw=i===0?"transparent":rgbToHex(...boneTint(i)); d.innerHTML=`<span class="st-bdot" style="background:${sw}"></span>${bn.name}`;
+      d.onclick=()=>{ studio.rigBone=i; renderBoneList(); syncParent(); draw(); }; el.appendChild(d); }); };
+  const syncParent=()=>{ const sel=$("#stParent"); sel.innerHTML=studio.bones.map((b,i)=>`<option value="${i}"${studio.bones[studio.rigBone].parent===i?" selected":""}>${i===studio.rigBone?"—":b.name}</option>`).join("");
+    sel.disabled=studio.rigBone===0; };
+  // ---- Animate ----
+  const boneOpts=sel=>studio.bones.map((b,i)=>`<option value="${i}"${sel===i?" selected":""}>${b.name}</option>`).join("");
+  const syncPoseSliders=()=>{ const r=curRot()[studio.rigBone]||[0,0,0];
+    $("#stRX").value=r[0]; $("#stRY").value=r[1]; $("#stRZ").value=r[2];
+    $("#stRXv").textContent=r[0]; $("#stRYv").textContent=r[1]; $("#stRZv").textContent=r[2]; };
+  const renderKeys=()=>{ const el=$("#stKeys"); el.innerHTML="";
+    studio.keys.forEach((k,i)=>{ const b=document.createElement("button"); b.className="st-key"+(i===studio.key?" on":""); b.textContent=i+1;
+      b.onclick=()=>{ studio.key=i; syncPoseSliders(); renderKeys(); draw(); }; el.appendChild(b); }); };
+  const setMode=mode=>{ studio.mode=mode;
+    document.querySelectorAll(".st-mode").forEach(b=>b.classList.toggle("on", b.dataset.mode===mode));
+    $("#stSculpt").style.display=mode==="sculpt"?"":"none";
+    $("#stRig").style.display=mode==="rig"?"":"none";
+    $("#stAnim").style.display=mode==="anim"?"":"none";
+    $("#stBakeAnim").style.display=mode==="anim"?"":"none";
+    $("#stHintTxt").textContent=mode==="sculpt"?"drag = orbit · click = edit":mode==="rig"?"drag = orbit · click = assign bone":"drag = orbit";
+    if(mode==="rig") renderBoneList(), syncParent();
+    if(mode==="anim"){ $("#stPoseBone").innerHTML=boneOpts(studio.rigBone); syncPoseSliders(); renderKeys(); }
+    if(studio._play){ clearInterval(studio._play); studio._play=null; $("#stPlay").textContent="Play"; }
+    draw(); };
+  // pointer: drag = orbit, click = mode action
   let dn=null;
+  const pickAt=(clientX,clientY)=>{ const r=studio._last; if(!r) return -1; const b=cv.getBoundingClientRect();
+    const sx=Math.floor((clientX-b.left)/b.width*r.SW), sy=Math.floor((clientY-b.top)/b.height*r.SW);
+    if(sx<0||sy<0||sx>=r.SW||sy>=r.SW) return -1; return r.pick[sy*r.SW+sx]; };
   cv.addEventListener("pointerdown",e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId);
     dn={x:e.clientX,y:e.clientY,yaw:studio.yaw,pitch:studio.pitch,moved:false}; });
   cv.addEventListener("pointermove",e=>{ if(!dn) return; const dx=e.clientX-dn.x, dy=e.clientY-dn.y;
     if(!dn.moved && Math.abs(dx)+Math.abs(dy)<4) return; dn.moved=true;
     studio.yaw=dn.yaw+dx*0.8; studio.pitch=clamp(dn.pitch-dy*0.6,-85,85); draw(); });
-  cv.addEventListener("pointerup",e=>{ if(dn && !dn.moved) editAt(e.clientX,e.clientY); dn=null; });
+  cv.addEventListener("pointerup",e=>{ if(dn && !dn.moved){ const hit=pickAt(e.clientX,e.clientY);
+      if(studio.mode==="sculpt"){ sculptAt(hit); draw(); }
+      else if(studio.mode==="rig"){ assignAt(hit); renderBoneList(); draw(); } }
+    dn=null; });
+  document.querySelectorAll(".st-mode").forEach(b=> b.onclick=()=>setMode(b.dataset.mode));
   document.querySelectorAll(".st-tool").forEach(b=> b.onclick=()=>setTool(b.dataset.st));
-  $("#stMirror").onchange=e=>{ studio.mirror=e.target.checked; };
-  $("#stMirror").checked=studio.mirror;
+  $("#stMirror").checked=studio.mirror; $("#stMirror2").checked=studio.mirror;
+  const setMirror=v=>{ studio.mirror=v; $("#stMirror").checked=v; $("#stMirror2").checked=v; };
+  $("#stMirror").onchange=e=>setMirror(e.target.checked);
+  $("#stMirror2").onchange=e=>setMirror(e.target.checked);
   $("#stUndo").onclick=()=>{ studioUndo(); draw(); };
   $("#stRedo").onclick=()=>{ studioRedo(); draw(); };
+  $("#stAddBone").onclick=()=>{ const n=studio.bones.length; if(n>=8){ showToast("8 bones max for now.","info"); return; }
+    studio.bones.push({name:"Bone "+n, parent:0, pivot:centroidOf(studio.model,-1)});
+    studio.keys.forEach(k=>k.rot.push([0,0,0])); studio.rigBone=n; renderBoneList(); syncParent(); draw(); };
+  $("#stDelBone").onclick=()=>{ const i=studio.rigBone; if(i===0){ showToast("Root can't be deleted.","info"); return; }
+    const m=studio.model; for(let j=0;j<m.bone.length;j++){ if(m.bone[j]===i) m.bone[j]=0; else if(m.bone[j]>i) m.bone[j]--; }
+    studio.bones.splice(i,1); studio.bones.forEach(b=>{ if(b.parent===i) b.parent=0; else if(b.parent>i) b.parent--; });
+    studio.keys.forEach(k=>k.rot.splice(i,1)); studio.rigBone=0; renderBoneList(); syncParent(); draw(); };
+  $("#stParent").onchange=e=>{ const v=+e.target.value; if(v!==studio.rigBone) studio.bones[studio.rigBone].parent=v; };
+  $("#stPoseBone").onchange=e=>{ studio.rigBone=+e.target.value; syncPoseSliders(); };
+  const setRot=(ax,val)=>{ const r=curRot(); if(!r[studio.rigBone]) r[studio.rigBone]=[0,0,0]; r[studio.rigBone][ax]=+val; };
+  $("#stRX").oninput=e=>{ setRot(0,e.target.value); $("#stRXv").textContent=e.target.value; draw(); };
+  $("#stRY").oninput=e=>{ setRot(1,e.target.value); $("#stRYv").textContent=e.target.value; draw(); };
+  $("#stRZ").oninput=e=>{ setRot(2,e.target.value); $("#stRZv").textContent=e.target.value; draw(); };
+  $("#stAddKey").onclick=()=>{ const src=curRot(); studio.keys.push({rot:src.map(r=>r.slice())}); studio.key=studio.keys.length-1; renderKeys(); syncPoseSliders(); draw(); };
+  $("#stDelKey").onclick=()=>{ if(studio.keys.length<=1){ showToast("Keep at least one keyframe.","info"); return; }
+    studio.keys.splice(studio.key,1); studio.key=Math.min(studio.key,studio.keys.length-1); renderKeys(); syncPoseSliders(); draw(); };
+  $("#stMs").onchange=e=>{ studio.frameMs=clamp(+e.target.value||120,20,4000); };
+  $("#stPlay").onclick=()=>{ if(studio._play){ clearInterval(studio._play); studio._play=null; $("#stPlay").textContent="Play"; return; }
+    if(studio.keys.length<2){ showToast("Add a second keyframe to play.","info"); return; }
+    $("#stPlay").textContent="Stop";
+    studio._play=setInterval(()=>{ studio.key=(studio.key+1)%studio.keys.length; renderKeys(); syncPoseSliders(); draw(); }, studio.frameMs||120); };
   $("#stBake").onclick=()=>studioBake();
-  setTool(studio.tool); requestAnimationFrame(draw);
+  $("#stBakeAnim").onclick=()=>studioBakeAnim();
+  setTool(studio.tool); setMode("sculpt"); requestAnimationFrame(draw);
   return p;
 }
 function packToDoc(plan, out, name){
