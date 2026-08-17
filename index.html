@@ -1053,7 +1053,7 @@
     <button data-cmd="addimage" data-icon="image" data-icon-size="16">Add image…</button>
     <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
     <div class="ctx-sep"></div>
-    <button data-cmd="voxel3d" data-icon="grid" data-icon-size="16">Pseudo-3D (front + back)…</button>
+    <button data-cmd="voxel3d" data-icon="grid" data-icon-size="16">Pseudo-3D…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
     <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
@@ -1635,7 +1635,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.11b";
+const APP_VERSION="2026.08.17";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -6468,7 +6468,7 @@ function packJSON(base, imgName, plan){
 // The outline is treated as a 2D convention, not geometry: it's kept on the front/back faces but never
 // packed through the depth (which would smear it into a black slab along the sides), and a clean 1px
 // outline is redrawn around the rendered silhouette instead — so edges stay sharp from any angle.
-let vx={front:null, back:null, side:null, mode:"round", model:null, yaw:32, pitch:30,
+let vx={front:null, back:null, side:null, mode:"round", model:null, yaw:32, pitch:0,
         outline:[0,0,0], useOutline:true, reoutline:true, mirror:true, depth:12};
 function imgDataOf(cv){ return cv.getContext("2d").getImageData(0,0,cv.width,cv.height); }
 function vxIsOutline(r,g,b,a){ if(!vx.useOutline||a<8) return false; const o=vx.outline;
@@ -6623,11 +6623,11 @@ async function showVoxelDialog(){
   composite();
   vx.front=imgDataOf(flat);
   vx.depth=clamp(Math.round(W*0.4),3,24);
-  vx.mirror=true; vx.useOutline=true; vx.reoutline=true; vx.mode="round"; vx.side=null; vx.yaw=32; vx.pitch=30;
+  vx.mirror=true; vx.useOutline=true; vx.reoutline=true; vx.mode="round"; vx.side=null; vx.yaw=32; vx.pitch=0;
   setVoxBack(null); vx.model=buildVoxels();
   const frOpts=voxFrameOptions();
   const body=`<div class="vx-wrap">
-      <div class="vx-prev" id="vxPrevBox"><canvas id="vxPrev"></canvas><span class="vx-drag">drag to spin</span></div>
+      <div class="vx-prev" id="vxPrevBox"><canvas id="vxPrev"></canvas><span class="vx-drag">drag to spin / tilt</span></div>
       <div class="vx-ctl">
         <div class="row"><label>Shape</label><select id="vxMode" style="flex:1">
           <option value="flat">Flat slab</option>
@@ -6640,14 +6640,11 @@ async function showVoxelDialog(){
         <div class="row" id="vxDepthRow"><label>Depth</label>
           <input type="range" id="vxDepth" min="2" max="48" value="${vx.depth}" style="flex:1">
           <span id="vxDepthV" class="shi-hint" style="width:22px;text-align:right">${vx.depth}</span></div>
-        <div class="row"><label>Tilt</label>
-          <input type="range" id="vxPitch" min="0" max="70" value="${vx.pitch}" style="flex:1">
-          <span id="vxPitchV" class="shi-hint" style="width:26px;text-align:right">${vx.pitch}°</span></div>
         <div class="row"><label>Outline</label>
-          <input type="text" id="vxOutline" value="#000000" spellcheck="false" style="width:82px">
-          <label class="chk" style="gap:4px"><input type="checkbox" id="vxReout" checked>redraw edge</label></div>
-        <div class="row"><label></label><label class="chk" style="gap:4px"><input type="checkbox" id="vxUseOut" checked>keep the outline off the sides</label></div>
-        <div class="row"><label></label><label class="chk" style="gap:4px"><input type="checkbox" id="vxMirror" checked>mirror the back view</label></div>
+          <input type="text" id="vxOutline" value="#000000" spellcheck="false" style="width:82px"></div>
+        <label class="chk" style="gap:6px"><input type="checkbox" id="vxReout" checked>Redraw edge</label>
+        <label class="chk" style="gap:6px"><input type="checkbox" id="vxUseOut" checked>Keep outline off the sides</label>
+        <label class="chk" style="gap:6px"><input type="checkbox" id="vxMirror" checked>Mirror the back</label>
         <div class="vx-dirs" id="vxDirs"></div>
         <div class="shi-hint" id="vxHint" style="line-height:1.5"></div>
       </div>
@@ -6657,9 +6654,9 @@ async function showVoxelDialog(){
   const p=openModal({title:"Pseudo-3D → 8 directions", bodyHTML:body, okText:"Export 8 directions", wide:true});
   hydrateIcons($("#modalBody"));
   const prev=$("#vxPrev");
-  const hints={flat:"Flat extrusion front→back — a slab. Fast, but ¾ views look thin.",
-    round:"Inflates the silhouette by its distance to the edge, so the body bulges instead of being a slab — a best guess with no side art.",
-    side:"Carves the volume against a side profile (front ∩ side) — a real hull. Draw a side view on another frame, then pick it here."};
+  const hints={flat:"Straight front→back slab. Fast; ¾ views look thin.",
+    round:"Bulges the body from the silhouette — best guess with no side art.",
+    side:"Carves against a side view (front ∩ side) — a real hull. Draw one on a frame, then pick it."};
   const syncRows=()=>{ $("#vxSideRow").style.display=vx.mode==="side"?"":"none";
     $("#vxDepthRow").style.display=vx.mode==="side"?"none":""; $("#vxHint").textContent=hints[vx.mode]||""; };
   const rebuild=()=>{ vx.model=buildVoxels(); draw(); };
@@ -6688,7 +6685,6 @@ async function showVoxelDialog(){
     inp.click(); };
   $("#vxMode").onchange=e=>{ vx.mode=e.target.value; syncRows(); rebuild(); };
   $("#vxDepth").oninput=e=>{ vx.depth=+e.target.value; $("#vxDepthV").textContent=vx.depth; rebuild(); };
-  $("#vxPitch").oninput=e=>{ vx.pitch=+e.target.value; $("#vxPitchV").textContent=vx.pitch+"°"; draw(); };
   $("#vxOutline").onchange=e=>{ const h=normHex(e.target.value); if(h){ vx.outline=hexToRgb(h); rebuild(); } };
   $("#vxReout").onchange=e=>{ vx.reoutline=e.target.checked; draw(); };
   $("#vxUseOut").onchange=e=>{ vx.useOutline=e.target.checked; rebuild(); };
