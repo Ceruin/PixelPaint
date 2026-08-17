@@ -538,6 +538,20 @@
     border-radius:5px; padding:2px 6px; white-space:nowrap;}
   .pk-i.more{color:var(--accent); border-color:var(--accent);}
 
+  /* ---- pseudo-3D (voxel) dialog ---- */
+  .vx-wrap{display:flex; gap:12px;}
+  .vx-prev{position:relative; flex:1; min-width:0; height:230px; display:flex; align-items:center; justify-content:center;
+    border:1px solid var(--line); border-radius:8px; overflow:hidden; touch-action:none; cursor:grab;
+    background:repeating-conic-gradient(#3a3f4b 0% 25%, #2b2f39 0% 50%) 0 0 / 18px 18px;}
+  .vx-prev:active{cursor:grabbing;}
+  .vx-prev canvas{image-rendering:pixelated;}
+  .vx-drag{position:absolute; bottom:5px; right:7px; font-size:10px; color:var(--muted); pointer-events:none;}
+  .vx-ctl{width:236px; flex:none; display:flex; flex-direction:column; gap:8px;}
+  .vx-ctl .row{display:flex; align-items:center; gap:8px;}
+  .vx-ctl .row > label:first-child{width:56px; flex:none; color:var(--muted); font-size:11px;}
+  .vx-dirs{display:grid; grid-template-columns:repeat(8,1fr); gap:3px; margin-top:2px;}
+  .vx-dir{width:100%; height:auto; image-rendering:pixelated; background:#0003; border:1px solid var(--line); border-radius:3px;}
+
   /* ---- open recent ---- */
   .rc-list{display:flex; flex-direction:column; gap:5px; max-height:min(52vh,330px); overflow:auto; margin-bottom:9px;}
   .rc-i{display:flex; align-items:center; gap:10px; padding:6px 8px; background:var(--panel2);
@@ -935,6 +949,11 @@
     #sidePanel > .mobile-cols{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
     #colorSection{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
     #colorSection > .sec-body{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
+    /* when a tilesheet / sub-canvas panel is open below, stop the palette from filling so that
+       panel stays in view — the palette drops to a compact fixed height instead */
+    body.has-side-ctx #sidePanel > .mobile-cols{ flex:0 0 auto; }
+    body.has-side-ctx #colorSection{ flex:0 0 auto; }
+    body.has-side-ctx #paletteGrid.palette{ flex:0 0 auto; height:120px; }
   }
   /* fill the whole cell so the grid is seamless — square-ish rather than forced square, the way a
      tight palette reads in Aseprite */
@@ -1031,6 +1050,8 @@
     <div class="ctx-sep"></div>
     <button data-cmd="addimage" data-icon="image" data-icon-size="16">Add image…</button>
     <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="voxel3d" data-icon="grid" data-icon-size="16">Pseudo-3D (front + back)…</button>
     <div class="ctx-sep"></div>
     <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
     <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
@@ -1612,7 +1633,7 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // ------------------------------------------------------------------ DOM
 // Dated rather than semantic: the question this answers is "has the site updated since I last
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
-const APP_VERSION="2026.08.10c";
+const APP_VERSION="2026.08.11a";
 
 const $=s=>document.querySelector(s);
 const view=$("#view"), vctx=view.getContext("2d");
@@ -3035,6 +3056,14 @@ function renderRegionPanel(){
   const rs=$("#regionSection"); if(rs) rs.style.display=(tool==="region"||region)?"":"none";
   const rt=$("#regionToggleMenu"); if(rt) rt.checked=!!region;
   const opts=$("#toolOpts"); if(opts) opts.classList.toggle("show-region", tool==="region" && !region);
+  updateSideCtx();
+}
+// When a contextual panel (tilesheet / sub-canvas) is showing below Color, the palette must stop
+// filling the whole panel so that panel stays reachable.
+function updateSideCtx(){
+  const s=$("#sheetSection"), r=$("#regionSection");
+  const on=(s&&s.style.display!=="none")||(r&&r.style.display!=="none");
+  document.body.classList.toggle("has-side-ctx", !!on);
 }
 
 // ------------------------------------------------------------------ tilesheets
@@ -3617,6 +3646,7 @@ function tileDown(p,e){
 function renderSheetPanel(){
   const sec=$("#sheetSection"); if(!sec) return;
   sec.style.display=(sheet || tool==="tile") ? "" : "none";
+  updateSideCtx();
   const none=$("#sheetNone"), ctl=$("#sheetCtl");
   if(none) none.style.display=sheet?"none":"";
   if(ctl)  ctl.style.display=sheet?"":"none";
@@ -6430,6 +6460,183 @@ function packJSON(base, imgName, plan){
 }
 // The packed sheet as a live document, with the grid already in place: every cell is a tile
 // carrying the name of the file (and frame, or group) it came from.
+// ------------------------------------------------------------------ pseudo-3D: front+back → voxels → 8 directions
+// Extrudes a front and back sprite into a rough voxel volume you can spin, then bakes 8 facings.
+// The outline is treated as a 2D convention, not geometry: it's kept on the front/back faces but never
+// packed through the depth (which would smear it into a black slab along the sides), and a clean 1px
+// outline is redrawn around the rendered silhouette instead — so edges stay sharp from any angle.
+let vx={front:null, back:null, backName:"front, mirrored", model:null, yaw:32, pitch:18,
+        outline:[0,0,0], useOutline:true, reoutline:true, mirror:true, depth:12};
+function imgDataOf(cv){ return cv.getContext("2d").getImageData(0,0,cv.width,cv.height); }
+function vxIsOutline(r,g,b,a){ if(!vx.useOutline||a<8) return false; const o=vx.outline;
+  return Math.abs(r-o[0])+Math.abs(g-o[1])+Math.abs(b-o[2])<=40; }
+// prepare the back as an ImageData the size of the front (resized, optionally mirrored). null src -> front mirrored.
+function setVoxBack(srcCanvas){
+  if(!vx.front) return;
+  const W=vx.front.width, H=vx.front.height, c=canvasOf(W,H), x=c.getContext("2d"); x.imageSmoothingEnabled=false;
+  x.save();
+  if(vx.mirror){ x.translate(W,0); x.scale(-1,1); }
+  if(srcCanvas){ x.drawImage(srcCanvas,0,0,W,H); }
+  else { const f=canvasOf(W,H); f.getContext("2d").putImageData(vx.front,0,0); x.drawImage(f,0,0); }  // reuse the front
+  x.restore();
+  vx.back=imgDataOf(c);
+}
+// A copy of an image with outline pixels flooded over by neighbouring body colour, so the volume can
+// be built from clean colour. Only opaque (outline) pixels are filled — transparent stays transparent.
+function vxDeoutline(data,W,H){
+  const out=new Uint8ClampedArray(data), work=new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++){ const a=data[i*4+3]; work[i]=(a>=8 && !vxIsOutline(data[i*4],data[i*4+1],data[i*4+2],a))?1:0; }
+  for(let it=0; it<8; it++){ let changed=false;
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const i=y*W+x; if(work[i]) continue; if(data[i*4+3]<8) continue;
+      let r=0,g=0,b=0,n=0;
+      if(x>0&&work[i-1]){ r+=out[(i-1)*4];g+=out[(i-1)*4+1];b+=out[(i-1)*4+2];n++; }
+      if(x<W-1&&work[i+1]){ r+=out[(i+1)*4];g+=out[(i+1)*4+1];b+=out[(i+1)*4+2];n++; }
+      if(y>0&&work[i-W]){ r+=out[(i-W)*4];g+=out[(i-W)*4+1];b+=out[(i-W)*4+2];n++; }
+      if(y<H-1&&work[i+W]){ r+=out[(i+W)*4];g+=out[(i+W)*4+1];b+=out[(i+W)*4+2];n++; }
+      if(n){ out[i*4]=r/n; out[i*4+1]=g/n; out[i*4+2]=b/n; out[i*4+3]=255; work[i]=1; changed=true; }
+    }
+    if(!changed) break;
+  }
+  return out;
+}
+function buildVoxels(){
+  const F=vx.front, B=vx.back; if(!F) return null;
+  const W=F.width, H=F.height, D=clamp(vx.depth,2,96), fd=F.data, bd=B?B.data:fd;
+  const dF=vxDeoutline(fd,W,H), dB=vxDeoutline(bd,W,H);        // clean body colour, outline flooded over
+  const vox=new Uint32Array(W*H*D);
+  const pack=(r,g,b)=> ((r&255)|((g&255)<<8)|((b&255)<<16)|(255<<24))>>>0;
+  const at=(x,y,z)=> (z*H+y)*W+x;
+  const opaque=(d,x,y)=> x>=0&&y>=0&&x<W&&y<H && d[(y*W+x)*4+3]>=8;
+  // an outline pixel on the silhouette edge (touching transparent) is what a side view would show as a
+  // black slab, so it's stripped to body colour; an *internal* outline pixel (eyes, seams) is kept on
+  // the face, where from other angles it's a thin line, not a wall.
+  const keepFace=(d,x,y)=>{ const i=(y*W+x)*4;
+    if(!vxIsOutline(d[i],d[i+1],d[i+2],d[i+3])) return true;
+    return opaque(d,x-1,y)&&opaque(d,x+1,y)&&opaque(d,x,y-1)&&opaque(d,x,y+1); };
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const i=(y*W+x)*4, fa=fd[i+3], ba=bd[i+3];
+    if(fa<8 && ba<8) continue;
+    if(fa>=8) vox[at(x,y,0)]   = keepFace(fd,x,y) ? pack(fd[i],fd[i+1],fd[i+2]) : pack(dF[i],dF[i+1],dF[i+2]);
+    if(ba>=8) vox[at(x,y,D-1)] = keepFace(bd,x,y) ? pack(bd[i],bd[i+1],bd[i+2]) : pack(dB[i],dB[i+1],dB[i+2]);
+    if(fa>=8 && ba>=8){                                        // solid where both agree — clean body colour through the middle
+      for(let z=1;z<D-1;z++){ const t=z/(D-1);
+        vox[at(x,y,z)]=pack(Math.round(dF[i]+(dB[i]-dF[i])*t), Math.round(dF[i+1]+(dB[i+1]-dF[i+1])*t), Math.round(dF[i+2]+(dB[i+2]-dF[i+2])*t)); }
+    }
+  }
+  return {vox,W,H,D};
+}
+// Orthographic point-splat render with a small footprint (fills the gaps rotation opens up) + z-buffer.
+function renderVoxel(m, yawDeg, pitchDeg){
+  const {vox,W,H,D}=m, cx=(W-1)/2, cy=(H-1)/2, cz=(D-1)/2;
+  const yaw=yawDeg*Math.PI/180, pit=pitchDeg*Math.PI/180;
+  const cyaw=Math.cos(yaw),syaw=Math.sin(yaw),cpit=Math.cos(pit),spit=Math.sin(pit);
+  const OUT=Math.ceil(Math.sqrt(W*W+H*H+D*D))+2, S=3, SW=OUT*S, off=OUT/2;
+  const zbuf=new Float32Array(SW*SW).fill(1e9), col=new Uint32Array(SW*SW);
+  for(let z=0;z<D;z++) for(let y=0;y<H;y++){ const row=(z*H+y)*W;
+    for(let x=0;x<W;x++){ const v=vox[row+x]; if(!v) continue;
+      const px=x-cx, py=y-cy, pz=z-cz;
+      const rx=px*cyaw+pz*syaw, rz=-px*syaw+pz*cyaw;              // yaw about Y
+      const ry2=py*cpit-rz*spit, rz2=py*spit+rz*cpit;            // pitch about X
+      const sx=Math.round((rx+off)*S), sy=Math.round((ry2+off)*S);
+      for(let dy=0;dy<S;dy++){ const yy=sy+dy; if(yy<0||yy>=SW) continue;
+        for(let dx=0;dx<S;dx++){ const xx=sx+dx; if(xx<0||xx>=SW) continue;
+          const idx=yy*SW+xx; if(rz2<zbuf[idx]){ zbuf[idx]=rz2; col[idx]=v; } } }
+    }}
+  const c=canvasOf(SW,SW), ctx=c.getContext("2d"), id=ctx.createImageData(SW,SW), dd=id.data;
+  for(let i=0;i<col.length;i++){ const v=col[i]; if(!v) continue; const o=i*4;
+    dd[o]=v&255; dd[o+1]=(v>>8)&255; dd[o+2]=(v>>16)&255; dd[o+3]=255; }
+  ctx.putImageData(id,0,0);
+  return {canvas:c, S, OUT};
+}
+function addSilhouetteOutline(c, rgb){
+  const x=c.getContext("2d"), w=c.width, h=c.height, id=x.getImageData(0,0,w,h), d=id.data, mark=new Uint8Array(w*h);
+  const op=i=> d[i*4+3]>8;
+  for(let y=0;y<h;y++) for(let xx=0;xx<w;xx++){ const i=y*w+xx; if(op(i)) continue;
+    if((xx>0&&op(i-1))||(xx<w-1&&op(i+1))||(y>0&&op(i-w))||(y<h-1&&op(i+w))) mark[i]=1; }
+  for(let i=0;i<w*h;i++) if(mark[i]){ const o=i*4; d[o]=rgb[0]; d[o+1]=rgb[1]; d[o+2]=rgb[2]; d[o+3]=255; }
+  x.putImageData(id,0,0);
+}
+function voxView(yawDeg, pitchDeg){
+  const m=vx.model; if(!m) return canvasOf(4,4);
+  const r=renderVoxel(m, yawDeg, pitchDeg), OUT=r.OUT, c=canvasOf(OUT,OUT), x=c.getContext("2d");
+  x.imageSmoothingEnabled=false; x.drawImage(r.canvas,0,0,OUT*r.S,OUT*r.S,0,0,OUT,OUT);
+  if(vx.reoutline && vx.useOutline) addSilhouetteOutline(c, vx.outline);
+  return c;
+}
+function exportVoxelDirections(){
+  vx.model=buildVoxels(); if(!vx.model){ showToast("Nothing to build a model from.","error"); return; }
+  const views=[]; for(let i=0;i<8;i++) views.push(voxView(i*45, vx.pitch));
+  const OUT=views[0].width;
+  createDoc(OUT, OUT, "3D "+spriteBaseName());
+  for(let i=0;i<8;i++){
+    if(i>0) addFrame(false);
+    const L=activeLayer(); if(L){ L.ctx.imageSmoothingEnabled=false; L.ctx.clearRect(0,0,OUT,OUT); L.ctx.drawImage(views[i],0,0); refreshThumb(L); }
+  }
+  selectFrame(0); renderLayers(); renderTimeline(); composite(); updateDocInfo(); captureActiveDoc(); renderTabs();
+  showToast("Baked 8 directions ("+OUT+"×"+OUT+"), one per frame — export a spritesheet when ready.","success",5200);
+}
+async function showVoxelDialog(){
+  if(!frames.length){ showToast("Draw a front view first.","info"); return; }
+  composite();
+  vx.front=imgDataOf(flat);
+  vx.depth=clamp(Math.round(W*0.4),3,24);
+  vx.mirror=true; vx.useOutline=true; vx.reoutline=true; vx.backName="front, mirrored"; vx.yaw=32; vx.pitch=18;
+  setVoxBack(null); vx.model=buildVoxels();
+  let backCanvas=null;
+  const body=`<div class="vx-wrap">
+      <div class="vx-prev" id="vxPrevBox"><canvas id="vxPrev"></canvas><span class="vx-drag">drag to spin</span></div>
+      <div class="vx-ctl">
+        <div class="row"><label>Back view</label>
+          <button id="vxBackBtn" data-icon="image" data-icon-size="14">Choose…</button>
+          <span id="vxBackName" class="shi-hint" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${vx.backName}</span></div>
+        <div class="row"><label>Depth</label>
+          <input type="range" id="vxDepth" min="2" max="48" value="${vx.depth}" style="flex:1">
+          <span id="vxDepthV" class="shi-hint" style="width:22px;text-align:right">${vx.depth}</span></div>
+        <div class="row"><label>Outline</label>
+          <input type="text" id="vxOutline" value="#000000" spellcheck="false" style="width:88px">
+          <label class="chk" style="gap:4px"><input type="checkbox" id="vxReout" checked>redraw edge</label></div>
+        <div class="row"><label></label><label class="chk" style="gap:4px"><input type="checkbox" id="vxUseOut" checked>keep the outline off the sides</label></div>
+        <div class="row"><label></label><label class="chk" style="gap:4px"><input type="checkbox" id="vxMirror" checked>mirror the back view</label></div>
+        <div class="vx-dirs" id="vxDirs"></div>
+        <div class="shi-hint" style="line-height:1.5">Front and back can't tell the sides apart, so ¾ and side views are approximate and blocky — best for chunky characters. Grouping voxels into bones comes next.</div>
+      </div>
+    </div>
+    <input type="file" id="vxBackFile" accept="image/*" hidden>`;
+  const p=openModal({title:"Pseudo-3D from front + back", bodyHTML:body, okText:"Export 8 directions", wide:true});
+  hydrateIcons($("#modalBody"));
+  const prev=$("#vxPrev");
+  const rebuild=()=>{ vx.model=buildVoxels(); draw(); };
+  const draw=()=>{
+    const c=voxView(vx.yaw, vx.pitch), box=$("#vxPrevBox"), s=Math.max(1,Math.floor(Math.min((box.clientWidth-16)/c.width,(box.clientHeight-16)/c.height)));
+    prev.width=c.width; prev.height=c.height; prev.getContext("2d").drawImage(c,0,0);
+    prev.style.width=(c.width*s)+"px"; prev.style.height=(c.height*s)+"px";
+    const dirs=$("#vxDirs"); dirs.innerHTML="";
+    for(let i=0;i<8;i++){ const dc=voxView(i*45, vx.pitch), t=document.createElement("canvas");
+      t.width=dc.width; t.height=dc.height; t.className="vx-dir"; t.getContext("2d").drawImage(dc,0,0);
+      t.title="Direction "+(i+1); dirs.appendChild(t); }
+  };
+  requestAnimationFrame(draw);
+  // spin the preview by dragging
+  let drag=null;
+  prev.addEventListener("pointerdown",e=>{ e.preventDefault(); prev.setPointerCapture(e.pointerId); drag={x:e.clientX,y:e.clientY,yaw:vx.yaw,pitch:vx.pitch}; });
+  prev.addEventListener("pointermove",e=>{ if(!drag) return;
+    vx.yaw=drag.yaw+(e.clientX-drag.x)*0.8; vx.pitch=clamp(drag.pitch-(e.clientY-drag.y)*0.6,-80,80); draw(); });
+  prev.addEventListener("pointerup",()=>{ drag=null; });
+  $("#vxDepth").oninput=e=>{ vx.depth=+e.target.value; $("#vxDepthV").textContent=vx.depth; rebuild(); };
+  $("#vxOutline").onchange=e=>{ const h=normHex(e.target.value); if(h){ vx.outline=hexToRgb(h); rebuild(); } };
+  $("#vxReout").onchange=e=>{ vx.reoutline=e.target.checked; draw(); };
+  $("#vxUseOut").onchange=e=>{ vx.useOutline=e.target.checked; rebuild(); };
+  $("#vxMirror").onchange=e=>{ vx.mirror=e.target.checked; setVoxBack(backCanvas); rebuild(); };
+  $("#vxBackBtn").onclick=()=>$("#vxBackFile").click();
+  $("#vxBackFile").onchange=e=>{ const f=e.target.files[0]; if(!f) return;
+    const url=URL.createObjectURL(f), img=new Image();
+    img.onload=()=>{ URL.revokeObjectURL(url); const c=canvasOf(img.naturalWidth,img.naturalHeight); c.getContext("2d").drawImage(img,0,0);
+      backCanvas=c; vx.backName=f.name; $("#vxBackName").textContent=f.name; setVoxBack(c); rebuild(); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); showToast("Couldn't read that image.","error"); };
+    img.src=url; e.target.value=""; };
+  const ok=await p;
+  if(ok) exportVoxelDirections();
+}
 function packToDoc(plan, out, name){
   if(out.width>MAX_DIM || out.height>MAX_DIM) return false;
   createDoc(out.width, out.height, name);
@@ -6765,6 +6972,7 @@ function runCmd(cmd){
     case "pastesel": if(!pastePixelClip()) showToast("Nothing copied yet.","info"); break;
     case "resize": resizeDialog(); break;
     case "trim": trimToContent(); break;
+    case "voxel3d": showVoxelDialog(); break;
     case "addimage": $("#imgInput").click(); break;
     case "addlayer": addLayerCmd(); break;
     case "duplayer": dupLayerCmd(); break;
