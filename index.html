@@ -797,8 +797,10 @@
   .brushbtns{display:flex; align-items:center; gap:6px; width:100%;}
   .brushbtns #brushReadout{flex:1; min-width:0; text-align:center;}
   #toolOpts .toolhead{display:none;}
-  #toolOpts.show-wand .opt-wand,#toolOpts.show-region .opt-region,#toolOpts.show-shape .opt-shape{display:block;}
-  .opt-wand,.opt-region,.opt-shape{display:none;}
+  #toolOpts.show-wand .opt-wand,#toolOpts.show-region .opt-region,#toolOpts.show-shape .opt-shape,#toolOpts.show-brush .opt-brush{display:block;}
+  .opt-wand,.opt-region,.opt-shape,.opt-brush{display:none;}
+  .opt-range{display:flex; flex-direction:column; gap:2px; color:var(--muted); font-size:12px; margin-bottom:6px;}
+  .opt-range input{width:100%;}
   .opt-hint{color:var(--muted); font-size:10px; line-height:1.4; margin-top:5px;}
 
   /* ---- collapsible side sections with a chevron ---- */
@@ -855,8 +857,17 @@
       border-right:none; border-bottom:1px solid var(--line); padding:7px 8px;
     }
     .tools.open{transform:none;}
-    .tools .toolhead,.tools #toolOpts,.tools .brush-sec{display:none;}   /* keep the row clean; brush lives in the hamburger */
-    .tools .toolgrid{display:flex; grid-template-columns:none; gap:6px; width:auto;}
+    /* the tool icons scroll in their own row; brush size and the active tool's options wrap under it */
+    .tools{flex-wrap:wrap; overflow-x:hidden;}
+    .tools .toolhead{display:none;}
+    .tools .toolgrid{display:flex; grid-template-columns:none; gap:6px; width:auto; flex:1 1 100%; min-width:0; overflow-x:auto;}
+    .tools .brush-sec{display:flex; align-items:center; margin:0;}
+    .tools #toolOpts{display:flex; align-items:center; gap:10px; flex:1; min-width:0; overflow-x:auto; margin:0;}
+    .tools .opt-hint{display:none;}
+    #toolOpts.show-brush .opt-brush{display:flex; align-items:center; gap:10px;}
+    .tools .opt-range{flex-direction:row; align-items:center; gap:6px; margin:0; white-space:nowrap;}
+    .tools .opt-range input{width:80px;}
+    .tools .opt-brush .chk{white-space:nowrap; margin:0;}
     .tools .tool{width:44px; height:44px; aspect-ratio:auto; flex:none;}
     .tools .helpbtn{width:44px; min-width:44px; margin-top:0; padding:0; flex:none;}
     /* side panel becomes an in-flow stack under the canvas */
@@ -1194,6 +1205,7 @@
       <div class="toolhead" data-icon="pencil" data-icon-size="12">Tools</div>
       <div class="toolgrid">
         <button class="tool" data-tool="pencil"     data-icon="pencil"  title="Pencil (B)"></button>
+        <button class="tool" data-tool="brush"      data-icon="brush"   title="Brush - smooth, pressure-sensitive (P)"></button>
         <button class="tool" data-tool="eraser"     data-icon="eraser"  title="Eraser (E)"></button>
         <button class="tool" data-tool="bucket"     data-icon="fill"    title="Fill (F)"></button>
         <button class="tool" data-tool="eyedropper" data-icon="pick"    title="Pick color (I)"></button>
@@ -1217,6 +1229,13 @@
 
       <!-- contextual options for the active tool -->
       <div id="toolOpts">
+        <div class="opt-brush">
+          <div class="toolhead" data-icon="brush" data-icon-size="12">Brush</div>
+          <label class="opt-range" title="How much paint each dab lays down. Overlapping dabs build up.">Flow <input type="range" id="brushFlow" min="5" max="100" value="100" /></label>
+          <label class="opt-range" title="Steadies the line by trailing the pen. Higher = smoother, laggier.">Smoothing <input type="range" id="brushSmooth" min="0" max="90" value="30" /></label>
+          <label class="chk"><input type="checkbox" id="pressureSize" checked /> Pressure: size</label>
+          <label class="chk"><input type="checkbox" id="pressureFlow" /> Pressure: flow</label>
+        </div>
         <div class="opt-shape">
           <div class="toolhead" data-icon="rect" data-icon-size="12">Shape</div>
           <label class="chk" title="Solid: paint every pixel inside the shape. Off: draw only the 1px outline."><input type="checkbox" id="fillShape" /> Solid fill</label>
@@ -1617,6 +1636,13 @@ let activeSlot="fg";   // which swatch the picker/hex edits
 let drawColor=primary; // resolved per stroke: left=foreground, right=background
 let tool="pencil";
 let brush=1;
+// Brush tool (smooth, pressure-sensitive) settings, and the stroke in progress
+let brushFlow=100, brushSmoothing=30, pressureToSize=true, pressureToFlow=false;
+let brushStroke=null;
+let strokeErase=false;   // this stroke erases: the Eraser tool, or a pen flipped to its eraser end
+// Once a pen has touched the canvas, fingers stop painting and only pan / pinch - that's the palm
+// resting on the screen while drawing, not a stroke.
+let penSeen=false;
 let fillShape=false;
 let showGrid=true;
 let showCenter=true;
@@ -1626,6 +1652,9 @@ let onion=false, onionTint=true;
 const ONION_OPACITY=0.4;
 let recents=[];
 const MAX_RECENTS=16, MAX_UNDO=80;
+// Undo is capped by memory as well as count: at 2048 px one layer snapshot is 16 MB, so 80 of them
+// would take the tab down long before the count limit mattered.
+const MAX_UNDO_BYTES=512*1024*1024;
 let placement=null;  // pending image being positioned: {img, name, x, y, w, h, ar}
 let xform=null;      // active move/resize gesture on the placement
 // Dragging a placed image lands on whole pixels. The commit rounds anyway, so a free-form drag was
@@ -1756,6 +1785,7 @@ function toolCursor(pathName,hx,hy){
 // Every cursor acts at its lower left, art up and to the right — one habit across the tools.
 const CURSORS = {
   pencil:     toolCursor("pencil",3,21),     // pencil tip
+  brush:      toolCursor("brush",3,20),      // bristle tip
   eraser:     toolCursor("eraser",5,20),     // the corner that rubs
   bucket:     toolCursor("fill",5,17),       // the bottom of the drop (mirrored, so 24-19)
   eyedropper: toolCursor("pick",3,21),       // dropper tip
@@ -1801,7 +1831,7 @@ function showConfirm(message,opts){ opts=opts||{}; return openModal({title:opts.
 function showPrompt(message,value,opts){ opts=opts||{}; return openModal({title:opts.title||"Rename",message,input:true,value,okText:opts.okText||"OK"}); }
 function showAlert(message,opts){ opts=opts||{}; return openModal({title:opts.title||"Notice",message,okText:"OK",cancel:false}); }
 
-const PRESET_SIZES=[8,16,32,48,64,96,128];
+const PRESET_SIZES=[8,16,32,48,64,96,128,256,512,1024,2048];
 // Ask for a canvas size (preset dropdown + W x H). Returns {w,h} or null.
 // opts.resize — this is an existing canvas being changed, so offer where the artwork should sit and
 // a shortcut to the size the artwork actually needs. Returns {w,h,anchor} or null.
@@ -1814,9 +1844,9 @@ async function showSizeDialog(title, w, h, okText, message, opts){
   const body = `
     <div class="row"><label>Preset</label><select id="dlgPreset">${pres}</select></div>
     <div class="row"><label>Size</label>
-      <input type="number" id="dlgW" min="1" max="512" value="${w}" />
+      <input type="number" id="dlgW" min="1" max="${MAX_DIM}" value="${w}" />
       <span style="color:var(--muted)">×</span>
-      <input type="number" id="dlgH" min="1" max="512" value="${h}" />
+      <input type="number" id="dlgH" min="1" max="${MAX_DIM}" value="${h}" />
       <span style="color:var(--muted)">px</span>
     </div>`
     + (opts.resize ? `
@@ -1836,7 +1866,7 @@ async function showSizeDialog(title, w, h, okText, message, opts){
   if(fit && bounds) fit.onclick=()=>{ $("#dlgW").value=bounds.w; $("#dlgH").value=bounds.h; mark(); closeModal("fit"); };
   const ok=await p;
   if(!ok) return null;
-  return { w:clamp(parseInt($("#dlgW").value,10)||32,1,512), h:clamp(parseInt($("#dlgH").value,10)||32,1,512),
+  return { w:clamp(parseInt($("#dlgW").value,10)||32,1,MAX_DIM), h:clamp(parseInt($("#dlgH").value,10)||32,1,MAX_DIM),
            anchor:(fit && $("#dlgAnchor")) ? $("#dlgAnchor").value : "topleft",
            trim:(ok==="fit") };
 }
@@ -1950,7 +1980,7 @@ function newDocument(w,h,makeFirst=true){
   selection=null; selMask=null; selDrag=null; stopAnts(); updateSelStatus(); stopPlayback();
   region=null; regionLocked=false; regionDrag=null;
   sheet=null; tileSel=null;
-  W=clamp(w|0,1,512); H=clamp(h|0,1,512);
+  W=clamp(w|0,1,MAX_DIM); H=clamp(h|0,1,MAX_DIM);
   layerSeq=1;
   frames=[{layers:[], dur:DEFAULT_DUR}];   // one frame to start
   frameIndex=0; tags=[]; tlView="__all"; lastFrameCount=null;
@@ -1966,7 +1996,7 @@ function newDocument(w,h,makeFirst=true){
 // ox/oy shift the artwork as it moves onto the new canvas: 0,0 keeps the top-left corner pinned
 // (the old behaviour), a negative offset crops from the left/top, a positive one insets it.
 function resizeCanvas(nw,nh,ox,oy){
-  nw=clamp(nw,1,512); nh=clamp(nh,1,512);
+  nw=clamp(nw,1,MAX_DIM); nh=clamp(nh,1,MAX_DIM);
   ox=ox|0; oy=oy|0;
   if(nw===W && nh===H && !ox && !oy) return;
   pushUndo();
@@ -2026,13 +2056,26 @@ function trimToContent(){
 function fitZoom(){
   let target=Math.min(stage.clientWidth, stage.clientHeight)-40;
   if(!isFinite(target) || target<80) target=640; // layout not ready / headless fallback
-  const z=Math.max(1, Math.floor(target/Math.max(W,H)));
-  setZoom(clamp(z,1,48), false);
+  const ratio=target/Math.max(W,H);
+  if(ratio>=1){ setZoom(Math.floor(ratio), false); return; }
+  let z=ZOOM_OUT_STEPS[0];
+  for(const s of ZOOM_OUT_STEPS) if(s<=ratio) z=s;
+  setZoom(z, false);
+}
+
+// Above 100% zoom is whole numbers only, so every art pixel stays an even block on screen. Below it
+// (large artwork) it walks these fractions instead.
+const ZOOM_OUT_STEPS=[0.0625,0.125,0.25,0.5];
+function stepZoom(dir){
+  if(zoom>1 || (zoom===1 && dir>0)){ setZoom(zoom+dir); return; }
+  const i=ZOOM_OUT_STEPS.indexOf(zoom);
+  if(dir>0) setZoom(i<0 || i===ZOOM_OUT_STEPS.length-1 ? 1 : ZOOM_OUT_STEPS[i+1]);
+  else setZoom(ZOOM_OUT_STEPS[Math.max(0, (i<0 ? ZOOM_OUT_STEPS.length : i)-1)]);
 }
 
 function setZoom(z, recompose=true){
-  zoom=clamp(z,1,48);
-  view.width=W*zoom; view.height=H*zoom;
+  zoom=clamp(z,ZOOM_OUT_STEPS[0],48);
+  view.width=Math.max(1,Math.round(W*zoom)); view.height=Math.max(1,Math.round(H*zoom));
   const cell=Math.max(6, zoom);   // 1 checker square == 1 art pixel, so the background aligns to the grid at any zoom
   wrap.style.backgroundSize=(cell*2)+"px "+(cell*2)+"px";
   const zt=Math.round(zoom*100)+"%";
@@ -2801,10 +2844,11 @@ function composite(){
   }
   fctx.globalAlpha=1;
 
-  vctx.imageSmoothingEnabled=false;
+  vctx.imageSmoothingEnabled=zoom<1;      // zoomed out, dropped pixels shimmer; smoothing keeps it readable
   vctx.clearRect(0,0,view.width,view.height);
   drawOnionSkin();                        // ghosts sit behind the current frame
   vctx.drawImage(flat,0,0,W*zoom,H*zoom);
+  vctx.imageSmoothingEnabled=false;
   if(showGrid && zoom>=4) drawGrid();
   if(showCenter) drawCenterGuide();
   if(sheet && showTileGrid) drawSheetGrid();
@@ -2897,11 +2941,13 @@ function drawRulers(){
   const line =(css.getPropertyValue("--line") ||"#3a3f4b").trim();
   const vr=view.getBoundingClientRect(), trr=rt.getBoundingClientRect(), lrr=rl.getBoundingClientRect();
   const ox=vr.left-trr.left, oy=vr.top-lrr.top;
-  const step=(zoom>=16)?8:(zoom>=8?16:32);   // label density scales with zoom so ticks don't crowd
+  // labels at least ~100 screen px apart, and a tick per pixel only while pixels are wide enough to see
+  let step=8; while(step*zoom<100) step*=2;
+  const minor=zoom>=4 ? 1 : step/8;
   // top ruler
   rtx.clearRect(0,0,rt.width,rt.height); rtx.font="9px system-ui,sans-serif"; rtx.textBaseline="alphabetic";
   const TH=rt.height;
-  for(let px=0;px<=W;px++){
+  for(let px=0;px<=W;px+=minor){
     const x=Math.round(ox+px*zoom); if(x<-24||x>rt.width+24) continue;
     const major=(px%step===0);
     rtx.strokeStyle=major?muted:line; rtx.beginPath(); rtx.moveTo(x+.5, major?TH-8:TH-4); rtx.lineTo(x+.5,TH); rtx.stroke();
@@ -2910,7 +2956,7 @@ function drawRulers(){
   // left ruler
   rlx.clearRect(0,0,rl.width,rl.height); rlx.font="9px system-ui,sans-serif"; rlx.textBaseline="top";
   const LW=rl.width;
-  for(let py=0;py<=H;py++){
+  for(let py=0;py<=H;py+=minor){
     const y=Math.round(oy+py*zoom); if(y<-24||y>rl.height+24) continue;
     const major=(py%step===0);
     rlx.strokeStyle=major?muted:line; rlx.beginPath(); rlx.moveTo(major?LW-8:LW-4, y+.5); rlx.lineTo(LW, y+.5); rlx.stroke();
@@ -3104,7 +3150,7 @@ function updateSideCtx(){
 // through sheetApply(): hand it the grid you want plus a map saying where each current row and
 // column ended up, and it repaints every tile of every frame into its new home. One code path
 // means the pixels can never drift out of step with the grid the overlay draws.
-const MAX_DIM=512;                 // the canvas cap resizeCanvas enforces
+const MAX_DIM=4096;                // the canvas cap resizeCanvas enforces
 // spans are merged blocks — a 32×32 tile made of four 16×16 cells is one {r,c,rs,cs}. They never
 // overlap, and a 1×1 span is just a cell, so it is never stored.
 let sheet=null;                    // {tw,th,gap,pad,cols:[w…],rows:[h…],tiles:[[{name}…]…],spans:[…]}
@@ -3893,9 +3939,20 @@ async function deserializeStack(arr){
 
 function pushUndo(){
   undoStack.push(snapshot());
-  if(undoStack.length>MAX_UNDO) undoStack.shift();
+  trimUndo();
   redoStack=[];
   updateUndoButtons();
+}
+function snapBytes(s){
+  let n=0;
+  if(s.layers) for(const l of s.layers) n+=l.img.data.length;
+  if(s.all) for(const f of s.all) for(const l of f.layers) n+=l.img.data.length;
+  return n;
+}
+// The newest step always survives, however big, so the edit just made can still be undone.
+function trimUndo(){
+  let bytes=0; for(const s of undoStack) bytes+=snapBytes(s);
+  while(undoStack.length>1 && (undoStack.length>MAX_UNDO || bytes>MAX_UNDO_BYTES)) bytes-=snapBytes(undoStack.shift());
 }
 // Every frame's pixels, for edits that change the whole sprite at once (rotate canvas). Costs more
 // memory than a one-frame snapshot, so it's only used where a one-frame snapshot couldn't undo the
@@ -3912,7 +3969,7 @@ function snapshotAll(){
 }
 function pushUndoAll(){
   undoStack.push(snapshotAll());
-  if(undoStack.length>MAX_UNDO) undoStack.shift();
+  trimUndo();
   redoStack=[];
   updateUndoButtons();
 }
@@ -3990,6 +4047,95 @@ function previewPixels(pts){
   vctx.save(); vctx.globalAlpha=.85; vctx.fillStyle=drawColor;
   for(const [x,y] of pts) vctx.fillRect(x*zoom,y*zoom,zoom,zoom);
   vctx.restore();
+}
+
+/** Pen pressure in 0..1. Mouse and finger report no real pressure, so they paint at full. */
+function pressureOf(e){ return e.pointerType==="pen" && e.pressure>0 ? e.pressure : 1; }
+
+/**
+ * One stroke of the Brush tool: round, anti-aliased dabs laid along the pointer path at sub-pixel
+ * positions, sized and faded by pen pressure. The pixel tools keep using stamp(); this is the path
+ * for painted, high-resolution art.
+ */
+class BrushStroke{
+  ctx; color; erase;
+  /** Canvas holding the allowed area (selection and sub-canvas), or null when the whole layer is open. */
+  mask=null;
+  /** Scratch canvas each dab is drawn on before it lands, so the mask can trim it first. */
+  dab=document.createElement("canvas");
+  x; y; pressure;
+
+  constructor(ctx, color, erase, pt){
+    this.ctx=ctx; this.color=color; this.erase=erase;
+    this.mask=BrushStroke.buildMask();
+    this.x=pt.x; this.y=pt.y; this.pressure=pt.pressure;
+    this.stamp(pt.x, pt.y, pt.pressure);
+  }
+
+  /** Follow the pointer to pt. Smoothing trails it: each sample closes only part of the gap, which irons out hand shake. */
+  moveTo(pt){
+    const follow=1-brushSmoothing/100;
+    this.walkTo(this.x+(pt.x-this.x)*follow, this.y+(pt.y-this.y)*follow, pt.pressure);
+  }
+
+  /** Close the gap smoothing left behind, so the line ends where the pen lifted. */
+  end(pt){ this.walkTo(pt.x, pt.y, this.pressure); }
+
+  sizeAt(pressure){ return Math.max(0.5, brush*(pressureToSize ? Math.max(0.1,pressure) : 1)); }
+
+  /** Drop a dab every fraction of the brush width between the last point and (tx,ty). */
+  walkTo(tx, ty, pressure){
+    const dist=Math.hypot(tx-this.x, ty-this.y);
+    const spacing=Math.max(0.25, this.sizeAt(this.pressure)*0.12);
+    const steps=Math.floor(dist/spacing);
+    if(!steps) return;
+    for(let i=1;i<=steps;i++){
+      const t=i*spacing/dist;
+      this.stamp(this.x+(tx-this.x)*t, this.y+(ty-this.y)*t, this.pressure+(pressure-this.pressure)*t);
+    }
+    // advance only as far as the last dab, so the leftover distance carries into the next sample
+    const t=steps*spacing/dist;
+    this.x+=(tx-this.x)*t; this.y+=(ty-this.y)*t; this.pressure+=(pressure-this.pressure)*t;
+  }
+
+  stamp(x, y, pressure){
+    const size=this.sizeAt(pressure), r=size/2;
+    const x0=Math.floor(x-r)-1, y0=Math.floor(y-r)-1, d=Math.ceil(size)+3;
+    if(this.dab.width<d){ this.dab.width=d; this.dab.height=d; }
+    const dc=this.dab.getContext("2d");
+    dc.clearRect(0,0,this.dab.width,this.dab.height);
+    dc.fillStyle=this.erase ? "#000" : this.color;
+    dc.beginPath(); dc.arc(x-x0, y-y0, r, 0, Math.PI*2); dc.fill();
+    if(this.mask){
+      dc.globalCompositeOperation="destination-in";
+      dc.drawImage(this.mask, -x0, -y0);
+      dc.globalCompositeOperation="source-over";
+    }
+    const c=this.ctx;
+    c.globalAlpha=(brushFlow/100)*(pressureToFlow ? pressure : 1);
+    c.globalCompositeOperation=this.erase ? "destination-out" : "source-over";
+    c.drawImage(this.dab, x0, y0);
+    c.globalAlpha=1; c.globalCompositeOperation="source-over";
+  }
+
+  /** Same rules as inSel/inRegion, as an alpha mask the dabs can be trimmed against. */
+  static buildMask(){
+    if(!selection && !region) return null;
+    const m=canvasOf(W,H), mc=m.getContext("2d");
+    if(selMask){
+      const img=mc.createImageData(W,H);
+      for(let i=0;i<selMask.length;i++) if(selMask[i]===1) img.data[i*4+3]=255;
+      mc.putImageData(img,0,0);
+    }else{
+      mc.fillStyle="#000";
+      if(selection) mc.fillRect(selection.x,selection.y,selection.w,selection.h); else mc.fillRect(0,0,W,H);
+    }
+    if(region){
+      mc.globalCompositeOperation="destination-in";
+      mc.fillRect(region.x,region.y,region.w,region.h);
+    }
+    return m;
+  }
 }
 
 function floodFill(ctx,sx,sy,hex){
@@ -4723,13 +4869,13 @@ function pinchStart(){
 function pinchApply(){
   if(!pinch || touchPtrs.size<2) return;
   const d=pinchDist();
-  if(d>0) setZoom(Math.round(pinch.z0*d/pinch.d0));
+  if(d>0){ const z=pinch.z0*d/pinch.d0; setZoom(z>=1 ? Math.round(z) : z); }
   const m=pinchMid(), r=view.getBoundingClientRect();
   stage.scrollLeft += (r.left + pinch.ax*zoom) - m.x;
   stage.scrollTop  += (r.top  + pinch.ay*zoom) - m.y;
 }
 function cancelActiveOps(){
-  if(drawing){ drawing=false; undo(); }                 // revert the accidental first-finger dot
+  if(drawing){ drawing=false; brushStroke=null; undo(); }   // revert the accidental first-finger dot
   if(touchCommitted){ touchCommitted=false; undo(); }   // revert an immediate first-finger fill
   if(shaping){ shaping=false; composite(); }
   if(selDrag){ selDrag=null; composite(); }
@@ -4744,12 +4890,18 @@ function toPixel(e){
 }
 
 view.addEventListener("pointerdown",e=>{
+  if(e.pointerType==="pen" && !penSeen){
+    penSeen=true;
+    showToast("Pen detected - fingers now pan and pinch-zoom instead of painting.","info",3600);
+  }
   if(e.pointerType==="touch"){
     touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(touchPtrs.size>=2){ cancelDeferredStroke(); cancelActiveOps(); pinchStart(); return; }
+    if(touchPtrs.size>=2){ panEnd(); cancelDeferredStroke(); cancelActiveOps(); pinchStart(); return; }
+    if(penSeen){ panStart(e); return; }
   }
   if(placement){ if(e.button===0) placementDown(e); return; }
-  if(e.button!==0 && e.button!==2) return;          // left or right button only
+  // left or right button, or a pen's eraser end (button 5)
+  if(e.button!==0 && e.button!==2 && !(e.pointerType==="pen" && e.button===5)) return;
   // the ✕ badges win over every tool: they're how you dismiss a selection / sub-canvas without
   // hunting through a panel, and they sit in space no tool can paint anyway
   if(e.button===0){
@@ -4785,18 +4937,25 @@ function beginStroke(e){
   if(e.altKey){ pickColor(p.x,p.y,slot); return; }
   drawColor = slot==="bg" ? secondary : primary;     // right-click paints background color
   const L=activeLayer(); if(!L) return;
+  const penEraser = e.pointerType==="pen" && e.button===5;
   // locked layers block anything that edits pixels (picking / wand / region / tiles still work)
-  if(L.locked && tool!=="eyedropper" && tool!=="wand" && tool!=="region" && tool!=="tile"){
+  if(L.locked && (penEraser || (tool!=="eyedropper" && tool!=="wand" && tool!=="region" && tool!=="tile"))){
     showToast("This layer is locked.","info"); return;
   }
   // On a tilesheet with clipping on, a stroke belongs to the tile it starts in: the sub-canvas moves
   // to that tile before the first pixel lands, so you can draw straight into any tile and never
   // spill over its edge. A press in the spacing between tiles belongs to nothing, so it's dropped.
-  if(PAINT_TOOLS.indexOf(tool)>=0 && !tileClipForStroke(p)) return;
+  if((PAINT_TOOLS.indexOf(tool)>=0 || penEraser) && !tileClipForStroke(p)) return;
 
-  if(tool==="pencil"||tool==="eraser"){
+  strokeErase = tool==="eraser" || penEraser;
+  if(tool==="brush"){
+    const a=toArtF(e);
+    pushUndo(); drawing=true;
+    brushStroke=new BrushStroke(L.ctx, drawColor, strokeErase, {x:a.x, y:a.y, pressure:pressureOf(e)});
+    composite();
+  }else if(tool==="pencil"||strokeErase){
     pushUndo(); drawing=true; last=p;
-    stamp(L.ctx,p.x,p.y,tool==="eraser"); composite();
+    stamp(L.ctx,p.x,p.y,strokeErase); composite();
   }else if(tool==="bucket"){
     pushUndo(); floodFill(L.ctx,p.x,p.y,drawColor); composite(); refreshThumb(L);
     if(e.pointerType==="touch") touchCommitted=true;   // a 2nd finger (pinch) can still roll it back
@@ -4825,8 +4984,8 @@ window.addEventListener("resize",()=>{ paintOverlays(); drawRulers(); });
 stage.addEventListener("scroll",()=>{ paintOverlays(); drawRulers(); });
 
 window.addEventListener("pointermove",e=>{
-  if(pan){ panMove(e); return; }
   if(touchPtrs.has(e.pointerId)) touchPtrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pan){ panMove(e); return; }
   if(pinch){ pinchApply(); return; }
   // a first finger held from pointerdown: once it travels it's clearly a stroke, so start it now and
   // let this same move extend it. Below the slop we wait — the tap might still become a pinch.
@@ -4837,9 +4996,16 @@ window.addEventListener("pointermove",e=>{
   if(placement){ if(xform) placementMove(e); else updatePlacementCursor(e); return; }
   if(regionDrag){ regionMove(e); return; }
   if(selDrag){ selectMove(e); return; }
-  if(drawing){
+  if(drawing && brushStroke){
+    // a pen reports far more samples than frames; the coalesced list keeps every one of them
+    const samples=e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+    for(const s of (samples.length ? samples : [e])){
+      const a=toArtF(s); brushStroke.moveTo({x:a.x, y:a.y, pressure:pressureOf(s)});
+    }
+    composite();
+  }else if(drawing){
     const p=toPixel(e), L=activeLayer();
-    for(const [x,y] of linePixels(last.x,last.y,p.x,p.y)) stamp(L.ctx,x,y,tool==="eraser");
+    for(const [x,y] of linePixels(last.x,last.y,p.x,p.y)) stamp(L.ctx,x,y,strokeErase);
     last=p; composite();
   }else if(shaping){
     const p=toPixel(e);
@@ -4883,7 +5049,7 @@ view.addEventListener("pointerleave",()=>{
 });
 
 window.addEventListener("pointerup",e=>{
-  if(pan){ panEnd(); return; }
+  if(pan){ touchPtrs.delete(e.pointerId); panEnd(); return; }   // a finger pan leaves the touch map too
   // a quick tap that lifted before the hold elapsed: fire it now so a single tap still paints a dot
   if(touchDefer && e.pointerId===touchDefer.ev.pointerId){
     const ev=touchDefer.ev; clearTimeout(touchDefer.timer); touchDefer=null; beginStroke(ev);
@@ -4900,6 +5066,7 @@ window.addEventListener("pointerup",e=>{
     applyPixels(L.ctx,shape(start,p),false);
     shaping=false; composite(); refreshThumb(L);
   }
+  if(brushStroke){ const a=toArtF(e); brushStroke.end({x:a.x, y:a.y}); brushStroke=null; composite(); }
   if(drawing){ drawing=false; refreshThumb(activeLayer()); }
 });
 
@@ -4914,6 +5081,7 @@ window.addEventListener("pointercancel",e=>{
   if(regionDrag) abortRegionDrag();
   if(selDrag){ selDrag=null; composite(); }
   if(shaping){ shaping=false; composite(); }
+  brushStroke=null;
   if(drawing){ drawing=false; refreshThumb(activeLayer()); }
 });
 
@@ -4939,7 +5107,7 @@ stage.addEventListener("auxclick",e=>{ if(e.button===1) e.preventDefault(); });
 stage.addEventListener("wheel",e=>{
   if(e.target===view || view.contains(e.target) || e.target===wrap){
     e.preventDefault();
-    setZoom(zoom + (e.deltaY<0?1:-1));
+    stepZoom(e.deltaY<0?1:-1);
   }
 },{passive:false});
 
@@ -5460,7 +5628,7 @@ function projectProblem(data){
 }
 function applyProject(data){
   {
-    W=clamp(data.w,1,512); H=clamp(data.h,1,512); flat.width=W; flat.height=H;
+    W=clamp(data.w,1,MAX_DIM); H=clamp(data.h,1,MAX_DIM); flat.width=W; flat.height=H;
     layerSeq=1;
     const frameDefs = data.frames || [{dur:DEFAULT_DUR, layers:data.layers||[]}];   // v1 files load as a single frame
     const built = frameDefs.map(fd=>({dur:fd.dur||DEFAULT_DUR, layers:[]}));
@@ -7169,20 +7337,20 @@ async function showPackDialog(sources, bad){
 }
 
 // ------------------------------------------------------------------ tool UI
-const TOOL_ICONS={pencil:"pencil",eraser:"eraser",bucket:"fill",eyedropper:"pick",line:"line",rect:"rect",ellipse:"ellipse",select:"select",wand:"wand",region:"region",tile:"grid"};
+const TOOL_ICONS={pencil:"pencil",brush:"brush",eraser:"eraser",bucket:"fill",eyedropper:"pick",line:"line",rect:"rect",ellipse:"ellipse",select:"select",wand:"wand",region:"region",tile:"grid"};
 // the last tool that actually paints — where Remove-sub-canvas drops you back to
-const PAINT_TOOLS=["pencil","eraser","bucket","line","rect","ellipse"];
+const PAINT_TOOLS=["pencil","brush","eraser","bucket","line","rect","ellipse"];
 let lastPaintTool="pencil";
 function setTool(t){
   tool=t;
   if(PAINT_TOOLS.indexOf(t)>=0) lastPaintTool=t;
   document.querySelectorAll(".tool").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
-  const names={pencil:"Pencil",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand",region:"Region",tile:"Tile"};
+  const names={pencil:"Pencil",brush:"Brush",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand",region:"Region",tile:"Tile"};
   $("#toolInfo").textContent=names[t];
   const ts=$("#toolStat"); if(ts){ ts.firstChild.outerHTML=iconSVG(TOOL_ICONS[t]||"pencil",14); }
   // contextual tool options in the left panel (solid-fill only means something for closed shapes)
   const opts=$("#toolOpts");
-  if(opts){ opts.classList.toggle("show-wand",t==="wand"); opts.classList.toggle("show-shape",t==="rect"||t==="ellipse"); }
+  if(opts){ opts.classList.toggle("show-wand",t==="wand"); opts.classList.toggle("show-shape",t==="rect"||t==="ellipse"); opts.classList.toggle("show-brush",t==="brush"); }
   renderRegionPanel();   // owns .show-region, #regionSection and the View-menu checkbox
   renderSheetPanel();    // the Tile tool brings the tilesheet panel with it
   if(t==="tile"){
@@ -7193,6 +7361,8 @@ function setTool(t){
                                    // where setTool runs before the first document exists)
   view.style.cursor = CURSORS[t] || "crosshair";
 }
+// 1 px steps for pixel brushes; roughly 10% steps once brushes get big enough for painted art
+function brushStep(){ return Math.max(1, Math.round(brush/10)); }
 function setBrush(n){ const max=Math.max(16, Math.round(Math.max(W,H)/2)); brush=clamp(n,1,max); $("#brushReadout").textContent=brush+" px"; }
 
 // ------------------------------------------------------------------ mobile popout side panel (tools are an in-flow row on mobile)
@@ -7386,7 +7556,7 @@ document.querySelectorAll(".menu-dd").forEach(dd=>dd.addEventListener("click",e=
 // the same actions carry elsewhere in the UI. A key of "" is a row with no shortcut.
 const HELP_SECTIONS=[
   {title:"Tools", icon:"pencil", rows:[
-    ["pencil","Pencil","B"], ["eraser","Eraser","E"], ["fill","Fill","F"], ["pick","Pick color","I"],
+    ["pencil","Pencil","B"], ["brush","Brush (pressure)","P"], ["eraser","Eraser","E"], ["fill","Fill","F"], ["pick","Pick color","I"],
     ["line","Line","L"], ["rect","Rectangle","R"], ["ellipse","Ellipse","C"],
     ["select","Rectangle select","M"], ["wand","Magic wand","W"], ["region","Sub-canvas","D"],
     ["grid","Tiles","T"],
@@ -7555,9 +7725,13 @@ document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{
   setTool(b.dataset.tool);
   if(isMobileLayout()) closeDrawers();   // picking a tool returns you to the canvas
 });
-$("#brushUp").onclick=()=>setBrush(brush+1);
-$("#brushDown").onclick=()=>setBrush(brush-1);
+$("#brushUp").onclick=()=>setBrush(brush+brushStep());
+$("#brushDown").onclick=()=>setBrush(brush-brushStep());
 $("#fillShape").onchange=e=>fillShape=e.target.checked;
+$("#brushFlow").oninput=e=>brushFlow=+e.target.value;
+$("#brushSmooth").oninput=e=>brushSmoothing=+e.target.value;
+$("#pressureSize").onchange=e=>pressureToSize=e.target.checked;
+$("#pressureFlow").onchange=e=>pressureToFlow=e.target.checked;
 function clearActiveLayer(){ const L=activeLayer(); if(!L)return; if(L.locked){ showToast("This layer is locked.","info"); return; } pushUndo(); L.ctx.clearRect(0,0,W,H); composite(); refreshThumb(L); }
 
 // image import: file dialog, place/cancel, paste, drag-and-drop (import is triggered from the Sprite menu)
@@ -7749,8 +7923,8 @@ window.addEventListener("drop",e=>{
   if(url) loadImageFromURL(url,"Dropped image");
 });
 
-$("#zoomIn").onclick=()=>setZoom(zoom+1);
-$("#zoomOut").onclick=()=>setZoom(zoom-1);
+$("#zoomIn").onclick=()=>stepZoom(1);
+$("#zoomOut").onclick=()=>stepZoom(-1);
 $("#zoomFit").onclick=()=>{ fitZoom(); composite(); };
 $("#gridToggle").onchange=e=>{showGrid=e.target.checked; composite();};
 $("#centerToggle").onchange=e=>{showCenter=e.target.checked; composite();};
@@ -7829,7 +8003,7 @@ function openProjectFile(f,opts){
 function openImageAsDoc(file, handle){
   const url=URL.createObjectURL(file), img=new Image();
   img.onload=()=>{ URL.revokeObjectURL(url);
-    const iw=img.naturalWidth, ih=img.naturalHeight, w=clamp(iw,1,512), h=clamp(ih,1,512);
+    const iw=img.naturalWidth, ih=img.naturalHeight, w=clamp(iw,1,MAX_DIM), h=clamp(ih,1,MAX_DIM);
     createDoc(w,h, (file.name||"image").replace(/\.[^.]+$/,""));
     const L=activeLayer(); if(L){ L.ctx.imageSmoothingEnabled=false; L.ctx.drawImage(img,0,0,w,h); refreshThumb(L); composite(); }
     rememberFile({name:file.name||"image", kind:"image", size:file.size||0, w, h,
@@ -8098,16 +8272,17 @@ window.addEventListener("keydown",e=>{
   }
   switch(e.key.toLowerCase()){
     case "b": setTool("pencil"); break;
+    case "p": setTool("brush"); break;
     case "e": setTool("eraser"); break;
     case "f": setTool("bucket"); break;
     case "i": setTool("eyedropper"); break;
     case "l": setTool("line"); break;
     case "r": setTool("rect"); break;
     case "c": setTool("ellipse"); break;
-    case "[": setBrush(brush-1); break;
-    case "]": setBrush(brush+1); break;
-    case "+": case "=": setZoom(zoom+1); break;
-    case "-": case "_": setZoom(zoom-1); break;
+    case "[": setBrush(brush-brushStep()); break;
+    case "]": setBrush(brush+brushStep()); break;
+    case "+": case "=": stepZoom(1); break;
+    case "-": case "_": stepZoom(-1); break;
     case "g": showGrid=!showGrid; $("#gridToggle").checked=showGrid; composite(); break;
     case "x": swapColors(); break;
     // Shift+H / Shift+V flip, matching Aseprite (plain h/v are unbound)
