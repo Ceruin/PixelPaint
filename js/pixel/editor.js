@@ -1289,6 +1289,9 @@ async function resizeDialog(){
 }
 
 // ------------------------------------------------------------------ compositing
+// The flattened image updates at once (other code reads it); the screen is drawn once per
+// display frame, however many times this runs in between (pens report up to 240 moves/s).
+let viewFrame=0;
 function composite(){
   fctx.clearRect(0,0,W,H);
   for(const l of layers){
@@ -1297,7 +1300,10 @@ function composite(){
     fctx.drawImage(l.canvas,0,0);
   }
   fctx.globalAlpha=1;
-
+  viewFrame ||= requestAnimationFrame(drawView);
+}
+function drawView(){
+  viewFrame=0;
   vctx.imageSmoothingEnabled=zoom<1;      // zoomed out, dropped pixels shimmer; smoothing keeps it readable
   vctx.clearRect(0,0,view.width,view.height);
   drawOnionSkin();                        // ghosts sit behind the current frame

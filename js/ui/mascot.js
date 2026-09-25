@@ -126,6 +126,7 @@ export class Mascot {
     if (!r.height) return;
     this.k = Math.max(1, Math.floor(Math.min(r.height * dpr / BOX_H, (r.width + 24) * dpr / BOX_W)));
     Object.assign(this.canvas, { width: BOX_W * this.k, height: BOX_H * this.k });
+    this.drawn = null;
     Object.assign(this.canvas.style, { width: `${BOX_W * this.k / dpr}px`, height: `${BOX_H * this.k / dpr}px` });
   }
 
@@ -199,18 +200,23 @@ export class Mascot {
   render() {
     const ctx = this.canvas.getContext('2d'), k = this.k, st = STATES[this.state], t = (performance.now() - this.started) / 1000;
     if (!atlas.complete || !st) return;
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const still = document.body.dataset.mode === 'paper'; // e-ink friendly: no breathing or blinking
     let pose = st.poses[st.fps ? Math.floor(t * st.fps) % st.poses.length : 0];
     let x = AX + this.pos, y = FLOOR, flip = this.flip;
     if (this.state === 'idle' && this.gaze) { pose = 'side'; flip = this.gaze < 0; }
-    if (pose === 'front' && Date.now() > this.blinkAt) pose = 'frontBlink';
+    if (pose === 'front' && !still && Date.now() > this.blinkAt) pose = 'frontBlink';
     if (pose === 'side') flip = !flip; // side view is drawn facing left
     if (st.hop) y -= Math.round(Math.abs(Math.sin(t * 9)) * 3);
     if (st.shake) x += Math.floor(t * 18) % 2 ? 1 : -1;
     if (st.walk && Math.floor(t * st.fps) % 2) y -= 1; // bob on each step
     const [, , w, , ax] = SPRITES[pose], [l, r] = flip ? [w - ax, ax] : [ax, w - ax];
     x = Math.max(l, Math.min(BOX_W - r, x)); // wide poses never clip out of her box
-    const breath = st.breath && (t % st.breath) / st.breath > 0.55 ? 1 : 0;
+    const breath = st.breath && !still && (t % st.breath) / st.breath > 0.55 ? 1 : 0;
+    // Only repaint when the picture changes (idle: a couple of times a second, not 12).
+    const key = `${pose}|${x}|${y}|${flip}|${breath}|${k}|${outfitHex}|${this.canvas.width}`;
+    if (key === this.drawn && !this.parts.length) return;
+    this.drawn = this.parts.length ? null : key;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     drawPose(ctx, pose, x, y, k, flip, breath);
     this.parts = this.parts.filter(p => p.life-- > 0);
     for (const p of this.parts) {

@@ -1,4 +1,4 @@
-import { TAU } from '../core/util.js';
+import { TAU, Rect } from '../core/util.js';
 import { regionMask } from './misc.js';
 
 const modeOf = (app, e) => (e.shiftKey ? 'add' : e.altKey ? 'sub' : app.opts.selMode);
@@ -51,14 +51,22 @@ export class WandTool {
   }
 }
 
-// Marching ants around the current selection (animated only while one exists).
+// Marching ants around the current selection (animated only while one exists, and never in
+// Paper mode, where a still outline suits e-ink screens). Each step repaints just the ants.
 export function selectionOverlay(app) {
   let dash = 0, timer = 0;
   const o = {
+    bounds(view) {
+      const b = app.doc?.selection?.active && app.doc.selection.bounds;
+      if (!b) return null;
+      const pts = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]].map(([x, y]) => view.toScreen(x, y));
+      return Rect.fromPoints(pts, 2);
+    },
     draw(ctx, view) {
-      const sel = app.doc?.selection;
-      if (!sel?.active) { clearInterval(timer); timer = 0; return; }
-      timer ||= setInterval(() => { dash = (dash + 1) % 8; view.redraw(); }, 120);
+      const sel = app.doc?.selection, still = app.mode === 'paper';
+      if (!sel?.active || still) { clearInterval(timer); timer = 0; }
+      if (!sel?.active) return;
+      if (!still) timer ||= setInterval(() => { dash = (dash + 1) % 8; view.redrawOverlays(o); }, 120);
       view.strokeDoc(ctx, sel.path, dash);
     },
   };

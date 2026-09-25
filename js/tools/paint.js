@@ -14,7 +14,14 @@ export class PaintTool {
   activate() { this.app.view.overlays.add(this); }
   deactivate() { this.cancel(); this.app.view.overlays.delete(this); }
   interrupt() { this.cancel(); }
-  hover(p) { this.hoverPt = p; this.app.view.redraw(); }
+  hover(p) { this.hoverPt = p; this.app.view.redrawOverlays(this); }
+  // Screen rect of the brush ring, so moving it repaints only around it.
+  bounds(view) {
+    const p = this.hoverPt, r = p && this.brush.size / 2 * view.zoom;
+    if (!p || r < 2) return null;
+    const s = view.toScreen(p.x, p.y);
+    return { x: s.x - r - 2, y: s.y - r - 2, w: 2 * r + 4, h: 2 * r + 4 };
+  }
 
   down(p, e) {
     const { app } = this, doc = app.doc, layer = doc.activeLayer;
@@ -48,6 +55,7 @@ export class PaintTool {
     this.travel += Math.hypot(last.x - (this.hoverPt?.x ?? last.x), last.y - (this.hoverPt?.y ?? last.y)) * this.app.view.zoom;
     if (this.travel > 40) { this.travel = 0; haptics.tick(); }
     this.hoverPt = last;
+    this.app.view.redrawOverlays(this);
     if (this.snap && !this.lock && Math.hypot(last.x - this.start.x, last.y - this.start.y) > 4 / this.app.view.zoom) this.lock = pickLock(this.app.doc.assistants, this.start, last);
     if (this.snap && !this.lock) return;
     pts.forEach(p => this.engine.move(this.lock ? project(this.lock, p) : p));

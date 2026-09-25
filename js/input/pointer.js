@@ -17,6 +17,11 @@ export class CanvasInput {
   constructor(app, el) {
     Object.assign(this, { app, el, pointers: new Map(), penSeen: false, active: null, gesture: null, pan: null, rect: el.getBoundingClientRect() });
     el.style.touchAction = 'none';
+    // Cached canvas position (reading it per hover move would force a layout each time).
+    const measure = () => { this.rect = el.getBoundingClientRect(); };
+    new ResizeObserver(measure).observe(el);
+    addEventListener('resize', measure);
+    addEventListener('scroll', measure, true);
     el.addEventListener('pointerdown', e => this.down(e));
     el.addEventListener('pointermove', e => this.move(e));
     el.addEventListener('pointerup', e => this.up(e));
@@ -66,7 +71,6 @@ export class CanvasInput {
       const evs = e.getCoalescedEvents?.() ?? [];
       app.tool.move((evs.length ? evs : [e]).map(ev => this.point(ev)), e);
     } else if (this.active == null && e.pointerType !== 'touch') {
-      this.rect = this.el.getBoundingClientRect();
       app.tool.hover?.(this.point(e));
     }
   }

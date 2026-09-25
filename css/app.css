@@ -1,4 +1,4 @@
-/* PixelPaint — shared look with the Pixel editor (pixel-editor.html, shown as Pixel mode): same palette, font and wordmark. */
+/* PixelPaint — shared look with the Pixel editor (Pixel mode, css/pixel.css): same palette, font and wordmark. */
 :root {
   --bg: #1b1d23; --stage: #16181d; --panel: #23262e; --panel2: #2b2f39; --panel3: #353a47; --line: #3a3f4b;
   --text: #e6e8ee; --muted: #9aa1b1; --accent: #5b8cff; --accent2: #3a6bff; --accent-ink: #fff; --danger: #e0556a;

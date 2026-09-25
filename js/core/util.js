@@ -25,10 +25,10 @@ export const Rect = {
     const x = Math.max(0, r.x), y = Math.max(0, r.y), x2 = Math.min(W, r.x + r.w), y2 = Math.min(H, r.y + r.h);
     return x2 > x && y2 > y ? { x, y, w: x2 - x, h: y2 - y } : null;
   },
-  fromPoints(pts) {
+  fromPoints(pts, pad = 0) {
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
-    const x = Math.floor(Math.min(...xs)), y = Math.floor(Math.min(...ys));
-    return { x, y, w: Math.ceil(Math.max(...xs)) - x + 1, h: Math.ceil(Math.max(...ys)) - y + 1 };
+    const x = Math.floor(Math.min(...xs) - pad), y = Math.floor(Math.min(...ys) - pad);
+    return { x, y, w: Math.ceil(Math.max(...xs) + pad) - x + 1, h: Math.ceil(Math.max(...ys) + pad) - y + 1 };
   },
 };
 
