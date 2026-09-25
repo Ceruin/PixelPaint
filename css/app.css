@@ -13,14 +13,14 @@ body.light {
 /* The app chrome follows data-layout, which keeps the last non-Pixel mode while Pixel mode covers
    it: entering Pixel then changes nothing underneath (no hidden panels re-shown, no re-theme). */
 body[data-theme=paper] {
-  --bg: #f4f2ec; --stage: #e6e3da; --panel: #fbfaf6; --panel2: #f1efe8; --panel3: #e4e1d8; --line: #111;
+  --bg: #f2f2ef; --stage: #ebebe7; --panel: #f7f7f4; --panel2: #ecece8; --panel3: #e0e0db; --line: #111;
   --text: #111; --muted: #444; --accent: #111; --accent2: #111; --accent-ink: #fff; --shadow: none; color-scheme: light;
 }
 /* e-ink: nothing animates — except the loading splash, which has to show it's working */
 /* E-ink simulation (js/ui/eink.js): 16 grey levels over everything, a faint paper grain, and the
    full-refresh flash. */
 html.eink-sim { filter: url(#eink) contrast(1.12); }
-html.eink-sim body::after { content: ''; position: fixed; inset: 0; z-index: 2000; pointer-events: none; opacity: .06;
+html.eink-sim body::after { content: ''; position: fixed; inset: 0; z-index: 2000; pointer-events: none; opacity: .035;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 .eink-flash { position: fixed; inset: 0; z-index: 2001; pointer-events: none; opacity: 0; }
 .eink-flash.go { animation: eink-flash .26s steps(1, end) forwards; }
@@ -157,7 +157,6 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .workspace { position: relative; display: flex; overflow: hidden; }
 .stage { position: relative; flex: 1; min-width: 0; background: var(--stage); overflow: hidden; }
 .stage canvas { position: absolute; left: 0; top: 0; display: block; }   /* sized by the viewport (grow-only backing) */
-body[data-theme=paper] .workspace .stage { background: var(--stage) repeating-linear-gradient(0deg, transparent 0 27px, rgba(0, 0, 0, .06) 27px 28px); }
 .dock { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: var(--bg); min-height: 0; position: relative; z-index: 4; }
 .dock-left { border-right: 1px solid var(--line); }
 .dock-right { width: var(--dock-w); border-left: 1px solid var(--line); }
@@ -376,7 +375,8 @@ body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-body .pxicon { display: block; }
 .pc-body small { font-size: 11px; line-height: 1.25; }
 .pc-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
-.pc-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; padding: 4px 1px; border: 0; border-radius: 3px; background: none; color: var(--muted); font-size: 10.5px; line-height: 1.2; }
+/* icon row of fixed height, label row below: every tab's icon and label line up whatever the icon's size */
+.pc-tab { display: grid; grid-template-rows: 18px auto; justify-items: center; align-items: center; gap: 2px; min-width: 0; padding: 4px 1px; border: 0; border-radius: 3px; background: none; color: var(--muted); font-size: 10.5px; line-height: 1.2; }
 .pc-tab span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-tab:hover { color: var(--text); background: var(--panel2); }
 .pc-tab.on { background: var(--accent); color: var(--accent-ink); }
@@ -386,6 +386,7 @@ body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-label { font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
 .pc-bars { display: flex; flex-direction: column; gap: 5px; }
 .pc-bar { display: grid; grid-template-columns: 16px 5.2em minmax(0, 1fr); align-items: center; gap: 6px; color: var(--muted); }
+.pc-bar > .pxicon, .pc-skill > .pxicon { justify-self: center; }   /* icons centred in their column, so they line up down the list */
 .pc-bar > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-track { height: 8px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); overflow: hidden; }
 .pc-track i { display: block; height: 100%; width: 100%; transform-origin: left; transition: transform .4s; }
@@ -449,7 +450,9 @@ body[data-theme=paper] .pc-medal, body[data-theme=paper] .pc-grade { filter: gra
 
 /* ---------- zen: canvas-first, one strip ---------- */
 .zen { display: none; }
-body[data-layout=zen] .zen { display: block; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); z-index: 50; }
+/* the strip always fits the stage (8px clear top and bottom) and scrolls when it's taller */
+body[data-layout=zen] .zen { display: flex; align-items: center; position: absolute; left: 8px; top: 8px; bottom: 8px; z-index: 50; pointer-events: none; }
+body[data-layout=zen] .zen > * { pointer-events: auto; }
 /* mode rules name #app's own parts: the Pixel editor reuses class names (.statusbar, .timeline, .stage)
    and must not be restyled by a mode switch */
 body[data-layout=zen] #app > :is(.optionsbar, .statusbar), body[data-layout=zen] .float-layer > .panel:not(.flyout) { display: none; }
@@ -459,7 +462,11 @@ body[data-layout=zen] #app > :is(.optionsbar, .statusbar), body[data-layout=zen]
 body[data-layout=zen] .dock { position: absolute; top: 0; bottom: 0; visibility: hidden; }
 body[data-layout=zen] .dock-left { left: 0; } body[data-layout=zen] .dock-right { right: 0; }
 body[data-layout=zen] .dock .panel.flyout { visibility: visible; }
-.zen-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; box-shadow: var(--shadow); max-height: calc(100dvh - 16px); overflow: auto; scrollbar-width: none; }
+.zen-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; box-shadow: var(--shadow); max-height: 100%; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; }
+.zen-strip > * { flex: none; }
+.zen-strip.more-down { -webkit-mask: linear-gradient(#000 calc(100% - 28px), transparent); mask: linear-gradient(#000 calc(100% - 28px), transparent); }
+.zen-strip.more-up { -webkit-mask: linear-gradient(transparent, #000 28px); mask: linear-gradient(transparent, #000 28px); }
+.zen-strip.more-up.more-down { -webkit-mask: linear-gradient(transparent, #000 28px, #000 calc(100% - 28px), transparent); mask: linear-gradient(transparent, #000 28px, #000 calc(100% - 28px), transparent); }
 .zen-sec { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .zen-strip .mascot-slot { margin-top: 0; position: sticky; bottom: -6px; padding-bottom: 6px; background: inherit; }   /* never scrolls out of a short strip */
 .zen-strip .mascot { width: 48px; height: 62px; }
@@ -676,3 +683,20 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
    floats over the spot it keeps free in its tool rail ---------- */
 .pixel-pyxl { position: fixed; z-index: 71; pointer-events: none; }
 .pixel-pyxl .mascot { pointer-events: auto; width: 92px; height: 76px; }
+
+/* ---------- touch screens: bigger targets, menus that fit and scroll ---------- */
+@media (pointer: coarse) {
+  .ibtn { min-width: 40px; min-height: 40px; }
+  .zen-strip .ibtn, .zen-strip .tool, .zen-strip .chip { width: 46px; height: 46px; }
+  .zen-strip { gap: 8px; padding: 8px 6px; }
+  .zen-strip .ic { width: 20px; height: 20px; }
+  .menu-drop { max-height: calc(100dvh - 64px); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-width: min(280px, calc(100vw - 16px)); }
+  .menu-item { height: 44px; font-size: 14px; }
+  .menu-title { min-height: 40px; }
+  .panel.flyout { max-height: calc(100dvh - 24px); overscroll-behavior: contain; }
+  .panel-body { overscroll-behavior: contain; }
+  .btn.sm { min-height: 36px; }
+  .brush-row { min-height: 44px; }
+  .ol-item, .ol-gname { height: 40px; }
+  .card-grip .ibtn, .grp-head .ibtn, .layer-row .ibtn { min-width: 0; min-height: 0; }   /* compact rows keep their size */
+}

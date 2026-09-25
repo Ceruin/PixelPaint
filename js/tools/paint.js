@@ -1,6 +1,6 @@
 import { acquire, release } from '../engine/compositor.js';
 import { BrushEngine } from '../engine/brush.js';
-import { PixelEngine } from '../engine/pixel.js';
+import { PixelEngine, PixelShapeEngine } from '../engine/pixel.js';
 import { Rect, drawRect, clipTo, TAU } from '../core/util.js';
 import { haptics } from '../input/haptics.js';
 import { pickLock, project } from '../engine/assistants.js';
@@ -19,7 +19,7 @@ function lazyCopy(pv, src) {
   };
 }
 
-const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge', pencil: 'Pixel Pencil' };
+const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge', pencil: 'Pixel Pencil', pxshape: 'Pixel Shape' };
 
 // Brush / Eraser / Smudge. Dabs go to a stroke buffer, which is composited over a copy of the
 // layer (the preview) inside the dirty rect only; the layer itself is written once, on pen-up.
@@ -168,15 +168,17 @@ export class PaintTool {
   }
 }
 
-// Pixel Pencil: Draw's pixel-art tool. Whole pixels (size 1–16), pixel-perfect lines, symmetry,
-// selection masks and alpha lock like any brush; right-click or the Erase toggle clears pixels.
+// Pixel Pencil / Pixel Shape: Draw's pixel-art tools. Whole pixels (size 1–16), pixel-perfect
+// lines, line / rectangle / ellipse, symmetry, selection masks and alpha lock like any brush;
+// right-click or the Erase toggle clears pixels.
 export class PixelTool extends PaintTool {
-  constructor(app) { super(app, 'pencil'); }
+  constructor(app, id = 'pencil') { super(app, id); }
   get brush() { return { size: this.app.opts.pixelSize, opacity: 1, blend: 'source-over', buildup: false }; }
   erasing(e) { return this.app.opts.pixelErase || e?.button === 2; }
   makeEngine(target) {
     const { app } = this;
-    return new PixelEngine({ target, color: app.color.fg, size: app.opts.pixelSize, perfect: app.opts.pixelPerfect, symmetry: app.symmetry() });
+    const o = app.opts, base = { target, color: app.color.fg, size: o.pixelSize, symmetry: app.symmetry() };
+    return this.id === 'pxshape' ? new PixelShapeEngine({ ...base, kind: o.pixelShape, filled: o.pixelFill }) : new PixelEngine({ ...base, perfect: o.pixelPerfect });
   }
   // The cursor is the square of pixels the pencil will fill.
   cellRect(view) {

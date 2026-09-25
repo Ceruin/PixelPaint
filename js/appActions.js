@@ -23,6 +23,7 @@ const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ['32x32', 'Pixel art — 32
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
 const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
+const SCALES = [1, 2, 4, 8, 16, 32].map(k => [String(k), `×${k}`]);
 
 export function defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline }) {
   const doc = () => app.doc;
@@ -267,6 +268,26 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'file.exportProject', label: 'Download Project (.ora)', key: 'Ctrl+Shift+S', run: project.exportProject },
     { id: 'file.exportPng', label: 'Export PNG', key: 'Ctrl+Shift+E', run: () => project.exportImage('image/png') },
     { id: 'file.exportJpg', label: 'Export JPG', run: () => project.exportImage('image/jpeg') },
+    // pixel art: crisp enlargements and sprite sheets
+    { id: 'file.exportScaled', label: 'Export PNG at Size…', icon: 'pixel', run: async () => {
+      const v = await form('Export PNG at Size', [{ id: 'k', label: 'Scale (hard pixels)', type: 'select', options: SCALES, value: doc().pixelArt ? '8' : '2' }], 'Export');
+      if (v) project.exportImage('image/png', +v.k);
+    } },
+    { id: 'file.exportSheet', label: 'Export Sprite Sheet…', icon: 'film', run: async () => {
+      const v = await form('Export Sprite Sheet', [
+        { id: 'k', label: 'Scale', type: 'select', options: SCALES, value: '1' },
+        { id: 'cols', label: 'Frames per row (0 = one row)', value: 0, min: 0, max: 256 }], 'Export');
+      if (v) project.exportSheet(+v.k, Math.round(+v.cols) || 0);
+    } },
+    { id: 'file.importSheet', label: 'Import Sprite Sheet…', icon: 'film', run: async () => {
+      const f = await pickFile('image/*');
+      if (!f) return;
+      const img = await createImageBitmap(f), n = Math.max(1, Math.round(img.width / img.height));
+      const v = await form('Import Sprite Sheet', [
+        { id: 'w', label: 'Frame width (px)', value: Math.round(img.width / n), min: 1, max: 2048 },
+        { id: 'h', label: 'Frame height (px)', value: img.height, min: 1, max: 2048 }], 'Import');
+      if (v) project.importSheet(f, dim(v.w), dim(v.h));
+    } },
     { id: 'file.exportPsd', label: 'Export Photoshop (.psd)', icon: 'download', run: () => download(encodePSD(doc()), `${doc().name}.psd`) },
 
     { id: 'edit.undo', label: 'Undo', key: 'Ctrl+Z', run: () => app.undo() },
@@ -385,7 +406,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.open', 'file.import', 'file.toPixel', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg', 'file.exportPsd']],
+      ['File', 'folder', ['file.new', 'file.open', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],

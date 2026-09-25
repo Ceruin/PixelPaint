@@ -52,7 +52,7 @@ export class CanvasInput {
     const touch = e.pointerType === 'touch';
     if (touch && (this.penSeen || !app.settings.fingerDraw || this.pointers.size > 1)) return this.startGesture(e);
     if (this.active != null) return;
-    const pencil = app.tool.id === 'pencil';   // the Pixel Pencil erases with right-click
+    const pencil = app.tool.id === 'pencil' || app.tool.id === 'pxshape';   // the pixel tools erase with right-click
     if (e.button === 2 && !pencil) { bus.emit('popup', { x: e.clientX, y: e.clientY }); return; }
     if (e.button === 1 || app.keys.space) { this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
     if (e.button !== 0 && !(pencil && e.button === 2)) return;

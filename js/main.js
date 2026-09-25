@@ -103,7 +103,7 @@ const focus = local.get('pp.focus', { paint: isTouchDevice, notes: false });
 function setMode(mode) {
   const legacy = LEGACY[mode];
   if (legacy) { if (legacy.focus) { focus.paint = true; local.set('pp.focus', focus); } if (legacy.theme) setTheme(legacy.theme); mode = legacy.mode; }
-  if (!MODES.some(m => m[0] === mode)) mode = 'paint';
+  if (mode !== 'pixel' && !MODES.some(m => m[0] === mode)) mode = 'paint';
   app.tool.interrupt?.();
   app.mode = mode;
   document.body.dataset.mode = mode;
@@ -148,11 +148,12 @@ const { menus } = defineActions(app, { panels, project, setMode, toggleFocus, se
 // Hand-offs between Draw and the Pixel editor: the picture opens there as a new pixel drawing, and
 // the Pixel editor's current frame comes back to Draw as a layer.
 actions.define([
-  { id: 'file.toPixel', label: 'Open in Pixel Editor', icon: 'pixel', run: async () => {
+  { id: 'file.toPixel', label: 'Open Canvas in Sprite Studio', icon: 'pixel', run: async () => {
     const blob = await new Promise(r => flatten(app.doc).toBlob(r, 'image/png'));
     await loadPixel(); setMode('pixel');
     pixelBox.dispatchEvent(new CustomEvent('pp-open-image', { detail: new File([blob], `${app.doc.name || 'Drawing'}.png`, { type: 'image/png' }) }));
   } },
+  { id: 'mode.pixel', label: 'Sprite Studio (tiles, voxels, .aseprite)', icon: 'pixel', run: () => setMode('pixel') },
   { id: 'file.fromPixel', label: 'Send to Draw as a Layer', icon: 'brush', run: () => pixelBox.dispatchEvent(new CustomEvent('pp-get-frame', { detail: c => { setMode('paint'); project.importLayer(c, 'From Pixel'); } })) },
 ]);
 menubar($('#menubar'), menus, modeBox);

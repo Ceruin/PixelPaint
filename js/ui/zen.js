@@ -9,7 +9,12 @@ export function initZen(app, panels) {
   const root = document.getElementById('zen');
   const slot = h('div.mascot-slot');
   const toolBtn = (id, tip) => h('button.ibtn.tool', { type: 'button', 'data-tip': tip, 'data-action': `tool.${id}`, dataset: { tool: id }, onclick: () => app.setTool(id) }, icon(id));
-  const tools = [toolBtn('brush', 'Brush'), toolBtn('smudge', 'Smudge'), toolBtn('eraser', 'Eraser'), toolBtn('lasso', 'Lasso'), toolBtn('transform', 'Transform')];
+  // painting tools, or on a pixel canvas the pixel tools
+  const paintTools = [toolBtn('brush', 'Brush'), toolBtn('smudge', 'Smudge'), toolBtn('eraser', 'Eraser')];
+  const pixelTools = [toolBtn('pencil', 'Pixel Pencil'), toolBtn('pxshape', 'Pixel line & shapes'), toolBtn('fill', 'Fill')];
+  const tools = [...paintTools, ...pixelTools, toolBtn('lasso', 'Lasso'), toolBtn('transform', 'Transform')];
+  const kind = () => { const px = !!app.doc?.pixelArt; paintTools.forEach(b => { b.hidden = px; }); pixelTools.forEach(b => { b.hidden = !px; }); };
+  bus.on('doc', kind);
   const chip = h('button.chip.zen-chip', { type: 'button', 'data-tip': 'Color', onclick: e => panels.flyout('color', e.currentTarget) });
   const fly = (id, ic, tip) => iconBtn(ic, tip, e => panels.flyout(id, e.currentTarget));
 
@@ -30,11 +35,19 @@ export function initZen(app, panels) {
     h('div.zen-sec', {}, chip, fly('brushes', 'grid', 'Brushes'), fly('brushSettings', 'sliders', 'Brush settings'), fly('layers', 'layers', 'Layers'), iconBtn('trash', 'Clear canvas…', () => actions.run('edit.clearCanvas'))),
     slot));
 
+  // Touch screens hide scrollbars: fade the strip's ends when there's more to scroll that way.
+  const strip = root.querySelector('.zen-strip');
+  const edges = () => {
+    const t = strip.scrollTop, more = strip.scrollHeight - strip.clientHeight;
+    strip.classList.toggle('more-up', t > 2); strip.classList.toggle('more-down', t < more - 2);
+  };
+  strip.addEventListener('scroll', edges, { passive: true });
+  new ResizeObserver(edges).observe(strip);
   const sync = () => {
     tools.forEach(b => b.classList.toggle('on', b.dataset.tool === app.tool.id));
     chip.style.background = app.color.fg;
   };
-  bus.on('tool', sync); bus.on('color', sync); sync();
+  bus.on('tool', sync); bus.on('color', sync); sync(); kind();
   bus.on('mode', () => panels.closeFlyout());
   return { slot };
 }

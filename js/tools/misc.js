@@ -10,11 +10,11 @@ export function sampleSource(app) {
   return doc.activeLayer.view() ?? makeCanvas(doc.w, doc.h);
 }
 
-export function regionMask(app, p, rgba = 0xffffffff, grow = false) {
+export function regionMask(app, p, rgba = 0xffffffff, grow = false, tolerance = app.opts.tolerance) {
   const { doc, opts } = app, x = Math.floor(p.x), y = Math.floor(p.y);
   if (x < 0 || y < 0 || x >= doc.w || y >= doc.h) return null;
   const img = sampleSource(app).getContext('2d').getImageData(0, 0, doc.w, doc.h);
-  let m = floodMask(img, x, y, opts.tolerance, opts.contiguous);
+  let m = floodMask(img, x, y, tolerance, opts.contiguous);
   if (grow) m = dilate(m, doc.w, doc.h);
   return maskToCanvas(m, doc.w, doc.h, rgba);
 }
@@ -24,7 +24,8 @@ export class FillTool {
   down(p) {
     const { app } = this, { doc } = app, layer = doc.activeLayer;
     if (!layer || layer.locked) { app.toast('Select an unlocked layer'); return false; }
-    const fill = regionMask(app, p, hexToU32(app.color.fg), true);
+    // a pixel canvas fills exact colours with hard edges; a painting grows under anti-aliased line art
+    const fill = regionMask(app, p, hexToU32(app.color.fg), !doc.pixelArt, doc.pixelArt ? 0 : undefined);
     if (!fill?.bounds) return false;
     const sel = doc.selection.clip;
     if (sel) { const fc = fill.getContext('2d'); fc.globalCompositeOperation = 'destination-in'; fc.drawImage(sel, 0, 0); }

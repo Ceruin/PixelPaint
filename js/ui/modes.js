@@ -1,9 +1,10 @@
 import { h, icon, iconBtn } from './dom.js';
 import { actions } from '../core/actions.js';
 
-// Three workspaces share one switch (mirrored in the Pixel editor's top bar). Focus (full screen,
-// what Zen used to be) and the theme (Dark / Light / E-ink) are toggles, not workspaces.
-export const MODES = [['paint', 'Draw', 'brush', 'Alt+1'], ['pixel', 'Pixel', 'pixel', 'Alt+2'], ['notes', 'Notes', 'note', 'Alt+3']];
+// Two workspaces: Draw (painting and pixel art — pixel tools, sprite sheets and frames live there) and
+// Notes. Focus (full screen, what Zen used to be) and the theme (Dark / Light / E-ink) are toggles.
+// The classic pixel editor lives on as Sprite Studio (tiles, voxels, .aseprite), opened from Draw.
+export const MODES = [['paint', 'Draw', 'brush', 'Alt+1'], ['notes', 'Notes', 'note', 'Alt+2']];
 export const THEMES = [['dark', 'Dark', 'zen'], ['light', 'Light', 'sun'], ['paper', 'E-ink', 'paper']];
 // Old saved modes → workspace + toggle.
 export const LEGACY = { zen: { mode: 'paint', focus: true }, paper: { mode: 'paint', theme: 'paper' } };

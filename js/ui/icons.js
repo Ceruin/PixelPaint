@@ -1,5 +1,6 @@
 // 24×24 stroke icons (inner SVG markup).
 export const ICONS = {
+  pxshape: '<path d="M3 21 11 13"/><rect x="13" y="3" width="8" height="8"/><circle cx="7" cy="7" r="4"/>',
   brush: '<path d="M18.4 2.6a2 2 0 0 1 3 3L11 16l-3-3z"/><path d="M7 14c-2 0-3.5 1.5-3.5 3.5 0 1-.5 2-1.5 2.5 1 .7 2.3 1 3.5 1C8 21 10 19 10 17z"/>',
   eraser: '<path d="M7 21h13"/><path d="m5.6 15.6 8.5-8.5a2 2 0 0 1 2.8 0l2.1 2.1a2 2 0 0 1 0 2.8L12 19l-2 2H7.8l-2.2-2.2a2 2 0 0 1 0-3.2z"/><path d="m9 12 5 5"/>',
   smudge: '<path d="M12 3s-4.5 5-4.5 8a4.5 4.5 0 0 0 9 0c0-3-4.5-8-4.5-8z"/><path d="M3 20c2.5-2 4.5 1 7 0s4.5-2 7 0 3 1 4 0"/>',

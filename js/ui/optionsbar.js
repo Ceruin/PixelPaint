@@ -56,9 +56,12 @@ export function optionsBar(app, el, openBrushes) {
       o.symmetry === 'radial' && mini({ label: 'Axes', min: 2, max: 16, value: o.radial, onInput: setOpt('radial') }),
       app.doc?.assistants.length > 0 && toggle('Snap to assistants', o.snapAssist, v => app.setOpt('snapAssist', v)),
       toggle('Wrap-around', o.wrap, v => app.setOpt('wrap', v)));
-    if (t === 'pencil') parts.push(
+    if (t === 'pxshape') parts.push(
+      segmented([['line', 'Line', 'pen'], ['rect', 'Rectangle', 'marquee'], ['ellipse', 'Ellipse', 'ellipse']], o.pixelShape, v => app.setOpt('pixelShape', v), true),
+      toggle('Filled', o.pixelFill, v => app.setOpt('pixelFill', v)));
+    if (t === 'pencil' || t === 'pxshape') parts.push(
       mini({ label: 'Pixel size', min: 1, max: 16, value: o.pixelSize, fmt: v => `${v}px`, onInput: v => { setOpt('pixelSize')(v); app.view.redrawOverlays(app.tool); } }),
-      toggle('Pixel-perfect lines', o.pixelPerfect, v => app.setOpt('pixelPerfect', v)),
+      t === 'pencil' && toggle('Pixel-perfect lines', o.pixelPerfect, v => app.setOpt('pixelPerfect', v)),
       toggle('Erase (or right-click)', o.pixelErase, v => app.setOpt('pixelErase', v)),
       h('label.inline', { 'data-tip': 'Symmetry' }, icon('symmetry'), select(SYMMETRY, o.symmetry, v => { app.setOpt('symmetry', v); render(); })),
       toggle('Pixel grid', o.pixelGrid, v => app.setOpt('pixelGrid', v)),

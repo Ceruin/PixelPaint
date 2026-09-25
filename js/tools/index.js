@@ -7,7 +7,7 @@ import { TextTool } from './text.js';
 import { AssistTool } from './assist.js';
 
 export const TOOL_META = [
-  ['brush', 'Brush', 'B'], ['pencil', 'Pixel Pencil', 'P'], ['eraser', 'Eraser', 'E'], ['smudge', 'Smudge', 'S'], ['fill', 'Fill', 'G'],
+  ['brush', 'Brush', 'B'], ['pencil', 'Pixel Pencil', 'P'], ['pxshape', 'Pixel Line & Shapes', 'Shift+P'], ['eraser', 'Eraser', 'E'], ['smudge', 'Smudge', 'S'], ['fill', 'Fill', 'G'],
   ['picker', 'Eyedropper', 'I'], ['marquee', 'Rectangle Select', 'M'], ['ellipse', 'Ellipse Select', 'O'],
   ['lasso', 'Lasso', 'L'], ['wand', 'Magic Wand', 'W'], ['transform', 'Transform / Warp', 'V'],
   ['shape', 'Shapes & Bubbles', 'U'], ['text', 'Text', 'T'], ['assist', 'Drawing Assistants', 'A'],
@@ -16,7 +16,7 @@ export const TOOL_META = [
 
 export function createTools(app) {
   return {
-    brush: new PaintTool(app, 'brush'), pencil: new PixelTool(app), eraser: new PaintTool(app, 'eraser'), smudge: new PaintTool(app, 'smudge'),
+    brush: new PaintTool(app, 'brush'), pencil: new PixelTool(app), pxshape: new PixelTool(app, 'pxshape'), eraser: new PaintTool(app, 'eraser'), smudge: new PaintTool(app, 'smudge'),
     fill: new FillTool(app), picker: new PickerTool(app),
     marquee: new MarqueeTool(app, 'marquee', false), ellipse: new MarqueeTool(app, 'ellipse', true),
     lasso: new LassoTool(app), wand: new WandTool(app), transform: new TransformTool(app),

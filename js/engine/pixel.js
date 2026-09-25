@@ -43,8 +43,45 @@ export class PixelEngine {
     for (const f of this.sym) {
       const [cx, cy] = f(x + s / 2, y + s / 2, 0), X = Math.round(cx - s / 2), Y = Math.round(cy - s / 2);
       clear ? this.ctx.clearRect(X, Y, s, s) : this.ctx.fillRect(X, Y, s, s);
-      this.dirty = Rect.union(this.dirty, { x: X, y: Y, w: s, h: s });
+      this.dirtyLast = { x: X, y: Y, w: s, h: s };
+      this.dirty = Rect.union(this.dirty, this.dirtyLast);
+      if (this.drawn && !clear) this.drawn.push(this.dirtyLast);
     }
   }
   takeDirty() { const d = this.dirty; this.dirty = null; return d; }
+}
+
+// Pixel line / rectangle / ellipse from the press point to the pointer, redrawn as it moves (the
+// last outline is cleared from the stroke buffer first). Filled or outline, at the pencil's size.
+export class PixelShapeEngine extends PixelEngine {
+  constructor(o) { super(o); Object.assign(this, { kind: o.kind ?? 'line', filled: !!o.filled, perfect: false, drawn: [] }); }
+  begin(p) { this.a = this.cell(p); this.draw(this.a); }
+  move(p) { this.draw(this.cell(p)); }
+  end(p) { if (p) this.move(p); }
+  draw(b) {
+    for (const r of this.drawn) { this.ctx.clearRect(r.x, r.y, r.w, r.h); this.dirty = Rect.union(this.dirty, r); }
+    this.drawn = [];
+    const [ax, ay] = this.a, [bx, by] = b, x0 = Math.min(ax, bx), x1 = Math.max(ax, bx), y0 = Math.min(ay, by), y1 = Math.max(ay, by);
+    if (this.kind === 'line') { this.path = []; this.add([ax, ay]); PixelEngine.prototype.move.call(this, { x: bx + (this.size - 1) / 2, y: by + (this.size - 1) / 2 }); return; }
+    if (this.kind === 'rect') {
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (this.filled || x === x0 || x === x1 || y === y0 || y === y1) this.plot([x, y]);
+      return;
+    }
+    // ellipse: a span per row, and for the outline the parts of each span its neighbours don't cover
+    const cx = (x0 + x1 + 1) / 2, cy = (y0 + y1 + 1) / 2, rx = (x1 - x0 + 1) / 2, ry = (y1 - y0 + 1) / 2, spans = [];
+    for (let y = y0; y <= y1; y++) {
+      const dy = (y + 0.5 - cy) / ry, dx = rx * Math.sqrt(Math.max(0, 1 - dy * dy));
+      let a = Math.ceil(cx - dx - 0.5), z = Math.floor(cx + dx - 0.5);
+      if (a > z) a = z = Math.round(cx - 0.5);
+      spans.push([a, z]);
+    }
+    spans.forEach(([a, z], i) => {
+      const y = y0 + i, up = spans[i - 1], dn = spans[i + 1];
+      if (this.filled || !up || !dn) { for (let x = a; x <= z; x++) this.plot([x, y]); return; }
+      // reach over to the more inset neighbour so the outline never breaks on the diagonals
+      const l = Math.min(z, Math.max(a, Math.max(up[0], dn[0]) - 1)), r = Math.max(a, Math.min(z, Math.min(up[1], dn[1]) + 1));
+      for (let x = a; x <= l; x++) this.plot([x, y]);
+      for (let x = Math.max(r, l + 1); x <= z; x++) this.plot([x, y]);
+    });
+  }
 }
