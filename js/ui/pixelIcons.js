@@ -3,6 +3,7 @@
 const C = {
   k: '#221822', w: '#ffffff', r: '#e0485a', p: '#ff8fa3', y: '#ffd23f', o: '#ff9f2b', g: '#2fb36b', G: '#1a7a45',
   b: '#3b7bff', c: '#84cee0', n: '#8a5a3c', t: '#f2cf99', s: '#9aa1b1', m: '#c9b8ff', l: '#dfe6f0',
+  v: '#a445ff', d: '#4a4f5c', Y: '#d99a14',
 };
 
 export const ICONS = {
@@ -21,6 +22,31 @@ export const ICONS = {
   strawberry: ['..gGg..', '.rrgrr.', 'rryrryr', 'rrrrrrr', 'ryrrryr', '.rrrrr.', '..ryr..', '...r...'],
   dango: ['..pp..', '.pppp.', '..pp..', '..ww..', '.wwww.', '..ww..', '..gg..', '.gggg.', '..gg..', '...n..'],
   tea: ['.l.l...', '..l.l..', 'kkkkkk.', 'kccccckk', 'kccccck.k', 'kcccccckk', '.kccck..', '..kkk...'],
+  pencilPx: ['.....kk', '....kyk', '...kyk.', '..kyk..', '.kyk...', 'kpk....', 'kk.....'],
+  // emote balls & expressions (after the Chao emote ball)
+  emDot: ['.yy.', 'yyyy', 'yyyy', '.yy.'], emHalo: ['.ccccc.', 'c.....c', '.ccccc.'], emSpike: ['..v..', '.vvv.', 'vvvvv', '.vvv.', '..v..'],
+  swirl: ['sssssss', '.sssss.', '..sss..', '.sss...', '..ss...', '...s...'], flame: ['..o..', '.oyo.', 'oyyyo', '.oyo.'],
+  // shop fruit
+  heartFruit: ['...g...', '.pp.pp.', 'ppppppp', 'ppppppp', '.ppppp.', '..ppp..', '...p...'],
+  brightFruit: ['...g...', '..yyy..', '.ywyyy.', '.yyyyy.', '.yyyyy.', '..yyy..'],
+  moodyFruit: ['...G...', '..vvv..', '.vmvvv.', '.vvvvv.', '.vvvvv.', '..vvv..'],
+  chaoFruit: ['...g...', '..rrr..', '.ooooo.', 'yyyyyyy', '.ggggg.', '..bbb..'],
+  mushroom: ['..rrr..', '.rwrwr.', 'rrrrrrr', '..ttt..', '..ttt..'],
+  // kindergarten instruments
+  bell: ['..y..', '.yyy.', '.yyy.', 'yyyyy', '..k..'], castanets: ['.nn.nn.', 'nnnnnnn', '.nn.nn.'],
+  cymbals: ['yyyyy', '.yyy.', '..s..', '.yyy.', 'yyyyy'], drum: ['.lllll.', 'rlllllr', 'rrrrrrr', 'ryryryr', '.rrrrr.'],
+  flute: ['ssssssss', 'sksksks.'], maracas: ['.o...o.', 'ooo.ooo', '.o...o.', '..n.n..', '..n.n..'],
+  tambourine: ['.nynyn.', 'y.....y', 'n.....n', 'y.....y', '.nynyn.'], trumpet: ['......y', 'yyyyyyy', '.k.k..y'],
+  // toys
+  box: ['nnnnnnn', 'ntttttn', 'ntttttn', 'ntttttn', 'nnnnnnn'], radio: ['.....k.', '....k..', 'sssssss', 'skksbbs', 'skksbbs', 'sssssss'],
+  tv: ['.k...k.', '..k.k..', 'ddddddd', 'dcccccd', 'dcbcccd', 'dcccccd', 'ddddddd', '.d...d.'], crayons: ['r.y.b', 'r.y.b', 'r.y.b', 'k.k.k'],
+  // her drawings, by drawing level
+  sun: ['y..y..y', '.yyyyy.', '.yyyyy.', 'yyyyyyy', '.yyyyy.', '.yyyyy.', 'y..y..y'], flower: ['..p.p..', '.ppypp.', '..p.p..', '...g...', '.g.g...', '..gg...'],
+  cake: ['..r.r..', '..y.y..', '.ppppp.', '.wwwww.', 'nnnnnnn', 'ttttttt'], car: ['..bbb....', '.bcbcbb..', 'bbbbbbbbb', '.k....k..'],
+  house: ['...r...', '..rrr..', '.rrrrr.', '.twtnt.', '.tttnt.'],
+  // bits and bobs
+  medal: ['r...r', '.r.r.', '..y..', '.yyy.', '.yYy.', '..y..'], ring: ['.yyy.', 'y...y', 'y...y', '.yyy.'],
+  pill: ['.rrww.', 'rrrwww', '.rrww.'], bag: ['.nnn.', 'n...n', 'bbbbb', 'bbybb', 'bbbbb'], bloom: ['.p.', 'pyp', '.p.'],
 };
 
 export function drawIcon(ctx, name, x, y, k = 1, color) {

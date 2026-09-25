@@ -10,7 +10,9 @@ const SECTIONS = [
   ['zen', 'Modes', ['Paint is the full studio, Zen hides everything but the canvas (Tab), Notes is a board for ideas, Paper is a calm e-ink look, and Pixel is the pixel-art editor.']],
   ['sketch', 'Touch', ['Pinch to zoom and rotate, drag two fingers to pan.', 'Two-finger tap undoes, three-finger tap redoes. With a pen, fingers never paint.']],
   ['save', 'Saving', ['Everything autosaves in this browser. File → Download Project saves an OpenRaster (.ora) file that Krita and GIMP open too; PNG, JPG and PSD export are there as well.']],
-  ['heart', 'Pyxl', ['Pyxl reacts to what you do. Click her to feed, pet, play or nap — drag her card anywhere, pin it, or dock it as a panel.']],
+  ['heart', 'Pyxl', ['Pyxl reacts to what you do and grows with you: your strokes, colours, shapes and filters train her Line, Colour, Shape and Power skills, and food builds her Stamina.',
+    'Click her to care for her. Her card has Care (food, toys), Chart (her name, personality, skills and grades), School (lessons she then shows off), Games (stars and races) and a Shop for rings you earn.',
+    'She has a life cycle — child, a cocoon, adult — and a happy Pyxl is reborn remembering you. Drag her card anywhere, pin it, or dock it as a panel.']],
   ['download', 'Updates', ['Installed as an app? Help → Check for Updates fetches the newest version; you’ll also see a banner when one is out.']],
 ];
 

@@ -2,36 +2,121 @@ import { h, icon, keepOnScreen } from './dom.js';
 import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
 import { clamp } from '../core/util.js';
-import { NEEDS, SNACKS } from './pyxlStats.js';
+import { NEEDS, SNACKS, SHOP, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
+import { RACES, raceUnlocked, medalName } from './pyxlRace.js';
 import { iconCanvas } from './pixelIcons.js';
 
 
-// Pyxl's care body: needs, mood, level, and Feed / Pet / Play / Nap. Used by the popup card
-// and by the dockable "Pyxl" panel; it stays in sync with her stats while it's in the page.
+// Pyxl's care body, in five tabs (after the Chao Kindergarten): Care (needs, food, toys), Chart
+// (the Health Center's medical chart: name, personality, age, skills and grades), School (the
+// classroom's rotating lessons), Games (stars and races) and Shop (special fruit for rings).
+// Used by the popup card and the dockable "Pyxl" panel; it re-renders as her stats change.
+const TABS = [['care', 'Care', 'heart'], ['chart', 'Chart', 'pill'], ['school', 'School', 'bag'], ['games', 'Games', 'star'], ['shop', 'Shop', 'ring']];
+const TOYS = [['ball', 'Ball'], ['box', 'Box'], ['radio', 'Radio'], ['tv', 'TV'], ['crayons', 'Crayons']];
+const HAPPY_WORDS = [[60, 'Overjoyed'], [30, 'Happy'], [0, 'Content'], [-30, 'Down'], [-101, 'Miserable']];
+let tab = local.get('pp.pyxlTab', 'care');
+
 export function careBody(pyxl, onPlay) {
-  const s = pyxl.stats, bars = {}, mood = h('p.pc-mood'), lvl = h('span.pc-lvl'), xp = h('i'), napBtn = h('button.btn.sm', { type: 'button' });
-  const snacks = h('div.pc-snacks', { hidden: true }, SNACKS.map(sn => h('button.pc-snack', { type: 'button', 'data-tip': sn[1], onclick: () => { pyxl.feed(sn); snacks.hidden = true; } }, iconCanvas(sn[0], 3), h('small', {}, sn[1]))));
-  const el = h('div.pc-body', {},
-    lvl, mood,
-    h('div.pc-bars', {}, NEEDS.map(([k, name, ic, color]) => h('div.pc-bar', { 'data-tip': name },
-      iconCanvas(ic, 2), h('span', {}, name), h('div.pc-track', {}, bars[k] = h('i', { style: { background: color } }))))),
-    h('div.pc-xp', {}, xp),
-    h('div.pc-actions', {},
-      h('button.btn.sm', { type: 'button', onclick: () => { snacks.hidden = !snacks.hidden; } }, iconCanvas('onigiri', 2), 'Feed'),
-      h('button.btn.sm', { type: 'button', onclick: () => pyxl.pet() }, iconCanvas('heart', 2), 'Pet'),
-      h('button.btn.sm', { type: 'button', onclick: () => { onPlay?.(); pyxl.playGame(); } }, iconCanvas('star', 2), 'Play'),
-      napBtn),
-    snacks);
-  const sync = () => {
-    NEEDS.forEach(([k]) => { bars[k].style.width = `${s[k]}%`; bars[k].parentElement.classList.toggle('low', s[k] < 28); });
-    mood.textContent = s.mood;
-    lvl.textContent = `Lv ${s.level} · ${s.ageDays ? `${s.ageDays} day${s.ageDays > 1 ? 's' : ''} old` : 'new friend'}`;
-    xp.style.width = `${s.xp / (s.level * 40) * 100}%`;
-    napBtn.replaceChildren(icon(s.asleep ? 'sun' : 'zen'), s.asleep ? 'Wake' : 'Nap');
-    napBtn.onclick = () => (s.asleep ? pyxl.wake() : pyxl.nap());
+  const s = pyxl.stats, content = h('div.pc-content'), tabs = h('div.pc-tabs', { role: 'tablist' });
+  const btn = (ic, label, fn, opts = {}) => h('button.btn.sm', { type: 'button', onclick: fn, ...opts }, iconCanvas(ic, 2), label);
+  const bar = (v, color, cls = '') => h(`div.pc-track${cls}`, {}, h('i', { style: { width: `${Math.max(0, Math.min(100, v))}%`, background: color } }));
+
+  const views = {
+    care() {
+      const snacks = h('div.pc-grid', { hidden: true }, SNACKS.map(sn => h('button.pc-item', { type: 'button', 'data-tip': sn[1], onclick: () => pyxl.feed(sn) }, iconCanvas(sn[0], 3), h('small', {}, sn[1]))));
+      return [
+        h('p.pc-mood', {}, s.mood),
+        h('div.pc-bars', {}, NEEDS.map(([k, name, ic, color]) => h(`div.pc-bar${s[k] < 28 ? '.low' : ''}`, { 'data-tip': name }, iconCanvas(ic, 2), h('span', {}, name), bar(s[k], color)))),
+        h('div.pc-xp', { 'data-tip': `Friendship level ${s.level}` }, h('i', { style: { width: `${s.xp / (s.level * 40) * 100}%` } })),
+        h('div.pc-actions', {},
+          btn('onigiri', 'Feed', () => { snacks.hidden = !snacks.hidden; }),
+          btn('heart', 'Pet', () => pyxl.pet()),
+          s.sick ? btn('pill', 'Doctor', () => pyxl.doctor()) : btn('ball', 'Play', () => { onPlay?.(); pyxl.playGame(); }),
+          h('button.btn.sm', { type: 'button', onclick: () => (s.asleep ? pyxl.wake() : pyxl.nap()) }, icon(s.asleep ? 'sun' : 'zen'), s.asleep ? 'Wake' : 'Nap')),
+        snacks,
+        h('div.pc-label', {}, 'Toys'),
+        h('div.pc-grid', {}, TOYS.map(([id, name]) => h('button.pc-item', { type: 'button', 'data-tip': name, onclick: () => pyxl.toy(id) }, iconCanvas(id, 2), h('small', {}, name)))),
+      ];
+    },
+    chart() {
+      const name = h('input.pc-name', { value: s.name, maxLength: 14, spellcheck: false, 'aria-label': 'Name',
+        onkeydown: e => e.stopPropagation(), onchange: () => { s.name = name.value.trim() || 'Pyxl'; s.save(); } });
+      const [pName, pDesc] = PERSONALITIES[s.personality] ?? PERSONALITIES.none;
+      const fav = [...SNACKS, ...SHOP].find(f => f[0] === s.fav);
+      const hw = HAPPY_WORDS.find(([v]) => s.happiness >= v)[1];
+      const row = (label, ...val) => h('div.pc-row', {}, h('span', {}, label), h('b', {}, ...val));
+      return [
+        h('div.pc-namerow', {}, name, h('button.ibtn.sm', { type: 'button', 'data-tip': 'Fortune teller: a lucky name', onclick: () => { s.name = LUCKY_NAMES[Math.floor(Math.random() * LUCKY_NAMES.length)]; s.save(); pyxl.react('happy', { icon: 'sparkle', say: `${s.name}? I love it!` }); } }, icon('sparkle'))),
+        h('div.pc-page.blue', {},
+          row('Stage', s.ageLabel, s.stage === 'child' || s.stage === 'adult' ? ` · life ${s.lives}` : ''),
+          row('Type', s.chaos ? `Chaos ${s.name}` : s.type ? TYPES[s.type] : 'Still growing'),
+          row('Alignment', s.alignment)),
+        h('div.pc-skills', {}, SKILLS.map(([k, label, ic, color]) => {
+          const sk = s.skills[k];
+          return h('div.pc-skill', { 'data-tip': `${sk.pts} points` }, iconCanvas(ic, 2), h('span', {}, label), h('b.pc-grade', { className: `g${sk.grade}` }, GRADES[sk.grade]),
+            h('span.pc-lv', {}, `Lv ${sk.level}`), h('span.pc-prog', {}, Array.from({ length: 10 }, (_, i) => h(`i${i < sk.prog / 10 ? '.on' : ''}`, { style: { '--c': color } }))));
+        })),
+        h('div.pc-page.yellow', {},
+          row('Personality', pName), h('p.pc-note', {}, pDesc),
+          row('Favourite', fav ? iconCanvas(fav[0], 2) : '', fav ? ` ${fav[1]}` : '?'),
+          row('Feeling', hw),
+          row('Health', s.sick ? `Has ${ILLNESSES[s.sick]}` : 'Healthy'),
+          s.sick && btn('pill', 'See the doctor', () => pyxl.doctor())),
+        h('div.pc-page.pink', {},
+          row('Rings', iconCanvas('ring', 2), ` ${s.rings}`),
+          row('Races', `${s.wins} won / ${s.races}`),
+          row('Medals', ...RACES.map(([id, label]) => s.medals[id] != null ? h('span.pc-medal', { className: `m${s.medals[id]}`, 'data-tip': `${label}: ${medalName(s.medals[id])}` }, iconCanvas('medal', 2)) : ''))),
+      ];
+    },
+    school() {
+      const [id, name, kind] = currentLesson(), left = Math.ceil((LESSON_SLOT - (Date.now() % LESSON_SLOT)) / 1000);
+      const at = s.school, learned = LESSONS.filter(l => s.learned[l[0]]);
+      return [
+        h('p.pc-mood', {}, at ? `${s.name} is in ${LESSONS.find(l => l[0] === at.id)?.[1]} class — back in ${Math.max(0, Math.ceil((at.until - Date.now()) / 1000))}s.` : `Now in class: ${name}. Next lesson in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}.`),
+        h('div.pc-lesson', {}, iconCanvas(kind === 'instrument' ? id : kind === 'dance' ? 'note' : kind === 'song' ? 'note' : kind === 'drawing' ? 'crayons' : 'star', 3),
+          h('div', {}, h('b', {}, name), h('small', {}, `${kind[0].toUpperCase()}${kind.slice(1)}${s.learned[id] ? ` · learned${kind === 'song' || kind === 'drawing' ? ` (level ${s.learned[id]}/5)` : ''}` : ''}`)),
+          h('button.btn.sm.primary', { type: 'button', disabled: !!at || !pyxl.awake(), onclick: () => pyxl.school() }, 'Send to class')),
+        h('div.pc-label', {}, `Learned ${learned.length} / ${LESSONS.length}`),
+        h('div.pc-learned', {}, LESSONS.map(([lid, lname]) => h(`span${s.learned[lid] ? '.on' : ''}`, { 'data-tip': lname }, lname))),
+        h('p.pc-note', {}, 'She shows off what she learns while you work. Lessons rotate every 3 minutes, like the Chao Kindergarten.'),
+      ];
+    },
+    games() {
+      return [
+        h('div.pc-game', {}, iconCanvas('star', 3), h('div', {}, h('b', {}, 'Catch the stars'), h('small', {}, 'Tap stars before they vanish. Builds luck.')),
+          h('button.btn.sm', { type: 'button', onclick: () => { onPlay?.(); pyxl.playGame(); } }, 'Play')),
+        h('div.pc-label', {}, 'Races — skills and stamina decide who wins'),
+        ...RACES.map(([id, label], i) => {
+          const open = raceUnlocked(s, i), m = s.medals[id];
+          return h('div.pc-game', {}, iconCanvas('medal', 3),
+            h('div', {}, h('b', {}, `${label} Race`), h('small', {}, open ? m != null ? `Best: ${medalName(m)}` : 'No medal yet' : `Win gold in the ${RACES[i - 1][1]} race`)),
+            h('button.btn.sm', { type: 'button', disabled: !open, onclick: () => { onPlay?.(); pyxl.race(i); } }, open ? 'Race' : icon('lock')));
+        }),
+      ];
+    },
+    shop() {
+      return [
+        h('p.pc-mood', {}, iconCanvas('ring', 2), ` ${s.rings} rings — earn them by painting, saving, levelling up and winning races.`),
+        h('div.pc-shop', {}, SHOP.map(item => h('button.pc-item', { type: 'button', disabled: s.rings < item[2], onclick: () => pyxl.buy(item), 'data-tip': SHOP_TIPS[item[3]] },
+          iconCanvas(item[0], 3), h('small', {}, item[1]), h('small.pc-price', {}, iconCanvas('ring', 1), ` ${item[2]}`)))),
+      ];
+    },
   };
-  sync();
-  el.dispose = bus.on('pyxl:stats', sync);
+  const SHOP_TIPS = { love: 'Love season: flowers bloom around her', bright: 'Nudges her toward Bright', moody: 'Nudges her toward Moody', skills: 'Trains every skill', energy: 'A pick-me-up' };
+
+  const render = () => {
+    tabs.replaceChildren(...TABS.map(([id, label, ic]) => h(`button.pc-tab${id === tab ? '.on' : ''}`, { type: 'button', role: 'tab', 'data-tip': label, onclick: () => { tab = id; local.set('pp.pyxlTab', id); render(); } }, iconCanvas(ic, 2), h('span', {}, label))));
+    if (tab === 'chart' && content.contains(document.activeElement)) return;   // don't yank the name field while typing
+    content.replaceChildren(...views[tab]().filter(Boolean));
+  };
+  // Re-render at most once a frame, and only while visible (the docked panel may be hidden).
+  let raf = 0, stale = false;
+  const schedule = () => { raf ||= requestAnimationFrame(() => { raf = 0; if (el.offsetParent) render(); else stale = true; }); };
+  const el = h('div.pc-body', {}, tabs, content);
+  new IntersectionObserver(([e]) => { if (e.isIntersecting && stale) { stale = false; render(); } }).observe(el);
+  render();
+  const off = bus.on('pyxl:stats', schedule), timer = setInterval(() => tab === 'school' && schedule(), 1000);
+  el.dispose = () => { off(); clearInterval(timer); };
   return el;
 }
 
@@ -46,7 +131,7 @@ export function openCareCard(pyxl, dock) {
   const saved = local.get('pp.pyxlCard') ?? {}, body = careBody(pyxl, () => !saved.pinned && close());
   const pin = h('button.ibtn.sm', { type: 'button', 'data-tip': 'Pin open', onclick: () => { saved.pinned = !saved.pinned; pin.classList.toggle('on', saved.pinned); local.set('pp.pyxlCard', saved); } }, icon('lock'));
   pin.classList.toggle('on', !!saved.pinned);
-  const head = h('div.pc-head', {}, iconCanvas('heart', 2), h('strong', {}, 'Pyxl'), h('span.spacer'), pin,
+  const head = h('div.pc-head', {}, iconCanvas('heart', 2), h('strong', {}, pyxl.stats.name), h('span.spacer'), pin,
     dock && h('button.ibtn.sm', { type: 'button', 'data-tip': 'Dock as a panel', onclick: () => { close(); dock(); } }, icon('window')),
     h('button.ibtn.sm', { type: 'button', 'aria-label': 'Close', onclick: close }, icon('x')));
   card = h('div.pyxl-card', {}, head, body);
