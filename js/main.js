@@ -60,8 +60,31 @@ panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hid
 initPopupPalette(app);
 document.body.classList.toggle('light', app.settings.theme === 'light');
 
+// Pixel mode: the pixel-art editor runs in a frame inside the app (loaded on first use and kept
+// alive, so switching modes never loses its state). Its top bar replaces ours while it's shown.
+const pixelBox = $('#pixel');
+let pixelFrame = null;
+const showPixel = on => {
+  pixelBox.hidden = !on;
+  if (!on) return;
+  if (!pixelFrame) {
+    pixelFrame = pixelBox.appendChild(Object.assign(document.createElement('iframe'), { src: 'pixel-editor.html', title: 'Pixel editor', className: 'pixel-frame' }));
+    pixelFrame.addEventListener('load', () => {
+      const w = pixelFrame.contentWindow, spot = w.document.getElementById('pyxlSpot');
+      if (spot) new w.ResizeObserver(placePixelPyxl).observe(spot);
+    });
+  }
+  pixelFrame.focus();
+};
+// Pyxl stands in the pixel editor's tool rail (a spot it keeps free above Help); hidden if there's no room.
+const placePixelPyxl = () => {
+  const r = pixelFrame.contentDocument?.getElementById('pyxlSpot')?.getBoundingClientRect(), slot = $('#pixelSlot');
+  slot.hidden = !(r?.width >= 80 && r.height >= 70);
+  if (!slot.hidden) Object.assign(slot.style, { left: `${r.left + (r.width - 92) / 2}px`, top: `${r.bottom - 78}px` });
+};
+addEventListener('message', e => e.origin === location.origin && e.data?.ppMode && setMode(e.data.ppMode));
+
 function setMode(mode) {
-  if (mode === 'pixel') { location.href = 'pixel/'; return; }
   if (!MODES.some(m => m[0] === mode)) mode = 'paint';
   app.tool.interrupt?.();
   app.mode = mode;
@@ -69,7 +92,8 @@ function setMode(mode) {
   local.set('pp.mode', mode);
   app.profile = mode === 'paper' ? { smoothing: 0.3, grain: 0.35 } : {};
   notes.show(mode === 'notes');
-  mascot.mount(mode === 'zen' ? zen.slot : mode === 'notes' ? notes.slot : $('#mascotSlot'));
+  showPixel(mode === 'pixel');
+  mascot.mount(mode === 'zen' ? zen.slot : mode === 'notes' ? notes.slot : mode === 'pixel' ? $('#pixelSlot') : $('#mascotSlot'));
   modeBox.replaceChildren(modeSwitch(mode, setMode));
   bus.emit('mode', mode);
   requestAnimationFrame(() => app.view.resize());
@@ -88,13 +112,13 @@ $('#optionsbar').addEventListener('wheel', e => {
 }, { passive: false });
 statusbar(app, $('#statusbar'), $('#view'));
 initTooltips();
-bindKeys();
+bindKeys(a => app.mode !== 'pixel' || /^mode\.(?!toggle)/.test(a.id));
 panels.apply(local.get('pp.layout'));
 bus.on('toast', toast);
 watchForUpdates(() => project.saveLocal(true));
 
 // Space = temporary hand tool.
-addEventListener('keydown', e => { if (e.code === 'Space' && !isTyping(e) && !app.keys.space) { app.keys.space = true; app.input.updateCursor(); e.preventDefault(); } });
+addEventListener('keydown', e => { if (e.code === 'Space' && app.mode !== 'pixel' && !isTyping(e) && !app.keys.space) { app.keys.space = true; app.input.updateCursor(); e.preventDefault(); } });
 addEventListener('keyup', e => { if (e.code === 'Space') { app.keys.space = false; app.input.updateCursor(); } });
 
 // Drop files: projects/images open; images dropped on an open canvas become layers.

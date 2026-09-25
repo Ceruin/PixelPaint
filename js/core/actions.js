@@ -31,11 +31,12 @@ export function comboOf(e) {
 
 export const isTyping = e => !!e.target.closest?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
 
-export function bindKeys() {
+// `allow` narrows which actions keys may trigger right now (e.g. only mode switches in Pixel mode).
+export function bindKeys(allow = () => true) {
   addEventListener('keydown', e => {
     if (isTyping(e) || document.querySelector('.modal-back')) return;
     const c = comboOf(e);
-    const a = c && actions.all().find(a => actions.key(a.id) === c && a.enabled?.() !== false);
+    const a = c && actions.all().find(a => actions.key(a.id) === c && a.enabled?.() !== false && allow(a));
     if (a) { e.preventDefault(); a.run(); }
   });
 }
