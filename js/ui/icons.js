@@ -79,6 +79,14 @@ export const ICONS = {
   texture: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 11 11 3M3 19 19 3M11 21 21 11"/>',
   mirror: '<path d="M12 3v18"/><path d="M8 7H4v10h4M16 7h4v10h-4"/>',
   heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/>',
+  play: '<path d="M7 4v16l13-8z"/>',
+  pause: '<path d="M7 4h3v16H7zM14 4h3v16h-3z"/>',
+  first: '<path d="M6 4v16M19 4 9 12l10 8z"/>',
+  last: '<path d="M18 4v16M5 4l10 8-10 8z"/>',
+  chevronLeft: '<path d="m15 6-6 6 6 6"/>',
+  onion: '<circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="8.5" stroke-dasharray="2.2 2.6"/>',
+  film: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 4v16M17 4v16M3 8h4M3 12h4M3 16h4M17 8h4M17 12h4M17 16h4"/>',
+  tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
 };
 ICONS.assist = ICONS.ruler;

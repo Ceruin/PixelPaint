@@ -1,4 +1,5 @@
 import { floodMask, dilate, maskToCanvas } from '../engine/flood.js';
+import { makeCanvas } from '../core/util.js';
 import { hexToU32 } from '../core/color.js';
 import { haptics } from '../input/haptics.js';
 
@@ -6,7 +7,7 @@ import { haptics } from '../input/haptics.js';
 export function sampleSource(app) {
   const { doc, view, opts } = app;
   if (opts.sampleAll || !doc.activeLayer) { view.compose(); return view.comp; }
-  return doc.activeLayer.canvas;
+  return doc.activeLayer.view() ?? makeCanvas(doc.w, doc.h);
 }
 
 export function regionMask(app, p, rgba = 0xffffffff, grow = false) {

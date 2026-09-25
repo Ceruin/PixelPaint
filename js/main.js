@@ -15,6 +15,7 @@ import { layersPanel } from './ui/layersPanel.js';
 import { historyPanel } from './ui/historyPanel.js';
 import { navigatorPanel, referencePanel } from './ui/navigator.js';
 import { initPopupPalette } from './ui/popupPalette.js';
+import { initTimeline } from './ui/timeline.js';
 import { showWelcome } from './ui/welcome.js';
 import { menubar } from './ui/menubar.js';
 import { MODES, modeSwitch } from './ui/modes.js';
@@ -68,7 +69,8 @@ function setMode(mode) {
   requestAnimationFrame(() => app.view.resize());
 }
 
-const { menus } = defineActions(app, { panels, project, setMode });
+const timeline = initTimeline(app, $('#timeline'));
+const { menus } = defineActions(app, { panels, project, setMode, timeline });
 const modeBox = document.createElement('div');
 menubar($('#menubar'), menus, modeBox);
 optionsBar(app, $('#optionsbar'), e => openPanel('brushes', e));

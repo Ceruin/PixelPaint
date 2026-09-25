@@ -43,13 +43,14 @@ export function layersPanel(app) {
   };
   const updateThumbs = () => {
     for (const [n, t] of thumbs) {
-      if (t.v === n.version && t.w === n.canvas.width) continue;
-      const { width: w, height: ht } = n.canvas, s = 40 / Math.max(w, ht);
+      const src = n.view(), key = `${n.version}|${n.doc.frame}|${n.doc.w}x${n.doc.h}`;
+      if (t.key === key) continue;
+      const { w, h: ht } = n.doc, s = 40 / Math.max(w, ht);
       t.c.width = Math.max(1, Math.round(w * s)); t.c.height = Math.max(1, Math.round(ht * s));
       const c = t.c.getContext('2d');
       c.clearRect(0, 0, t.c.width, t.c.height);
-      c.drawImage(n.canvas, 0, 0, t.c.width, t.c.height);
-      t.v = n.version; t.w = w;
+      if (src) c.drawImage(src, 0, 0, t.c.width, t.c.height);
+      t.key = key;
     }
   };
   let thumbTimer = 0;
@@ -146,6 +147,7 @@ export function layersPanel(app) {
   bus.on('layers', render);
   bus.on('filterLayer', n => editFilter(n));
   bus.on('dirty', scheduleThumbs);
+  bus.on('frame', scheduleThumbs);
 
   const foot = h('div.layer-foot', {},
     iconBtn('plus', 'New layer', () => actions.run('layer.new'), { 'data-action': 'layer.new' }),

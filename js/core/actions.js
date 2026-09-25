@@ -35,7 +35,7 @@ export function bindKeys() {
   addEventListener('keydown', e => {
     if (isTyping(e) || document.querySelector('.modal-back')) return;
     const c = comboOf(e);
-    const a = c && actions.all().find(a => actions.key(a.id) === c);
-    if (a && a.enabled?.() !== false) { e.preventDefault(); a.run(); }
+    const a = c && actions.all().find(a => actions.key(a.id) === c && a.enabled?.() !== false);
+    if (a) { e.preventDefault(); a.run(); }
   });
 }

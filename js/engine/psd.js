@@ -51,8 +51,8 @@ export function encodePSD(doc) {
       walk(n);
       recs.push({ name: n.name, section: n.collapsed ? 2 : 1, node: n, r: { x: 0, y: 0, w: 0, h: 0 }, ch: planes(null, { w: 0, h: 0 }) });
     } else if (n.type === 'layer') {
-      const r = tightBounds(n.canvas);
-      recs.push({ name: n.name, node: n, r, ch: planes(n.canvas, r) });
+      const cel = n.view(doc.frame), r = cel ? tightBounds(cel) : { x: 0, y: 0, w: 0, h: 0 };
+      recs.push({ name: n.name, node: n, r, ch: planes(cel, r) });
     }
   });
   walk(doc.root);

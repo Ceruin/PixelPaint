@@ -8,6 +8,7 @@ import { createTools } from './tools/index.js';
 import { CanvasInput } from './input/pointer.js';
 import { haptics } from './input/haptics.js';
 import { assistOverlay } from './tools/assist.js';
+import { Player } from './engine/animation.js';
 
 // Application state + controller. UI modules read from it and call its methods; the engine
 // never touches the DOM outside the view canvas.
@@ -16,7 +17,7 @@ export class App {
     this.color = local.get('pp.color', { fg: '#1b1d23', bg: '#ffffff' });
     this.opts = {
       selMode: 'replace', tolerance: 24, contiguous: true, sampleAll: true, transformMode: 'free', uniform: true,
-      symmetry: 'none', radial: 6, wrap: false, snapAssist: false, showAssist: true, assistKind: 'ruler',
+      symmetry: 'none', radial: 6, wrap: false, onion: false, onionPrev: 1, onionNext: 1, onionAlpha: 0.5, playDir: 'forward', snapAssist: false, showAssist: true, assistKind: 'ruler',
       shape: 'rect', shapeWidth: 4, shapeFill: false, shapeStroke: true, font: "'Pixelify Sans'", fontSize: 48, bold: false,
       ...local.get('pp.opts', {}),
     };
@@ -33,11 +34,16 @@ export class App {
     this.tool.activate();
     this.view.overlays.add(assistOverlay(this));
     this.view.wrap = this.opts.wrap;
+    this.player = new Player(this);
+    this.syncOnion();
+    bus.on('play', on => { this.view.onion = on ? null : this.onionCfg(); });
     bus.on('brush', () => local.set('pp.brushes', this.brushes));
   }
 
   setDoc(doc) {
     this.tool.interrupt?.();
+    this.player?.stop();
+    if (this.player) this.player.tag = -1;
     this.doc = doc;
     if (this.settings.historyMB) doc.history.maxBytes = this.settings.historyMB * 2 ** 20;
     this.view.setDoc(doc);
@@ -69,7 +75,16 @@ export class App {
   }
   swapColors() { const { fg, bg } = this.color; this.setColor(bg, 'fg'); this.setColor(fg, 'bg'); }
 
-  setOpt(k, v) { this.opts[k] = v; local.set('pp.opts', this.opts); if (k === 'wrap') this.view.setWrap(v); bus.emit('opts', this.opts); this.view.redraw(); }
+  setOpt(k, v) {
+    this.opts[k] = v;
+    local.set('pp.opts', this.opts);
+    if (k === 'wrap') this.view.setWrap(v);
+    if (k.startsWith('onion')) this.syncOnion();
+    bus.emit('opts', this.opts);
+    this.view.redraw();
+  }
+  onionCfg() { const o = this.opts; return o.onion ? { prev: o.onionPrev, next: o.onionNext, alpha: o.onionAlpha } : null; }
+  syncOnion() { this.view.onion = this.onionCfg(); this.view.redraw(); }
   setSetting(k, v) { this.settings[k] = v; local.set('pp.settings', this.settings); haptics.enabled = this.settings.haptics; }
 
   symmetry() { return symmetryFns(this.opts.symmetry, this.doc.w / 2, this.doc.h / 2, this.opts.radial); }

@@ -2,10 +2,12 @@ import { h, iconBtn, slider } from './ui/dom.js';
 import { modal, form } from './ui/dialogs.js';
 import { actions, comboOf } from './core/actions.js';
 import { local } from './core/storage.js';
-import { clamp, download, pickFile, readJSON, toBlob } from './core/util.js';
+import { clamp, download, pickFile, pickFiles, readJSON, toBlob } from './core/util.js';
 import { Doc } from './engine/document.js';
 import { FILTERS, LAYER_FILTERS, renderFilter } from './engine/filters.js';
 import { encodePSD } from './engine/psd.js';
+import { Layer } from './engine/document.js';
+import { renderFrames, exportGIF, exportPNGSequence, exportSpriteSheet, exportVideo } from './engine/animation.js';
 import { bus } from './core/bus.js';
 import { acquire, release } from './engine/compositor.js';
 import { TOOL_META } from './tools/index.js';
@@ -17,7 +19,7 @@ const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], [
 const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
 
-export function defineActions(app, { panels, project, setMode }) {
+export function defineActions(app, { panels, project, setMode, timeline }) {
   const doc = () => app.doc;
   const editable = fn => () => {
     const l = doc().activeLayer;
@@ -182,11 +184,51 @@ export function defineActions(app, { panels, project, setMode }) {
     if (j.keys) actions.loadKeymap(j.keys);
   };
 
+  // ---- animation ----
+  const exportAnim = async () => {
+    const d = doc();
+    const v = await form('Export Animation', [
+      { id: 'fmt', label: 'Format', type: 'select', value: 'gif', options: [['gif', 'Animated GIF'], ['sheet', 'Sprite sheet + JSON (.zip)'], ['seq', 'PNG sequence (.zip)'], ['video', 'Video (WebM)']] },
+      { id: 'range', label: 'Frames', type: 'select', value: '-1', options: [['-1', `All (${d.frames.length})`], ...d.tags.map((t, i) => [String(i), `Tag: ${t.name}`])] },
+      { id: 'scale', label: 'Scale', type: 'select', value: '1', options: [['0.25', '25%'], ['0.5', '50%'], ['1', '100%'], ['2', '200%'], ['4', '400%']] },
+      { id: 'layout', label: 'Sheet layout', type: 'select', value: 'horizontal', options: [['horizontal', 'Horizontal strip'], ['vertical', 'Vertical strip'], ['grid', 'Grid']] },
+      { id: 'loops', label: 'Video loops', value: 1, min: 1, max: 20 },
+    ], 'Export');
+    if (!v) return;
+    const t = d.tags[+v.range], from = t?.from ?? 0, to = t?.to ?? d.frames.length - 1, name = d.name;
+    app.toast('Rendering frames…');
+    await new Promise(r => setTimeout(r, 30));
+    const frames = renderFrames(d, from, to, +v.scale);
+    try {
+      if (v.fmt === 'gif') download(exportGIF(frames), `${name}.gif`);
+      if (v.fmt === 'seq') download(await exportPNGSequence(frames, name), `${name}-frames.zip`);
+      if (v.fmt === 'sheet') download(await exportSpriteSheet(frames, name, v.layout, d.tags, from), `${name}-sheet.zip`);
+      if (v.fmt === 'video') { app.toast('Recording video in real time…'); download(await exportVideo(frames, v.loops), `${name}.webm`); }
+    } catch (e) { app.toast(e.message); }
+  };
+
+  // Image sequence → a new layer whose cels are the images, one per frame (frames added as needed).
+  const importFrames = async () => {
+    const files = (await pickFiles('image/*')).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    if (!files.length) return;
+    const d = doc(), imgs = await Promise.all(files.map(f => createImageBitmap(f))), l = new Layer(d, files[0].name.replace(/[_-]?\d*\.\w+$/, '') || 'Sequence');
+    d.editTree('Import Frames', () => { d.insert(l); d.active = l; });
+    d.editFrames('Import Frames', () => {
+      const start = d.frames.length > 1 ? d.frame : 0;
+      while (d.frames.length < start + imgs.length) d.frames.push({ duration: d.frames.at(-1).duration });
+      imgs.forEach((img, i) => {
+        const s = Math.min(1, d.w / img.width, d.h / img.height), w = img.width * s, ht = img.height * s;
+        l.cel(start + i, true).getContext('2d').drawImage(img, (d.w - w) / 2, (d.h - ht) / 2, w, ht);
+      });
+    });
+    timeline.expand();
+  };
+
   const nudgeSize = k => () => { const b = app.brush; b.size = clamp(Math.round(b.size * k + (k > 1 ? 1 : -1)), 1, 1000); app.brushChanged(); };
   const v = () => app.view;
 
   actions.define([
-    { id: 'file.new', label: 'New Canvas…', key: 'Alt+N', run: newDoc },
+    { id: 'file.new', label: 'New Canvas…', key: 'Ctrl+Alt+N', run: newDoc },
     { id: 'file.open', label: 'Open…', key: 'Ctrl+O', run: project.open },
     { id: 'file.import', label: 'Import Image as Layer…', key: 'Ctrl+Shift+O', run: async () => { const f = await pickFile('image/*'); if (f) project.importLayer(f, f.name); } },
     { id: 'file.save', label: 'Save to Browser', key: 'Ctrl+S', run: () => project.saveLocal(false) },
@@ -229,6 +271,21 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'sel.feather', label: 'Feather…', key: 'Shift+F6', run: async () => { const r = await form('Feather Selection', [{ id: 'r', label: 'Radius (px)', value: 8, min: 1, max: 250 }]); if (r) doc().selection.feather(r.r); } },
 
     ...Object.entries(FILTERS).map(([k, f]) => ({ id: `filter.${k}`, label: f.params.length ? `${f.label}…` : f.label, key: { hsl: 'Ctrl+U', invert: 'Ctrl+I', desaturate: 'Ctrl+Shift+U' }[k], run: filter(k) })),
+
+    { id: 'anim.play', label: 'Play / Pause', icon: 'play', key: 'Enter', enabled: () => !app.tools.transform.s, run: () => app.player.toggle() },
+    { id: 'anim.first', label: 'First Frame', icon: 'first', key: 'Home', run: () => { app.player.stop(); doc().setFrame(0); } },
+    { id: 'anim.prev', label: 'Previous Frame', icon: 'chevronLeft', key: ',', run: () => app.player.step(-1) },
+    { id: 'anim.next', label: 'Next Frame', icon: 'chevronRight', key: '.', run: () => app.player.step(1) },
+    { id: 'anim.last', label: 'Last Frame', icon: 'last', key: 'End', run: () => { app.player.stop(); doc().setFrame(doc().frames.length - 1); } },
+    { id: 'anim.newFrame', label: 'New Frame', icon: 'plus', key: 'Alt+N', run: () => { app.player.stop(); doc().addFrame(false); timeline.expand(); } },
+    { id: 'anim.dupFrame', label: 'Duplicate Frame', icon: 'copy', key: 'Alt+D', run: () => { app.player.stop(); doc().addFrame(true); timeline.expand(); } },
+    { id: 'anim.delFrame', label: 'Delete Frame', icon: 'trash', key: 'Alt+Delete', run: () => { app.player.stop(); doc().deleteFrame(); } },
+    { id: 'anim.clearCel', label: 'Blank Cel', icon: 'eraser', run: () => doc().activeLayer && doc().clearCel(doc().activeLayer) },
+    { id: 'anim.holdCel', label: 'Hold Previous Cel', icon: 'last', run: () => doc().activeLayer && doc().holdCel(doc().activeLayer) },
+    { id: 'anim.onion', label: 'Onion Skin', icon: 'onion', key: 'F3', checked: () => app.opts.onion, run: () => app.setOpt('onion', !app.opts.onion) },
+    { id: 'anim.tag', label: 'New Tag', icon: 'tag', key: 'F2', run: () => { const r = timeline.tagRange() ?? [doc().frame, doc().frame]; doc().addTag(...r); } },
+    { id: 'anim.export', label: 'Export Animation…', icon: 'film', key: 'Ctrl+Alt+E', run: exportAnim },
+    { id: 'anim.import', label: 'Import Frames (image sequence)…', icon: 'upload', run: importFrames },
 
     { id: 'view.in', label: 'Zoom In', key: 'Ctrl+=', run: () => v().zoomAt(1.25, v().cw / 2, v().ch / 2) },
     { id: 'view.out', label: 'Zoom Out', key: 'Ctrl+-', run: () => v().zoomAt(0.8, v().cw / 2, v().ch / 2) },
@@ -282,6 +339,7 @@ export function defineActions(app, { panels, project, setMode }) {
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.fill', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
+      ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
       ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.assist', 'assist.clear', '-', 'view.theme', 'app.welcome', '-', ...MODES.map(m => `mode.${m[0]}`)]],

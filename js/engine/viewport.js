@@ -16,6 +16,9 @@ export class Viewport {
     this.checker = this.ctx.createPattern(t, 'repeat');
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
     bus.on('dirty', r => this.invalidate(r));
+    this.onion = null;
+    this.onionCache = new Map();
+    ['history', 'frames', 'resize', 'doc', 'layers'].forEach(ev => bus.on(ev, () => this.onionCache.clear()));
     bus.on('resize', () => this.setDoc(this.doc));
   }
 
@@ -92,9 +95,32 @@ export class Viewport {
       ctx.imageSmoothingEnabled = this.zoom < 2;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(this.comp, 0, 0);
+      this.drawOnion(ctx);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.overlays.forEach(o => o.draw(ctx, this));
+  }
+
+  // Onion skin: the active layer's neighbouring cels, tinted red (before) / blue (after).
+  drawOnion(ctx) {
+    const o = this.onion, d = this.doc, l = d.activeLayer;
+    if (!o || !l || d.frames.length < 2) return;
+    for (const [dir, n, color] of [[-1, o.prev, '#ff3b47'], [1, o.next, '#3b7bff']]) for (let k = n; k >= 1; k--) {
+      const f = d.frame + dir * k, src = l.view(f);
+      if (f < 0 || f >= d.frames.length || !src) continue;
+      const key = `${l.id}|${f}|${color}`;
+      let t = this.onionCache.get(key);
+      if (!t) {
+        t = makeCanvas(d.w, d.h);
+        const tc = t.getContext('2d');
+        tc.drawImage(src, 0, 0);
+        tc.globalCompositeOperation = 'source-atop'; tc.globalAlpha = 0.55; tc.fillStyle = color; tc.fillRect(0, 0, d.w, d.h);
+        this.onionCache.set(key, t);
+      }
+      ctx.globalAlpha = o.alpha / k;
+      ctx.drawImage(t, 0, 0);
+      ctx.globalAlpha = 1;
+    }
   }
 
   // Strokes a doc-space path with a constant 1-css-px screen width.

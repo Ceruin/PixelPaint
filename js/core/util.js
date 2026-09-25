@@ -71,6 +71,13 @@ export const pickFile = accept => new Promise(res => {
   i.click();
 });
 
+export const pickFiles = accept => new Promise(res => {
+  const i = document.createElement('input');
+  i.type = 'file'; i.accept = accept; i.multiple = true;
+  i.onchange = () => res([...i.files]);
+  i.click();
+});
+
 export const toBlob = (c, type = 'image/png', q) => new Promise(r => c.toBlob(r, type, q));
 export const readJSON = async file => JSON.parse(await file.text());
 export const isTouchDevice = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;

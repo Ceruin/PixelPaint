@@ -35,7 +35,7 @@ export async function form(title, fields, ok = 'OK') {
   if (!await modal(title, body, [['Cancel', null], [ok, 'ok', true]])) return null;
   return Object.fromEntries(fields.map(f => {
     const i = inputs[f.id];
-    return [f.id, f.type === 'checkbox' ? i.checked : f.type === 'select' || f.type === 'text' ? i.value : +i.value];
+    return [f.id, f.type === 'checkbox' ? i.checked : ['select', 'text', 'color'].includes(f.type) ? i.value : +i.value];
   }));
 }
 

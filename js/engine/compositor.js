@@ -27,7 +27,7 @@ function blit(ctx, src, r, alpha, op) {
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
 
-function drawGroup(g, ctx, r, pv) {
+function drawGroup(g, ctx, r, pv, f) {
   const kids = g.children, { width: W, height: H } = ctx.canvas;
   for (let i = 0; i < kids.length; i++) {
     const n = kids[i];
@@ -42,22 +42,24 @@ function drawGroup(g, ctx, r, pv) {
       continue;
     }
     if (n.type === 'group') {
-      if (n.blend === 'pass' && n.opacity === 1) { drawGroup(n, ctx, r, pv); continue; }
+      if (n.blend === 'pass' && n.opacity === 1) { drawGroup(n, ctx, r, pv, f); continue; }
       const t = acquire(W, H), tc = t.getContext('2d');
       tc.clearRect(r.x, r.y, r.w, r.h);
-      drawGroup(n, tc, r, pv);
+      drawGroup(n, tc, r, pv, f);
       blit(ctx, t, r, n.opacity, n.blend === 'pass' ? 'source-over' : n.blend);
       release(t);
       continue;
     }
-    const src = pv?.get(n) ?? n.canvas;
+    const src = pv?.get(n) ?? n.view(f);
+    if (!src) continue;
     blit(ctx, src, r, n.opacity, n.blend);
     for (let j = i + 1; j < kids.length && kids[j].type === 'layer' && kids[j].clip; j++) {
       const c = kids[j];
-      if (!c.visible) continue;
+      const cs = pv?.get(c) ?? c.view(f);
+      if (!c.visible || !cs) continue;
       const t = acquire(W, H), tc = t.getContext('2d');
       tc.clearRect(r.x, r.y, r.w, r.h);
-      drawRect(tc, pv?.get(c) ?? c.canvas, r);
+      drawRect(tc, cs, r);
       tc.globalCompositeOperation = 'destination-in'; tc.globalAlpha = n.opacity;
       drawRect(tc, src, r);
       tc.globalCompositeOperation = 'source-over'; tc.globalAlpha = 1;
@@ -67,13 +69,13 @@ function drawGroup(g, ctx, r, pv) {
   }
 }
 
-export function renderDoc(doc, ctx, r, previews) {
+export function renderDoc(doc, ctx, r, previews, frame = doc.frame) {
   ctx.clearRect(r.x, r.y, r.w, r.h);
-  drawGroup(doc.root, ctx, r, previews);
+  drawGroup(doc.root, ctx, r, previews, frame);
 }
 
-export function flatten(doc) {
+export function flatten(doc, frame = doc.frame) {
   const c = makeCanvas(doc.w, doc.h);
-  renderDoc(doc, c.getContext('2d'), doc.bounds);
+  renderDoc(doc, c.getContext('2d'), doc.bounds, null, frame);
   return c;
 }

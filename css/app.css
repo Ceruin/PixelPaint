@@ -404,3 +404,35 @@ body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 @keyframes wl-float { 50% { transform: translateY(-8px); } }
 @media (max-width: 720px) { .wl-card { flex-direction: column; gap: 14px; text-align: center; } .wl-art { height: 44vh; } .wl-text { align-items: center; } .wl-text .brand { font-size: 32px; } }
 .dock-left .mascot { width: 90px; height: 84px; }
+
+/* ---------- animation timeline (same collapsible strip as the Pixel editor's) ---------- */
+.timeline { display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); max-height: 240px; position: relative; z-index: 3; }
+body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; }
+.tl-bar { display: flex; align-items: center; gap: 6px; padding: 4px 10px; min-height: 36px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; border-bottom: 1px solid var(--line); flex: none; }
+.timeline.collapsed .tl-bar { border-bottom: 0; }
+.tl-toggle { display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; color: var(--muted); padding: 0 4px; height: 28px; }
+.tl-toggle:hover { color: var(--text); }
+.tl-sep { width: 1px; height: 22px; background: var(--line); flex: none; }
+.tl-pos { min-width: 54px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
+.tl-num { width: 64px; height: 26px; padding: 0 6px; border-radius: var(--r); border: 1px solid var(--line); background: var(--bg); }
+.tl-body { overflow: auto; flex: 1; min-height: 0; scrollbar-width: thin; }
+.tl-grid { display: grid; grid-auto-rows: 26px; align-items: stretch; width: max-content; }
+.tl-name { position: sticky; left: 0; z-index: 1; display: flex; align-items: center; gap: 6px; padding: 0 8px; background: var(--panel); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; cursor: pointer; font-size: 12px; }
+.tl-name span { overflow: hidden; text-overflow: ellipsis; }
+.tl-name .ic { width: 13px; height: 13px; color: var(--muted); }
+.tl-name.on { color: var(--accent); }
+.tl-head { color: var(--muted); cursor: default; text-transform: uppercase; letter-spacing: .6px; font-size: 10.5px; }
+.tl-frame { display: grid; place-items: center; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); cursor: grab; touch-action: none; font-variant-numeric: tabular-nums; }
+.tl-frame.on { background: var(--accent); color: var(--accent-ink); }
+.tl-frame.sel, .tl-cel.sel { box-shadow: inset 0 -3px 0 var(--accent); }
+.tl-frame.drop { box-shadow: inset 3px 0 0 var(--accent); }
+.tl-cel { display: grid; place-items: center; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); cursor: pointer; }
+.tl-cel:hover { background: var(--panel2); }
+.tl-cel.col, .tl-cel.row { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.tl-cel.on { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.tl-cel i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); }
+.tl-cel i.full { background: var(--text); border-color: var(--text); }
+.tl-tag { margin: 3px 1px; border: 0; border-radius: 2px; padding: 0 6px; font-size: 11px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; background: color-mix(in srgb, var(--c) 70%, #000); }
+.tl-tag.on { outline: 2px solid var(--text); }
+.tl-cel i.key { background: var(--text); border-color: var(--text); }
+.tl-cel i.hold { width: 100%; height: 2px; border: 0; border-radius: 0; background: var(--muted); opacity: .6; }
