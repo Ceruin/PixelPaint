@@ -8438,7 +8438,7 @@ if(location.protocol.indexOf("http")===0){
   ml.href=URL.createObjectURL(new Blob([JSON.stringify(man)],{type:"application/manifest+json"}));
   document.head.appendChild(ml);
   // clean up the old multi-file version's service worker + caches so clients update
-  if("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
+  if("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>{ const u=(r.active||r.waiting||r.installing)?.scriptURL; if(u!==new URL("../sw.js",location.href).href) r.unregister(); })).catch(()=>{});
   if(window.caches) caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});
 }
 let deferredPrompt=null;

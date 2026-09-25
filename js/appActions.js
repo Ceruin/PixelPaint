@@ -15,6 +15,9 @@ import { MODES } from './ui/modes.js';
 import { hexToRgb } from './core/color.js';
 import { tipFromImage, registerTip } from './engine/tips.js';
 import { showWelcome } from './ui/welcome.js';
+import { checkForUpdates, reloadFresh } from './ui/updates.js';
+import { showGuide } from './ui/guide.js';
+import { VERSION } from './version.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
@@ -331,6 +334,10 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
     { id: 'view.assist', label: 'Show Assistants', icon: 'ruler', checked: () => app.opts.showAssist, run: () => app.setOpt('showAssist', !app.opts.showAssist) },
     { id: 'assist.clear', label: 'Clear Assistants', icon: 'trash', run: () => { doc().assistants.length = 0; bus.emit('assist'); v().redraw(); } },
     { id: 'app.welcome', label: 'Say Hi to Pyxl', icon: 'heart', run: () => showWelcome(true) },
+    { id: 'help.guide', label: 'Getting Started', icon: 'info', key: 'F1', run: showGuide },
+    { id: 'help.update', label: 'Check for Updates…', icon: 'download', run: () => checkForUpdates() },
+    { id: 'help.reload', label: 'Reload App', icon: 'rotCW', run: reloadFresh },
+    { id: 'help.about', label: 'About PixelPaint', icon: 'bubble', run: () => modal('About PixelPaint', h('p', {}, `PixelPaint ${VERSION} — a painting, pixel art, animation and notes app that runs in your browser and works offline. Your work autosaves on this device.`), [['OK', 'ok', true]]) },
     { id: 'view.theme', label: 'Light Theme', icon: 'sun', checked: () => app.settings.theme === 'light', run: () => { app.setSetting('theme', app.settings.theme === 'light' ? 'dark' : 'light'); document.body.classList.toggle('light', app.settings.theme === 'light'); bus.emit('mode', app.mode); } },
 
     ...MODES.map(([id, label, ic, key]) => ({ id: `mode.${id}`, label: `${label} Mode`, icon: ic, key, checked: () => app.mode === id, run: () => setMode(id) })),
@@ -374,8 +381,9 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
-      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.theme', 'app.welcome', '-', ...MODES.map(m => `mode.${m[0]}`)]],
+      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.theme', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
+      ['Help', 'info', ['help.guide', 'edit.shortcuts', 'app.welcome', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],
   };
 }

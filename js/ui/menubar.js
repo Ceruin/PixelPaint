@@ -34,23 +34,31 @@ export function menubar(el, menus, right) {
     const drop = popMenu(burger, []);
     drop.append(...menus.map(([title, ic, items]) => h('button.menu-item', { type: 'button', onclick: () => popMenu(burger, items) }, icon(ic), h('span.mi-label', {}, title), h('span.kbd', {}, '›'))));
   } }, icon('menu'));
-  el.append(
-    wordmark(), burger,
-    h('nav.menus', {}, menus.map(([title, ic, items]) => {
+  const nav = h('nav.menus', {}, menus.map(([title, ic, items]) => {
       const m = h('div.menu');
       m.items = items;
       const btn = h('button.menu-title', {
-        type: 'button',
+        type: 'button', 'aria-label': title,
         onclick: () => (m.classList.contains('open') ? closeMenus() : open(m, btn)),
         onpointerenter: () => document.querySelector('.menu.open') && !m.classList.contains('open') && open(m, btn),
       }, icon(ic), h('span', {}, title));
       m.append(btn);
       return m;
-    })),
+    }));
+  el.append(
+    wordmark(), burger, nav,
     h('div.spacer'), right,
     h('div.group', {},
       iconBtn('undo', 'Undo', () => actions.run('edit.undo'), { 'data-action': 'edit.undo' }),
       iconBtn('redo', 'Redo', () => actions.run('edit.redo'), { 'data-action': 'edit.redo' })));
+  // Menus never get cut off: labels drop to icons when space runs short, then fold into the burger.
+  const fit = () => {
+    const over = () => nav.scrollWidth > nav.clientWidth + 1;
+    el.classList.remove('menus-icons', 'menus-burger');
+    if (over()) el.classList.add('menus-icons');
+    if (over()) el.classList.add('menus-burger');
+  };
+  new ResizeObserver(fit).observe(el);
   addEventListener('pointerdown', e => !e.target.closest('.menu, .menu-drop') && closeMenus());
   addEventListener('keydown', e => e.key === 'Escape' && closeMenus());
 }

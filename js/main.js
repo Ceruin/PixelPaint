@@ -25,6 +25,7 @@ import { initTooltips } from './ui/tooltip.js';
 import { toast } from './ui/dialogs.js';
 import { Mascot } from './ui/mascot.js';
 import { careBody, openCareCard } from './ui/pyxlCare.js';
+import { watchForUpdates } from './ui/updates.js';
 import { initZen } from './ui/zen.js';
 import { initNotes } from './ui/notes.js';
 
@@ -90,6 +91,7 @@ initTooltips();
 bindKeys();
 panels.apply(local.get('pp.layout'));
 bus.on('toast', toast);
+watchForUpdates(() => project.saveLocal(true));
 
 // Space = temporary hand tool.
 addEventListener('keydown', e => { if (e.code === 'Space' && !isTyping(e) && !app.keys.space) { app.keys.space = true; app.input.updateCursor(); e.preventDefault(); } });

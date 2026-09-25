@@ -1,12 +1,12 @@
 import { h, icon, iconBtn } from './dom.js';
 import { idb, local } from '../core/storage.js';
-import { debounce, clamp } from '../core/util.js';
+import { debounce, clamp, makeCanvas } from '../core/util.js';
 import { BrushEngine, DEFAULT_BRUSH } from '../engine/brush.js';
 
 const COLORS = ['#fff3a8', '#ffd1dc', '#c8f0d8', '#cfe6ff', '#e6dcff', '#ffffff'];
 const GROUP_COLORS = ['#5b8cff', '#17c06b', '#ff8a3d', '#a445ff', '#ff5fa2', '#8c93a5'];
 const PEN = { ...DEFAULT_BRUSH, name: 'Note pen', size: 3.5, minSize: 0.35, hardness: 0.95, spacing: 0.05, smoothing: 0.35 };
-const SKETCH_W = 640, SKETCH_H = 480, HEAD = 30, KIND_ICON = { note: 'note', text: 'text', sketch: 'sketch' };
+const DPX = 2, HEAD = 30, KIND_ICON = { note: 'note', text: 'text', sketch: 'sketch' };
 const SIZES = { note: [220, 200], text: [280, 90], sketch: [320, 274] };
 
 const label = it => it.title || it.text?.split('\n').find(Boolean)?.slice(0, 40) || (it.kind === 'sketch' ? 'Sketch' : 'Untitled note');
@@ -44,9 +44,8 @@ export function initNotes(app, sendToCanvas) {
     el.onpointerup = () => { el.onpointermove = null; end?.(); save(); };
   });
 
-  // Resize from any edge or corner. Works from the drag's start values so clamping never drifts;
-  // `aspect` (h per w, plus a fixed extra) keeps sketches in proportion.
-  const resizable = (el, obj, { minW, minH, aspect, onChange }) => ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].forEach(dir => {
+  // Resize from any edge or corner. Works from the drag's start values so clamping never drifts.
+  const resizable = (el, obj, { minW, minH, onChange }) => ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].forEach(dir => {
     const hd = h(`div.rz.rz-${dir}`);
     el.append(hd);
     hd.addEventListener('pointerdown', e => {
@@ -56,8 +55,7 @@ export function initNotes(app, sendToCanvas) {
       hd.onpointermove = ev => {
         const dx = (ev.clientX - x0) / state.view.z, dy = (ev.clientY - y0) / state.view.z;
         let w = s0.w + (dir.includes('e') ? dx : dir.includes('w') ? -dx : 0), ht = s0.h + (dir.includes('s') ? dy : dir.includes('n') ? -dy : 0);
-        w = clamp(aspect && !/[ew]/.test(dir) ? (ht - aspect[1]) / aspect[0] : w, minW, 5000);
-        ht = aspect ? w * aspect[0] + aspect[1] : clamp(ht, minH, 5000);
+        w = clamp(w, minW, 5000); ht = clamp(ht, minH, 5000);
         Object.assign(obj, { w, h: ht, x: dir.includes('w') ? s0.x + s0.w - w : s0.x, y: dir.includes('n') ? s0.y + s0.h - ht : s0.y });
         onChange();
       };
@@ -98,7 +96,7 @@ export function initNotes(app, sendToCanvas) {
     el.append(head);
     if (it.kind === 'sketch') {
       canvas = sketchCanvas(it);
-      el.append(canvas);
+      el.append(h('div.card-sketch', {}, canvas));
     } else el.append(h('div.card-text', {
       contentEditable: 'true', spellcheck: true, textContent: it.text,
       oninput: e => { it.text = e.target.innerText; el.querySelector('.card-title').dataset.placeholder = label(it); save(); },
@@ -106,18 +104,31 @@ export function initNotes(app, sendToCanvas) {
       onpointerdown: e => e.stopPropagation(),
     }));
     dragger(head, (dx, dy) => { it.x += dx; it.y += dy; placeCard(it); }, () => assignGroup(it));
-    if (!it.collapsed) resizable(el, it, { minW: 120, minH: HEAD + 30, aspect: it.kind === 'sketch' && [SKETCH_H / SKETCH_W, HEAD], onChange: () => placeCard(it) });
+    if (!it.collapsed) resizable(el, it, { minW: 120, minH: HEAD + 30, onChange: () => { placeCard(it); canvas?.fit(); } });
     els.set(it.id, el);
     inner.append(el);
     placeCard(it);
     return el;
   };
 
+  // A sketch's paper grows with its card (never shrinks, so nothing drawn is lost) and is
+  // shown 1:1 from the top-left: resizing the card to any shape reveals or crops, never stretches.
   const sketchCanvas = it => {
-    const canvas = h('canvas.card-canvas', { width: SKETCH_W, height: SKETCH_H });
-    if (it.img) { const i = new Image(); i.onload = () => canvas.getContext('2d').drawImage(i, 0, 0); i.src = it.img; }
+    const canvas = h('canvas.card-canvas', { width: 1, height: 1 });
+    canvas.fit = (w = it.w * DPX, ht = (it.h - HEAD) * DPX) => {
+      w = Math.ceil(Math.max(w, canvas.width)); ht = Math.ceil(Math.max(ht, canvas.height));
+      if (w !== canvas.width || ht !== canvas.height) {
+        const old = canvas.width > 1 ? makeCanvas(canvas.width, canvas.height) : null;
+        old?.getContext('2d').drawImage(canvas, 0, 0);
+        Object.assign(canvas, { width: w, height: ht });
+        if (old) canvas.getContext('2d').drawImage(old, 0, 0);
+      }
+      Object.assign(canvas.style, { width: `${w / DPX}px`, height: `${ht / DPX}px` });
+    };
+    canvas.fit();
+    if (it.img) { const i = new Image(); i.onload = () => { canvas.fit(i.width, i.height); canvas.getContext('2d').drawImage(i, 0, 0); }; i.src = it.img; }
     let eng = null;
-    const pt = e => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * SKETCH_W / r.width, y: (e.clientY - r.top) * SKETCH_H / r.height, p: e.pointerType === 'pen' ? e.pressure : 1 }; };
+    const pt = e => { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height, p: e.pointerType === 'pen' ? e.pressure : 1 }; };
     canvas.addEventListener('pointerdown', e => {
       e.stopPropagation();
       canvas.setPointerCapture(e.pointerId);

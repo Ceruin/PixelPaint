@@ -69,7 +69,7 @@ select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: -1
 .brand b i:nth-of-type(4) { color: #ffd23f; } .brand b i:nth-of-type(5) { color: #ff3b47; }
 body.light .brand em, body[data-mode=paper] .brand em { color: #2f5fd6 !important; }
 body[data-mode=paper] .brand b i { color: #111 !important; }
-.menus { display: flex; gap: 1px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.menus { display: flex; gap: 1px; overflow: hidden; min-width: 0; }
 .menu-title { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r); background: none; color: var(--muted); }
 .menu-title:hover, .menu.open .menu-title { color: var(--text); background: var(--panel2); border-color: var(--line); }
 .menu-title .ic { width: 15px; height: 15px; }
@@ -403,7 +403,8 @@ body[data-mode=notes] #optionsbar, body[data-mode=notes] .workspace { display: n
 .dot { width: 13px; height: 13px; border-radius: 2px; border: 1px solid rgba(0, 0, 0, .25); padding: 0; }
 .card-text { flex: 1; padding: 6px 11px 11px; outline: none; overflow: auto; font: 15px/1.45 var(--font); user-select: text; -webkit-user-select: text; white-space: pre-wrap; cursor: text; }
 .card.text .card-text { font-size: 22px; }
-.card-canvas { flex: 1; width: 100%; min-height: 0; background: #fff; touch-action: none; cursor: crosshair; }
+.card-sketch { flex: 1; min-height: 0; overflow: hidden; background: #fff; border-radius: 0 0 3px 3px; }
+.card-canvas { display: block; background: #fff; touch-action: none; cursor: crosshair; }
 /* resize handles on every edge and corner of notes and groups */
 .rz { position: absolute; z-index: 2; touch-action: none; }
 .rz-n, .rz-s { left: 10px; right: 10px; height: 8px; cursor: ns-resize; } .rz-n { top: -4px; } .rz-s { bottom: -4px; }
@@ -414,7 +415,10 @@ body[data-mode=notes] #optionsbar, body[data-mode=notes] .workspace { display: n
 .note-group > .rz-se::after { border-color: var(--gc); }
 body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 
-@media (max-width: 900px) { .mode-btn > span:not(.ic), .menu-title > span:not(.ic) { display: none; } }
+@media (max-width: 900px) { .mode-btn > span:not(.ic) { display: none; } }
+.menus-icons .menu-title > span:not(.ic) { display: none; }
+.menus-burger .menus { display: none; }
+.menus-burger .menu-burger { display: inline-grid; }
 @media (max-width: 720px) { :root { --dock-w: 240px; } }
 
 /* ---------- pop-up palette (right-click / pen barrel button) ---------- */
@@ -510,8 +514,6 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .pal-sel select { width: 100%; }
 .menu-burger { display: none; }
 @media (max-width: 720px) {
-  .menus { display: none; }
-  .menu-burger { display: inline-grid; }
   .menubar { gap: 4px; padding: 5px 6px; }
   .brand { font-size: 13px; margin-right: 0; }
   .mode-btn { padding: 0 8px; }
@@ -551,6 +553,13 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .focus-head .ibtn { color: inherit; }
 .focus-title { font-size: 16px; }
 .focus-text { flex: 1; padding: 16px 20px; outline: none; overflow: auto; font: 17px/1.55 var(--font); white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
-.focus-card .card-canvas { flex: 1; object-fit: contain; background: #fff; }
+.focus-card .card-canvas { flex: 1; min-height: 0; width: 100% !important; height: auto !important; object-fit: contain; object-position: left top; background: #fff; }
 .notes { position: relative; }
 @media (max-width: 720px) { .notes-outline { position: absolute; z-index: 20; top: 45px; bottom: 0; left: 0; box-shadow: var(--shadow); } .notes .optionsbar .btn span { display: none; } .outline-sizer { display: none; } }
+.guide { display: flex; flex-direction: column; gap: 12px; }
+.guide-sec { display: grid; grid-template-columns: 18px 1fr; gap: 10px; }
+.guide-sec > .ic { width: 18px; height: 18px; color: var(--accent); margin-top: 1px; }
+.guide-sec h4 { margin: 0 0 3px; font-size: 13px; }
+.guide-sec p { margin: 0 0 3px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.update-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); padding: 6px 6px 6px 12px; background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: var(--shadow); }
+.update-bar > .ic { color: var(--accent); }
