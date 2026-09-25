@@ -434,7 +434,7 @@ body[data-mode=zen] .dock { width: 0; padding: 0; border: 0; overflow: visible; 
 body[data-mode=zen] .dock > :not(.dock-panels), body[data-mode=zen] .dock .panel:not(.flyout) { display: none !important; }
 .zen-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; box-shadow: var(--shadow); max-height: calc(100dvh - 60px); overflow: auto; scrollbar-width: none; }
 .zen-sec { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-.zen-strip .mascot-slot { margin-top: 0; }
+.zen-strip .mascot-slot { margin-top: 0; position: sticky; bottom: -6px; padding-bottom: 6px; background: inherit; }   /* never scrolls out of a short strip */
 .zen-strip .mascot { width: 48px; height: 62px; }
 .zen-chip { width: 30px; height: 30px; margin: 2px 0; }
 .vs-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--muted); font-size: 11px; }

@@ -3,6 +3,7 @@ import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
 import { drawIcon, iconSize } from './pixelIcons.js';
 import { artCanvas } from './pixelArt.js';
+import { rotated, centreOfMass, Pendulum, Settle } from './pyxlPhysics.js';
 import { PyxlStats, LESSONS, TYPES, currentLesson } from './pyxlStats.js';
 import { openCareCard, startStarGame } from './pyxlCare.js';
 import { startRace, RACES, medalName } from './pyxlRace.js';
@@ -73,6 +74,7 @@ export function drawPose(ctx, name, x, y, k, flip = false, breath = 0, src = she
 }
 
 const BOX_W = 92, BOX_H = 76, AX = 36, FLOOR = 74;
+const PIV = [46, 13], GRIP = [46, 12];   // where the grab point sits in her box; her brush head in the 'raise' pose
 
 // Behaviour table: poses to cycle (fps), duration (or hold), breathing period (s) and motion flavour.
 // `prop` names an extra drawn with the pose (instrument, toy, drawing…); `emote` forces the emote ball.
@@ -105,8 +107,8 @@ const STATES = {
   sick: { poses: ['drowsy'], hold: true, breath: 2 },
   bloom: { poses: ['floor'], dur: 6000, breath: 2, prop: 'bloom', emote: 'heart' },
   // picked up and carried: arms up, legs kicking, swaying under your finger
-  held: { poses: ['raise', 'cheer', 'raise', 'happy'], fps: 4, hold: true, held: true, emote: 'bang' },
-  land: { poses: ['floor', 'happy'], fps: 3, dur: 1100, hop: true },
+  held: { poses: ['raise'], hold: true, held: true, emote: 'bang' },
+  land: { poses: ['oops', 'happy'], fps: 2, dur: 1300 },
   // kindergarten skills
   instrument: { poses: ['raise', 'brush'], fps: 2.5, dur: 3600, prop: 'instrument', notes: true },
   gogo: { poses: ['cheer', 'happy'], fps: 5, dur: 3200, hop: true, flipEvery: 0.4, notes: true },
@@ -216,7 +218,8 @@ export class Mascot {
   mount(host) {
     this.home = host;
     if (this.floating) return;
-    if (host && this.el.parentElement !== host) { host.append(this.el); this.box = null; requestAnimationFrame(() => this.placeBubble()); }
+    if (host && this.el.parentElement !== host) { host.append(this.el); this.el.style.translate = ''; this.box = null; }
+    requestAnimationFrame(() => requestAnimationFrame(() => { this.keepInView(); this.placeBubble(); }));   // after the new mode's layout
   }
 
   // ---- pick her up and put her anywhere ----
@@ -226,31 +229,49 @@ export class Mascot {
     const saved = local.get('pp.pyxlPos', null);
     this.floatBox = h('div.pyxl-float');
     if (saved) this.float(saved.x, saved.y);
-    addEventListener('resize', () => this.floating && this.float(this.floatPos.x, this.floatPos.y));
+    const reclamp = () => (this.floating ? this.float(this.floatPos.x, this.floatPos.y) : this.keepInView());
+    addEventListener('resize', reclamp); visualViewport?.addEventListener('resize', reclamp);
     this.el.addEventListener('pointerdown', e => {
       if (e.button !== 0 || !this.awake() && !this.stats.asleep) return;
-      const r = this.el.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top, x0 = e.clientX, y0 = e.clientY;
+      const x0 = e.clientX, y0 = e.clientY;
       let lifting = false;
-      this.el.setPointerCapture(e.pointerId);
-      this.el.onpointermove = ev => {
-        if (!lifting && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
-        if (!lifting) { lifting = true; this.lift(); }
-        this.float(ev.clientX - ox, ev.clientY - oy, false);
+      // window listeners: moving her into the floating box would drop an element pointer capture
+      const move = ev => {
+        if (ev.pointerId !== e.pointerId || !lifting && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
+        if (!lifting) { lifting = true; this.lift(ev); }
+        this.grab = { x: ev.clientX, y: ev.clientY };
+        this.hangAt();
       };
-      this.el.onpointerup = this.el.onpointercancel = () => {
-        this.el.onpointermove = this.el.onpointerup = this.el.onpointercancel = null;
-        if (lifting) { this.dragged = true; this.drop(); }
+      const up = ev => {
+        if (ev.pointerId !== e.pointerId) return;
+        removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+        if (lifting) { this.dragged = true; this.drop(); setTimeout(() => { this.dragged = false; }); }
       };
+      addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
     });
   }
-  lift() {
+  // She grabs the pen/cursor by her brush and hangs from it (the pivot follows the pointer).
+  lift(ev) {
     const s = this.stats;
+    this.grab = { x: ev.clientX, y: ev.clientY };
+    this.phys = { hang: new Pendulum(), v: [0, 0], a: [0, 0], last: null };
+    this.hangAt();
+    this.runPhysics();
     if (s.asleep) { s.sleep(false); s.feel('anger', 15); }
     this.heldAt = Date.now();
     this.play('held', { say: ['Wheee!', 'Whoa!', 'Up we go!'][Math.floor(Math.random() * 3)] });
     s.change({ fun: 3 }); s.feel('joy', 10);
   }
+  // Where her box must be for the grab point to sit under the pointer (not clamped while held).
+  hangAt() {
+    const sc = this.k / (devicePixelRatio || 1), c = this.canvas;
+    this.float(this.grab.x - c.offsetLeft - PIV[0] * sc, this.grab.y - c.offsetTop - PIV[1] * sc, false, true);
+  }
   drop() {
+    const ang = this.hangAngle();
+    this.pos = PIV[0] - AX;   // stand right under where she hung
+    this.phys = document.body.dataset.mode === 'paper' ? null : { settle: new Settle(Math.max(-0.7, Math.min(0.7, ang)), this.phys?.hang?.om ?? 0, -16) };   // e-ink: no wobble
+    if (this.phys) this.runPhysics(); else this.keepInView();
     const home = this.home?.getBoundingClientRect(), me = this.el.getBoundingClientRect();
     const nearHome = home?.width && Math.hypot(me.left + me.width / 2 - (home.left + home.width / 2), me.bottom - home.bottom) < 80;
     if (nearHome) this.goHome();
@@ -259,14 +280,66 @@ export class Mascot {
     this.play('land', { say: nearHome ? 'Home sweet home!' : long ? 'Phew, finally!' : Math.random() < 0.5 ? 'I like it here!' : '' });
     if (long) this.stats.feel('anger', 10);
   }
-  float(x, y, save = true) {
-    const b = this.floatBox, w = 92, hh = 76;
-    x = Math.max(4, Math.min(innerWidth - w - 4, x)); y = Math.max(4, Math.min(innerHeight - hh - 4, y));
-    this.floatPos = { x: Math.round(x), y: Math.round(y) };
+  float(x, y, save = true, free = false) {
+    const b = this.floatBox, dpr = devicePixelRatio || 1;
+    this.floatPos = { x: Math.round(x * dpr) / dpr, y: Math.round(y * dpr) / dpr };
     Object.assign(b.style, { left: `${this.floatPos.x}px`, top: `${this.floatPos.y}px` });
-    if (!this.floating) { this.floating = true; document.body.append(b); b.append(this.el); this.el.classList.add('floating'); }
+    if (!this.floating) { this.floating = true; document.body.append(b); b.append(this.el); this.el.classList.add('floating'); this.el.style.translate = ''; }
     this.box = null;
+    if (!free) this.keepInView();
     if (save) local.set('pp.pyxlPos', this.floatPos);
+  }
+
+  // Her whole sprite always stays on screen: inside the visible viewport and any panel that clips
+  // her. A floating Pyxl moves; a docked one is nudged with a translate (whole device pixels).
+  keepInView() {
+    if (this.phys) return;
+    const cr = this.canvas.getBoundingClientRect(), sb = this.spriteBox;
+    if (!cr.width || !sb) return;
+    const sc = cr.width / BOX_W, c = { left: cr.left + sb[0] * sc, top: cr.top + sb[1] * sc, right: cr.left + sb[2] * sc, bottom: cr.top + sb[3] * sc };
+    const vv = window.visualViewport, m = 4, dpr = devicePixelRatio || 1;
+    let L = (vv?.offsetLeft ?? 0) + m, T = (vv?.offsetTop ?? 0) + m, R = L - 2 * m + (vv?.width ?? innerWidth), B = T - 2 * m + (vv?.height ?? innerHeight);
+    if (!this.floating) for (let a = this.el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const o = getComputedStyle(a);
+      if (o.overflowX === 'visible' && o.overflowY === 'visible') continue;
+      const q = a.getBoundingClientRect();
+      L = Math.max(L, q.left); T = Math.max(T, q.top); R = Math.min(R, q.right); B = Math.min(B, q.bottom);
+    }
+    const snap = v => Math.round(v * dpr) / dpr;
+    const dx = snap(c.left < L ? L - c.left : c.right > R ? Math.max(L - c.left, R - c.right) : 0);
+    const dy = snap(c.top < T ? T - c.top : c.bottom > B ? Math.max(T - c.top, B - c.bottom) : 0);
+    if (!dx && !dy) return;
+    if (this.floating) { this.floatPos.x += dx; this.floatPos.y += dy; Object.assign(this.floatBox.style, { left: `${this.floatPos.x}px`, top: `${this.floatPos.y}px` }); local.set('pp.pyxlPos', this.floatPos); }
+    else { const [ox = 0, oy = 0] = (this.el.style.translate || '').split(' ').map(parseFloat); this.el.style.translate = `${snap(ox + dx)}px ${snap(oy + dy)}px`; }
+    this.box = null;
+    this.placeBubble();
+  }
+
+  // Frame-rate physics while she hangs or lands (the 12 fps behaviour tick keeps running too).
+  runPhysics() {
+    if (this.physRaf) return;
+    let last = performance.now();
+    const step = now => {
+      const ph = this.phys, dt = Math.min(1 / 30, (now - last) / 1000) || 1 / 60;
+      last = now;
+      if (!ph) { this.physRaf = 0; return; }
+      if (ph.hang) {
+        this.hangAt();   // her scale can change as she's lifted out of a panel
+        const g = this.grab, pv = ph.last ?? g, v = [(g.x - pv.x) / dt, (g.y - pv.y) / dt];
+        const a = v.map((vi, i) => (vi - ph.v[i]) / dt);
+        ph.a = ph.a.map((ai, i) => ai * 0.6 + a[i] * 0.4); ph.v = v; ph.last = { ...g };
+        const [cx, cy] = centreOfMass(sheet(), SPRITES.raise);
+        ph.hang.step(dt, ph.a[0], ph.a[1], Math.hypot(cx - GRIP[0], cy - GRIP[1]) * this.k / (devicePixelRatio || 1));
+      } else if (!ph.settle.step(dt)) { this.phys = null; this.drawn = null; this.render(); this.keepInView(); this.physRaf = 0; return; }
+      this.render();
+      this.physRaf = requestAnimationFrame(step);
+    };
+    this.physRaf = requestAnimationFrame(step);
+  }
+  // Her on-screen tilt while hanging: the natural hang of the pose (centre of mass under the grip) plus the swing.
+  hangAngle() {
+    const [cx, cy] = centreOfMass(sheet(), SPRITES.raise);
+    return Math.max(-1.3, Math.min(1.3, Math.atan2(cx - GRIP[0], cy - GRIP[1]) + (this.phys?.hang?.th ?? 0)));   // never swings out of her box
   }
   goHome() {
     this.floating = false;
@@ -287,6 +360,7 @@ export class Mascot {
     this.placeBubble();
     // 1 canvas pixel = 1 device pixel, centred on a whole device pixel (no resampling)
     Object.assign(this.canvas.style, { width: `${BOX_W * this.k / dpr}px`, height: `${BOX_H * this.k / dpr}px`, left: `${Math.round((r.width * dpr - BOX_W * this.k) / 2) / dpr}px` });
+    this.keepInView();
   }
 
   // A hello that depends on the time of day and how long you've been away.
@@ -369,6 +443,7 @@ export class Mascot {
     if (now > this.blinkAt + 150) this.blinkAt = now + 2500 + Math.random() * 3500 * (Math.random() < 0.2 ? 0.1 : 1);
     this.symptoms(now);
     this.watchCursor(now);
+    if (now > (this.viewCheck ?? 0)) { this.viewCheck = now + 2000; this.keepInView(); }
     const need = s.need;
     if (NEED_ICON[need] && now > this.nextNeed) { this.nextNeed = now + 4000; this.parts.push({ icon: NEED_ICON[need], x: AX + 10, y: FLOOR - 64, vx: 0, vy: -0.15, life: 26 }); }
     this.render();
@@ -495,27 +570,46 @@ export class Mascot {
     if (st.shake) x += Math.floor(t * 18) % 2 ? 1 : -1;
     if (st.walk && Math.floor(t * st.fps) % 2) y -= 1; // bob on each step
     if (this.hic > now) y -= 2;
-    if (st.held) { x += Math.round(Math.sin(t * 5) * 2); y -= 3 + Math.round(Math.abs(Math.sin(t * 5)) * 1); }
     if (this.stats.sick === 'cold' && this.state === 'sick') x += Math.floor(t * 12) % 2;
     const [, , w, hh, ax, by] = SPRITES[pose], [l, r] = flip ? [w - ax, ax] : [ax, w - ax];
     x = Math.max(l, Math.min(BOX_W - r, x)); // wide poses never clip out of her box
     const breath = st.breath && !still && (t % st.breath) / st.breath > 0.55 ? 1 : 0;
     const emote = this.emoteName(now), bob = still ? 0 : Math.round(Math.sin(t * 2.5));
     const phase = st.special || st.prop || st.tears || st.notes ? Math.floor(t * 4) : 0;
+    // physics: hanging tilt / landing wobble, in 3° steps (each step is a cached pixel-art frame)
+    const ph = this.phys, deg = ph ? Math.round((ph.hang ? this.hangAngle() : ph.settle.th) * 60 / Math.PI) * 3 : 0;
+    const kick = ph?.hang ? (Math.floor(t * 5) % 3) - 1 : 0, drop = ph?.settle ? Math.round(ph.settle.y) : 0;
     // Only repaint when the picture changes (idle: a couple of times a second, not 12).
-    const key = `${this.state}|${pose}|${x}|${y}|${flip}|${breath}|${k}|${outfitHex}|${this.canvas.width}|${emote}|${bob}|${phase}|${this.extra}`;
+    const key = `${this.state}|${pose}|${x}|${y}|${flip}|${breath}|${k}|${outfitHex}|${this.canvas.width}|${emote}|${bob}|${phase}|${this.extra}|${deg}|${kick}|${drop}`;
     if (key === this.drawn && !this.parts.length) return;
     this.drawn = this.parts.length ? null : key;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     if (st.special) this.drawSpecial(ctx, st.special, t, k, still);
     else {
       if (st.prop === 'bloom') for (let i = 0; i < 7; i++) drawIcon(ctx, 'bloom', AX + this.pos + Math.cos(i / 7 * 6.28) * 22 - 1, FLOOR - 3 + Math.sin(i / 7 * 6.28) * 3, k);
-      drawPose(ctx, pose, x, y, k, flip, breath);
+      if (ph?.hang) {   // hanging from the grab point by her brush, legs kicking
+        const f = rotated(sheet(), SPRITES.raise, GRIP, deg, kick);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(f.canvas, (PIV[0] - f.r) * k, (PIV[1] - f.r) * k, f.canvas.width * k, f.canvas.height * k);
+        if (emote) drawIcon(ctx, emote, PIV[0] + 9, PIV[1] - 4, k);
+        return this.drawParts(ctx, k);
+      }
+      y += drop;
+      if (deg && !flip) {   // wobbling upright on her feet
+        const f = rotated(sheet(), SPRITES[pose], SPRITES[pose].slice(4), deg);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(f.canvas, (x - f.r) * k, (y - f.r) * k, f.canvas.width * k, f.canvas.height * k);
+      } else drawPose(ctx, pose, x, y, k, flip, breath);
+      const [, , pw, ph2, pax, pby] = SPRITES[pose];
+      this.spriteBox = [x - (flip ? pw - pax : pax), y - pby, x + (flip ? pax : pw - pax), y - pby + ph2];   // what keepInView keeps on screen
       this.drawProp(ctx, st, x, y - by, t, k);
       if (st.tears && Math.floor(t * 3) % 2) { drawIcon(ctx, 'drop', x - 8, y - by + 22, k); drawIcon(ctx, 'drop', x + 5, y - by + 22, k); }
       if (st.notes && Math.floor(t * 2) % 2 && !still) this.parts.length < 3 && this.parts.push({ icon: 'note', x: AX + (Math.random() - 0.5) * 30, y: FLOOR - 58, vx: (Math.random() - 0.5) * 0.4, vy: -0.4, life: 18 });
       if (emote) { const [ew] = iconSize(emote); drawIcon(ctx, emote, x - Math.floor(ew / 2), y - by - 7 + bob, k, this.stats.chaos && emote === 'emDot' ? '#ffd23f' : null); }
     }
+    this.drawParts(ctx, k);
+  }
+  drawParts(ctx, k) {
     this.parts = this.parts.filter(p => p.life-- > 0);
     for (const p of this.parts) {
       p.x += p.vx; p.y += p.vy;
