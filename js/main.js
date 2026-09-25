@@ -74,6 +74,12 @@ const { menus } = defineActions(app, { panels, project, setMode, timeline });
 const modeBox = document.createElement('div');
 menubar($('#menubar'), menus, modeBox);
 optionsBar(app, $('#optionsbar'), e => openPanel('brushes', e));
+// Mouse wheel scrolls the options bar sideways when it overflows (sliders keep their own wheel).
+$('#optionsbar').addEventListener('wheel', e => {
+  const bar = e.currentTarget;
+  if (bar.scrollWidth <= bar.clientWidth || e.deltaX || e.target.matches('input[type=range], select')) return;
+  bar.scrollLeft += e.deltaY; e.preventDefault();
+}, { passive: false });
 statusbar(app, $('#statusbar'), $('#view'));
 initTooltips();
 bindKeys();

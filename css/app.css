@@ -98,10 +98,12 @@ body[data-mode=paper] .brand b i { color: #111 !important; }
 
 /* ---------- tool options bar ---------- */
 .optionsbar {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 44px; padding: 5px 12px; overflow-x: auto; scrollbar-width: thin;
-  background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; z-index: 5; scrollbar-width: none;
+  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 5px 12px; overflow-x: auto; overflow-y: hidden;
+  background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; z-index: 5; scrollbar-width: thin; scrollbar-color: var(--panel3) transparent;
 }
-.optionsbar::-webkit-scrollbar { display: none; }
+.optionsbar > * { flex: none; }
+.optionsbar::-webkit-scrollbar { height: 4px; }
+.optionsbar::-webkit-scrollbar-thumb { background: var(--panel3); border-radius: 2px; }
 .opt-tool { display: inline-flex; align-items: center; gap: 7px; padding-right: 12px; border-right: 1px solid var(--line); font-weight: 600; }
 .opt-tool .ic { color: var(--accent); }
 .brush-name { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: var(--r); border: 1px solid var(--line); background: var(--bg); }
@@ -543,4 +545,3 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .focus-card .card-canvas { flex: 1; object-fit: contain; background: #fff; }
 .notes { position: relative; }
 @media (max-width: 720px) { .notes-outline { position: absolute; z-index: 20; top: 45px; bottom: 0; left: 0; box-shadow: var(--shadow); } .notes .optionsbar .btn span { display: none; } }
-@media (max-width: 1200px) { .slider.mini { width: 100px; } .optionsbar { gap: 6px 10px; } }
