@@ -335,6 +335,9 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 .pyxl-float .mascot { width: 92px; height: 76px; }
 .mascot.floating:active { cursor: grabbing; }
 .pyxl-canvas { position: absolute; left: 0; bottom: 0; image-rendering: pixelated; pointer-events: none; }
+.mascot.hanging .pyxl-canvas { visibility: hidden; }
+.pyxl-hang { position: fixed; left: 0; top: 0; z-index: 145; image-rendering: pixelated; pointer-events: none; will-change: transform; }
+body[data-mode=paper] .pyxl-hang { filter: grayscale(1) contrast(1.15); }
 .m-bubble {
   position: fixed; left: 0; top: 0; padding: 4px 9px; border-radius: var(--r);
   width: max-content; max-width: min(220px, calc(100vw - 16px)); text-align: center; line-height: 1.3; overflow-wrap: break-word;
@@ -367,7 +370,7 @@ body[data-mode=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-bar { display: grid; grid-template-columns: 16px 5.2em minmax(0, 1fr); align-items: center; gap: 6px; color: var(--muted); }
 .pc-bar > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-track { height: 8px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); overflow: hidden; }
-.pc-track i { display: block; height: 100%; transition: width .4s; }
+.pc-track i { display: block; height: 100%; width: 100%; transform-origin: left; transition: transform .4s; }
 .pc-bar.low span { color: var(--danger); }
 .pc-bar.low .pc-track { animation: pc-blink 1s steps(2) infinite; }
 @keyframes pc-blink { 50% { border-color: var(--danger); } }
@@ -539,9 +542,9 @@ body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 .wl-text .brand { font-size: 44px; }
 .wl-text p { margin: 0; color: var(--muted); font-size: 15px; }
 .wl-bar { width: 240px; height: 8px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); overflow: hidden; }
-.wl-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #a445ff, #3b7bff, #17c06b, #ffd23f, #ff3b47); }
+.wl-bar i { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: left; background: linear-gradient(90deg, #a445ff, #3b7bff, #17c06b, #ffd23f, #ff3b47); }
 .wl-trail { position: absolute; left: 0; bottom: 24px; height: 60px; pointer-events: none; }
-.wl-walker { position: absolute; bottom: 30px; image-rendering: pixelated; }
+.wl-walker { position: absolute; left: 0; bottom: 30px; will-change: transform; image-rendering: pixelated; }
 @keyframes wl-in { from { opacity: 0; } }
 @keyframes wl-float { to { transform: translateY(calc(-1 * var(--px, 4px))); } }
 @media (max-width: 720px) { .wl-card { flex-direction: column; gap: 14px; text-align: center; } .wl-text { align-items: center; } .wl-text .brand { font-size: 32px; } }

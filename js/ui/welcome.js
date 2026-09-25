@@ -30,14 +30,14 @@ export function showWelcome(force = false) {
       const wc = walker.getContext('2d');
       wc.clearRect(0, 0, walker.width, walker.height);
       drawPose(wc, t > 0.97 ? 'cheer' : poses[Math.floor(now / 160) % 4], 40, 62, wk);
-      walker.style.left = `${Math.round((x - 40) * dpr) / dpr}px`;
+      walker.style.transform = `translateX(${Math.round((x - 40) * dpr) / dpr}px)`;   // compositor-only
       if (last) {
         ctx.lineCap = 'round'; ctx.lineWidth = 9;
         ctx.strokeStyle = `hsl(${(t * 720) % 360},90%,60%)`;
         ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(x + 8, y); ctx.stroke();
       }
       last = { x: x + 8, y };
-      bar.style.width = `${t * 100}%`;
+      bar.style.transform = `scaleX(${t})`;
       if (t < 1) raf = requestAnimationFrame(tick);
       else setTimeout(close, 700);
     };

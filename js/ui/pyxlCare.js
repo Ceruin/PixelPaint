@@ -19,7 +19,7 @@ let tab = local.get('pp.pyxlTab', 'care');
 export function careBody(pyxl, onPlay) {
   const s = pyxl.stats, content = h('div.pc-content'), tabs = h('div.pc-tabs', { role: 'tablist' });
   const btn = (ic, label, fn, opts = {}) => h('button.btn.sm', { type: 'button', onclick: fn, ...opts }, iconCanvas(ic, 2), h('span.lbl', {}, label));
-  const bar = (v, color, cls = '') => h(`div.pc-track${cls}`, {}, h('i', { style: { width: `${Math.max(0, Math.min(100, v))}%`, background: color } }));
+  const bar = (v, color, cls = '') => h(`div.pc-track${cls}`, {}, h('i', { style: { transform: `scaleX(${Math.max(0, Math.min(100, v)) / 100})`, background: color } }));
 
   const views = {
     care() {

@@ -71,7 +71,8 @@ export function brushLibrary(app) {
   const list = h('div.brush-list');
   let query = '';
   const search = h('input', { type: 'search', placeholder: 'Search brushes…', oninput: () => { query = search.value.toLowerCase(); render(); } });
-  const ink = () => getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e6e8ee';
+  let inkFor, inkVal;   // the theme's text colour, read once per theme/mode (a style read can force a recalc)
+  const ink = () => { const key = document.body.className + document.body.dataset.mode; if (key !== inkFor) { inkFor = key; inkVal = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e6e8ee'; } return inkVal; };
   const mark = () => list.querySelectorAll('.brush-row').forEach(r => r.classList.toggle('on', r.dataset.name === app.brush.name));
   const render = () => {
     const all = [...PRESETS, ...userBrushes().map(b => ({ ...b, cat: b.cat === 'Eraser' || b.cat === 'Blend' ? b.cat : 'My Brushes' }))]

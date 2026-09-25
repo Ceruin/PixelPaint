@@ -6810,7 +6810,6 @@ const ICON_COLS={K:"#22304d",                                        // outline
                  Y:"#ffe27a", y:"#ffd23f", "3":"#d9a51f",
                  O:"#ffb763", o:"#ff9f2b", "2":"#d97615",
                  R:"#ff6f78", r:"#ff3b47", "1":"#cc2230"};
-const APP_BG="#1b1d23";
 // bg omitted -> transparent, which is what a favicon wants; pass one for the contexts that
 // composite the icon onto something (see the links below).
 function makeIconDataURL(size, bg){
@@ -6823,11 +6822,6 @@ function makeIconDataURL(size, bg){
   }
   return c.toDataURL("image/png");
 }
-const icon192=makeIconDataURL(192), icon512=makeIconDataURL(512);
-// Two contexts can't use a transparent icon: iOS composites an apple-touch-icon onto black, and a
-// maskable icon is meant to be full-bleed under whatever shape the launcher crops it to. Those get
-// the app's own background; the favicons stay transparent.
-const solid192=makeIconDataURL(192, APP_BG), solid512=makeIconDataURL(512, APP_BG);
 // The PixelPaint app (index.html) owns the PWA manifest, service worker and updates.
 let deferredPrompt=null;
 // install is triggered from the File menu (data-fa="install" -> doInstall)

@@ -208,7 +208,10 @@ export class Mascot {
     new ResizeObserver(() => this.fit()).observe(this.el);
     this.wire();
     this.base();
-    setInterval(() => this.tick(), 1000 / 12);
+    setInterval(() => this.tick(), 1000 / 12);   // behaviour at 12 fps; drawing and the bubble at display rate
+    this.hangCv = h('canvas.pyxl-hang');
+    const frame = () => { requestAnimationFrame(frame); if (document.hidden) return; this.render(); if (this.bubble.textContent) this.placeBubble(); };
+    requestAnimationFrame(frame);
     setTimeout(() => this.greeting(), 1800);
   }
 
@@ -239,8 +242,7 @@ export class Mascot {
       const move = ev => {
         if (ev.pointerId !== e.pointerId || !lifting && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
         if (!lifting) { lifting = true; this.lift(ev); }
-        this.grab = { x: ev.clientX, y: ev.clientY };
-        this.hangAt();
+        this.grab = { x: ev.clientX, y: ev.clientY };   // the frame loop draws her there
       };
       const up = ev => {
         if (ev.pointerId !== e.pointerId) return;
@@ -256,6 +258,7 @@ export class Mascot {
     this.grab = { x: ev.clientX, y: ev.clientY };
     this.phys = { hang: new Pendulum(), v: [0, 0], a: [0, 0], last: null };
     this.hangAt();
+    this.el.classList.add('hanging'); document.body.append(this.hangCv);
     this.runPhysics();
     if (s.asleep) { s.sleep(false); s.feel('anger', 15); }
     this.heldAt = Date.now();
@@ -268,7 +271,9 @@ export class Mascot {
     this.float(this.grab.x - c.offsetLeft - PIV[0] * sc, this.grab.y - c.offsetTop - PIV[1] * sc, false, true);
   }
   drop() {
-    const ang = this.hangAngle();
+    const ang = Math.atan2(Math.sin(this.hangAngle()), Math.cos(this.hangAngle()));   // -π…π after any loops
+    this.hangAt();
+    this.el.classList.remove('hanging'); this.hangCv.remove();
     this.pos = PIV[0] - AX;   // stand right under where she hung
     this.phys = document.body.dataset.mode === 'paper' ? null : { settle: new Settle(Math.max(-0.7, Math.min(0.7, ang)), this.phys?.hang?.om ?? 0, -16) };   // e-ink: no wobble
     if (this.phys) this.runPhysics(); else this.keepInView();
@@ -324,14 +329,14 @@ export class Mascot {
       last = now;
       if (!ph) { this.physRaf = 0; return; }
       if (ph.hang) {
-        this.hangAt();   // her scale can change as she's lifted out of a panel
         const g = this.grab, pv = ph.last ?? g, v = [(g.x - pv.x) / dt, (g.y - pv.y) / dt];
         const a = v.map((vi, i) => (vi - ph.v[i]) / dt);
         ph.a = ph.a.map((ai, i) => ai * 0.6 + a[i] * 0.4); ph.v = v; ph.last = { ...g };
         const [cx, cy] = centreOfMass(sheet(), SPRITES.raise);
         ph.hang.step(dt, ph.a[0], ph.a[1], Math.hypot(cx - GRIP[0], cy - GRIP[1]) * this.k / (devicePixelRatio || 1));
-      } else if (!ph.settle.step(dt)) { this.phys = null; this.drawn = null; this.render(); this.keepInView(); this.physRaf = 0; return; }
-      this.render();
+      } else if (!ph.settle.step(dt)) { this.phys = null; this.keepInView(); this.physRaf = 0; return; }
+      this.render();   // same frame as the step (the frame loop then finds nothing new)
+      if (this.bubble.textContent) this.placeBubble();
       this.physRaf = requestAnimationFrame(step);
     };
     this.physRaf = requestAnimationFrame(step);
@@ -339,7 +344,7 @@ export class Mascot {
   // Her on-screen tilt while hanging: the natural hang of the pose (centre of mass under the grip) plus the swing.
   hangAngle() {
     const [cx, cy] = centreOfMass(sheet(), SPRITES.raise);
-    return Math.max(-1.3, Math.min(1.3, Math.atan2(cx - GRIP[0], cy - GRIP[1]) + (this.phys?.hang?.th ?? 0)));   // never swings out of her box
+    return Math.atan2(cx - GRIP[0], cy - GRIP[1]) + (this.phys?.hang?.th ?? 0);
   }
   goHome() {
     this.floating = false;
@@ -397,12 +402,20 @@ export class Mascot {
   placeBubble() {
     const b = this.bubble;
     if (!b.textContent) return;
-    const c = this.canvas.getBoundingClientRect();
-    if (!c.width || !this.el.offsetParent) { b.style.visibility = 'hidden'; return; }
-    const sc = c.width / BOX_W, ax = c.left + (AX + this.pos) * sc, ay = c.top + (FLOOR - 60) * sc, m = 8;
-    const w = b.offsetWidth, hh = b.offsetHeight;
-    const left = Math.max(m, Math.min(innerWidth - m - w, ax - w / 2)), top = Math.max(m, ay - hh - 6);
-    Object.assign(b.style, { visibility: '', left: `${Math.round(left)}px`, top: `${Math.round(top)}px` });
+    let ax, ay;
+    if (this.phys?.hang) { ax = this.grab.x; ay = this.grab.y - 14; }   // over the hand holding her
+    else {
+      const c = this.canvas.getBoundingClientRect();
+      if (!c.width || !this.el.offsetParent) { b.style.visibility = 'hidden'; b.at = null; return; }
+      const sc = c.width / BOX_W;
+      ax = c.left + (AX + this.pos) * sc; ay = c.top + (FLOOR - 60) * sc;
+    }
+    if (b.sized !== b.textContent) { b.sized = b.textContent; b.size = [b.offsetWidth, b.offsetHeight]; }   // measure once per message
+    const [w, hh] = b.size, m = 8, left = Math.round(Math.max(m, Math.min(innerWidth - m - w, ax - w / 2))), top = Math.round(Math.max(m, ay - hh - 6));
+    if (b.at === `${left},${top}`) return;
+    b.at = `${left},${top}`;
+    b.style.visibility = '';
+    b.style.transform = `translate(${left}px, ${top}px)`;   // compositor-only: no layout per frame
     b.style.setProperty('--tail', `${Math.max(10, Math.min(w - 10, ax - left))}px`);
   }
   chat(text) { if (!this.stats.is('quiet') || Math.random() < 0.3) this.say(text); }
@@ -432,10 +445,9 @@ export class Mascot {
 
   tick() {
     const now = Date.now(), st = STATES[this.state], s = this.stats;
-    if (this.bubble.textContent) this.placeBubble();
     if (now > this.until) this.afterState();
     this.lifeCycle(now);
-    if (!this.awake()) return this.render();
+    if (!this.awake()) return;
     if (s.energy < 10) { s.sleep(true); this.say('So sleepy…'); this.play('sleep'); }
     if (this.state === 'idle' && now > this.nextFidget) this.fidget(now);
     if (this.state === 'idle' && s.need === 'bored' && now - this.lastActive > 20000) this.play('sit');
@@ -446,7 +458,6 @@ export class Mascot {
     if (now > (this.viewCheck ?? 0)) { this.viewCheck = now + 2000; this.keepInView(); }
     const need = s.need;
     if (NEED_ICON[need] && now > this.nextNeed) { this.nextNeed = now + 4000; this.parts.push({ icon: NEED_ICON[need], x: AX + 10, y: FLOOR - 64, vx: 0, vy: -0.15, life: 26 }); }
-    this.render();
   }
 
   // What happens when a timed state ends (some chain into a follow-up).
@@ -578,27 +589,23 @@ export class Mascot {
     const phase = st.special || st.prop || st.tears || st.notes ? Math.floor(t * 4) : 0;
     // physics: hanging tilt / landing wobble, in 3° steps (each step is a cached pixel-art frame)
     const ph = this.phys, deg = ph ? Math.round((ph.hang ? this.hangAngle() : ph.settle.th) * 60 / Math.PI) * 3 : 0;
-    const kick = ph?.hang ? (Math.floor(t * 5) % 3) - 1 : 0, drop = ph?.settle ? Math.round(ph.settle.y) : 0;
+    const kick = ph?.hang && Math.abs(ph.hang.om) < 4 ? (Math.floor(t * 5) % 3) - 1 : 0, drop = ph?.settle ? Math.round(ph.settle.y) : 0;
     // Only repaint when the picture changes (idle: a couple of times a second, not 12).
-    const key = `${this.state}|${pose}|${x}|${y}|${flip}|${breath}|${k}|${outfitHex}|${this.canvas.width}|${emote}|${bob}|${phase}|${this.extra}|${deg}|${kick}|${drop}`;
+    const key = `${this.state}|${pose}|${x}|${y}|${flip}|${breath}|${k}|${outfitHex}|${this.canvas.width}|${emote}|${bob}|${phase}|${this.extra}|${deg}|${kick}|${drop}|${ph?.hang ? `${this.grab.x},${this.grab.y}` : ''}`;
+    const dt = Math.min(0.1, (performance.now() - (this.lastDraw ?? 0)) / 1000);
+    this.lastDraw = performance.now();
     if (key === this.drawn && !this.parts.length) return;
     this.drawn = this.parts.length ? null : key;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     if (st.special) this.drawSpecial(ctx, st.special, t, k, still);
     else {
       if (st.prop === 'bloom') for (let i = 0; i < 7; i++) drawIcon(ctx, 'bloom', AX + this.pos + Math.cos(i / 7 * 6.28) * 22 - 1, FLOOR - 3 + Math.sin(i / 7 * 6.28) * 3, k);
-      if (ph?.hang) {   // hanging from the grab point by her brush, legs kicking
-        const f = rotated(sheet(), SPRITES.raise, GRIP, deg, kick);
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(f.canvas, (PIV[0] - f.r) * k, (PIV[1] - f.r) * k, f.canvas.width * k, f.canvas.height * k);
-        if (emote) drawIcon(ctx, emote, PIV[0] + 9, PIV[1] - 4, k);
-        return this.drawParts(ctx, k);
-      }
+      if (ph?.hang) return this.drawHanging(deg, kick, emote);
       y += drop;
       if (deg && !flip) {   // wobbling upright on her feet
         const f = rotated(sheet(), SPRITES[pose], SPRITES[pose].slice(4), deg);
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(f.canvas, (x - f.r) * k, (y - f.r) * k, f.canvas.width * k, f.canvas.height * k);
+        ctx.drawImage(f.canvas, (x - f.ox) * k, (y - f.oy) * k, f.canvas.width * k, f.canvas.height * k);
       } else drawPose(ctx, pose, x, y, k, flip, breath);
       const [, , pw, ph2, pax, pby] = SPRITES[pose];
       this.spriteBox = [x - (flip ? pw - pax : pax), y - pby, x + (flip ? pax : pw - pax), y - pby + ph2];   // what keepInView keeps on screen
@@ -607,12 +614,27 @@ export class Mascot {
       if (st.notes && Math.floor(t * 2) % 2 && !still) this.parts.length < 3 && this.parts.push({ icon: 'note', x: AX + (Math.random() - 0.5) * 30, y: FLOOR - 58, vx: (Math.random() - 0.5) * 0.4, vy: -0.4, life: 18 });
       if (emote) { const [ew] = iconSize(emote); drawIcon(ctx, emote, x - Math.floor(ew / 2), y - by - 7 + bob, k, this.stats.chaos && emote === 'emDot' ? '#ffd23f' : null); }
     }
-    this.drawParts(ctx, k);
+    this.drawParts(ctx, k, dt);
   }
-  drawParts(ctx, k) {
-    this.parts = this.parts.filter(p => p.life-- > 0);
+  // She hangs on her own small overlay canvas centred on the pointer, so she can loop right round
+  // it; it moves by a compositor-only transform each frame (snapped to whole device pixels).
+  drawHanging(deg, kick, emote) {
+    const c = this.hangCv, k = this.k, dpr = devicePixelRatio || 1, f = rotated(sheet(), SPRITES.raise, GRIP, deg, kick), S = f.r * 2 + 1;
+    if (c.width !== S * k) { c.width = c.height = S * k; c.style.width = c.style.height = `${S * k / dpr}px`; }
+    const x = c.getContext('2d');
+    x.clearRect(0, 0, c.width, c.height); x.imageSmoothingEnabled = false;
+    x.drawImage(f.canvas, (f.r - f.ox) * k, (f.r - f.oy) * k, f.canvas.width * k, f.canvas.height * k);
+    if (emote) drawIcon(x, emote, f.r + 9, f.r - 12, k);
+    c.dataset.deg = deg;
+    const snap = v => Math.round(v * dpr) / dpr;
+    c.style.transform = `translate(${snap(this.grab.x - (f.r + 0.5) * k / dpr)}px, ${snap(this.grab.y - (f.r + 0.5) * k / dpr)}px)`;
+  }
+  // Particles move by time, not frames (the canvas repaints every frame while they're alive).
+  drawParts(ctx, k, dt = 1 / 12) {
+    const f = dt * 12;
+    this.parts = this.parts.filter(p => (p.life -= f) > 0);
     for (const p of this.parts) {
-      p.x += p.vx; p.y += p.vy;
+      p.x += p.vx * f; p.y += p.vy * f;
       ctx.globalAlpha = Math.min(1, p.life / 8);
       const [pw] = iconSize(p.icon);
       drawIcon(ctx, p.icon, p.x + this.pos - pw / 2, p.y, k, p.color);
