@@ -1,86 +1,235 @@
 import { h } from './dom.js';
 import { bus } from '../core/bus.js';
+import { drawIcon, iconSize } from './pixelIcons.js';
+import { PipStats } from './pipStats.js';
+import { openCareCard, startStarGame } from './pipCare.js';
 
-// Pip — the painter girl from the character sheet, drawn from a sprite atlas (assets/).
-export const ATLAS = { src: 'assets/pip-sprites.webp', w: 2164, h: 151 };
+// Pip — pixel sprites rebuilt from the character sheet at their native resolution (one art pixel
+// per sprite pixel, shared palette, 1px outline). Always drawn at an integer scale so she stays crisp.
+const atlas = new Image();
+atlas.src = 'assets/pip-pixel.webp';
+export const atlasReady = atlas.decode().catch(() => {});
+// name: [x, y, w, h, anchorX (beret centre), feet line]
 export const SPRITES = {
-  idle0: [0, 13, 107, 138], idle1: [109, 12, 104, 139], walk: [215, 10, 105, 141], brush: [322, 10, 134, 141],
-  paint: [458, 9, 231, 142], raise: [691, 14, 139, 137], point: [832, 19, 134, 132], floor: [968, 27, 149, 124],
-  cheer: [1119, 16, 149, 135], spray: [1270, 9, 226, 142], happy: [1498, 0, 164, 151], oops: [1664, 3, 157, 148],
-  drowsy: [1823, 22, 146, 129], sleep: [1971, 65, 191, 86],
+  idle0: [0, 5, 48, 54, 23, 52], idle1: [49, 5, 50, 54, 22, 52], walk: [100, 5, 51, 54, 22, 52], brush: [152, 5, 61, 54, 22, 52],
+  paint: [214, 5, 89, 54, 29, 51], raise: [304, 1, 56, 58, 20, 54], point: [361, 1, 59, 58, 23, 53], floor: [421, 8, 64, 51, 26, 49],
+  cheer: [486, 1, 61, 58, 21, 50], spray: [548, 0, 86, 59, 33, 53], happy: [635, 0, 64, 59, 22, 55], oops: [700, 0, 62, 59, 23, 55],
+  drowsy: [763, 5, 58, 54, 21, 48], sleep: [822, 16, 75, 43, 29, 34],
 };
-const REF_H = 142;   // standing height: every pose is scaled by the same factor
 
-// Places one atlas frame into `el` (a positioned box), bottom-left anchored, at `height` px tall.
-export function showSprite(el, name, height, flip = false) {
-  const [x, y, w, hh] = SPRITES[name], k = height / REF_H;
-  Object.assign(el.style, {
-    width: `${w * k}px`, height: `${hh * k}px`,
-    backgroundImage: `url(${ATLAS.src})`, backgroundSize: `${ATLAS.w * k}px ${ATLAS.h * k}px`,
-    backgroundPosition: `${-x * k}px ${-y * k}px`, transform: flip ? 'scaleX(-1)' : '',
-  });
+// Draws a pose with its beret centre at x and feet at y (native pixels), scaled by integer k.
+export function drawPose(ctx, name, x, y, k, flip = false) {
+  const [sx, sy, w, hh, ax, by] = SPRITES[name];
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  if (flip) { ctx.translate(x * k, 0); ctx.scale(-1, 1); ctx.drawImage(atlas, sx, sy, w, hh, -ax * k, (y - by) * k, w * k, hh * k); }
+  else ctx.drawImage(atlas, sx, sy, w, hh, (x - ax) * k, (y - by) * k, w * k, hh * k);
+  ctx.restore();
 }
 
-// Behaviour is a data table: poses to cycle, frame rate, and which events lead where.
+const BOX_W = 92, BOX_H = 76, AX = 36, FLOOR = 74;
+
+// Behaviour table: poses to cycle (fps), duration (or hold), and motion flavour.
 const STATES = {
-  idle: { poses: ['idle0', 'idle1'], fps: 1.4, after: [20000, 'doodle'], on: { wake: 'idle', paint: 'painting', save: 'cheering', tip: 'pointing', undo: 'oops', sleep: 'drowsy', pet: 'happy' } },
-  doodle: { poses: ['floor'], fps: 0, after: [25000, 'drowsy'], on: { paint: 'painting', save: 'cheering', tip: 'pointing', wake: 'idle', pet: 'happy' } },
-  painting: { poses: ['brush', 'paint'], fps: 3, after: [1200, 'idle'], on: { save: 'cheering', undo: 'oops', paint: 'painting' } },
-  pointing: { poses: ['point'], fps: 0, on: { untip: 'idle', save: 'cheering' } },
-  cheering: { poses: ['cheer', 'happy', 'cheer', 'spray'], fps: 3, after: [2000, 'idle'], on: { tip: 'pointing' } },
-  happy: { poses: ['happy'], fps: 0, after: [1400, 'idle'], on: { save: 'cheering' } },
-  oops: { poses: ['oops'], fps: 0, after: [900, 'idle'], on: { save: 'cheering', undo: 'oops' } },
-  drowsy: { poses: ['drowsy'], fps: 0, after: [6000, 'sleeping'], on: { wake: 'idle', paint: 'painting', save: 'cheering', tip: 'pointing', pet: 'happy' } },
-  sleeping: { poses: ['sleep'], fps: 0, on: { wake: 'idle', save: 'cheering', pet: 'happy' } },
+  idle: { poses: ['idle0', 'idle1'], fps: 1.5 },
+  look: { poses: ['idle0'], dur: 1800, turn: true },
+  walk: { poses: ['walk', 'idle1', 'walk', 'idle0'], fps: 6, dur: 2600, walk: true },
+  wave: { poses: ['raise', 'idle1'], fps: 3, dur: 1600 },
+  paint: { poses: ['brush', 'paint'], fps: 4, dur: 1300 },
+  spray: { poses: ['spray'], dur: 1100 },
+  point: { poses: ['point'], hold: true },
+  raise: { poses: ['raise'], hold: true },
+  cheer: { poses: ['cheer', 'happy'], fps: 4, dur: 2200, hop: true },
+  dance: { poses: ['cheer', 'happy', 'raise', 'happy'], fps: 3, hold: true, hop: true },
+  happy: { poses: ['happy'], dur: 1400, hop: true },
+  eat: { poses: ['happy', 'idle1'], fps: 3, dur: 2000 },
+  oops: { poses: ['oops'], dur: 900, shake: true },
+  refuse: { poses: ['oops'], dur: 1300, shake: true },
+  sit: { poses: ['floor'], hold: true },
+  drowsy: { poses: ['drowsy'], hold: true },
+  sleep: { poses: ['sleep'], hold: true },
 };
-const BUBBLES = { cheering: 'Saved! ✨', happy: '♪', oops: 'Oops!' };
+const NEED_ICON = { hungry: 'onigiri', lonely: 'heart', bored: 'dots', tired: 'moon' };
+const ACTIONS = [
+  [/^(Brush|Smudge|Shape|Eraser)$/, 'paint', null],
+  [/^Fill$/, 'spray', 'drop'],
+  [/^(New Layer|New Group|Group Layer|Duplicate|New Frame|Duplicate Frame|New Tag|New Filter Layer|Import Frames)$/, 'wave', 'plus'],
+  [/^(Delete Layer|Delete Frame|Clear|Cut|Blank Cel)$/, 'oops', 'bang'],
+  [/Blur|Hue|Brightness|Invert|Desaturate|Outline|Adjust|Transform|Merge|Flatten|Replace/, 'cheer', 'sparkle'],
+];
 
 export class Mascot {
-  constructor() {
-    this.sprite = h('div.m-sprite');
+  constructor(app) {
+    this.app = app;
+    this.stats = new PipStats();
+    this.canvas = h('canvas.pip-canvas');
     this.bubble = h('div.m-bubble');
-    this.el = h('div.mascot', { 'data-tip': 'Pip — your painting buddy (click to say hi)' }, this.sprite, this.bubble);
-    this.el.addEventListener('click', () => this.send('pet'));
-    this.height = 64;
-    this.flip = false;
-    this.enter('idle');
-    bus.on('saved', e => !e?.auto && this.send('save'));
-    bus.on('tip', r => { this.aim(r); this.send('tip'); });
-    bus.on('untip', () => this.send('untip'));
-    bus.on('history', hist => {
-      const last = hist.done.at(-1)?.label;
-      if (['Brush', 'Eraser', 'Smudge', 'Fill', 'Shape'].includes(last) && hist.undone.length === 0) this.send('paint');
-      else if (hist.undone.length && this.lastUndone !== hist.undone.length) this.send('undo');
-      this.lastUndone = hist.undone.length;
-    });
-    ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, () => this.send('wake'), { passive: true }));
+    this.el = h('div.mascot', { 'data-tip': 'Pip — click to care for her' }, this.canvas, this.bubble);
+    Object.assign(this, { parts: [], k: 1, flip: false, pets: [], lastUndone: 0, lastActive: Date.now(), nextFidget: Date.now() + 9000, nextNeed: 0 });
+    this.el.addEventListener('click', () => this.onClick());
+    this.el.addEventListener('pointerenter', () => this.greet());
     new ResizeObserver(() => this.fit()).observe(this.el);
+    this.wire();
+    this.base();
+    setInterval(() => this.tick(), 1000 / 12);
+    if (this.stats.welcomeBack) setTimeout(() => this.react('happy', { icon: 'heart', say: 'Welcome back!' }), 1800);
   }
 
   mount(host) { if (host && this.el.parentElement !== host) { host.append(this.el); this.fit(); } }
-  fit() { const hh = this.el.clientHeight; if (hh && hh !== this.height) { this.height = hh; this.draw(); } }
-  send(ev) { const next = STATES[this.state]?.on[ev]; if (next) this.enter(next); }
 
-  enter(s) {
-    clearTimeout(this.timer); clearInterval(this.ticker);
-    const st = STATES[s];
-    this.state = s; this.frame = 0;
-    this.el.dataset.state = s;
-    this.bubble.textContent = BUBBLES[s] ?? '';
-    if (s !== 'pointing') this.flip = false;
-    if (st.fps) this.ticker = setInterval(() => { this.frame = (this.frame + 1) % st.poses.length; this.draw(); }, 1000 / st.fps);
-    if (st.after) this.timer = setTimeout(() => this.enter(st.after[1]), st.after[0]);
-    this.draw();
+  fit() {
+    const dpr = devicePixelRatio || 1, r = this.el.getBoundingClientRect();
+    if (!r.height) return;
+    this.k = Math.max(1, Math.floor(Math.min(r.height * dpr / BOX_H, (r.width + 24) * dpr / BOX_W)));
+    Object.assign(this.canvas, { width: BOX_W * this.k, height: BOX_H * this.k });
+    Object.assign(this.canvas.style, { width: `${BOX_W * this.k / dpr}px`, height: `${BOX_H * this.k / dpr}px` });
   }
 
-  draw() { showSprite(this.sprite, STATES[this.state].poses[this.frame], this.height, this.flip); }
+  // ---- state machine ----
+  play(name, { dur, say = '', flip } = {}) {
+    const st = STATES[name];
+    this.state = name;
+    this.started = performance.now();
+    this.until = st.hold && dur == null ? Infinity : Date.now() + (dur ?? st.dur ?? 1500);
+    if (flip != null) this.flip = flip; else if (!st.turn && !st.walk && name !== 'point') this.flip = false;
+    this.say(say);
+    this.el.dataset.state = name;
+  }
 
-  // Points her brush at the tooltip: raised when it's above her, mirrored when it's to her left.
+  say(text, ms = 1800) {
+    clearTimeout(this.sayTimer);
+    this.bubble.textContent = text;
+    if (text) this.sayTimer = setTimeout(() => { this.bubble.textContent = ''; }, ms);
+  }
+
+  // Resting behaviour follows her most pressing need.
+  base() {
+    const need = this.stats.need;
+    if (need === 'asleep') return this.play('sleep');
+    if (need === 'tired') return this.play('drowsy');
+    if (need === 'bored' && Date.now() - this.lastActive > 20000) return this.play('sit');
+    this.play('idle');
+  }
+
+  react(name, { icon, n = 3, say, color, dur, force } = {}) {
+    if (this.stats.asleep && !force) return;
+    if (this.state === 'dance' && !force) return;
+    this.play(name, { dur, say });
+    if (icon) this.burst(icon, n, color);
+  }
+
+  burst(icon, n = 3, color) {
+    for (let i = 0; i < n; i++) this.parts.push({ icon, color, x: AX - 12 + Math.random() * 24, y: FLOOR - 56 - Math.random() * 6, vx: (Math.random() - 0.5) * 0.6, vy: -0.5 - Math.random() * 0.5, life: 22 + i * 4 });
+  }
+
+  tick() {
+    const now = Date.now(), st = STATES[this.state];
+    if (now > this.until) this.base();
+    if (this.stats.energy < 10 && !this.stats.asleep) { this.stats.sleep(true); this.say('So sleepy…'); this.play('sleep'); }
+    if (this.stats.asleep && this.stats.energy >= 100) { this.stats.sleep(false); this.react('happy', { icon: 'sparkle', say: 'Good morning!' }); }
+    if (this.state === 'idle' && now > this.nextFidget) {
+      this.nextFidget = now + 8000 + Math.random() * 9000;
+      const pick = this.stats.need === 'lonely' ? 'wave' : ['look', 'walk', 'wave', 'look', 'paint'][Math.floor(Math.random() * 5)];
+      this.play(pick, pick === 'wave' && this.stats.need === 'lonely' ? { say: 'Hey! Over here!' } : {});
+    }
+    if (this.state === 'idle' && this.stats.need === 'bored' && now - this.lastActive > 20000) this.play('sit');
+    const need = this.stats.need;
+    if (NEED_ICON[need] && now > this.nextNeed && !this.stats.asleep) { this.nextNeed = now + 4000; this.parts.push({ icon: NEED_ICON[need], x: AX + 10, y: FLOOR - 64, vx: 0, vy: -0.15, life: 26 }); }
+    this.render();
+  }
+
+  render() {
+    const ctx = this.canvas.getContext('2d'), k = this.k, st = STATES[this.state], t = (performance.now() - this.started) / 1000;
+    if (!atlas.complete || !st) return;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const pose = st.poses[st.fps ? Math.floor(t * st.fps) % st.poses.length : 0];
+    let x = AX, y = FLOOR, flip = this.flip;
+    if (st.hop) y -= Math.round(Math.abs(Math.sin(t * 9)) * 3);
+    if (st.shake) x += Math.floor(t * 18) % 2 ? 1 : -1;
+    if (st.walk) { x += Math.round(Math.sin(t * 2.4) * 8); flip = Math.cos(t * 2.4) < 0; }
+    if (st.turn) flip = t > 0.9;
+    drawPose(ctx, pose, x, y, k, flip);
+    this.parts = this.parts.filter(p => p.life-- > 0);
+    for (const p of this.parts) {
+      p.x += p.vx; p.y += p.vy;
+      ctx.globalAlpha = Math.min(1, p.life / 8);
+      const [w] = iconSize(p.icon);
+      drawIcon(ctx, p.icon, p.x - w / 2, p.y, k, p.color);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- reactions to what the user does ----
+  wire() {
+    const active = () => { this.lastActive = Date.now(); if (this.state === 'sit' && this.stats.need !== 'bored') this.base(); };
+    ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, active, { passive: true }));
+    bus.on('history', hist => {
+      const undone = hist.undone.length, top = hist.done.at(-1), label = top?.label ?? '';
+      if (undone > this.lastUndone) this.react('oops', { icon: 'drop', n: 1 });
+      else if (top && top === this.redoTop) this.react('happy', { icon: 'sparkle', n: 2 });
+      else for (const [re, state, icon] of ACTIONS) if (re.test(label)) {
+        this.react(state, { icon, color: state === 'spray' ? this.app?.color.fg : null });
+        if (state === 'paint') { this.stats.change({ fun: 0.6 }, 0.5); if (this.state === 'sit') this.base(); }
+        break;
+      }
+      this.lastUndone = undone;
+      this.redoTop = hist.undone.at(-1);
+    });
+    bus.on('saved', e => { if (!e?.auto) { this.stats.gainXp(5); this.react('cheer', { icon: 'star', n: 4, say: 'Saved!' }); } });
+    bus.on('mode', () => this.react('walk'));
+    bus.on('play', on => (on ? this.react('dance') : this.state === 'dance' && this.base()));
+    bus.on('pip:level', lv => this.react('cheer', { icon: 'star', n: 6, say: `Level ${lv}!`, force: true }));
+    let colorAt = 0;
+    bus.on('color', c => { if (Date.now() - colorAt > 2500 && this.state === 'idle') { colorAt = Date.now(); this.react('paint', { icon: 'drop', n: 1, color: c.fg, dur: 900 }); } });
+    bus.on('tip', r => this.aim(r));
+    bus.on('untip', () => ['point', 'raise'].includes(this.state) && this.base());
+  }
+
+  // Points her brush at a tooltip: raised when it's above her, mirrored when it's to her left.
   aim(r) {
+    if (this.stats.asleep || !['idle', 'look', 'point', 'raise', 'sit'].includes(this.state)) return;
     const m = this.el.getBoundingClientRect();
     if (!m.width) return;
     const dx = r.left + r.width / 2 - (m.left + m.width / 2), dy = r.top + r.height / 2 - (m.top + m.height / 2);
-    STATES.pointing.poses = [dy < -Math.abs(dx) ? 'raise' : 'point'];
-    this.flip = dx < 0;
+    this.play(dy < -Math.abs(dx) ? 'raise' : 'point', { flip: dx < 0 });
   }
+
+  greet() { if (this.state === 'idle') this.react('wave', { dur: 1200 }); }
+
+  // ---- care ----
+  onClick() { this.pet(); openCareCard(this); }
+
+  pet() {
+    const now = Date.now();
+    if (this.stats.asleep) { this.stats.sleep(false); this.stats.change({ love: this.stats.energy < 40 ? -2 : 2 }); return this.react('oops', { icon: 'bang', n: 1, say: 'Huh?!', force: true }); }
+    this.pets = this.pets.filter(t => now - t < 4000).concat(now);
+    if (this.pets.length > 6) { this.stats.change({ love: -3 }); return this.react('refuse', { icon: 'bang', n: 1, say: 'Hey, that tickles!' }); }
+    this.stats.change({ love: 8, fun: 2 }, 1);
+    this.react('happy', { icon: 'heart', n: 3 });
+  }
+
+  feed([icon, name, delta]) {
+    if (this.stats.asleep) return this.say('Zzz…');
+    if (this.stats.food > 92) return this.react('refuse', { say: 'I’m full!' });
+    this.stats.change(delta, 3);
+    this.parts.push({ icon, x: AX + 16, y: FLOOR - 40, vx: -0.4, vy: 0.2, life: 16 });
+    setTimeout(() => this.react('eat', { icon: 'heart', n: 2, say: `Yum, ${name.toLowerCase()}!` }), 700);
+  }
+
+  playGame() {
+    if (this.stats.asleep) return this.say('Zzz…');
+    if (this.stats.energy < 20) return this.react('refuse', { say: 'Too tired to play…' });
+    this.react('wave', { say: 'Catch the stars!' });
+    startStarGame(this);
+  }
+
+  gameOver(score) {
+    this.stats.change({ fun: 8 + score * 6, energy: -10, love: 4 }, score * 2);
+    if (score >= 6) this.react('cheer', { icon: 'star', n: 5, say: `${score} stars! Amazing!`, force: true });
+    else if (score >= 3) this.react('happy', { icon: 'star', n: 3, say: `${score} stars, nice!` });
+    else this.react('oops', { say: score ? `Only ${score}… again?` : 'Aww, missed them all!' });
+  }
+
+  nap() { this.stats.sleep(true); this.say('Night night…'); this.play('sleep'); }
+  wake() { this.stats.sleep(false); this.react('happy', { icon: 'sparkle', say: 'I’m up!', force: true }); }
 }

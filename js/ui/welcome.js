@@ -1,7 +1,7 @@
 import { h } from './dom.js';
 import { local } from '../core/storage.js';
 import { wordmark } from './menubar.js';
-import { showSprite } from './mascot.js';
+import { drawPose } from './mascot.js';
 
 // First-visit welcome: Pip's full art, the wordmark, and little Pip walking across the bottom
 // leaving a rainbow brush trail while the app warms up. Click / key / 4.5 s to continue.
@@ -9,7 +9,7 @@ export function showWelcome(force = false) {
   if (!force && local.get('pp.welcomed', false)) return Promise.resolve();
   local.set('pp.welcomed', true);
   return new Promise(done => {
-    const trail = h('canvas.wl-trail'), walker = h('div.m-sprite.wl-walker'), bar = h('i');
+    const trail = h('canvas.wl-trail'), walker = h('canvas.wl-walker', { width: 96 * 2, height: 64 * 2 }), bar = h('i');
     const root = h('div.welcome', {},
       h('div.wl-card', {},
         h('img.wl-art', { src: 'assets/pip-art.webp', alt: 'Pip the painter' }),
@@ -22,8 +22,10 @@ export function showWelcome(force = false) {
     let last = null, raf = 0, closed = false;
     const tick = now => {
       const t = Math.min(1, (now - T0) / DUR), x = -80 + t * (W + 40), y = 34 + Math.sin(t * 18) * 5;
-      showSprite(walker, t > 0.97 ? 'cheer' : poses[Math.floor(now / 160) % 4], 72);
-      walker.style.left = `${x}px`;
+      const wc = walker.getContext('2d');
+      wc.clearRect(0, 0, walker.width, walker.height);
+      drawPose(wc, t > 0.97 ? 'cheer' : poses[Math.floor(now / 160) % 4], 40, 62, 2);
+      walker.style.left = `${x - 40}px`;
       if (last) {
         ctx.lineCap = 'round'; ctx.lineWidth = 9;
         ctx.strokeStyle = `hsl(${(t * 720) % 360},90%,60%)`;

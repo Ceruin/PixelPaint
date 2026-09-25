@@ -309,15 +309,49 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 .tooltip.show { opacity: 1; }
 .tooltip kbd { font: inherit; font-size: 11px; opacity: .6; }
 
-/* ---------- mascot: Pip (sprite atlas in assets/) ---------- */
-.mascot { position: relative; width: 64px; height: 64px; cursor: pointer; flex: none; }
-.m-sprite { position: absolute; left: 0; bottom: 0; background-repeat: no-repeat; pointer-events: none; }
-.mascot[data-state=cheering] .m-sprite { animation: m-hop .5s ease-in-out 4; }
-.m-bubble { position: absolute; left: 0; bottom: 100%; margin-bottom: 2px; padding: 2px 8px; border-radius: var(--r); white-space: nowrap; background: var(--text); color: var(--bg); font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .2s; }
+/* ---------- mascot: Pip (pixel sprites, integer-scaled on a canvas) ---------- */
+.mascot { position: relative; width: 64px; height: 64px; flex: none; }
+.mascot { cursor: pointer; }
+.pip-canvas { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); image-rendering: pixelated; pointer-events: none; }
+.m-bubble {
+  position: absolute; left: 50%; bottom: 100%; transform: translateX(-30%); margin-bottom: 4px; padding: 3px 8px; border-radius: var(--r);
+  white-space: nowrap; background: var(--text); color: var(--bg); font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 5;
+}
+.m-bubble::after { content: ''; position: absolute; left: 30%; top: 100%; border: 5px solid transparent; border-top-color: var(--text); }
 .m-bubble:not(:empty) { opacity: 1; }
-@keyframes m-hop { 50% { translate: 0 -4px; } }
-body[data-mode=paper] .m-sprite { filter: grayscale(1) contrast(1.15); }
-.dock.folded .mascot { width: 38px; height: 38px; }
+body[data-mode=paper] .pip-canvas { filter: grayscale(1) contrast(1.15); }
+.dock.folded .mascot { width: 38px; height: 44px; }
+.pxicon { image-rendering: pixelated; flex: none; }
+
+/* Pip's care card */
+.pip-card { position: fixed; z-index: 160; width: 260px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+.pc-head { display: flex; align-items: center; gap: 8px; }
+.pc-lvl { color: var(--muted); font-size: 12px; }
+.pc-mood { margin: 0; font-size: 12.5px; color: var(--text); }
+.pc-bars { display: flex; flex-direction: column; gap: 5px; }
+.pc-bar { display: grid; grid-template-columns: 16px 62px 1fr; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.pc-track { height: 8px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); overflow: hidden; }
+.pc-track i { display: block; height: 100%; transition: width .4s; }
+.pc-bar.low span { color: var(--danger); }
+.pc-bar.low .pc-track { animation: pc-blink 1s steps(2) infinite; }
+@keyframes pc-blink { 50% { border-color: var(--danger); } }
+.pc-xp { height: 3px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.pc-xp i { display: block; height: 100%; background: linear-gradient(90deg, #a445ff, #3b7bff, #17c06b, #ffd23f, #ff3b47); }
+.pc-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.pc-actions .btn { justify-content: center; padding: 0 4px; gap: 4px; }
+.pc-snacks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.pc-snack { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+.pc-snack:hover { border-color: var(--accent); }
+.pc-snack small { font-size: 11px; color: var(--muted); }
+
+/* mini-game */
+.star-game { position: fixed; inset: 0; z-index: 800; pointer-events: none; }
+.sg-score { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); padding: 4px 12px; border-radius: var(--r); background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.sg-star { position: absolute; pointer-events: auto; border: 0; background: none; padding: 6px; cursor: pointer; animation: sg-in .25s ease-out, sg-bob .6s ease-in-out infinite alternate; }
+.sg-star.pop { animation: sg-pop .18s ease-in forwards; }
+@keyframes sg-in { from { transform: scale(0); } }
+@keyframes sg-bob { to { translate: 0 -6px; } }
+@keyframes sg-pop { to { transform: scale(1.6); opacity: 0; } }
 
 /* ---------- zen: canvas-first, one strip ---------- */
 .zen { display: none; }
@@ -328,7 +362,7 @@ body[data-mode=zen] .dock > :not(.dock-panels), body[data-mode=zen] .dock .panel
 .zen-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; box-shadow: var(--shadow); max-height: calc(100dvh - 60px); overflow: auto; scrollbar-width: none; }
 .zen-sec { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .zen-strip .mascot-slot { margin-top: 0; }
-.zen-strip .mascot { width: 48px; height: 52px; }
+.zen-strip .mascot { width: 48px; height: 62px; }
 .zen-chip { width: 30px; height: 30px; margin: 2px 0; }
 .vs-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--muted); font-size: 11px; }
 .vslider { writing-mode: vertical-lr; direction: rtl; width: 22px !important; height: 110px !important; }
@@ -423,11 +457,11 @@ body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 .wl-bar { width: 240px; height: 8px; border: 1px solid var(--line); border-radius: 2px; background: var(--bg); overflow: hidden; }
 .wl-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #a445ff, #3b7bff, #17c06b, #ffd23f, #ff3b47); }
 .wl-trail { position: absolute; left: 0; bottom: 24px; height: 60px; pointer-events: none; }
-.wl-walker { bottom: 34px; }
+.wl-walker { position: absolute; bottom: 30px; width: 192px; height: 128px; image-rendering: pixelated; }
 @keyframes wl-in { from { opacity: 0; transform: translateY(16px) scale(.97); } }
 @keyframes wl-float { 50% { transform: translateY(-8px); } }
 @media (max-width: 720px) { .wl-card { flex-direction: column; gap: 14px; text-align: center; } .wl-art { height: 44vh; } .wl-text { align-items: center; } .wl-text .brand { font-size: 32px; } }
-.dock-left .mascot { width: 90px; height: 84px; }
+.dock-left .mascot { width: 92px; height: 76px; }
 
 /* ---------- animation timeline (same collapsible strip as the Pixel editor's) ---------- */
 .timeline { display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); max-height: 240px; position: relative; z-index: 3; }
