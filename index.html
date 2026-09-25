@@ -16,14 +16,14 @@
 <style>
 /* Boot / update splash: inline so it shows before anything else loads; it only fades in if
    loading takes a moment, so quick starts never flash it. Pyxl walks in place (sprite atlas ×3). */
-#splash { position: fixed; inset: 0; z-index: 2000; display: grid; place-content: center; justify-items: center; gap: 14px; background: #1b1d23; color: #9aa1b1; font: 13px system-ui, sans-serif; opacity: 0; animation: sp-in .3s .25s forwards; transition: opacity .3s; }
-#splash.now { animation-delay: 0s; }
+#splash { position: fixed; inset: 0; z-index: 2000; display: grid; place-content: center; justify-items: center; gap: 14px; background: #1b1d23; color: #9aa1b1; font: 13px 'Pixelify Sans', system-ui, sans-serif; opacity: 0; animation: sp-in .3s .25s forwards; transition: opacity .3s; }
+#splash.now { animation: none; opacity: 1; transition: opacity .45s; }
 #splash.out { opacity: 0 !important; animation: none; pointer-events: none; }
 .sp-pyxl { width: 156px; height: 162px; background: url(assets/pyxl-pixel.webp) -408px -15px / 3138px 177px no-repeat; image-rendering: pixelated; animation: sp-walk .6s infinite, sp-bob .3s ease-in-out infinite alternate; }
 .sp-brand { font-weight: 700; font-size: 22px; letter-spacing: .5px; color: #cbe4ff; } .sp-brand i { font-style: normal; color: #ffd23f; }
 .sp-bar { width: 180px; height: 4px; border-radius: 2px; background: #2b2f39; overflow: hidden; }
 .sp-bar i { display: block; height: 100%; width: 35%; background: linear-gradient(90deg, #a445ff, #3b7bff, #17c06b, #ffd23f, #ff3b47); animation: sp-load 1.1s ease-in-out infinite; }
-.sp-bar.pct i { animation: none; transition: width .2s; }
+.sp-bar.pct i { animation: none; transition: width .5s ease-out; }
 .sp-msg { margin: 0; }
 @keyframes sp-in { to { opacity: 1; } }
 @keyframes sp-walk { 0%, 32% { background-position-x: -408px; } 33%, 65% { background-position-x: -708px; } 66%, 100% { background-position-x: -555px; } }
@@ -38,6 +38,7 @@
 </head>
 <body data-mode="paint">
 <div id="splash" aria-live="polite"><div class="sp-pyxl"></div><div class="sp-brand">Pixel<i>Paint</i></div><div class="sp-bar"><i></i></div><p class="sp-msg">Loading…</p></div>
+<script>try { if (sessionStorage.getItem('pp.updated')) { const s = document.getElementById('splash'); s.classList.add('now'); s.querySelector('.sp-msg').textContent = 'Updating PixelPaint…'; } } catch (e) {}</script>
 <div id="app">
   <header class="menubar" id="menubar"></header>
   <div class="optionsbar" id="optionsbar"></div>

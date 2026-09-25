@@ -7,7 +7,7 @@ export function statusbar(app, el, canvas) {
   const t = () => h('b', { style: { fontWeight: 400 } });
   const [zt, st, pt, mt, svt, tt] = [t(), t(), t(), t(), t(), t()];
   zoom.append(icon('zoom'), zt);
-  el.append(zoom, h('span', {}, icon('image'), st), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span', {}, icon('brush'), tt), h('span', {}, icon('history'), mt), h('span', {}, icon('save'), svt));
+  el.append(zoom, h('span.st-size', {}, icon('image'), st), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
   svt.textContent = 'Not saved yet';
   bus.on('view', v => { zt.textContent = `${(v.zoom * 100).toFixed(v.zoom < 0.1 ? 1 : 0)}%${v.rot ? ` · ${Math.round(v.rot)}°` : ''}`; });
   bus.on('doc', d => { st.textContent = `${d.w} × ${d.h}`; });
@@ -16,6 +16,19 @@ export function statusbar(app, el, canvas) {
   const brushInfo = () => { tt.textContent = `${app.brush.name} · ${app.brush.size}px`; };
   bus.on('brush', brushInfo); bus.on('tool', brushInfo); brushInfo();
   bus.on('saved', e => { svt.textContent = `${e?.auto ? 'Auto-saved' : 'Saved'} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; });
+  // Never cut off: drop the least important readouts until the rest fits (text can be enlarged).
+  const order = ['.st-pos', '.st-mem', '.st-brush', '.st-size'].map(q => el.querySelector(q));
+  let fitting = 0;
+  const fit = () => {
+    fitting = 0;
+    el.classList.add('measuring');            // measure the save label at its full width
+    order.forEach(n => { n.hidden = false; });
+    for (const n of order) if (el.scrollWidth > el.clientWidth + 1) n.hidden = true;
+    el.classList.remove('measuring');
+  };
+  const refit = () => { fitting ||= requestAnimationFrame(fit); };
+  new ResizeObserver(refit).observe(el);
+  ['saved', 'brush', 'tool', 'view', 'doc', 'history'].forEach(ev => bus.on(ev, refit));
   // Cursor position: at most once per frame, from the input's cached canvas rect (no layout reads).
   let last = null, raf = 0;
   canvas.addEventListener('pointermove', e => {

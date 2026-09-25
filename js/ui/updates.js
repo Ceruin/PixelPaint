@@ -15,15 +15,25 @@ let beforeReload = () => {};
 
 // The splash (inline in index.html): hidden once the app has booted, shown again while updating.
 const splash = () => document.getElementById('splash');
+// Once the app is up: a splash that was showing (slow start, or just after an update) finishes
+// its animation — the bar fills, a last word — before it fades; one that never showed just goes.
 export function hideSplash() {
   const el = splash();
   if (!el) return;
-  el.classList.add('out');
-  setTimeout(() => { if (el.classList.contains('out')) el.hidden = true; }, 350);
+  let updated = false;
+  try { updated = !!sessionStorage.getItem('pp.updated'); sessionStorage.removeItem('pp.updated'); } catch (e) {}
+  if (!updated && +getComputedStyle(el).opacity < 0.05) { el.hidden = true; return; }
+  el.classList.add('now');
+  const bar = el.querySelector('.sp-bar');
+  bar.classList.add('pct');
+  requestAnimationFrame(() => { bar.firstChild.style.width = '100%'; });
+  el.querySelector('.sp-msg').textContent = updated ? 'All set — enjoy the new version!' : 'Ready!';
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; }, 500); }, updated ? 1700 : 800);
 }
 function showSplash(msg) {
   const el = splash();
   el.hidden = false;
+  el.style.transition = 'none';          // cover the whole app at once, no fade-in
   el.classList.remove('out');
   el.classList.add('now');
   el.querySelector('.sp-msg').textContent = msg;
@@ -45,6 +55,7 @@ export async function reloadFresh() {
   await Promise.all(urls.map(u => fetch(u, { cache: 'reload' }).catch(() => {}).finally(() => sp.progress(++done / urls.length))));
   await navigator.serviceWorker?.getRegistration().then(r => r?.update()).catch(() => {});
   sp.say('Starting…');
+  try { sessionStorage.setItem('pp.updated', '1'); } catch (e) {}
   location.reload();
 }
 

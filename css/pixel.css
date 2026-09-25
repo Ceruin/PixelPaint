@@ -3,7 +3,7 @@
    into each other. SVG is left alone so icons keep their presentation attributes. */
 #pixel { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
 #pixel[hidden] { display: none !important; }
-#pixel *:not(svg, svg *) { all: revert; }
+#pixel :where(*:not(svg, svg *)) { all: revert; }   /* :where keeps it below every Pixel rule */
 
 #pixel{
   --bg:#1b1d23; --panel:#23262e; --panel2:#2b2f39; --line:#3a3f4b;
@@ -893,9 +893,13 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
   #pixel .mobile-cols{display:block;}
   body[data-ptab="color"] #pixel  #layerSection{display:none !important;}
   body[data-ptab="layers"] #pixel #colorSection{display:none !important;}
-  body[data-ptab="anim"] #pixel   #colorSection, body[data-ptab="anim"] #pixel   #layerSection, body[data-ptab="anim"] #pixel   #regionSection, body[data-ptab="anim"] #pixel   #sheetSection, body[data-ptab="color"] #pixel  #sheetSection, body[data-ptab="layers"] #pixel #sheetSection, #pixel /* the Tiles tab owns the panel outright while it's open */
-  body[data-ptab="tiles"]  #colorSection, body[data-ptab="tiles"] #pixel  #layerSection, body[data-ptab="tiles"] #pixel  #regionSection, #pixel /* "none": every panel is tabbed off and the canvas gets the whole screen */
-  body[data-ptab="none"]   #colorSection, body[data-ptab="none"] #pixel   #layerSection, body[data-ptab="none"] #pixel   #sheetSection, body[data-ptab="none"] #pixel   #regionSection{display:none !important;}
+  body[data-ptab="anim"] #pixel #colorSection, body[data-ptab="anim"] #pixel #layerSection, body[data-ptab="anim"] #pixel #regionSection,
+  body[data-ptab="anim"] #pixel #sheetSection, body[data-ptab="color"] #pixel #sheetSection, body[data-ptab="layers"] #pixel #sheetSection,
+  /* the Tiles tab owns the panel outright while it's open */
+  body[data-ptab="tiles"] #pixel #colorSection, body[data-ptab="tiles"] #pixel #layerSection, body[data-ptab="tiles"] #pixel #regionSection,
+  /* "none": every panel is tabbed off and the canvas gets the whole screen */
+  body[data-ptab="none"] #pixel #colorSection, body[data-ptab="none"] #pixel #layerSection, body[data-ptab="none"] #pixel #sheetSection,
+  body[data-ptab="none"] #pixel #regionSection{display:none !important;}
   body[data-ptab="tiles"] #pixel  #sheetSection{display:block !important;}
   body[data-ptab="none"] #pixel .side{overflow:visible; border-bottom:none;}
   body:not([data-ptab="anim"]) #pixel #pxTimeline{display:none;}
@@ -1018,7 +1022,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 #pixel .brushbtns{gap:4px;}
 #pixel .brushbtns .iconbtn{min-width:26px; min-height:26px;}
 #pixel .tools .helpbtn{min-height:30px;}
-#pixel .side{width:280px;}
+@media (min-width:769px){ #pixel .side{width:280px;} }
 #pixel .section{padding:10px 12px;}
 #pixel .section h3{font-size:11px; letter-spacing:.8px;}
 #pixel .stage{background:#16181d;}
@@ -1037,3 +1041,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 #pixel #pyxlSpot{height:80px; flex:none; margin-top:auto;}
 #pixel #pyxlSpot + .helpbtn{margin-top:0;}
 @media (max-width: 768px){ #pixel #pyxlSpot{display:none;} }
+/* long labels on full-width buttons wrap instead of spilling out (tablets enlarge text) */
+#pixel #palAddColor, #pixel #applyPaletteBtn{white-space:normal; height:auto; min-height:30px; line-height:1.25; padding-top:5px; padding-bottom:5px; overflow-wrap:anywhere;}
+#pixel button{min-width:0;}
+#pixel .brushbtns #brushReadout{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}

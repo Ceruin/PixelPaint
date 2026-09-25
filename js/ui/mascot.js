@@ -197,7 +197,7 @@ export class Mascot {
 
   get name() { return this.stats.name; }
   awake() { return !this.stats.asleep && !['egg', 'school'].includes(this.stats.need) && !['cocoon', 'hatch'].includes(this.state); }
-  mount(host) { if (host && this.el.parentElement !== host) { host.append(this.el); this.fit(); } }
+  mount(host) { if (host && this.el.parentElement !== host) { host.append(this.el); this.fit(); requestAnimationFrame(() => this.placeBubble()); } }
 
   fit() {
     const dpr = devicePixelRatio || 1, r = this.el.getBoundingClientRect();
@@ -205,6 +205,7 @@ export class Mascot {
     this.k = Math.max(1, Math.floor(Math.min(r.height * dpr / BOX_H, (r.width + 24) * dpr / BOX_W)));
     Object.assign(this.canvas, { width: BOX_W * this.k, height: BOX_H * this.k });
     this.drawn = null;
+    this.placeBubble();
     Object.assign(this.canvas.style, { width: `${BOX_W * this.k / dpr}px`, height: `${BOX_H * this.k / dpr}px` });
   }
 
@@ -234,7 +235,18 @@ export class Mascot {
   say(text, ms = 1800) {
     clearTimeout(this.sayTimer);
     this.bubble.textContent = text;
+    if (text) requestAnimationFrame(() => this.placeBubble());
     if (text) this.sayTimer = setTimeout(() => { this.bubble.textContent = ''; }, ms + text.length * 25);
+  }
+  // Keeps the bubble inside the window (re-run when she moves); its tail still points at her.
+  placeBubble() {
+    const b = this.bubble;
+    if (!b.textContent) return;
+    b.style.setProperty('--dx', '0px');
+    const r = b.getBoundingClientRect(), m = 8;
+    const dx = r.left < m ? m - r.left : r.right > innerWidth - m ? innerWidth - m - r.right : 0;
+    b.style.setProperty('--dx', `${dx}px`);
+    b.style.setProperty('--tail', `${Math.max(10, Math.min(r.width - 10, r.width / 2 - dx))}px`);
   }
   chat(text) { if (!this.stats.is('quiet') || Math.random() < 0.3) this.say(text); }
   showEmote(name, ms = 1500) { this.emote = { name, until: Date.now() + ms }; }
@@ -330,6 +342,7 @@ export class Mascot {
     const s = this.stats;
     if (now < (this.nextLife ?? 0)) return;
     this.nextLife = now + 1000;
+    if (this.bubble.textContent) this.placeBubble();
     if (s.stage === 'egg' && this.state !== 'egg' && this.state !== 'hatch') { this.play('egg'); this.eggSince = now; }
     if (this.state === 'egg' && now - (this.eggSince ??= now) > 120e3) this.hatchNow();
     if (s.school && now > s.school.until) {

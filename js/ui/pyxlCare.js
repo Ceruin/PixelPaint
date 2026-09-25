@@ -18,7 +18,7 @@ let tab = local.get('pp.pyxlTab', 'care');
 
 export function careBody(pyxl, onPlay) {
   const s = pyxl.stats, content = h('div.pc-content'), tabs = h('div.pc-tabs', { role: 'tablist' });
-  const btn = (ic, label, fn, opts = {}) => h('button.btn.sm', { type: 'button', onclick: fn, ...opts }, iconCanvas(ic, 2), label);
+  const btn = (ic, label, fn, opts = {}) => h('button.btn.sm', { type: 'button', onclick: fn, ...opts }, iconCanvas(ic, 2), h('span.lbl', {}, label));
   const bar = (v, color, cls = '') => h(`div.pc-track${cls}`, {}, h('i', { style: { width: `${Math.max(0, Math.min(100, v))}%`, background: color } }));
 
   const views = {
@@ -32,7 +32,7 @@ export function careBody(pyxl, onPlay) {
           btn('onigiri', 'Feed', () => { snacks.hidden = !snacks.hidden; }),
           btn('heart', 'Pet', () => pyxl.pet()),
           s.sick ? btn('pill', 'Doctor', () => pyxl.doctor()) : btn('ball', 'Play', () => { onPlay?.(); pyxl.playGame(); }),
-          h('button.btn.sm', { type: 'button', onclick: () => (s.asleep ? pyxl.wake() : pyxl.nap()) }, icon(s.asleep ? 'sun' : 'zen'), s.asleep ? 'Wake' : 'Nap')),
+          h('button.btn.sm', { type: 'button', onclick: () => (s.asleep ? pyxl.wake() : pyxl.nap()) }, icon(s.asleep ? 'sun' : 'zen'), h('span.lbl', {}, s.asleep ? 'Wake' : 'Nap'))),
         snacks,
         h('div.pc-label', {}, 'Toys'),
         h('div.pc-grid', {}, TOYS.map(([id, name]) => h('button.pc-item', { type: 'button', 'data-tip': name, onclick: () => pyxl.toy(id) }, iconCanvas(id, 2), h('small', {}, name)))),
@@ -75,7 +75,7 @@ export function careBody(pyxl, onPlay) {
         h('p.pc-mood', {}, at ? `${s.name} is in ${LESSONS.find(l => l[0] === at.id)?.[1]} class — back in ${Math.max(0, Math.ceil((at.until - Date.now()) / 1000))}s.` : `Now in class: ${name}. Next lesson in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}.`),
         h('div.pc-lesson', {}, iconCanvas(kind === 'instrument' ? id : kind === 'dance' ? 'note' : kind === 'song' ? 'note' : kind === 'drawing' ? 'crayons' : 'star', 3),
           h('div', {}, h('b', {}, name), h('small', {}, `${kind[0].toUpperCase()}${kind.slice(1)}${s.learned[id] ? ` · learned${kind === 'song' || kind === 'drawing' ? ` (level ${s.learned[id]}/5)` : ''}` : ''}`)),
-          h('button.btn.sm.primary', { type: 'button', disabled: !!at || !pyxl.awake(), onclick: () => pyxl.school() }, 'Send to class')),
+          h('button.btn.sm.primary', { type: 'button', disabled: !!at || !pyxl.awake(), onclick: () => pyxl.school() }, h('span.lbl', {}, 'Send to class'))),
         h('div.pc-label', {}, `Learned ${learned.length} / ${LESSONS.length}`),
         h('div.pc-learned', {}, LESSONS.map(([lid, lname]) => h(`span${s.learned[lid] ? '.on' : ''}`, { 'data-tip': lname }, lname))),
         h('p.pc-note', {}, 'She shows off what she learns while you work. Lessons rotate every 3 minutes, like the Chao Kindergarten.'),
