@@ -52,7 +52,7 @@ export class WandTool {
 }
 
 // Marching ants around the current selection (animated only while one exists, and never in
-// Paper mode, where a still outline suits e-ink screens). Each step repaints just the ants.
+// Paper theme, where a still outline suits e-ink screens). Each step repaints just the ants.
 export function selectionOverlay(app) {
   let dash = 0, timer = 0;
   const o = {
@@ -63,7 +63,7 @@ export function selectionOverlay(app) {
       return Rect.fromPoints(pts, 2);
     },
     draw(ctx, view) {
-      const sel = app.doc?.selection, still = app.mode === 'paper';
+      const sel = app.doc?.selection, still = app.settings.theme === 'paper';
       if (!sel?.active || still) { clearInterval(timer); timer = 0; }
       if (!sel?.active) return;
       if (!still) timer ||= setInterval(() => { dash = (dash + 1) % 8; view.redrawOverlays(o); }, 120);

@@ -125,7 +125,7 @@ export function careBody(pyxl, onPlay) {
 }
 
 // The popup card: drag it by its header anywhere; pin it to keep it open (it remembers where you
-// left it); or dock it as a regular panel (Paint / Paper modes).
+// left it); or dock it as a regular panel (Draw workspace).
 let card = null;
 const close = () => { card?.stop(); card?.body.dispose(); card?.remove(); card = null; };
 export const closeCareCard = close;

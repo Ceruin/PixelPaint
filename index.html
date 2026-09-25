@@ -76,7 +76,7 @@ setTimeout(() => { const s = document.getElementById('splash'); if (s && !s.hidd
       <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="15">Help</div>
     </div>
     <!-- shared mode switch (wired by js/main.js) -->
-    <nav class="mode-switch" aria-label="Mode"><a class="mode-btn" href="#" data-mode="paint" title="Paint mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.4 2.6a2 2 0 0 1 3 3L11 16l-3-3z"/><path d="M7 14c-2 0-3.5 1.5-3.5 3.5 0 1-.5 2-1.5 2.5 1 .7 2.3 1 3.5 1C8 21 10 19 10 17z"/></svg><span>Paint</span></a><a class="mode-btn" href="#" data-mode="zen" title="Zen mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a4.5 4.5 0 0 0 0 9 4.5 4.5 0 0 1 0 9"/></svg><span>Zen</span></a><a class="mode-btn" href="#" data-mode="notes" title="Notes mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h5"/></svg><span>Notes</span></a><a class="mode-btn" href="#" data-mode="paper" title="Paper mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M9 12h8M9 16h8M9 8h3"/></svg><span>Paper</span></a><span class="mode-btn on" aria-current="page" data-mode="pixel"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h6v6H3zM9 9h6v6H9zM15 3h6v6h-6zM3 15h6v6H3zM15 15h6v6h-6z"/></svg><span>Pixel</span></span></nav>
+    <nav class="mode-switch" aria-label="Workspace"><a class="mode-btn" href="#" data-mode="paint" title="Draw workspace"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.4 2.6a2 2 0 0 1 3 3L11 16l-3-3z"/><path d="M7 14c-2 0-3.5 1.5-3.5 3.5 0 1-.5 2-1.5 2.5 1 .7 2.3 1 3.5 1C8 21 10 19 10 17z"/></svg><span>Draw</span></a><span class="mode-btn on" aria-current="page" data-mode="pixel"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h6v6H3zM9 9h6v6H9zM15 3h6v6h-6zM3 15h6v6H3zM15 15h6v6h-6z"/></svg><span>Pixel</span></span><a class="mode-btn" href="#" data-mode="notes" title="Notes workspace"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h5"/></svg><span>Notes</span></a></nav>
     <div class="group">
       <button id="undoBtn" class="iconbtn" data-icon="undo" title="Undo (Ctrl+Z)"></button>
       <button id="redoBtn" class="iconbtn" data-icon="redo" title="Redo (Ctrl+Y)"></button>
@@ -104,6 +104,7 @@ setTimeout(() => { const s = document.getElementById('splash'); if (s && !s.hidd
     <button data-cmd="save"   data-icon="save"     data-icon-size="16">Save project<span class="hk">Ctrl+S</span></button>
     <div class="ctx-sep"></div>
     <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
+    <button data-cmd="app:file.fromPixel" data-icon="image" data-icon-size="16">Send to Draw as a layer</button>
     <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
     <button data-cmd="aseprite" data-icon="grid"   data-icon-size="16">Export .aseprite…</button>
     <div class="ctx-sep"></div>
@@ -233,7 +234,7 @@ setTimeout(() => { const s = document.getElementById('splash'); if (s && !s.hidd
     <div class="ctx-sep"></div>
     <button data-cmd="app:help.guide" data-icon="info" data-icon-size="16">Getting started</button>
     <button data-cmd="app:app.welcome" data-icon="palette" data-icon-size="16">Say hi to Pyxl</button>
-    <button data-cmd="app:view.theme" data-icon="palette" data-icon-size="16">Light / dark theme</button>
+    <button data-cmd="app:view.theme" data-icon="palette" data-icon-size="16">Theme: dark / light / paper</button>
     <button data-cmd="app:help.update" data-icon="download" data-icon-size="16">Check for updates…</button>
     <button data-cmd="app:help.reload" data-icon="rotR" data-icon-size="16">Reload app</button>
   </div>

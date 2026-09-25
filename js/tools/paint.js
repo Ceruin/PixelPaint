@@ -1,5 +1,6 @@
 import { acquire, release } from '../engine/compositor.js';
 import { BrushEngine } from '../engine/brush.js';
+import { PixelEngine } from '../engine/pixel.js';
 import { Rect, drawRect, clipTo, TAU } from '../core/util.js';
 import { haptics } from '../input/haptics.js';
 import { pickLock, project } from '../engine/assistants.js';
@@ -18,7 +19,7 @@ function lazyCopy(pv, src) {
   };
 }
 
-const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge' };
+const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge', pencil: 'Pixel Pencil' };
 
 // Brush / Eraser / Smudge. Dabs go to a stroke buffer, which is composited over a copy of the
 // layer (the preview) inside the dirty rect only; the layer itself is written once, on pen-up.
@@ -39,7 +40,7 @@ export class PaintTool {
 
   down(p, e) {
     const { app } = this, doc = app.doc, layer = doc.activeLayer;
-    if (e.altKey && this.id === 'brush') { this.picking = true; app.pickColor(p.x, p.y); return true; }
+    if (e.altKey && (this.id === 'brush' || this.id === 'pencil')) { this.picking = true; app.pickColor(p.x, p.y); return true; }
     if (!layer || layer.locked || !layer.visible) { app.toast(layer ? 'Layer is locked or hidden' : 'Select a layer to paint on'); return false; }
     const { w, h } = doc, b = this.brush, smudge = this.id === 'smudge';
     Object.assign(this, { layer, total: null, travel: 0 });
@@ -48,11 +49,8 @@ export class PaintTool {
     else lazyCopy(this.preview, layer.canvas);
     if (!smudge) { this.buf = acquire(w, h); if (this.buf.stale?.w) { const s = this.buf.stale; this.buf.getContext('2d').clearRect(s.x, s.y, s.w, s.h); this.buf.stale = null; } }   // only what the last stroke left
     this.opacity = b.buildup ? 1 : b.opacity;
-    this.mode = this.id === 'eraser' ? 'destination-out' : layer.alphaLock ? 'source-atop' : b.blend;
-    this.engine = new BrushEngine(b, {
-      target: (smudge ? this.preview : this.buf).getContext('2d'), color: app.color.fg, symmetry: app.symmetry(),
-      profile: app.profile, alphaMul: b.buildup ? b.opacity : 1, smudge, wrap: app.opts.wrap ? { w, h } : null,
-    });
+    this.mode = this.erasing(e) ? 'destination-out' : layer.alphaLock ? 'source-atop' : b.blend;
+    this.engine = this.makeEngine((smudge ? this.preview : this.buf).getContext('2d'), b, smudge);
     this.start = p;
     this.lock = null;
     this.snap = app.opts.snapAssist && doc.assistants.length > 0;
@@ -60,6 +58,15 @@ export class PaintTool {
     this.engine.begin(p);
     this.flush();
     return true;
+  }
+
+  erasing() { return this.id === 'eraser'; }
+  makeEngine(target, b, smudge) {
+    const { app } = this, { w, h } = app.doc;
+    return new BrushEngine(b, {
+      target, color: app.color.fg, symmetry: app.symmetry(),
+      profile: app.profile, alphaMul: b.buildup ? b.opacity : 1, smudge, wrap: app.opts.wrap ? { w, h } : null,
+    });
   }
 
   move(pts) {
@@ -82,6 +89,7 @@ export class PaintTool {
     this.engine.end(this.lock ? project(this.lock, p) : p);
     this.flush();
     const r = this.total, pv = this.preview;
+    pv.ensure?.(r);   // the stroke's bounding box can span tiles no dab touched: fill them from the layer first
     if (r) this.app.doc.editPixels(LABEL[this.id], this.layer, r, ctx => { ctx.clearRect(r.x, r.y, r.w, r.h); drawRect(ctx, pv, r); });
     this.cleanup();
   }
@@ -147,6 +155,9 @@ export class PaintTool {
       if (['horizontal', 'quad'].includes(opts.symmetry)) { g.moveTo(0, cy); g.lineTo(doc.w, cy); }
       view.strokeDoc(ctx, g, 0, 'rgba(132,206,224,.9)', 'rgba(0,0,0,.35)');
     }
+    this.drawCursor(ctx, view);
+  }
+  drawCursor(ctx, view) {
     const p = this.hoverPt, r = p && this.brush.size / 2 * view.zoom;
     if (!p || r < 2) return;
     const s = view.toScreen(p.x, p.y);
@@ -154,5 +165,38 @@ export class PaintTool {
     [['rgba(0,0,0,.55)', r + 0.5], ['rgba(255,255,255,.9)', r - 0.5]].forEach(([c, rr]) => {
       ctx.beginPath(); ctx.arc(s.x, s.y, Math.max(1, rr), 0, TAU); ctx.strokeStyle = c; ctx.stroke();
     });
+  }
+}
+
+// Pixel Pencil: Draw's pixel-art tool. Whole pixels (size 1–16), pixel-perfect lines, symmetry,
+// selection masks and alpha lock like any brush; right-click or the Erase toggle clears pixels.
+export class PixelTool extends PaintTool {
+  constructor(app) { super(app, 'pencil'); }
+  get brush() { return { size: this.app.opts.pixelSize, opacity: 1, blend: 'source-over', buildup: false }; }
+  erasing(e) { return this.app.opts.pixelErase || e?.button === 2; }
+  makeEngine(target) {
+    const { app } = this;
+    return new PixelEngine({ target, color: app.color.fg, size: app.opts.pixelSize, perfect: app.opts.pixelPerfect, symmetry: app.symmetry() });
+  }
+  // The cursor is the square of pixels the pencil will fill.
+  cellRect(view) {
+    const p = this.hoverPt;
+    if (!p) return null;
+    const n = this.app.opts.pixelSize, o = (n - 1) / 2, x = Math.floor(p.x - o), y = Math.floor(p.y - o);
+    const pts = [[x, y], [x + n, y], [x, y + n], [x + n, y + n]].map(([a, b]) => view.toScreen(a, b));
+    const xs = pts.map(q => q.x), ys = pts.map(q => q.y);
+    return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys), pts };
+  }
+  bounds(view) { const r = this.cellRect(view); return r && { x: r.x - 2, y: r.y - 2, w: r.w + 4, h: r.h + 4 }; }
+  drawCursor(ctx, view) {
+    const r = this.cellRect(view);
+    if (!r) return;
+    const [a, b, c, d] = r.pts;
+    ctx.lineWidth = 1;
+    for (const [col, off] of [['rgba(0,0,0,.6)', 0], ['rgba(255,255,255,.9)', 1]]) {
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(d.x, d.y); ctx.lineTo(c.x, c.y); ctx.closePath();
+      ctx.setLineDash(off ? [3, 3] : []); ctx.strokeStyle = col; ctx.stroke();
+    }
+    ctx.setLineDash([]);
   }
 }

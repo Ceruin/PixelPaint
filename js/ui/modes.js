@@ -1,13 +1,19 @@
-import { h, icon } from './dom.js';
+import { h, icon, iconBtn } from './dom.js';
+import { actions } from '../core/actions.js';
 
-// One switch shared by every mode (and mirrored in the Pixel editor's top bar).
-export const MODES = [
-  ['paint', 'Paint', 'brush', 'Alt+1'], ['zen', 'Zen', 'zen', 'Alt+2'], ['notes', 'Notes', 'note', 'Alt+3'],
-  ['paper', 'Paper', 'paper', 'Alt+4'], ['pixel', 'Pixel', 'pixel', 'Alt+5'],
-];
+// Three workspaces share one switch (mirrored in the Pixel editor's top bar). Focus (full screen,
+// what Zen used to be) and the theme (Dark / Light / E-ink) are toggles, not workspaces.
+export const MODES = [['paint', 'Draw', 'brush', 'Alt+1'], ['pixel', 'Pixel', 'pixel', 'Alt+2'], ['notes', 'Notes', 'note', 'Alt+3']];
+export const THEMES = [['dark', 'Dark', 'zen'], ['light', 'Light', 'sun'], ['paper', 'E-ink', 'paper']];
+// Old saved modes → workspace + toggle.
+export const LEGACY = { zen: { mode: 'paint', focus: true }, paper: { mode: 'paint', theme: 'paper' } };
 
-export function modeSwitch(current, onPick) {
-  return h('div.mode-switch', { role: 'tablist' }, MODES.map(([id, label, ic]) =>
-    h('button.mode-btn', { type: 'button', role: 'tab', className: id === current ? 'on' : '', 'data-tip': `${label} mode`, 'data-action': `mode.${id}`, onclick: () => onPick(id) },
-      icon(ic), h('span', {}, label))));
+export function modeSwitch(current, { focus, theme }) {
+  const [, tLabel, tIcon] = THEMES.find(t => t[0] === theme) ?? THEMES[0];
+  return h('div.mode-bar', {},
+    h('div.mode-switch', { role: 'tablist' }, MODES.map(([id, label, ic]) =>
+      h('button.mode-btn', { type: 'button', role: 'tab', className: id === current ? 'on' : '', 'data-tip': `${label} workspace`, 'data-action': `mode.${id}`, onclick: () => actions.run(`mode.${id}`) },
+        icon(ic), h('span', {}, label)))),
+    current !== 'pixel' && iconBtn('expand', 'Focus: full-screen canvas', () => actions.run('view.focus'), { className: `ibtn${focus ? ' on' : ''}`, 'data-action': 'view.focus' }),
+    iconBtn(tIcon, `Theme: ${tLabel} (click for the next)`, () => actions.run('view.theme'), { 'data-action': 'view.theme' }));
 }

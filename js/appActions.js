@@ -11,7 +11,7 @@ import { renderFrames, exportGIF, exportPNGSequence, exportSpriteSheet, exportVi
 import { bus } from './core/bus.js';
 import { acquire, release } from './engine/compositor.js';
 import { TOOL_META } from './tools/index.js';
-import { MODES } from './ui/modes.js';
+import { MODES, THEMES } from './ui/modes.js';
 import { hexToRgb } from './core/color.js';
 import { tipFromImage, registerTip } from './engine/tips.js';
 import { showWelcome } from './ui/welcome.js';
@@ -19,12 +19,12 @@ import { checkForUpdates, reloadFresh } from './ui/updates.js';
 import { showGuide } from './ui/guide.js';
 import { VERSION } from './version.js';
 
-const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
+const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
 const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
 
-export function defineActions(app, { panels, project, setMode, timeline }) {
+export function defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline }) {
   const doc = () => app.doc;
   const editable = fn => () => {
     const l = doc().activeLayer;
@@ -71,7 +71,9 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
       { id: 'bg', label: 'Background', type: 'select', options: [['white', 'White'], ['transparent', 'Transparent'], ['color', 'Background color']], value: 'white' },
     ], 'Create');
     if (!v) return;
-    app.setDoc(new Doc(dim(v.w), dim(v.h), { bg: { white: '#ffffff', transparent: null, color: app.color.bg }[v.bg] }));
+    const d = new Doc(dim(v.w), dim(v.h), { bg: { white: '#ffffff', transparent: null, color: app.color.bg }[v.bg] });
+    app.setDoc(d);
+    if (d.pixelArt) app.setTool('pencil');   // a pixel canvas starts with the Pixel Pencil
   };
 
   const imageSize = async () => {
@@ -342,10 +344,15 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
     { id: 'help.update', label: 'Check for Updates…', icon: 'download', run: () => checkForUpdates() },
     { id: 'help.reload', label: 'Reload App', icon: 'rotCW', run: reloadFresh },
     { id: 'help.about', label: 'About PixelPaint', icon: 'bubble', run: () => modal('About PixelPaint', h('p', {}, `PixelPaint ${VERSION} — a painting, pixel art, animation and notes app that runs in your browser and works offline. Your work autosaves on this device.`), [['OK', 'ok', true]]) },
-    { id: 'view.theme', label: 'Light Theme', icon: 'sun', checked: () => app.settings.theme === 'light', run: () => { app.setSetting('theme', app.settings.theme === 'light' ? 'dark' : 'light'); document.body.classList.toggle('light', app.settings.theme === 'light'); bus.emit('mode', app.mode); } },
+    // Themes: Dark, Light and Paper (calm e-ink colours with a pencil-on-paper feel). view.theme cycles them.
+    ...THEMES.map(([id, label, ic]) => ({ id: `theme.${id}`, label: `${label} Theme`, icon: ic, checked: () => app.settings.theme === id, run: () => setTheme(id) })),
+    { id: 'view.theme', label: 'Next Theme', icon: 'sun', run: () => setTheme(THEMES[(THEMES.findIndex(t => t[0] === app.settings.theme) + 1) % THEMES.length][0]) },
+    { id: 'view.einkSim', label: 'Simulate E-ink Display', icon: 'paper', checked: () => app.settings.einkSim !== false, run: () => { app.setSetting('einkSim', app.settings.einkSim === false); bus.emit('eink'); } },
+    { id: 'view.focus', label: 'Focus (Full-Screen Canvas)', icon: 'expand', key: 'Tab', checked: () => !!app.focus, run: () => toggleFocus() },
+    { id: 'view.fullscreen', label: 'Browser Full Screen', icon: 'fit', checked: () => !!document.fullscreenElement,
+      run: () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.())?.catch?.(() => {}) },
 
-    ...MODES.map(([id, label, ic, key]) => ({ id: `mode.${id}`, label: `${label} Mode`, icon: ic, key, checked: () => app.mode === id, run: () => setMode(id) })),
-    { id: 'mode.toggleZen', label: 'Toggle Zen Mode', icon: 'zen', key: 'Tab', run: () => setMode(app.mode === 'zen' ? 'paint' : 'zen') },
+    ...MODES.map(([id, label, ic, key]) => ({ id: `mode.${id}`, label: `${label} Workspace`, icon: ic, key, checked: () => app.mode === id, run: () => setMode(id) })),
 
     ...TOOL_META.map(([id, label, key]) => ({ id: `tool.${id}`, label: `${label} Tool`, key, run: () => app.setTool(id) })),
     { id: 'tool.commit', label: 'Apply Transform', key: 'Enter', enabled: () => !!app.tools.transform.s, run: () => app.tools.transform.commit() },
@@ -378,14 +385,14 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg', 'file.exportPsd']],
+      ['File', 'folder', ['file.new', 'file.open', 'file.import', 'file.toPixel', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg', 'file.exportPsd']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
-      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.theme', '-', ...MODES.map(m => `mode.${m[0]}`)]],
+      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
       ['Help', 'info', ['help.guide', 'edit.shortcuts', 'app.welcome', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],

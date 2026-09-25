@@ -1,4 +1,6 @@
 import { h, icon, iconBtn } from './dom.js';
+import { bus } from '../core/bus.js';
+import { actions } from '../core/actions.js';
 import { idb, local } from '../core/storage.js';
 import { debounce, clamp, makeCanvas } from '../core/util.js';
 import { BrushEngine, DEFAULT_BRUSH } from '../engine/brush.js';
@@ -297,7 +299,8 @@ export function initNotes(app, sendToCanvas) {
       ondblclick: () => focusNote(it),
     }, icon(KIND_ICON[it.kind]), h('span', {}, label(it)), it.collapsed && h('small', {}, '—'));
     outline.replaceChildren(
-      h('div.ol-head', {}, icon('layers'), 'Outline', h('span.spacer'), h('small', {}, `${state.items.length}`)),
+      h('div.ol-head', {}, iconBtn(showOutline ? 'chevronsLeft' : 'chevronsRight', showOutline ? 'Collapse the outline' : 'Expand the outline', () => setOutline(!showOutline)),
+        h('span.ol-title', {}, 'Outline'), h('span.spacer'), h('small', {}, `${state.items.length}`)),
       search,
       ...state.groups.map(g => h('div.ol-group', {},
         h('button.ol-gname', { type: 'button', style: { '--gc': g.color }, onclick: () => centerOn(g) },
@@ -341,14 +344,22 @@ export function initNotes(app, sendToCanvas) {
     outlineSizer.onpointermove = ev => { outline.style.width = `${clamp(w0 + ev.clientX - x0, 160, 520)}px`; };
     outlineSizer.onpointerup = () => { outlineSizer.onpointermove = null; local.set('pp.notesOutlineW', outline.offsetWidth); };
   });
-  let showOutline = local.get('pp.notesOutline', innerWidth > 720);
-  const outlineBtn = iconBtn('layers', 'Show / hide the outline', () => { showOutline = !showOutline; local.set('pp.notesOutline', showOutline); outline.hidden = outlineSizer.hidden = !showOutline; outlineBtn.classList.toggle('on', showOutline); });
-  outline.hidden = outlineSizer.hidden = !showOutline; outlineBtn.classList.toggle('on', showOutline);
+  // The outline starts collapsed to a slim rail (the board gets the room); expand it from the rail or the bar.
+  let showOutline = local.get('pp.notesOutline2', false);
+  const setOutline = on => {
+    showOutline = on; local.set('pp.notesOutline2', on);
+    outline.classList.toggle('collapsed', !on); outlineSizer.hidden = !on; outlineBtn.classList.toggle('on', on);
+    refreshOutline();
+  };
+  const outlineBtn = iconBtn('layers', 'Show / hide the outline', () => setOutline(!showOutline));
+  const focusBtn = iconBtn('expand', 'Focus: full-screen board (Tab)', () => actions.run('view.focus'), { 'data-action': 'view.focus' });
+  bus.on('mode', () => focusBtn.classList.toggle('on', !!app.focus));
+  setOutline(showOutline);
   const btn = (ic, text, fn, tip) => h('button.btn.sm', { type: 'button', 'data-tip': tip, onclick: fn }, icon(ic), h('span', {}, text));
 
   root.append(
     h('div.optionsbar', {},
-      h('span.opt-tool', {}, icon('note'), 'Notes'), outlineBtn,
+      h('span.opt-tool', {}, icon('note'), 'Notes'), outlineBtn, focusBtn,
       btn('note', 'Sticky', () => add('note'), 'New sticky note'),
       btn('text', 'Text', () => add('text'), 'New text block'),
       btn('sketch', 'Sketch', () => add('sketch'), 'New sketch card'),

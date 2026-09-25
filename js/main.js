@@ -3,6 +3,8 @@ import { bus } from './core/bus.js';
 import { local } from './core/storage.js';
 import { actions, bindKeys, isTyping } from './core/actions.js';
 import { isTouchDevice } from './core/util.js';
+import { flatten } from './engine/compositor.js';
+import { initEink } from './ui/eink.js';
 import { Doc } from './engine/document.js';
 import { App } from './app.js';
 import { createProject } from './project.js';
@@ -18,7 +20,7 @@ import { initPopupPalette } from './ui/popupPalette.js';
 import { initTimeline } from './ui/timeline.js';
 import { showWelcome } from './ui/welcome.js';
 import { menubar } from './ui/menubar.js';
-import { MODES, modeSwitch } from './ui/modes.js';
+import { MODES, THEMES, LEGACY, modeSwitch } from './ui/modes.js';
 import { optionsBar } from './ui/optionsbar.js';
 import { statusbar } from './ui/statusbar.js';
 import { initTooltips } from './ui/tooltip.js';
@@ -38,10 +40,10 @@ const mascot = new Mascot(app);
 const zen = initZen(app, panels);
 const notes = initNotes(app, c => { setMode('paint'); project.importLayer(c, 'Sketch note'); });
 
-// Opens a panel where it lives; in Zen, or when its dock is folded, as a flyout by the clicked control.
+// Opens a panel where it lives; in Focus, or when its dock is folded, as a flyout by the clicked control.
 const openPanel = (id, e) => {
   const s = panels.map.get(id).s;
-  if (e?.currentTarget && (app.mode === 'zen' || (s.dock && panels.folded[s.dock]))) return panels.flyout(id, e.currentTarget);
+  if (e?.currentTarget && (app.focus || (s.dock && panels.folded[s.dock]))) return panels.flyout(id, e.currentTarget);
   panels.patch(id, { hidden: false, collapsed: false });
 };
 
@@ -54,11 +56,10 @@ panels.add('navigator', 'Navigator', 'navigator', navigatorPanel(app), { dock: '
 panels.add('reference', 'Reference', 'image', referencePanel(app), { dock: null, hidden: true, x: 440, y: 60, w: 280, h: 320 });
 panels.add('pyxl', 'Pyxl', 'heart', careBody(mascot), { dock: 'right', order: 4, hidden: true });
 // Clicking Pyxl shows her docked panel when it's open, else her draggable popup (which can dock itself).
-const dockable = () => !['zen', 'notes'].includes(app.mode);
+const dockable = () => app.mode === 'paint' && !app.focus;
 mascot.openCare = () => (dockable() && panels.isOpen('pyxl') ? openPanel('pyxl') : openCareCard(mascot, dockable() && (() => openPanel('pyxl'))));
 panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hidden: true, x: 440, y: 16, w: 230, h: 320 });
 initPopupPalette(app);
-document.body.classList.toggle('light', app.settings.theme === 'light');
 
 // Pixel mode: the pixel-art editor lives in #pixel (styles: css/pixel.css); its top bar replaces ours.
 // Its script boots behind the boot splash, laid out at full size but parked off-screen: that one
@@ -95,25 +96,65 @@ pixelBox.addEventListener('click', e => {
 // App-wide items in the editor's Help menu (updates, guide, theme…).
 pixelBox.addEventListener('pp-action', e => actions.run(e.detail));
 
+// Workspaces: Draw ('paint'), Pixel, Notes. Focus hides the chrome (remembered per workspace; Draw
+// starts focused on touch screens). The chrome's CSS follows data-layout, which Pixel leaves as it
+// was (it covers the app), and the theme follows data-theme.
+const focus = local.get('pp.focus', { paint: isTouchDevice, notes: false });
 function setMode(mode) {
+  const legacy = LEGACY[mode];
+  if (legacy) { if (legacy.focus) { focus.paint = true; local.set('pp.focus', focus); } if (legacy.theme) setTheme(legacy.theme); mode = legacy.mode; }
   if (!MODES.some(m => m[0] === mode)) mode = 'paint';
   app.tool.interrupt?.();
   app.mode = mode;
   document.body.dataset.mode = mode;
-  if (mode !== 'pixel') document.body.dataset.layout = mode;
   local.set('pp.mode', mode);
-  app.profile = mode === 'paper' ? { smoothing: 0.3, grain: 0.35 } : {};
   if (mode !== 'pixel') notes.show(mode === 'notes');   // Pixel covers the app: leave it as it was
   showPixel(mode === 'pixel');
-  mascot.mount(mode === 'zen' ? zen.slot : mode === 'notes' ? notes.slot : mode === 'pixel' ? pixelSlot : $('#mascotSlot'));
-  modeBox.replaceChildren(modeSwitch(mode, setMode));
+  applyFocus();
+}
+function applyFocus() {
+  const mode = app.mode;
+  app.focus = mode !== 'pixel' && !!focus[mode];
+  if (mode !== 'pixel') {
+    document.body.dataset.layout = mode === 'notes' ? 'notes' : app.focus ? 'zen' : 'paint';
+    document.body.toggleAttribute('data-focus', app.focus);
+  }
+  mascot.mount(mode === 'notes' ? notes.slot : mode === 'pixel' ? pixelSlot : app.focus ? zen.slot : $('#mascotSlot'));
+  modeBox.replaceChildren(modeSwitch(mode, { focus: app.focus, theme: app.settings.theme }));
   bus.emit('mode', mode);
   if (mode !== 'pixel') requestAnimationFrame(() => app.view.resize());
 }
+function toggleFocus(on = !app.focus) {
+  if (app.mode === 'pixel') return;
+  focus[app.mode] = on;
+  local.set('pp.focus', focus);
+  applyFocus();
+}
+// Paper is a theme with its own feel: e-ink colours, no animation, and a pencil-on-paper brush profile.
+function setTheme(theme) {
+  if (!THEMES.some(t => t[0] === theme)) theme = 'dark';
+  if (app.settings.theme !== theme) app.setSetting('theme', theme);
+  document.body.classList.toggle('light', theme === 'light');
+  document.body.dataset.theme = theme;
+  app.profile = theme === 'paper' ? { smoothing: 0.3, grain: 0.35 } : {};
+  app.view.flat = theme === 'paper'; app.view.redraw();
+  if (modeBox.isConnected) modeBox.replaceChildren(modeSwitch(app.mode, { focus: app.focus, theme }));
+  bus.emit('theme', theme);
+}
 
 const timeline = initTimeline(app, $('#timeline'));
-const { menus } = defineActions(app, { panels, project, setMode, timeline });
 const modeBox = document.createElement('div');
+const { menus } = defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline });
+// Hand-offs between Draw and the Pixel editor: the picture opens there as a new pixel drawing, and
+// the Pixel editor's current frame comes back to Draw as a layer.
+actions.define([
+  { id: 'file.toPixel', label: 'Open in Pixel Editor', icon: 'pixel', run: async () => {
+    const blob = await new Promise(r => flatten(app.doc).toBlob(r, 'image/png'));
+    await loadPixel(); setMode('pixel');
+    pixelBox.dispatchEvent(new CustomEvent('pp-open-image', { detail: new File([blob], `${app.doc.name || 'Drawing'}.png`, { type: 'image/png' }) }));
+  } },
+  { id: 'file.fromPixel', label: 'Send to Draw as a Layer', icon: 'brush', run: () => pixelBox.dispatchEvent(new CustomEvent('pp-get-frame', { detail: c => { setMode('paint'); project.importLayer(c, 'From Pixel'); } })) },
+]);
 menubar($('#menubar'), menus, modeBox);
 optionsBar(app, $('#optionsbar'), e => openPanel('brushes', e));
 // Mouse wheel scrolls the options bar sideways when it overflows (sliders keep their own wheel).
@@ -124,7 +165,7 @@ $('#optionsbar').addEventListener('wheel', e => {
 }, { passive: false });
 statusbar(app, $('#statusbar'), $('#view'));
 initTooltips();
-bindKeys(a => app.mode !== 'pixel' || /^mode\.(?!toggle)/.test(a.id));
+bindKeys(a => app.mode !== 'pixel' || /^mode\./.test(a.id));
 panels.apply(local.get('pp.layout'));
 bus.on('toast', toast);
 watchForUpdates(() => project.saveLocal(true));
@@ -141,12 +182,14 @@ stage.addEventListener('drop', e => {
   for (const f of e.dataTransfer.files) /\.ora$/i.test(f.name) ? project.openFile(f) : f.type.startsWith('image/') && project.importLayer(f, f.name);
 });
 
+initEink(app, mascot);
 const doc = await project.restore().catch(() => null) ?? new Doc(1920, 1080);
 app.setDoc(doc);
 // ?mode=… (links from the Pixel editor) wins over the remembered mode.
 const asked = new URLSearchParams(location.search).get('mode');
 if (asked) history.replaceState(null, '', location.pathname);
-setMode(asked ?? local.get('pp.mode', isTouchDevice ? 'zen' : 'paint'));
+setTheme(app.settings.theme);
+setMode(asked ?? local.get('pp.mode', 'paint'));
 globalThis.pixelpaint = app;
 hideSplash(loadPixel());
 await welcome;

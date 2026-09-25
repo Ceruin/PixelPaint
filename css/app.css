@@ -12,13 +12,21 @@ body.light {
 }
 /* The app chrome follows data-layout, which keeps the last non-Pixel mode while Pixel mode covers
    it: entering Pixel then changes nothing underneath (no hidden panels re-shown, no re-theme). */
-body[data-layout=paper] {
+body[data-theme=paper] {
   --bg: #f4f2ec; --stage: #e6e3da; --panel: #fbfaf6; --panel2: #f1efe8; --panel3: #e4e1d8; --line: #111;
   --text: #111; --muted: #444; --accent: #111; --accent2: #111; --accent-ink: #fff; --shadow: none; color-scheme: light;
 }
 /* e-ink: nothing animates — except the loading splash, which has to show it's working */
+/* E-ink simulation (js/ui/eink.js): 16 grey levels over everything, a faint paper grain, and the
+   full-refresh flash. */
+html.eink-sim { filter: url(#eink) contrast(1.12); }
+html.eink-sim body::after { content: ''; position: fixed; inset: 0; z-index: 2000; pointer-events: none; opacity: .06;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.eink-flash { position: fixed; inset: 0; z-index: 2001; pointer-events: none; opacity: 0; }
+.eink-flash.go { animation: eink-flash .26s steps(1, end) forwards; }
+@keyframes eink-flash { 0% { opacity: 1; background: #000; } 30% { opacity: 1; background: #fff; } 60% { opacity: .5; background: #fff; } 100% { opacity: 0; } }
 /* e-ink: nothing animates. Listed explicitly (a universal selector here restyled every element on each switch). */
-body[data-mode=paper] :is(.toast, .tooltip, .m-bubble, .pc-track i, .pc-track, .sg-star, .welcome, .wl-card, .wl-art) { transition: none !important; animation: none !important; }
+body[data-theme=paper] :is(.toast, .tooltip, .m-bubble, .pc-track i, .pc-track, .sg-star, .welcome, .wl-card, .wl-art) { transition: none !important; animation: none !important; }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -76,8 +84,8 @@ select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: -1
 .brand em:nth-of-type(4) { color: #7cb1fa; } .brand em:nth-of-type(5) { color: #4f8cf5; }
 .brand b i:nth-of-type(1) { color: #a445ff; } .brand b i:nth-of-type(2) { color: #3b7bff; } .brand b i:nth-of-type(3) { color: #17c06b; }
 .brand b i:nth-of-type(4) { color: #ffd23f; } .brand b i:nth-of-type(5) { color: #ff3b47; }
-body.light .brand em, body[data-layout=paper] #app .brand em { color: #2f5fd6 !important; }
-body[data-layout=paper] #app .brand b i { color: #111 !important; }
+body.light .brand em, body[data-theme=paper] #app .brand em { color: #2f5fd6 !important; }
+body[data-theme=paper] #app .brand b i { color: #111 !important; }
 .menus { display: flex; gap: 1px; overflow: hidden; min-width: 0; }
 .menu-title { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r); background: none; color: var(--muted); }
 .menu-title:hover, .menu.open .menu-title { color: var(--text); background: var(--panel2); border-color: var(--line); }
@@ -100,6 +108,8 @@ body[data-layout=paper] #app .brand b i { color: #111 !important; }
 .menu-item.checked .kbd { color: var(--accent); font-weight: 700; }
 .group { display: flex; gap: 2px; }
 
+.mode-bar { flex: none; display: flex; align-items: center; gap: 4px; }
+.mode-bar > .ibtn.on { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .mode-switch { flex: none; display: flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
 .mode-btn { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: var(--r); background: none; color: var(--muted); }
 .mode-btn:hover { color: var(--text); background: var(--panel2); }
@@ -147,7 +157,7 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .workspace { position: relative; display: flex; overflow: hidden; }
 .stage { position: relative; flex: 1; min-width: 0; background: var(--stage); overflow: hidden; }
 .stage canvas { position: absolute; left: 0; top: 0; display: block; }   /* sized by the viewport (grow-only backing) */
-body[data-layout=paper] .workspace .stage { background: var(--stage) repeating-linear-gradient(0deg, transparent 0 27px, rgba(0, 0, 0, .06) 27px 28px); }
+body[data-theme=paper] .workspace .stage { background: var(--stage) repeating-linear-gradient(0deg, transparent 0 27px, rgba(0, 0, 0, .06) 27px 28px); }
 .dock { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: var(--bg); min-height: 0; position: relative; z-index: 4; }
 .dock-left { border-right: 1px solid var(--line); }
 .dock-right { width: var(--dock-w); border-left: 1px solid var(--line); }
@@ -345,7 +355,7 @@ body[data-layout=paper] .workspace .stage { background: var(--stage) repeating-l
 .pyxl-canvas { position: absolute; left: 0; bottom: 0; image-rendering: pixelated; pointer-events: none; }
 .mascot.hanging .pyxl-canvas { visibility: hidden; }
 .pyxl-hang { position: fixed; left: 0; top: 0; z-index: 145; image-rendering: pixelated; pointer-events: none; will-change: transform; }
-body[data-mode=paper] .pyxl-hang { filter: grayscale(1) contrast(1.15); }
+body[data-theme=paper] .pyxl-hang { filter: grayscale(1) contrast(1.15); }
 .m-bubble {
   position: fixed; left: 0; top: 0; padding: 4px 9px; border-radius: var(--r);
   width: max-content; max-width: min(220px, calc(100vw - 16px)); text-align: center; line-height: 1.3; overflow-wrap: break-word;
@@ -354,7 +364,7 @@ body[data-mode=paper] .pyxl-hang { filter: grayscale(1) contrast(1.15); }
 .m-bubble:empty { display: none; }
 .m-bubble::after { content: ''; position: absolute; left: var(--tail, 50%); top: 100%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: var(--text); }
 .m-bubble:not(:empty) { opacity: 1; }
-body[data-mode=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
+body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .dock.folded .mascot { width: 38px; height: 44px; }
 .pxicon { image-rendering: pixelated; flex: none; }
 
@@ -418,7 +428,7 @@ body[data-mode=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-learned { display: flex; flex-wrap: wrap; gap: 3px; }
 .pc-learned span { padding: 1px 6px; border-radius: 2px; font-size: 11px; line-height: 1.4; color: var(--muted); border: 1px dashed var(--line); }
 .pc-learned span.on { color: var(--text); border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
-body[data-mode=paper] .pc-medal, body[data-mode=paper] .pc-grade { filter: grayscale(1); }
+body[data-theme=paper] .pc-medal, body[data-theme=paper] .pc-grade { filter: grayscale(1); }
 /* race mini-game */
 .race-layer { position: fixed; inset: 0; z-index: 820; display: grid; place-items: center; background: rgba(8, 10, 14, .5); }
 .race-card { display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; max-width: 96vw; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
@@ -449,19 +459,21 @@ body[data-layout=zen] #app > :is(.optionsbar, .statusbar), body[data-layout=zen]
 body[data-layout=zen] .dock { position: absolute; top: 0; bottom: 0; visibility: hidden; }
 body[data-layout=zen] .dock-left { left: 0; } body[data-layout=zen] .dock-right { right: 0; }
 body[data-layout=zen] .dock .panel.flyout { visibility: visible; }
-.zen-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; box-shadow: var(--shadow); max-height: calc(100dvh - 60px); overflow: auto; scrollbar-width: none; }
+.zen-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; box-shadow: var(--shadow); max-height: calc(100dvh - 16px); overflow: auto; scrollbar-width: none; }
 .zen-sec { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .zen-strip .mascot-slot { margin-top: 0; position: sticky; bottom: -6px; padding-bottom: 6px; background: inherit; }   /* never scrolls out of a short strip */
 .zen-strip .mascot { width: 48px; height: 62px; }
 .zen-chip { width: 30px; height: 30px; margin: 2px 0; }
 .vs-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--muted); font-size: 11px; }
-.vslider { writing-mode: vertical-lr; direction: rtl; width: 22px !important; height: 110px !important; }
+.vslider { writing-mode: vertical-lr; direction: rtl; width: 22px !important; height: clamp(56px, 13vh, 110px) !important; }   /* shorter on short screens so the strip fits */
 .vslider::-webkit-slider-runnable-track { width: 6px !important; height: 100% !important; background: linear-gradient(0deg, var(--accent) var(--p, 50%), var(--panel3) var(--p, 50%)) !important; }
 .vslider::-webkit-slider-thumb { margin: 0 0 0 -5px !important; width: 16px !important; height: 10px !important; }
 
 /* ---------- notes: same chrome, a board instead of a canvas ---------- */
 .notes { display: flex; flex-direction: column; }
 body[data-layout=notes] #optionsbar, body[data-layout=notes] .workspace { display: none; }
+/* Focus (full screen): the canvas or board gets the whole window; Tab or the strip's button brings the chrome back */
+body[data-focus] #app > #menubar, body[data-layout=notes][data-focus] #app > .statusbar { display: none; }
 .board { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; background-color: var(--stage); background-image: radial-gradient(circle, var(--line) 1px, transparent 1.2px); }
 .board-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .board-slot { position: absolute; right: 10px; bottom: max(8px, env(safe-area-inset-bottom)); z-index: 5; }
@@ -498,7 +510,7 @@ body[data-layout=notes] #optionsbar, body[data-layout=notes] .workspace { displa
 .rz-ne, .rz-se { right: -5px; } .rz-nw, .rz-sw { left: -5px; } .rz-ne, .rz-sw { cursor: nesw-resize; } .rz-nw, .rz-se { cursor: nwse-resize; }
 .rz-se::after { content: ''; position: absolute; right: 7px; bottom: 7px; width: 6px; height: 6px; border-right: 2px solid rgba(0, 0, 0, .3); border-bottom: 2px solid rgba(0, 0, 0, .3); }
 .note-group > .rz-se::after { border-color: var(--gc); }
-body[data-layout=paper] .card { box-shadow: none; border: 1.5px solid #111; }
+body[data-theme=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 
 @media (max-width: 900px) { .mode-btn > span:not(.ic) { display: none; } }
 .menus-icons .menu-title > span:not(.ic) { display: none; }
@@ -630,6 +642,11 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .card-title[contenteditable=false], .grp-name[contenteditable=false] { cursor: inherit; user-select: none; -webkit-user-select: none; }   /* a drag handle until double-tapped */
 .card-title:empty::before, .grp-name:empty::before, .focus-title:empty::before { content: attr(data-placeholder); opacity: .45; font-weight: 400; }
 .card-title:focus, .grp-name:focus, .focus-title:focus { background: rgba(0, 0, 0, .08); }
+/* collapsed: a slim rail with the expand button */
+.notes-outline.collapsed { width: 40px !important; padding: 6px 4px; overflow: hidden; }
+.notes-outline.collapsed > :not(.ol-head), .notes-outline.collapsed .ol-head > :not(.ibtn) { display: none; }
+.notes-outline.collapsed .ol-head { padding: 0; justify-content: center; }
+.ol-head .ibtn { width: 24px; height: 24px; }
 .outline-sizer { width: 5px; margin-left: -3px; flex: none; cursor: col-resize; touch-action: none; z-index: 21; }
 .outline-sizer:hover { background: var(--accent); }
 .note-group { position: absolute; border: 2px dashed var(--gc); border-radius: 6px; background: color-mix(in srgb, var(--gc) 7%, transparent); }

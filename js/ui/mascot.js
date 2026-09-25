@@ -210,7 +210,8 @@ export class Mascot {
     this.base();
     setInterval(() => this.tick(), 1000 / 12);   // behaviour at 12 fps; drawing and the bubble at display rate
     this.hangCv = h('canvas.pyxl-hang');
-    const frame = () => { requestAnimationFrame(frame); if (document.hidden) return; this.render(); if (this.bubble.textContent) this.placeBubble(); };
+    let last = 0;
+    const frame = now => { requestAnimationFrame(frame); if (document.hidden || now - last < (this.minFrame || 0) - 1) return; last = now; this.render(); if (this.bubble.textContent) this.placeBubble(); };
     requestAnimationFrame(frame);
     setTimeout(() => this.greeting(), 1800);
   }
@@ -278,7 +279,7 @@ export class Mascot {
     this.hangAt();
     this.el.classList.remove('hanging'); this.hangCv.remove();
     this.pos = PIV[0] - AX;   // stand right under where she hung
-    this.phys = document.body.dataset.mode === 'paper' ? null : { settle: new Settle(Math.max(-0.7, Math.min(0.7, ang)), this.phys?.hang?.om ?? 0, -16) };   // e-ink: no wobble
+    this.phys = document.body.dataset.theme === 'paper' ? null : { settle: new Settle(Math.max(-0.7, Math.min(0.7, ang)), this.phys?.hang?.om ?? 0, -16) };   // e-ink: no wobble
     if (this.phys) this.runPhysics(); else this.keepInView();
     const nearHome = this.nearHome();
     if (nearHome) this.goHome();
@@ -578,7 +579,7 @@ export class Mascot {
   render() {
     const ctx = this.canvas.getContext('2d'), k = this.k, st = STATES[this.state], t = (performance.now() - this.started) / 1000;
     if (!atlas.complete || !st) return;
-    const still = document.body.dataset.mode === 'paper', now = Date.now(); // e-ink friendly: no breathing, blinking or bobbing
+    const still = document.body.dataset.theme === 'paper', now = Date.now(); // e-ink friendly: no breathing, blinking or bobbing
     let pose = st.poses[st.fps ? Math.floor(t * st.fps) % st.poses.length : 0];
     let x = AX + this.pos, y = FLOOR, flip = this.flip;
     if (this.state === 'idle' && this.gaze) { pose = 'side'; flip = this.gaze < 0; }

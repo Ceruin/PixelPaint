@@ -17,7 +17,7 @@ const preview = b => {
   const c = h('canvas', { width: 140, height: 40 });
   const idle = window.requestIdleCallback ?? (f => setTimeout(f, 50));
   idle(() => {   // off the frame that rebuilt the bar
-    const theme = document.body.className + document.body.dataset.mode;
+    const theme = document.body.className + document.body.dataset.theme;
     if (theme !== inkFor) { inkFor = theme; ink = getComputedStyle(document.body).getPropertyValue('--text').trim(); }
     const key = `${JSON.stringify(b)}|${ink}`;
     let done = previews.get(key);
@@ -56,6 +56,13 @@ export function optionsBar(app, el, openBrushes) {
       o.symmetry === 'radial' && mini({ label: 'Axes', min: 2, max: 16, value: o.radial, onInput: setOpt('radial') }),
       app.doc?.assistants.length > 0 && toggle('Snap to assistants', o.snapAssist, v => app.setOpt('snapAssist', v)),
       toggle('Wrap-around', o.wrap, v => app.setOpt('wrap', v)));
+    if (t === 'pencil') parts.push(
+      mini({ label: 'Pixel size', min: 1, max: 16, value: o.pixelSize, fmt: v => `${v}px`, onInput: v => { setOpt('pixelSize')(v); app.view.redrawOverlays(app.tool); } }),
+      toggle('Pixel-perfect lines', o.pixelPerfect, v => app.setOpt('pixelPerfect', v)),
+      toggle('Erase (or right-click)', o.pixelErase, v => app.setOpt('pixelErase', v)),
+      h('label.inline', { 'data-tip': 'Symmetry' }, icon('symmetry'), select(SYMMETRY, o.symmetry, v => { app.setOpt('symmetry', v); render(); })),
+      toggle('Pixel grid', o.pixelGrid, v => app.setOpt('pixelGrid', v)),
+      h('span.muted', {}, 'Alt-click picks a colour'));
     if (t === 'shape') parts.push(
       segmented(SHAPES.map(([id, label, ic]) => [id, label, ic]), o.shape, v => app.setOpt('shape', v)),
       mini({ label: 'Line width', min: 1, max: 60, value: o.shapeWidth, fmt: v => `${v}px`, onInput: setOpt('shapeWidth') }),
@@ -87,7 +94,7 @@ export function optionsBar(app, el, openBrushes) {
     el.replaceChildren(...parts.filter(Boolean));
   };
   bus.on('tool', render);
-  bus.on('mode', render);
+  bus.on('mode', render); bus.on('theme', render);
   bus.on('brush', () => !busy && render());
   render();
 }

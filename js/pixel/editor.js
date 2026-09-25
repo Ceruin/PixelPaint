@@ -6476,6 +6476,13 @@ function openImageAsDoc(file, handle){
   img.onerror=()=>{ URL.revokeObjectURL(url); showToast("Couldn't read that image.","error"); };
   img.src=url;
 }
+// Hand-offs with Draw (js/main.js): it sends a picture to open as a new drawing, and asks for the
+// current frame to bring back as a layer.
+PX.addEventListener("pp-open-image", e=>openImageAsDoc(e.detail));
+PX.addEventListener("pp-get-frame", e=>{
+  const c=document.createElement("canvas"); c.width=W; c.height=H;
+  compositeFrameInto(c.getContext("2d"), frames[frameIndex]); e.detail(c);
+});
 // Route an opened file: a .pxpaint/.json is a project, an image opens as a new drawing.
 function openAnyFile(f, opts){
   if(!f) return;

@@ -3,7 +3,7 @@ import { bus } from '../core/bus.js';
 import { actions } from '../core/actions.js';
 import { sizeToPos, posToSize } from './brushPanel.js';
 
-// Zen / touch mode: the canvas fills the window; one floating strip (styled like every other
+// Focus (full screen, once Zen mode): the canvas fills the window; one floating strip (styled like every other
 // panel) holds the essential tools, Procreate-style size/opacity sliders and panel flyouts.
 export function initZen(app, panels) {
   const root = document.getElementById('zen');
@@ -22,6 +22,7 @@ export function initZen(app, panels) {
   };
 
   root.append(h('div.zen-strip.panel', {},
+    h('div.zen-sec', {}, iconBtn('chevronsRight', 'Leave Focus (Tab)', () => actions.run('view.focus')), iconBtn('undo', 'Undo', () => actions.run('edit.undo')), iconBtn('redo', 'Redo', () => actions.run('edit.redo'))),
     h('div.zen-sec', {}, tools),
     h('div.zen-sec', {},
       vslider('Size', () => sizeToPos(app.brush.size), v => { app.brush.size = posToSize(v); app.brushChanged(); }, 0),

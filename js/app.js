@@ -20,7 +20,7 @@ export class App {
     this.color = local.get('pp.color', { fg: '#1b1d23', bg: '#ffffff' });
     this.opts = {
       selMode: 'replace', tolerance: 24, contiguous: true, sampleAll: true, transformMode: 'free', uniform: true,
-      symmetry: 'none', radial: 6, wrap: false, grid: false, gridSize: 16, pixelGrid: true, onion: false, onionPrev: 1, onionNext: 1, onionAlpha: 0.5, playDir: 'forward', snapAssist: false, showAssist: true, assistKind: 'ruler',
+      symmetry: 'none', radial: 6, wrap: false, grid: false, gridSize: 16, pixelGrid: true, pixelSize: 1, pixelPerfect: true, pixelErase: false, onion: false, onionPrev: 1, onionNext: 1, onionAlpha: 0.5, playDir: 'forward', snapAssist: false, showAssist: true, assistKind: 'ruler',
       shape: 'rect', shapeWidth: 4, shapeFill: false, shapeStroke: true, font: "'Pixelify Sans'", fontSize: 48, bold: false,
       ...local.get('pp.opts', {}),
     };

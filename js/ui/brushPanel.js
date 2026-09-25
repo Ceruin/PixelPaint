@@ -72,7 +72,7 @@ export function brushLibrary(app) {
   let query = '';
   const search = h('input', { type: 'search', placeholder: 'Search brushes…', oninput: () => { query = search.value.toLowerCase(); render(); } });
   let inkFor, inkVal;   // the theme's text colour, read once per theme/mode (a style read can force a recalc)
-  const ink = () => { const key = document.body.className + document.body.dataset.mode; if (key !== inkFor) { inkFor = key; inkVal = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e6e8ee'; } return inkVal; };
+  const ink = () => { const key = document.body.className + document.body.dataset.theme; if (key !== inkFor) { inkFor = key; inkVal = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e6e8ee'; } return inkVal; };
   const mark = () => list.querySelectorAll('.brush-row').forEach(r => r.classList.toggle('on', r.dataset.name === app.brush.name));
   const render = () => {
     const all = [...PRESETS, ...userBrushes().map(b => ({ ...b, cat: b.cat === 'Eraser' || b.cat === 'Blend' ? b.cat : 'My Brushes' }))]
@@ -92,7 +92,8 @@ export function brushLibrary(app) {
   bus.on('brush', mark); bus.on('tool', mark);
   // Modes only matter if they change the ink colour (light theme / paper): then re-render.
   let lastInk = ink();
-  bus.on('mode', () => { if (ink() !== lastInk) { lastInk = ink(); render(); } });
+  const reink = () => { if (ink() !== lastInk) { lastInk = ink(); render(); } };
+  bus.on('mode', reink); bus.on('theme', reink);
   bus.on('userBrushes', render); bus.on('favs', render);
   render();
   return h('div.brush-lib', {},

@@ -7,7 +7,7 @@ const SECTIONS = [
   ['layers', 'Layers', ['Blend modes, opacity, clipping masks, alpha lock, groups and filter layers live in the Layers panel.', 'Drag layers to reorder them.']],
   ['film', 'Animation', ['Open the Animation strip at the bottom. Each frame holds the drawing before it until you draw a new key.', 'Onion skin, tags, playback speed, and export to GIF, sprite sheet, PNG frames or video are in the Frame menu.']],
   ['window', 'Panels & layouts', ['Drag panel headers to move, dock or float them; the « » buttons fold a dock into an icon rail.', 'Window → Save Layout keeps your arrangement; Keyboard Shortcuts lets you rebind any key.']],
-  ['zen', 'Modes', ['Paint is the full studio, Zen hides everything but the canvas (Tab), Notes is a board for ideas, Paper is a calm e-ink look, and Pixel is the pixel-art editor.']],
+  ['zen', 'Workspaces', ['Draw is the studio, Pixel is the pixel-art and sprite editor, and Notes is a board for ideas. Focus (Tab) hides everything but the canvas or board. The theme button switches Dark, Light and Paper — a calm e-ink look with a pencil-on-paper feel.']],
   ['sketch', 'Touch', ['Pinch to zoom and rotate, drag two fingers to pan.', 'Two-finger tap undoes, three-finger tap redoes. With a pen, fingers never paint.']],
   ['save', 'Saving', ['Everything autosaves in this browser. File → Download Project saves an OpenRaster (.ora) file that Krita and GIMP open too; PNG, JPG and PSD export are there as well.']],
   ['heart', 'Pyxl', ['Pyxl reacts to what you do and grows with you: your strokes, colours, shapes and filters train her Line, Colour, Shape and Power skills, and food builds her Stamina.',

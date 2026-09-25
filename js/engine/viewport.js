@@ -41,8 +41,9 @@ export class Viewport {
   toScreen(x, y) { return this.matrix.transformPoint({ x, y }); }
 
   fit() {
-    const { doc, cw, ch } = this, pad = cw < 600 ? 16 : 48;
-    this.set(Math.min((cw - pad) / doc.w, (ch - pad) / doc.h, 4), 0, cw / 2, ch / 2, { x: doc.w / 2, y: doc.h / 2 });
+    const { doc, cw, ch } = this, pad = cw < 600 ? 16 : 48, z = Math.min((cw - pad) / doc.w, (ch - pad) / doc.h);
+    // pixel canvases fit at a whole-number zoom so every pixel is the same size on screen
+    this.set(doc.pixelArt && z >= 1 ? Math.min(64, Math.floor(z)) : Math.min(z, 4), 0, cw / 2, ch / 2, { x: doc.w / 2, y: doc.h / 2 });
   }
 
   // Sets zoom/rotation while keeping doc point under screen point (sx, sy).
@@ -83,7 +84,12 @@ export class Viewport {
   redraw() { this.full = true; this.schedule(); }
   // Repaints only where overlay `o` (one with `bounds(view)`: brush ring, marching ants) was and now is.
   redrawOverlays(o) { if (o?.bounds) this.moved.add(o); else this.full = true; this.schedule(); }
-  schedule() { if (!this.raf) this.raf = requestAnimationFrame(() => this.frame()); }
+  // minFrame (ms) caps the refresh rate (the e-ink simulation's slow panel); 0 = every display frame.
+  schedule() {
+    if (this.raf) return;
+    const wait = (this.minFrame || 0) - (performance.now() - (this.lastFrame || 0));
+    this.raf = wait > 1 ? setTimeout(() => requestAnimationFrame(() => this.frame()), wait) : requestAnimationFrame(() => this.frame());
+  }
 
   // Brings the composite up to date now (for sampling it outside a frame).
   compose() {
@@ -91,7 +97,7 @@ export class Viewport {
   }
 
   frame() {
-    this.raf = 0;
+    this.raf = 0; this.lastFrame = performance.now();
     const { doc, el } = this;
     if (!doc) return;
     this.compose();
@@ -115,11 +121,12 @@ export class Viewport {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.vw, this.vh);
     const base = new DOMMatrix().scale(dpr).multiply(this.matrix);
-    if (shadow && !this.wrap) this.drawShadow(ctx);
+    if (shadow && !this.wrap && !this.flat) this.drawShadow(ctx);   // flat: the E-ink theme has no shadows
     for (const [i, j] of this.tiles()) {
       ctx.setTransform(base.translate(i * doc.w, j * doc.h));
+      this.checker.setTransform(new DOMMatrix().scale(1 / this.zoom));   // same size squares on screen at any zoom
       ctx.fillStyle = this.checker; ctx.fillRect(0, 0, doc.w, doc.h);
-      ctx.imageSmoothingEnabled = this.zoom < 2;
+      ctx.imageSmoothingEnabled = this.zoom < 2 && !doc.pixelArt;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(this.comp, 0, 0);
       this.drawOnion(ctx);
