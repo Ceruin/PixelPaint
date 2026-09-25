@@ -36,6 +36,7 @@ export function careBody(pyxl, onPlay) {
         snacks,
         h('div.pc-label', {}, 'Toys'),
         h('div.pc-grid', {}, TOYS.map(([id, name]) => h('button.pc-item', { type: 'button', 'data-tip': name, 'aria-label': name, onclick: () => pyxl.toy(id) }, iconCanvas(id, 3)))),
+        pyxl.floating ? h('button.btn.sm', { type: 'button', onclick: () => { pyxl.goHome(); pyxl.react('happy', { say: 'Home sweet home!' }); } }, iconCanvas('bag', 2), h('span.lbl', {}, 'Send Pyxl home')) : h('p.pc-note', {}, 'Tip: drag Pyxl to carry her anywhere.'),
       ];
     },
     chart() {

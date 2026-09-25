@@ -60,7 +60,7 @@ select, .field input:not([type=checkbox]), .hex, .rename {
 select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
 
 /* ---------- top bar (identical in every mode, and in the Pixel editor) ---------- */
-#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; box-sizing: border-box; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 #app > * { flex: none; }
 #app > .workspace, #app > .notes { flex: 1; min-height: 0; }
 .menubar {
@@ -329,7 +329,11 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 
 /* ---------- mascot: Pyxl (pixel sprites, integer-scaled on a canvas) ---------- */
 .mascot { position: relative; width: 64px; height: 64px; flex: none; }
-.mascot { cursor: pointer; }
+.mascot { cursor: grab; touch-action: none; }
+/* Pyxl picked up and placed anywhere: floats over the app (under cards and dialogs) */
+.pyxl-float { position: fixed; z-index: 140; width: 92px; height: 76px; }
+.pyxl-float .mascot { width: 92px; height: 76px; }
+.mascot.floating:active { cursor: grabbing; }
 .pyxl-canvas { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); image-rendering: pixelated; pointer-events: none; }
 .m-bubble {
   position: fixed; left: 0; top: 0; padding: 4px 9px; border-radius: var(--r);
@@ -443,7 +447,8 @@ body[data-mode=zen] .dock > :not(.dock-panels), body[data-mode=zen] .dock .panel
 body[data-mode=notes] #optionsbar, body[data-mode=notes] .workspace { display: none; }
 .board { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; background-color: var(--stage); background-image: radial-gradient(circle, var(--line) 1px, transparent 1.2px); }
 .board-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-.board-slot { position: absolute; left: 10px; bottom: 8px; z-index: 5; }
+.board-slot { position: absolute; right: 10px; bottom: max(8px, env(safe-area-inset-bottom)); z-index: 5; }
+.board-slot .mascot { width: 92px; height: 76px; }
 .card { position: absolute; display: flex; flex-direction: column; border-radius: 3px; color: #1b1d23; background: #fff; border: 1px solid rgba(0, 0, 0, .25); box-shadow: 0 4px 12px rgba(0, 0, 0, .25); cursor: default; }
 .card.text { background: transparent; box-shadow: none; border: 1px dashed transparent; color: var(--text); }
 .card.text:hover { border-color: var(--line); }
