@@ -227,6 +227,11 @@ body[data-layout=paper] .workspace .stage { background: var(--stage) repeating-l
 .chips.inline .fg { left: 0; }
 .chips.inline .bg { left: 14px; top: 11px; }
 .mascot-slot { margin-top: auto; display: grid; place-items: center; }
+/* while she's carried elsewhere her spot keeps her size, so dropping her back on it (even after a
+   restart) is recognised as home */
+.mascot-slot:empty { width: 92px; height: 76px; }
+.zen-strip .mascot-slot:empty { width: 48px; height: 62px; }
+.dock.folded .mascot-slot:empty { width: 38px; height: 44px; }
 
 /* ---------- color picker ---------- */
 .picker { display: flex; flex-direction: column; gap: 8px; }
@@ -618,10 +623,11 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .ol-sub { margin: 8px 4px 2px; font-size: 11px; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; }
 .card-title { flex: 0 1 auto; }   /* sized to its text: the rest of the bar is a drag handle */
 .card-space { flex: 1; min-width: 12px; align-self: stretch; }
-.card-handle { flex: none; align-self: stretch; width: 10px; margin: 0 1px; opacity: .45; background: radial-gradient(currentColor 1px, transparent 1.4px) center / 4px 4px; background-clip: content-box; padding: 8px 0; }
+.card-handle { flex: none; align-self: stretch; width: 16px; margin: 0 1px; cursor: grab; opacity: .45; background: radial-gradient(currentColor 1px, transparent 1.4px) center / 4px 4px; background-clip: content-box; padding: 8px 0; }
 .card:hover .card-handle { opacity: .75; }
 .grp-name, .focus-title { flex: 1; }
 .card-title, .grp-name, .focus-title { min-width: 20px; outline: none; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; user-select: text; -webkit-user-select: text; padding: 2px 3px; border-radius: 2px; }
+.card-title[contenteditable=false], .grp-name[contenteditable=false] { cursor: inherit; user-select: none; -webkit-user-select: none; }   /* a drag handle until double-tapped */
 .card-title:empty::before, .grp-name:empty::before, .focus-title:empty::before { content: attr(data-placeholder); opacity: .45; font-weight: 400; }
 .card-title:focus, .grp-name:focus, .focus-title:focus { background: rgba(0, 0, 0, .08); }
 .outline-sizer { width: 5px; margin-left: -3px; flex: none; cursor: col-resize; touch-action: none; z-index: 21; }

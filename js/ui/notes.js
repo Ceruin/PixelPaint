@@ -63,13 +63,34 @@ export function initNotes(app, sendToCanvas) {
     });
   });
 
-  // Inline-editable title that saves on input and keeps keys away from app shortcuts.
-  const titleField = (obj, placeholder, cls = 'card-title') => h(`span.${cls}`, {
-    contentEditable: 'true', spellcheck: false, textContent: obj.title ?? obj.name ?? '', 'data-placeholder': placeholder,
-    onkeydown: e => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } },
-    oninput: e => { if ('name' in obj) obj.name = e.target.textContent; else obj.title = e.target.textContent; save(); },
-    onpointerdown: e => e.stopPropagation(),
-  });
+  // Inline-editable title that saves on input and keeps keys away from app shortcuts. On a card or
+  // group header (`tapEdit`) it's part of the drag handle: one tap/press drags, a double-tap (or
+  // double-click) edits it.
+  const titleField = (obj, placeholder, cls = 'card-title', tapEdit = true) => {
+    const el = h(`span.${cls}`, {
+      contentEditable: tapEdit ? 'false' : 'true', spellcheck: false, textContent: obj.title ?? obj.name ?? '', 'data-placeholder': placeholder,
+      onkeydown: e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.target.blur(); } },
+      oninput: e => { if ('name' in obj) obj.name = e.target.textContent; else obj.title = e.target.textContent; save(); },
+      onpointerdown: e => el.isContentEditable && e.stopPropagation(),
+    });
+    if (!tapEdit) return el;
+    const edit = () => {
+      el.contentEditable = 'true'; el.focus();
+      getSelection().selectAllChildren(el);
+      el.addEventListener('blur', () => { el.contentEditable = 'false'; }, { once: true });
+    };
+    let last = 0;
+    el.addEventListener('pointerdown', e => {
+      if (el.isContentEditable) return;
+      const x0 = e.clientX, y0 = e.clientY;
+      // the header captures the pointer to drag, so the release is caught at window level
+      addEventListener('pointerup', u => {
+        if (Math.hypot(u.clientX - x0, u.clientY - y0) > 6) return void (last = 0);   // a drag, not a tap
+        if (u.timeStamp - last < 400) { last = 0; edit(); } else last = u.timeStamp;
+      }, { once: true, capture: true });
+    });
+    return el;
+  };
 
   // ---- cards ----
   const placeCard = it => {
@@ -87,7 +108,9 @@ export function initNotes(app, sendToCanvas) {
     let canvas;
     const head = h('div.card-grip', {},
       iconBtn(it.collapsed ? 'chevronRight' : 'chevron', 'Collapse / expand', () => { it.collapsed = !it.collapsed; mountCard(it); save(); }),
-      h('span.card-handle', { 'data-tip': 'Drag to move' }),   // always something to grab, however long the title
+      // always something to grab, however long the title; the (no-op) click makes it a tap target, so
+      // touch adjustment doesn't snap a press on it onto the neighbouring button
+      h('span.card-handle', { 'data-tip': 'Drag to move', onclick: () => {} }),
       icon(KIND_ICON[it.kind]),
       titleField(it, label(it)),
       h('span.card-space'),
@@ -260,7 +283,7 @@ export function initNotes(app, sendToCanvas) {
     });
     const back = h('div.note-focus', { onpointerdown: e => e.target === back && close() },
       h('div.focus-card', { style: { background: it.kind === 'note' ? it.color : '' } },
-        h('div.focus-head', {}, icon(KIND_ICON[it.kind]), titleField(it, label(it), 'focus-title'), h('span.spacer'), iconBtn('x', 'Close (Esc)', close)),
+        h('div.focus-head', {}, icon(KIND_ICON[it.kind]), titleField(it, label(it), 'focus-title', false), h('span.spacer'), iconBtn('x', 'Close (Esc)', close)),
         body));
     root.append(back);
     (body.focus ? body : back).focus?.();
