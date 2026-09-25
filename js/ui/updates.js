@@ -68,17 +68,32 @@ const offer = v => {
   document.body.append(banner);
 };
 
-// quiet: background check (banner only if newer); otherwise tells you either way.
-export async function checkForUpdates(quiet = false) {
+// mode 'quiet': a banner if newer; 'prompt': ask right away if newer (on opening / returning to
+// the app), silent otherwise; default (Help → Check for Updates): tells you either way.
+let asking = false;
+export async function checkForUpdates(mode) {
   const v = await latest().catch(() => null);
-  if (v && v !== VERSION) return quiet ? offer(v) : (await modal('Update available', h('p', {}, `Version ${v} is out (you have ${VERSION}). Your work is autosaved — update now?`), [['Later', null], ['Update', 'ok', true]])) && reloadFresh();
-  if (!quiet) toast(v ? `You're up to date (${VERSION})` : 'Couldn’t reach the server — try again when online');
+  if (v && v !== VERSION) {
+    if (mode === 'quiet') return offer(v);
+    if (asking) return;
+    asking = true;
+    const ok = await modal('Update available', h('p', {}, `PixelPaint ${v} is ready (you have ${VERSION}). Your work is saved first — update now?`), [['Later', null], ['Update now', 'ok', true]]);
+    asking = false;
+    return ok ? reloadFresh() : offer(v);
+  }
+  if (!mode) toast(v ? `You're up to date (${VERSION})` : 'Couldn’t reach the server — try again when online');
 }
 
-// `save` runs before any update reload so no brush stroke is lost.
+// `save` runs before any update reload so no brush stroke is lost. Checks on opening (once the
+// splash is gone), whenever you come back to the app after a while, and every half hour.
 export function watchForUpdates(save) {
   beforeReload = save;
   registerSW();
-  setTimeout(() => checkForUpdates(true), 5000);
-  setInterval(() => !document.hidden && checkForUpdates(true), 30 * 60000);
+  setTimeout(() => checkForUpdates('prompt'), 2600);
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) hiddenAt = Date.now();
+    else if (Date.now() - hiddenAt > 10 * 60e3) checkForUpdates('prompt');
+  });
+  setInterval(() => !document.hidden && checkForUpdates('quiet'), 30 * 60000);
 }

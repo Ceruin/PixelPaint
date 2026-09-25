@@ -146,6 +146,13 @@ const ACTIONS = [
   [/Rotate|Flip|Resize|Crop|Canvas Size|Image Size/, 'spin', null, 'shape', 4],
   [/Blur|Outline|Adjust|Merge|Flatten|Filter/, 'cheer', 'sparkle', 'power', 6],
 ];
+// A friendly name for a colour ("soft pink", "deep blue", "grey"…).
+function colourName(hex) {
+  const [hh, s, v] = hsv(...[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)));
+  if (s < 0.15) return v > 0.85 ? 'white' : v < 0.2 ? 'black' : 'grey';
+  const base = hh < 15 ? 'red' : hh < 40 ? 'orange' : hh < 65 ? 'yellow' : hh < 160 ? 'green' : hh < 195 ? 'teal' : hh < 255 ? 'blue' : hh < 290 ? 'purple' : hh < 335 ? 'pink' : 'red';
+  return `${v < 0.45 ? 'deep ' : s < 0.45 && v > 0.8 ? 'soft ' : ''}${base}`;
+}
 const lum = hex => { const n = parseInt(hex.slice(1), 16); return ((n >> 16) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114) / 255; };
 
 // Pixel ovals for the egg and cocoon: outline, shading and a highlight, drawn pixel by pixel.
@@ -172,7 +179,8 @@ export class Mascot {
     this.stats = new PyxlStats();
     this.canvas = h('canvas.pyxl-canvas');
     this.bubble = h('div.m-bubble');
-    this.el = h('div.mascot', { 'data-tip': 'Pyxl — click to care for her' }, this.canvas, this.bubble);
+    this.el = h('div.mascot', { 'data-tip': 'Pyxl — click to care for her' }, this.canvas);
+    document.body.append(this.bubble);   // floats above every panel and the canvas; follows her
     Object.assign(this, { parts: [], k: 1, flip: false, pets: [], undos: [], lastUndone: 0, lastActive: Date.now(), sessionStart: Date.now(), strokes: 0,
       nextFidget: Date.now() + 6000, nextNeed: 0, nextSymptom: 0, nextTip: Date.now() + 90e3, pos: 0, path: [], blinkAt: Date.now() + 3000, emote: null, taps: 0 });
     this.el.addEventListener('click', () => this.onClick());
@@ -235,18 +243,21 @@ export class Mascot {
   say(text, ms = 1800) {
     clearTimeout(this.sayTimer);
     this.bubble.textContent = text;
-    if (text) requestAnimationFrame(() => this.placeBubble());
+    if (text) this.placeBubble();
     if (text) this.sayTimer = setTimeout(() => { this.bubble.textContent = ''; }, ms + text.length * 25);
   }
-  // Keeps the bubble inside the window (re-run when she moves); its tail still points at her.
+  // The bubble lives at the top of the page (no panel can clip it): placed over her head, kept
+  // inside the window, its tail pointing at her. Re-placed every tick while it's showing.
   placeBubble() {
     const b = this.bubble;
     if (!b.textContent) return;
-    b.style.setProperty('--dx', '0px');
-    const r = b.getBoundingClientRect(), m = 8;
-    const dx = r.left < m ? m - r.left : r.right > innerWidth - m ? innerWidth - m - r.right : 0;
-    b.style.setProperty('--dx', `${dx}px`);
-    b.style.setProperty('--tail', `${Math.max(10, Math.min(r.width - 10, r.width / 2 - dx))}px`);
+    const c = this.canvas.getBoundingClientRect();
+    if (!c.width || !this.el.offsetParent) { b.style.visibility = 'hidden'; return; }
+    const sc = c.width / BOX_W, ax = c.left + (AX + this.pos) * sc, ay = c.top + (FLOOR - 60) * sc, m = 8;
+    const w = b.offsetWidth, hh = b.offsetHeight;
+    const left = Math.max(m, Math.min(innerWidth - m - w, ax - w / 2)), top = Math.max(m, ay - hh - 6);
+    Object.assign(b.style, { visibility: '', left: `${Math.round(left)}px`, top: `${Math.round(top)}px` });
+    b.style.setProperty('--tail', `${Math.max(10, Math.min(w - 10, ax - left))}px`);
   }
   chat(text) { if (!this.stats.is('quiet') || Math.random() < 0.3) this.say(text); }
   showEmote(name, ms = 1500) { this.emote = { name, until: Date.now() + ms }; }
@@ -275,6 +286,7 @@ export class Mascot {
 
   tick() {
     const now = Date.now(), st = STATES[this.state], s = this.stats;
+    if (this.bubble.textContent) this.placeBubble();
     if (now > this.until) this.afterState();
     this.lifeCycle(now);
     if (!this.awake()) return this.render();
@@ -342,7 +354,6 @@ export class Mascot {
     const s = this.stats;
     if (now < (this.nextLife ?? 0)) return;
     this.nextLife = now + 1000;
-    if (this.bubble.textContent) this.placeBubble();
     if (s.stage === 'egg' && this.state !== 'egg' && this.state !== 'hatch') { this.play('egg'); this.eggSince = now; }
     if (this.state === 'egg' && now - (this.eggSince ??= now) > 120e3) this.hatchNow();
     if (s.school && now > s.school.until) {
@@ -512,7 +523,7 @@ export class Mascot {
         if (skill === 'line' && (this.app?.brush?.size ?? 0) > 60) s.train('power', 4);
         if (state === 'oops') { s.feel('fear', 25); if (s.is('crybaby') && Math.random() < 0.4) { this.react('cry'); break; } }
         this.react(state, { icon, color: state === 'spray' ? this.app?.color.fg : null });
-        if (state === 'paint') this.painted();
+        if (state === 'paint') { this.painted(); this.noteStroke(label); }
         break;
       }
       this.lastUndone = undone;
@@ -547,6 +558,67 @@ export class Mascot {
       this.breakAt = now;
       setTimeout(() => this.react(s.learned.exercise ? 'exercise' : 'stretch', { say: 'Time for a stretch break? Move with me!' }), 1500);
     }
+  }
+
+  // ---- what you're drawing ----
+  // A running tally of your strokes; every so often (never often) she comments on it.
+  noteStroke(label) {
+    const a = this.app, t = this.art ??= { strokes: 0, erase: 0, colours: new Map(), big: 0, tiny: 0, long: 0 }, now = Date.now();
+    t.strokes++;
+    if (label === 'Eraser') t.erase++;
+    else t.colours.set(a.color.fg, (t.colours.get(a.color.fg) ?? 0) + 1);
+    const size = a.brush?.size ?? 0, r = a.tool?.total, d = a.doc;
+    if (size > 80) t.big++;
+    if (size < 6) t.tiny++;
+    if (r && d && Math.hypot(r.w, r.h) > 0.45 * Math.hypot(d.w, d.h)) t.long++;
+    this.nextCritique ??= now + 40e3;
+    if (now > this.nextCritique && t.strokes >= 5 && this.awake() && ['idle', 'sit', 'glance', 'peek', 'paint'].includes(this.state)) this.critique(now);
+  }
+
+  critique(now) {
+    const s = this.stats, t = this.art, p = s.personality, lines = [];
+    this.nextCritique = now + (70 + Math.random() * 90) * 1000 * (p === 'chatty' ? 0.6 : p === 'quiet' ? 2 : 1);
+    this.art = null;
+    const top = [...t.colours].sort((a, b) => b[1] - a[1])[0]?.[0], name = top && colourName(top);
+    if (t.erase >= 4) lines.push('Happy little accidents!', 'Erasing is part of making art.');
+    if (name) lines.push(`I love this ${name}!`, `Ooh, that ${name} is so pretty.`, `That ${name} really pops!`);
+    if (t.colours.size >= 4) lines.push('So many colours! ✿', 'What a rainbow!');
+    if (t.big >= 3) lines.push('Big, bold strokes — nice!');
+    if (t.tiny >= 6) lines.push('Such tiny details!', 'Careful work… I like it.');
+    if (t.long >= 2) lines.push('Whoa, what a long line!', 'Such confident lines!');
+    if (this.app.opts?.symmetry && this.app.opts.symmetry !== 'none') lines.push('Ooh, symmetrical!');
+    const look = this.lookAtCanvas();
+    if (look) lines.push(look, look);
+    if (!lines.length) return;
+    const text = lines[Math.floor(Math.random() * lines.length)];
+    this.play('peek');                                                   // she turns to look at your canvas…
+    setTimeout(() => this.awake() && this.react(Math.random() < 0.5 ? 'point' : 'happy', { say: text, icon: 'heart', n: 1, dur: 1800 }), 1300);
+    s.train('smarts', 3); s.feel('joy', 10);
+  }
+
+  // A 16×16 glance at the whole picture (scaled on the GPU, so only 256 pixels are read back):
+  // how full it is, and its main colour or mood.
+  lookAtCanvas() {
+    const comp = this.app.view?.comp;
+    if (!comp) return null;
+    const c = (this.sampler ??= Object.assign(document.createElement('canvas'), { width: 16, height: 16 })), x = c.getContext('2d');
+    x.clearRect(0, 0, 16, 16);
+    x.drawImage(comp, 0, 0, 16, 16);
+    const d = x.getImageData(0, 0, 16, 16).data, hues = new Array(8).fill(0);
+    let inked = 0, dark = 0;
+    for (let i = 0; i < 1024; i += 4) {
+      const [r, g, b, a] = [d[i], d[i + 1], d[i + 2], d[i + 3]];
+      if (a < 40 || (r > 235 && g > 235 && b > 235)) continue;
+      inked++;
+      const [hh, sat, v] = hsv(r, g, b);
+      if (v < 0.3) dark++;
+      if (sat > 0.3 && v > 0.25) hues[Math.floor(hh / 45) % 8]++;
+    }
+    if (inked < 12) return null;
+    if (inked > 170) return 'Your canvas is really filling up!';
+    if (dark > inked * 0.6) return 'A moody piece. I like it.';
+    const hi = hues.indexOf(Math.max(...hues));
+    return hues[hi] > inked * 0.4 ? ['So warm and red!', 'Such a sunny picture!', 'Lots of green… a forest?', 'So fresh and green!', 'Lots of teal — so calm.', 'So much blue! Is that the sky?', 'Purple dreams…', 'Pink and lovely!'][hi] : null;
   }
 
   // Points her brush at a tooltip: raised when it's above her, mirrored when it's to her left.

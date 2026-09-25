@@ -23,7 +23,7 @@ export function careBody(pyxl, onPlay) {
 
   const views = {
     care() {
-      const snacks = h('div.pc-grid', { hidden: true }, SNACKS.map(sn => h('button.pc-item', { type: 'button', 'data-tip': sn[1], onclick: () => pyxl.feed(sn) }, iconCanvas(sn[0], 3), h('small', {}, sn[1]))));
+      const snacks = h('div.pc-grid', { hidden: true }, SNACKS.map(sn => h('button.pc-item', { type: 'button', 'data-tip': sn[1], 'aria-label': sn[1], onclick: () => pyxl.feed(sn) }, iconCanvas(sn[0], 3))));
       return [
         h('p.pc-mood', {}, s.mood),
         h('div.pc-bars', {}, NEEDS.map(([k, name, ic, color]) => h(`div.pc-bar${s[k] < 28 ? '.low' : ''}`, { 'data-tip': name }, iconCanvas(ic, 2), h('span', {}, name), bar(s[k], color)))),
@@ -35,7 +35,7 @@ export function careBody(pyxl, onPlay) {
           h('button.btn.sm', { type: 'button', onclick: () => (s.asleep ? pyxl.wake() : pyxl.nap()) }, icon(s.asleep ? 'sun' : 'zen'), h('span.lbl', {}, s.asleep ? 'Wake' : 'Nap'))),
         snacks,
         h('div.pc-label', {}, 'Toys'),
-        h('div.pc-grid', {}, TOYS.map(([id, name]) => h('button.pc-item', { type: 'button', 'data-tip': name, onclick: () => pyxl.toy(id) }, iconCanvas(id, 2), h('small', {}, name)))),
+        h('div.pc-grid', {}, TOYS.map(([id, name]) => h('button.pc-item', { type: 'button', 'data-tip': name, 'aria-label': name, onclick: () => pyxl.toy(id) }, iconCanvas(id, 3)))),
       ];
     },
     chart() {
@@ -97,8 +97,8 @@ export function careBody(pyxl, onPlay) {
     shop() {
       return [
         h('p.pc-mood', {}, iconCanvas('ring', 2), ` ${s.rings} rings — earn them by painting, saving, levelling up and winning races.`),
-        h('div.pc-shop', {}, SHOP.map(item => h('button.pc-item', { type: 'button', disabled: s.rings < item[2], onclick: () => pyxl.buy(item), 'data-tip': SHOP_TIPS[item[3]] },
-          iconCanvas(item[0], 3), h('small', {}, item[1]), h('small.pc-price', {}, iconCanvas('ring', 1), ` ${item[2]}`)))),
+        h('div.pc-shop', {}, SHOP.map(item => h('button.pc-item', { type: 'button', disabled: s.rings < item[2], onclick: () => pyxl.buy(item), 'data-tip': `${item[1]} — ${SHOP_TIPS[item[3]]}`, 'aria-label': item[1] },
+          iconCanvas(item[0], 3), h('small.pc-price', {}, iconCanvas('ring', 1), `${item[2]}`)))),
       ];
     },
   };
