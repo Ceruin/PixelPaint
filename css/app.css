@@ -144,6 +144,7 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 .dock-right.empty:not(.folded) { display: none; }
 .dock-panels { display: flex; flex-direction: column; gap: 6px; min-height: 0; flex: 1; overflow-y: auto; scrollbar-width: thin; }
 .dock-left .dock-panels { flex: 0 1 auto; }
+.dock-left .panel[data-panel=tools]:not(.collapsed):not(.flyout) { flex-shrink: 1; min-height: 140px; }
 .dock.drop { outline: 2px dashed var(--accent); outline-offset: -3px; }
 .dock-resizer { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 2; }
 .dock-rail { display: flex; gap: 4px; flex: none; }
@@ -173,8 +174,7 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 .float-layer > * { pointer-events: auto; }
 
 .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex: none; }
-.dock .panel:not(.collapsed):not(.flyout) { flex-shrink: 1; min-height: 96px; }
-.dock .panel.grow:not(.collapsed) { flex: 1 1 200px; min-height: 180px; }
+.dock .panel.grow:not(.collapsed) { flex: 1 1 200px; min-height: 200px; }
 .dock .panel[data-panel=layers]:not(.collapsed) { flex: 2 1 300px; min-height: 260px; }
 .panel.floating { position: absolute; box-shadow: var(--shadow); resize: both; min-width: 64px; min-height: 60px; }
 .panel.floating.collapsed { resize: none; }
