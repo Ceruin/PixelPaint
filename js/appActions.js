@@ -190,6 +190,7 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'file.exportProject', label: 'Download Project (.ppaint)', key: 'Ctrl+Shift+S', run: project.exportProject },
     { id: 'file.exportPng', label: 'Export PNG', key: 'Ctrl+Shift+E', run: () => project.exportImage('image/png') },
     { id: 'file.exportJpg', label: 'Export JPG', run: () => project.exportImage('image/jpeg') },
+    { id: 'file.pixel', label: 'Classic Pixel Editor ↗', run: () => open('pixel/', '_blank') },
 
     { id: 'edit.undo', label: 'Undo', key: 'Ctrl+Z', run: () => app.undo() },
     { id: 'edit.redo', label: 'Redo', key: 'Ctrl+Shift+Z', run: () => app.redo() },
@@ -254,7 +255,7 @@ export function defineActions(app, { panels, project, setMode }) {
 
   return {
     menus: [
-      ['File', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg']],
+      ['File', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg', '-', 'file.pixel']],
       ['Edit', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.fill', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
       ['Layer', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
