@@ -121,6 +121,7 @@ export function initTimeline(app, el) {
 
   const render = () => {
     el.classList.toggle('collapsed', collapsed);
+    body.hidden = collapsed;
     renderBar();
     if (!collapsed) renderGrid();
   };

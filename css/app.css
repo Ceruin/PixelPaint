@@ -90,7 +90,7 @@ body[data-mode=paper] .brand b i { color: #111 !important; }
 .menu-item.checked .kbd { color: var(--accent); font-weight: 700; }
 .group { display: flex; gap: 2px; }
 
-.mode-switch { display: flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.mode-switch { flex: none; display: flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
 .mode-btn { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: var(--r); background: none; color: var(--muted); }
 .mode-btn:hover { color: var(--text); background: var(--panel2); }
 .mode-btn.on { background: var(--accent); color: var(--accent-ink); }
@@ -139,26 +139,39 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 .dock-left { border-right: 1px solid var(--line); }
 .dock-right { width: var(--dock-w); border-left: 1px solid var(--line); }
 .dock-right.empty:not(.folded) { display: none; }
-.dock-panels { display: flex; flex-direction: column; gap: 6px; min-height: 0; flex: 1; }
+.dock-panels { display: flex; flex-direction: column; gap: 6px; min-height: 0; flex: 1; overflow-y: auto; scrollbar-width: thin; }
 .dock-left .dock-panels { flex: 0 1 auto; }
 .dock.drop { outline: 2px dashed var(--accent); outline-offset: -3px; }
 .dock-resizer { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 2; }
 .dock-rail { display: flex; gap: 4px; flex: none; }
 .dock-right .dock-rail { justify-content: flex-start; }
 .dock-left .dock-rail { justify-content: flex-end; }
-.rail-toggle { width: 100% !important; height: 18px !important; color: var(--muted); }
+.rail-toggle { height: 22px !important; color: var(--muted); }
+.dock:not(.folded) .dock-rail { align-items: center; gap: 2px; flex-wrap: wrap; }
+.dock-left:not(.folded) .rail-toggle { margin-left: auto; }
+.rail-mini.on { background: var(--panel2); border-color: var(--line); color: var(--accent); }
+.rail-mini:not(.on) { opacity: .5; }
 .dock.folded { width: 46px; padding: 6px 4px; }
 .dock.folded .dock-rail { flex-direction: column; align-items: center; }
-.dock.folded .dock-panels > .panel:not(.flyout), .dock.folded .dock-resizer { display: none; }
-.dock.folded .dock-panels { flex: 0; }
+.dock.folded .dock-panels > .panel:not(.flyout):not([data-panel=tools]), .dock.folded .dock-resizer { display: none; }
+.dock.folded .dock-panels { flex: 0 1 auto; overflow: visible; }
+/* folded left rail keeps the tools as a one-column strip */
+.dock.folded .panel[data-panel=tools]:not(.flyout) { border: 0; background: none; }
+.dock.folded .panel[data-panel=tools]:not(.flyout) .panel-head { display: none; }
+.dock.folded .panel[data-panel=tools]:not(.flyout) .panel-body { padding: 0; overflow: visible; }
+.dock.folded .toolbar { grid-template-columns: 36px; gap: 3px; }
+.dock.folded .tool { width: 36px; height: 36px; }
+.dock.folded .chips { width: 36px; height: 42px; }
+.dock.folded .chips .chip { width: 24px; height: 24px; }
+.dock.folded .chips .fg { left: 0; } .dock.folded .chips .bg { left: 10px; top: 14px; }
 .rail-btn { width: 36px; height: 36px; }
 .rail-btn .ic { width: 18px; height: 18px; }
 .float-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
 .float-layer > * { pointer-events: auto; }
 
 .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex: none; }
-.dock .panel.grow:not(.collapsed) { flex: 1 1 150px; }
-.dock .panel[data-panel=layers]:not(.collapsed) { flex: 1.5 1 220px; }
+.dock .panel.grow:not(.collapsed) { flex: 1 1 200px; min-height: 180px; }
+.dock .panel[data-panel=layers]:not(.collapsed) { flex: 2 1 300px; min-height: 260px; }
 .panel.floating { position: absolute; box-shadow: var(--shadow); resize: both; min-width: 64px; min-height: 60px; }
 .panel.floating.collapsed { resize: none; }
 .panel-head {
@@ -204,7 +217,7 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 /* ---------- color picker ---------- */
 .picker { display: flex; flex-direction: column; gap: 8px; }
 .sv-wrap, .hue-wrap { position: relative; touch-action: none; }
-.sv { display: block; width: 100%; height: 130px; border-radius: var(--r); cursor: crosshair; touch-action: none; }
+.sv { display: block; width: 100%; height: 110px; border-radius: var(--r); cursor: crosshair; touch-action: none; }
 .hue { display: block; width: 100%; height: 12px; border-radius: 2px; cursor: pointer; touch-action: none; }
 .knob { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); pointer-events: none; }
 .hue-wrap .knob { top: 6px; background: transparent; border-radius: 2px; width: 6px; height: 16px; margin: -8px 0 0 -3px; }
@@ -344,7 +357,7 @@ body[data-mode=notes] #optionsbar, body[data-mode=notes] .workspace { display: n
 .card-resize::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 6px; height: 6px; border-right: 2px solid rgba(0, 0, 0, .3); border-bottom: 2px solid rgba(0, 0, 0, .3); }
 body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 
-@media (max-width: 900px) { .mode-btn span, .menu-title span { display: none; } }
+@media (max-width: 900px) { .mode-btn > span:not(.ic), .menu-title > span:not(.ic) { display: none; } }
 @media (max-width: 720px) { :root { --dock-w: 240px; } }
 
 /* ---------- pop-up palette (right-click / pen barrel button) ---------- */
@@ -438,3 +451,12 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .tl-cel i.hold { width: 100%; height: 2px; border: 0; border-radius: 0; background: var(--muted); opacity: .6; }
 .pal-sel { flex: 1; min-width: 0; }
 .pal-sel select { width: 100%; }
+.menu-burger { display: none; }
+@media (max-width: 720px) {
+  .menus { display: none; }
+  .menu-burger { display: inline-grid; }
+  .menubar { gap: 4px; padding: 5px 6px; }
+  .brand { font-size: 13px; margin-right: 0; }
+  .mode-btn { padding: 0 8px; }
+}
+@media (max-width: 380px) { .brand { display: none; } }

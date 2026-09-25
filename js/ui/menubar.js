@@ -28,8 +28,13 @@ export const wordmark = () => h('div.brand', { 'aria-label': 'PixelPaint' },
 
 export function menubar(el, menus, right) {
   const open = (m, btn) => { popMenu(btn, m.items); m.classList.add('open'); };
+  // Phones: one button lists the menus; picking one shows its items in the same spot.
+  const burger = h('button.ibtn.menu-burger', { type: 'button', 'aria-label': 'Menu', onclick: () => {
+    const drop = popMenu(burger, []);
+    drop.append(...menus.map(([title, ic, items]) => h('button.menu-item', { type: 'button', onclick: () => popMenu(burger, items) }, icon(ic), h('span.mi-label', {}, title), h('span.kbd', {}, '›'))));
+  } }, icon('menu'));
   el.append(
-    wordmark(),
+    wordmark(), burger,
     h('nav.menus', {}, menus.map(([title, ic, items]) => {
       const m = h('div.menu');
       m.items = items;

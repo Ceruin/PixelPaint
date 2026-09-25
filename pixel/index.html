@@ -1021,6 +1021,43 @@
   .pal-resize:hover{ color:var(--text); background:#323744; }
   .pal-resize.drag{ background:var(--accent2); color:#fff; border-color:var(--accent2); }
   .pal-resize .grip{ width:28px; height:4px; background:repeating-linear-gradient(90deg,currentColor 0 2px,transparent 2px 4px); }
+
+  /* ================= shared PixelPaint look (kept in step with the main app's css/app.css) ================= */
+  button{border-radius:4px; min-height:30px; padding:0 10px; font-weight:400;}
+  button:hover{background:var(--panel2); border-color:var(--muted);}
+  button:active{transform:none;}
+  button.primary, .tool.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  select, input[type=number], input[type=text]{border-radius:4px; height:30px; background:var(--bg);}
+  .topbar{min-height:42px; padding:5px 10px; gap:4px 8px;}
+  .menu-item{height:28px; padding:0 8px; border-radius:4px; border:1px solid transparent;}
+  .menu-item:hover, .menu-item.open{border-color:var(--line);}
+  #undoBtn, #redoBtn{background:transparent; border-color:transparent; min-height:30px; min-width:30px; padding:0;}
+  #undoBtn:hover, #redoBtn:hover{background:var(--panel2); border-color:var(--line);}
+  .ctx-menu{border-radius:6px;}
+  .ctx-menu button{border-radius:4px;}
+  @media (min-width:769px){
+    .tools{width:106px; padding:8px 6px; gap:4px;}
+    .tools .toolgrid{grid-template-columns:repeat(2,40px); gap:4px; justify-content:center;}
+  }
+  .tools .tool{width:40px; height:40px; aspect-ratio:auto; min-height:0;}
+  .brushbtns{gap:4px;}
+  .brushbtns .iconbtn{min-width:26px; min-height:26px;}
+  .tools .helpbtn{min-height:30px;}
+  .side{width:280px;}
+  .section{padding:10px 12px;}
+  .section h3{font-size:11px; letter-spacing:.8px;}
+  .stage{background:#16181d;}
+  .statusbar{font-size:12px;}
+  .timeline .tl-bar button{min-height:26px;}
+  /* same breakpoints as the main app: menus go icon-only, then fold into the hamburger */
+  @media (min-width:769px) and (max-width:1180px){ .menu-item{font-size:0; gap:0; padding:0 7px;} }
+  @media (max-width:768px){
+    .tools .tool{width:40px; height:40px;}
+    .topbar{gap:4px; padding:5px 6px;}
+    .mode-btn{padding:0 8px;}
+    .brand{font-size:13px;}
+  }
+  @media (max-width:380px){ .brand{display:none;} }
 </style>
 </head>
 <body>

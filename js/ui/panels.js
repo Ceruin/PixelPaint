@@ -20,7 +20,11 @@ export class Panels {
     this.fly = null;
     this.save = debounce(() => local.set('pp.layout', this.layout()), 300);
     this.initResizer(ws.querySelector('#dockRight .dock-resizer'));
-    new ResizeObserver(() => this.map.forEach(p => !p.s.dock && this.clampFloat(p))).observe(ws);
+    this.narrow = innerWidth < 900;
+    new ResizeObserver(() => {
+      this.map.forEach(p => !p.s.dock && this.clampFloat(p));
+      if (this.narrow !== innerWidth < 900) { this.narrow = !this.narrow; this.placeAll(); }
+    }).observe(ws);
     document.addEventListener('pointerdown', e => {
       if (this.fly && !this.fly.p.el.contains(e.target) && !this.fly.anchor.contains(e.target) && !e.target.closest('.modal-back, .menu-drop')) this.closeFlyout();
     }, true);
@@ -47,7 +51,13 @@ export class Panels {
   patch(id, s) { Object.assign(this.map.get(id).s, s); this.placeAll(); this.save(); }
   toggle(id) { this.patch(id, { hidden: !this.map.get(id).s.hidden }); }
   isOpen(id) { return !this.map.get(id)?.s.hidden; }
-  fold(side, on = !this.folded[side]) { this.folded[side] = on; this.closeFlyout(); this.placeAll(); this.save(); }
+  // Narrow screens fold both docks unless the user opened one for this session.
+  isFolded(side) { return this.narrow ? !this.opened?.[side] : this.folded[side]; }
+  fold(side) {
+    if (this.narrow) (this.opened ??= {})[side] = this.isFolded(side);
+    else this.folded[side] = !this.folded[side];
+    this.closeFlyout(); this.placeAll(); this.save();
+  }
 
   // Shows a panel as a popover beside `anchor` (collapsed dock rails, Zen strip).
   flyout(id, anchor) {
@@ -58,9 +68,14 @@ export class Panels {
     const r = anchor.getBoundingClientRect(), right = r.left > innerWidth / 2;
     p.el.classList.add('flyout');
     Object.assign(p.el.style, {
-      top: `${clamp(r.top, 8, innerHeight - 340)}px`, width: '', height: '',
+      top: `${Math.max(8, r.top)}px`, width: '', height: '',
       left: right ? 'auto' : `${r.right + 8}px`, right: right ? `${innerWidth - r.left + 8}px` : 'auto',
     });
+    // Keep the whole popover on screen: slide it up / sideways once its real size is known.
+    const b = p.el.getBoundingClientRect();
+    if (b.bottom > innerHeight - 8) p.el.style.top = `${Math.max(8, innerHeight - 8 - b.height)}px`;
+    if (b.right > innerWidth - 8) Object.assign(p.el.style, { left: `${Math.max(8, innerWidth - 8 - b.width)}px`, right: 'auto' });
+    if (b.left < 8) Object.assign(p.el.style, { left: '8px', right: 'auto' });
     anchor.classList.add('on');
   }
   closeFlyout() {
@@ -93,7 +108,10 @@ export class Panels {
   placeAll() {
     const sorted = [...this.map.values()].sort((a, b) => (a.s.order ?? 0) - (b.s.order ?? 0));
     sorted.forEach(p => this.place(p));
-    for (const side of ['left', 'right']) this.renderRail(side, sorted.filter(p => p.s.dock === side && !p.s.hidden));
+    // A folded rail offers every panel that lives on its side (docked there, floating or closed),
+    // except the Tools panel, which stays visible as a compact strip in the left rail.
+    this.renderRail('left', sorted.filter(p => p.s.dock === 'left' && p.id !== 'tools' && !p.s.hidden));
+    this.renderRail('right', sorted.filter(p => p.s.dock !== 'left' && p.id !== 'tools'));
     bus.emit('panels');
   }
 
@@ -116,13 +134,18 @@ export class Panels {
   }
 
   renderRail(side, docked) {
-    const folded = this.folded[side], dock = this.sides[side];
+    const folded = this.isFolded(side), dock = this.sides[side];
     dock.classList.toggle('folded', folded);
-    dock.classList.toggle('empty', !docked.length);
+    dock.classList.toggle('empty', ![...this.map.values()].some(p => p.s.dock === side && !p.s.hidden));
     const arrow = (side === 'left') === folded ? 'chevronsRight' : 'chevronsLeft';
+    // Folded: icons open flyouts. Expanded: icons show / collapse each panel in place.
+    const shown = p => !p.s.hidden && !p.s.collapsed;
+    const toggle = p => (p.s.hidden ? this.patch(p.id, { hidden: false, collapsed: false, dock: p.s.dock ?? side }) : this.patch(p.id, { collapsed: !p.s.collapsed }));
     this.rails[side].replaceChildren(
       h('button.ibtn.sm.rail-toggle', { type: 'button', 'data-tip': folded ? 'Expand side panel' : 'Collapse side panel', onclick: () => this.fold(side) }, icon(arrow)),
-      ...(folded ? docked : []).map(p => h('button.ibtn.rail-btn', { type: 'button', 'data-tip': p.title, onclick: e => this.flyout(p.id, e.currentTarget) }, icon(p.icon))));
+      ...docked.map(p => folded
+        ? h('button.ibtn.rail-btn', { type: 'button', 'data-tip': p.title, onclick: e => this.flyout(p.id, e.currentTarget) }, icon(p.icon))
+        : h('button.ibtn.sm.rail-mini', { type: 'button', className: shown(p) ? 'on' : '', 'data-tip': `${p.title} — show / collapse`, onclick: () => toggle(p) }, icon(p.icon))));
   }
 
   clampFloat({ el, s }) {
@@ -154,7 +177,7 @@ export class Panels {
       for (const side of ['left', 'right']) this.sides[side].classList.remove('drop');
       el.style.zIndex = '';
       if (!moved) return;
-      if (zone) { Object.assign(s, { dock: zone.side, order: zone.order }); this.folded[zone.side] = false; }
+      if (zone) { Object.assign(s, { dock: zone.side, order: zone.order }); this.folded[zone.side] = false; if (this.opened) this.opened[zone.side] = true; }
       this.normalize();
       this.placeAll();
       this.save();

@@ -45,9 +45,9 @@ const openPanel = (id, e) => {
 
 panels.add('tools', 'Tools', 'brush', toolbar(app, e => openPanel('color', e)), { dock: 'left', order: 0 });
 panels.add('color', 'Color', 'palette', colorPicker(app), { dock: 'right', order: 0 });
-panels.add('brushes', 'Brushes', 'grid', brushLibrary(app), { dock: 'right', order: 1 }, { grow: true });
+panels.add('brushes', 'Brushes', 'grid', brushLibrary(app), { dock: 'right', order: 2 }, { grow: true });
 panels.add('brushSettings', 'Brush Settings', 'sliders', brushSettings(app), { dock: null, hidden: true, x: 130, y: 16, w: 290, h: 520 });
-panels.add('layers', 'Layers', 'layers', layersPanel(app), { dock: 'right', order: 2 }, { grow: true });
+panels.add('layers', 'Layers', 'layers', layersPanel(app), { dock: 'right', order: 1 }, { grow: true });
 panels.add('navigator', 'Navigator', 'navigator', navigatorPanel(app), { dock: 'right', order: 3, hidden: true });
 panels.add('reference', 'Reference', 'image', referencePanel(app), { dock: null, hidden: true, x: 440, y: 60, w: 280, h: 320 });
 panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hidden: true, x: 440, y: 16, w: 230, h: 320 });
