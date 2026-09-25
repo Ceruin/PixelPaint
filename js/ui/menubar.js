@@ -1,4 +1,4 @@
-import { h, icon, iconBtn } from './dom.js';
+import { h, icon, iconBtn, keepOnScreen } from './dom.js';
 import { actions } from '../core/actions.js';
 
 export const menuItem = (id, after) => {
@@ -19,6 +19,7 @@ export function popMenu(anchor, ids) {
   current = h('div.menu-drop', { style: { left: `${Math.min(r.left, innerWidth - 270)}px`, top: `${r.bottom + 2}px` } },
     (typeof ids === 'function' ? ids() : ids).map(id => menuItem(id, closeMenus)));
   document.body.append(current);
+  keepOnScreen(current);
   return current;
 }
 

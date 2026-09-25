@@ -99,8 +99,9 @@ body[data-mode=paper] .brand b i { color: #111 !important; }
 /* ---------- tool options bar ---------- */
 .optionsbar {
   display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 5px 12px; overflow-x: auto; scrollbar-width: thin;
-  background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; z-index: 5;
+  background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; z-index: 5; scrollbar-width: none;
 }
+.optionsbar::-webkit-scrollbar { display: none; }
 .opt-tool { display: inline-flex; align-items: center; gap: 7px; padding-right: 12px; border-right: 1px solid var(--line); font-weight: 600; }
 .opt-tool .ic { color: var(--accent); }
 .brush-name { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: var(--r); border: 1px solid var(--line); background: var(--bg); }
@@ -324,7 +325,7 @@ body[data-mode=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pxicon { image-rendering: pixelated; flex: none; }
 
 /* Pyxl's care card */
-.pyxl-card { position: fixed; z-index: 160; width: 260px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+.pyxl-card { position: fixed; z-index: 160; width: 260px; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
 .pc-head { display: flex; align-items: center; gap: 8px; }
 .pc-lvl { color: var(--muted); font-size: 12px; }
 .pc-mood { margin: 0; font-size: 12.5px; color: var(--text); }

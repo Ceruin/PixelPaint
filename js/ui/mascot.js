@@ -9,6 +9,33 @@ import { openCareCard, startStarGame } from './pyxlCare.js';
 const atlas = new Image();
 atlas.src = 'assets/pyxl-pixel.webp';
 export const atlasReady = atlas.decode().catch(() => {});
+
+// Outfit: her teal smock (and the teal paint on her beret) is recoloured to the colour you're
+// painting with. Greys keep her last colourful outfit; the default is her original teal.
+const outfitAtlas = document.createElement('canvas');
+let outfitHex = null;
+const hsv = (r, g, b) => { const v = Math.max(r, g, b), d = v - Math.min(r, g, b); return [d === 0 ? 0 : v === r ? ((g - b) / d + 6) % 6 * 60 : v === g ? ((b - r) / d + 2) * 60 : ((r - g) / d + 4) * 60, v ? d / v : 0, v / 255]; };
+const rgb = (hh, s, v) => { const f = n => { const k = (n + hh / 60) % 6; return Math.round(255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
+const isTeal = (hh, s, v) => hh > 150 && hh < 205 && s > 0.25 && v > 0.2;
+export function setOutfit(hex) {
+  if (!atlas.complete || hex === outfitHex) return;
+  const [th, ts, tv] = hsv(...[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)));
+  if (ts < 0.25 || tv < 0.3) return;
+  outfitHex = hex;
+  Object.assign(outfitAtlas, { width: atlas.width, height: atlas.height });
+  const c = outfitAtlas.getContext('2d');
+  c.drawImage(atlas, 0, 0);
+  const img = c.getImageData(0, 0, atlas.width, atlas.height), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const [hh, s, v] = hsv(d[i], d[i + 1], d[i + 2]);
+    if (!isTeal(hh, s, v)) continue;
+    const [r, g, b] = rgb(th, Math.min(1, ts * s / 0.6), Math.min(1, v * tv / 0.62));
+    d[i] = r; d[i + 1] = g; d[i + 2] = b;
+  }
+  c.putImageData(img, 0, 0);
+}
+const sheet = () => (outfitHex ? outfitAtlas : atlas);
 // name: [x, y, w, h, anchorX (beret centre), feet line]
 export const SPRITES = {
   idle0: [0, 5, 48, 54, 23, 52], idle1: [49, 5, 50, 54, 22, 52], walk: [100, 5, 51, 54, 22, 52], brush: [152, 5, 61, 54, 22, 52],
@@ -22,8 +49,8 @@ export function drawPose(ctx, name, x, y, k, flip = false) {
   const [sx, sy, w, hh, ax, by] = SPRITES[name];
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  if (flip) { ctx.translate(x * k, 0); ctx.scale(-1, 1); ctx.drawImage(atlas, sx, sy, w, hh, -ax * k, (y - by) * k, w * k, hh * k); }
-  else ctx.drawImage(atlas, sx, sy, w, hh, (x - ax) * k, (y - by) * k, w * k, hh * k);
+  if (flip) { ctx.translate(x * k, 0); ctx.scale(-1, 1); ctx.drawImage(sheet(), sx, sy, w, hh, -ax * k, (y - by) * k, w * k, hh * k); }
+  else ctx.drawImage(sheet(), sx, sy, w, hh, (x - ax) * k, (y - by) * k, w * k, hh * k);
   ctx.restore();
 }
 
@@ -39,6 +66,7 @@ const STATES = {
   spray: { poses: ['spray'], dur: 1100 },
   point: { poses: ['point'], hold: true },
   raise: { poses: ['raise'], hold: true },
+  reach: { poses: ['raise', 'point'], fps: 2, hold: true },
   cheer: { poses: ['cheer', 'happy'], fps: 4, dur: 2200, hop: true },
   dance: { poses: ['cheer', 'happy', 'raise', 'happy'], fps: 3, hold: true, hop: true },
   happy: { poses: ['happy'], dur: 1400, hop: true },
@@ -68,6 +96,14 @@ export class Mascot {
     Object.assign(this, { parts: [], k: 1, flip: false, pets: [], lastUndone: 0, lastActive: Date.now(), nextFidget: Date.now() + 9000, nextNeed: 0 });
     this.el.addEventListener('click', () => this.onClick());
     this.el.addEventListener('pointerenter', () => this.greet());
+    this.el.addEventListener('pointerleave', () => { this.hovered = false; });
+    addEventListener('pointermove', e => { this.cursor = { x: e.clientX, y: e.clientY, t: Date.now() }; }, { passive: true });
+    let hiddenAt = 0;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) hiddenAt = Date.now();
+      else if (Date.now() - hiddenAt > 60000 && !this.stats.asleep) this.react('happy', { icon: 'heart', n: 2, say: 'You’re back!' });
+    });
+    atlasReady.then(() => this.app && setOutfit(this.app.color.fg));
     new ResizeObserver(() => this.fit()).observe(this.el);
     this.wire();
     this.base();
@@ -133,6 +169,7 @@ export class Mascot {
       this.play(pick, pick === 'wave' && this.stats.need === 'lonely' ? { say: 'Hey! Over here!' } : {});
     }
     if (this.state === 'idle' && this.stats.need === 'bored' && now - this.lastActive > 20000) this.play('sit');
+    this.watchCursor(now);
     const need = this.stats.need;
     if (NEED_ICON[need] && now > this.nextNeed && !this.stats.asleep) { this.nextNeed = now + 4000; this.parts.push({ icon: NEED_ICON[need], x: AX + 10, y: FLOOR - 64, vx: 0, vy: -0.15, life: 26 }); }
     this.render();
@@ -180,6 +217,7 @@ export class Mascot {
     bus.on('play', on => (on ? this.react('dance') : this.state === 'dance' && this.base()));
     bus.on('pyxl:level', lv => this.react('cheer', { icon: 'star', n: 6, say: `Level ${lv}!`, force: true }));
     let colorAt = 0;
+    bus.on('color', c => setOutfit(c.fg));
     bus.on('color', c => { if (Date.now() - colorAt > 2500 && this.state === 'idle') { colorAt = Date.now(); this.react('paint', { icon: 'drop', n: 1, color: c.fg, dur: 900 }); } });
     bus.on('tip', r => this.aim(r));
     bus.on('untip', () => ['point', 'raise'].includes(this.state) && this.base());
@@ -194,7 +232,26 @@ export class Mascot {
     this.play(dy < -Math.abs(dx) ? 'raise' : 'point', { flip: dx < 0 });
   }
 
-  greet() { if (this.state === 'idle') this.react('wave', { dur: 1200 }); }
+  // Hovering over her: a wave, or a shy giggle if you linger or keep coming back.
+  greet() {
+    this.hovered = true;
+    if (!['idle', 'look', 'sit', 'reach'].includes(this.state)) return;
+    this.greets = (this.greets ?? 0) + 1;
+    if (this.greets % 3 === 0) this.react('happy', { icon: 'heart', n: 1, say: 'Hehe…', dur: 1200 });
+    else this.react('wave', { dur: 1200 });
+  }
+
+  // Self-aware idling: she turns to face the cursor when it's near, reaches up when it hovers
+  // above her head, and looks toward wherever you're working otherwise.
+  watchCursor(now) {
+    const c = this.cursor;
+    if (!c || now - c.t > 4000 || this.stats.asleep || !['idle', 'look', 'reach'].includes(this.state)) return;
+    const r = this.el.getBoundingClientRect(), cx = r.left + r.width / 2, head = r.bottom - 50 * this.k / (devicePixelRatio || 1);
+    const dx = c.x - cx, dy = c.y - head, near = Math.hypot(dx, dy) < 220;
+    if (near && dy < -12 && Math.abs(dx) < 70 && !this.hovered) { if (this.state !== 'reach') this.play('reach', { flip: dx < 0 }); else this.flip = dx < 0; return; }
+    if (this.state === 'reach') return this.base();
+    if (this.state === 'idle') this.flip = dx < -8;
+  }
 
   // ---- care ----
   onClick() { this.pet(); openCareCard(this); }

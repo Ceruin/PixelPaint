@@ -19,6 +19,24 @@ export function h(tag, props, ...kids) {
 
 export const $ = (s, r = document) => r.querySelector(s);
 
+// Nudges a fixed-position popup back inside the viewport (and caps its height), now and
+// whenever its size changes — e.g. a section expanding inside it.
+export function keepOnScreen(el, m = 8) {
+  const fix = () => {
+    if (!el.isConnected) return ro.disconnect();
+    el.style.maxHeight = `${innerHeight - m * 2}px`;
+    const r = el.getBoundingClientRect();
+    if (r.right > innerWidth - m) el.style.left = `${Math.max(m, innerWidth - m - r.width)}px`;
+    if (r.bottom > innerHeight - m) el.style.top = `${Math.max(m, innerHeight - m - r.height)}px`;
+    if (r.left < m) el.style.left = `${m}px`;
+    if (r.top < m) el.style.top = `${m}px`;
+  };
+  const ro = new ResizeObserver(fix);
+  ro.observe(el);
+  fix();
+  return () => { ro.disconnect(); el.style.maxHeight = ''; };
+}
+
 export function icon(name) {
   const s = h('span.ic');
   s.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] ?? ''}</svg>`;

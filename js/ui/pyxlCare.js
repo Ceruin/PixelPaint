@@ -1,4 +1,4 @@
-import { h, icon } from './dom.js';
+import { h, icon, keepOnScreen } from './dom.js';
 import { bus } from '../core/bus.js';
 import { NEEDS, SNACKS } from './pyxlStats.js';
 import { iconCanvas } from './pixelIcons.js';
@@ -34,6 +34,7 @@ export function openCareCard(pyxl) {
   const m = pyxl.el.getBoundingClientRect(), c = card.getBoundingClientRect();
   const left = m.left + m.width / 2 > innerWidth / 2 ? m.left - c.width - 8 : m.right + 8;
   Object.assign(card.style, { left: `${Math.max(8, Math.min(left, innerWidth - c.width - 8))}px`, top: `${Math.max(8, Math.min(m.bottom - c.height, innerHeight - c.height - 8))}px` });
+  keepOnScreen(card);
   sync();
   const off = bus.on('pyxl:stats', () => card && sync());
   const outside = e => { if (card && !card.contains(e.target) && !pyxl.el.contains(e.target)) { close(); off(); removeEventListener('pointerdown', outside, true); } };

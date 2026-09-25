@@ -1,4 +1,4 @@
-import { h, icon } from './dom.js';
+import { h, icon, keepOnScreen } from './dom.js';
 import { local } from '../core/storage.js';
 import { clamp, debounce } from '../core/util.js';
 import { bus } from '../core/bus.js';
@@ -76,11 +76,13 @@ export class Panels {
     if (b.bottom > innerHeight - 8) p.el.style.top = `${Math.max(8, innerHeight - 8 - b.height)}px`;
     if (b.right > innerWidth - 8) Object.assign(p.el.style, { left: `${Math.max(8, innerWidth - 8 - b.width)}px`, right: 'auto' });
     if (b.left < 8) Object.assign(p.el.style, { left: '8px', right: 'auto' });
+    this.fly.stop = keepOnScreen(p.el);
     anchor.classList.add('on');
   }
   closeFlyout() {
     if (!this.fly) return;
-    const { p, anchor } = this.fly;
+    const { p, anchor, stop } = this.fly;
+    stop?.();
     this.fly = null;
     p.el.classList.remove('flyout');
     anchor.classList.remove('on');
