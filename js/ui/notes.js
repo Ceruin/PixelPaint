@@ -44,6 +44,27 @@ export function initNotes(app, sendToCanvas) {
     el.onpointerup = () => { el.onpointermove = null; end?.(); save(); };
   });
 
+  // Resize from any edge or corner. Works from the drag's start values so clamping never drifts;
+  // `aspect` (h per w, plus a fixed extra) keeps sketches in proportion.
+  const resizable = (el, obj, { minW, minH, aspect, onChange }) => ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].forEach(dir => {
+    const hd = h(`div.rz.rz-${dir}`);
+    el.append(hd);
+    hd.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      hd.setPointerCapture(e.pointerId);
+      const s0 = { x: obj.x, y: obj.y, w: obj.w, h: obj.h }, x0 = e.clientX, y0 = e.clientY;
+      hd.onpointermove = ev => {
+        const dx = (ev.clientX - x0) / state.view.z, dy = (ev.clientY - y0) / state.view.z;
+        let w = s0.w + (dir.includes('e') ? dx : dir.includes('w') ? -dx : 0), ht = s0.h + (dir.includes('s') ? dy : dir.includes('n') ? -dy : 0);
+        w = clamp(aspect && !/[ew]/.test(dir) ? (ht - aspect[1]) / aspect[0] : w, minW, 5000);
+        ht = aspect ? w * aspect[0] + aspect[1] : clamp(ht, minH, 5000);
+        Object.assign(obj, { w, h: ht, x: dir.includes('w') ? s0.x + s0.w - w : s0.x, y: dir.includes('n') ? s0.y + s0.h - ht : s0.y });
+        onChange();
+      };
+      hd.onpointerup = () => { hd.onpointermove = null; save(); };
+    });
+  });
+
   // Inline-editable title that saves on input and keeps keys away from app shortcuts.
   const titleField = (obj, placeholder, cls = 'card-title') => h(`span.${cls}`, {
     contentEditable: 'true', spellcheck: false, textContent: obj.title ?? obj.name ?? '', 'data-placeholder': placeholder,
@@ -84,14 +105,8 @@ export function initNotes(app, sendToCanvas) {
       onkeydown: e => e.stopPropagation(),
       onpointerdown: e => e.stopPropagation(),
     }));
-    const resize = h('div.card-resize');
-    el.append(resize);
     dragger(head, (dx, dy) => { it.x += dx; it.y += dy; placeCard(it); }, () => assignGroup(it));
-    dragger(resize, (dx, dy) => {
-      it.w = clamp(it.w + dx, 160, 2400);
-      it.h = it.kind === 'sketch' ? it.w * SKETCH_H / SKETCH_W + HEAD : clamp(it.h + dy, 60, 2400);
-      placeCard(it);
-    });
+    if (!it.collapsed) resizable(el, it, { minW: 120, minH: HEAD + 30, aspect: it.kind === 'sketch' && [SKETCH_H / SKETCH_W, HEAD], onChange: () => placeCard(it) });
     els.set(it.id, el);
     inner.append(el);
     placeCard(it);
@@ -132,14 +147,13 @@ export function initNotes(app, sendToCanvas) {
       iconBtn('plus', 'Add a note to this group', () => add('note', { x: g.x + 16, y: g.y + HEAD + 16 }, g)),
       iconBtn('grid', 'Tidy this group', () => tidyGroup(g)),
       iconBtn('x', 'Remove group (keeps its notes)', () => ungroup(g)));
-    const resize = h('div.card-resize');
-    const el = h('div.note-group', { dataset: { id: g.id } }, head, resize);
+    const el = h('div.note-group', { dataset: { id: g.id } }, head);
     dragger(head, (dx, dy) => {
       g.x += dx; g.y += dy;
       members(g).forEach(it => { it.x += dx; it.y += dy; placeCard(it); });
       placeGroup(g);
     });
-    dragger(resize, (dx, dy) => { g.w = clamp(g.w + dx, 200, 5000); g.h = clamp(g.h + dy, 120, 5000); placeGroup(g); });
+    if (!g.collapsed) resizable(el, g, { minW: 180, minH: HEAD + 40, onChange: () => placeGroup(g) });
     els.set(`g${g.id}`, el);
     inner.prepend(el);
     placeGroup(g);
@@ -282,9 +296,18 @@ export function initNotes(app, sendToCanvas) {
     applyView(); persist();
   }, { passive: false });
 
+  // Drag the outline's edge to resize it.
+  const outlineSizer = h('div.outline-sizer');
+  outline.style.width = `${local.get('pp.notesOutlineW', 250)}px`;
+  outlineSizer.addEventListener('pointerdown', e => {
+    outlineSizer.setPointerCapture(e.pointerId);
+    const x0 = e.clientX, w0 = outline.offsetWidth;
+    outlineSizer.onpointermove = ev => { outline.style.width = `${clamp(w0 + ev.clientX - x0, 160, 520)}px`; };
+    outlineSizer.onpointerup = () => { outlineSizer.onpointermove = null; local.set('pp.notesOutlineW', outline.offsetWidth); };
+  });
   let showOutline = local.get('pp.notesOutline', innerWidth > 720);
-  const outlineBtn = iconBtn('layers', 'Show / hide the outline', () => { showOutline = !showOutline; local.set('pp.notesOutline', showOutline); outline.hidden = !showOutline; outlineBtn.classList.toggle('on', showOutline); });
-  outline.hidden = !showOutline; outlineBtn.classList.toggle('on', showOutline);
+  const outlineBtn = iconBtn('layers', 'Show / hide the outline', () => { showOutline = !showOutline; local.set('pp.notesOutline', showOutline); outline.hidden = outlineSizer.hidden = !showOutline; outlineBtn.classList.toggle('on', showOutline); });
+  outline.hidden = outlineSizer.hidden = !showOutline; outlineBtn.classList.toggle('on', showOutline);
   const btn = (ic, text, fn, tip) => h('button.btn.sm', { type: 'button', 'data-tip': tip, onclick: fn }, icon(ic), h('span', {}, text));
 
   root.append(
@@ -300,7 +323,7 @@ export function initNotes(app, sendToCanvas) {
       btn('grid', 'Tidy', tidyAll, 'Arrange notes neatly inside their groups'),
       btn('fit', 'Fit all', fitAll, 'Zoom to show everything'),
       h('span.muted', {}, 'Double-click the board for a quick note')),
-    h('div.notes-main', {}, outline, board));
+    h('div.notes-main', {}, outline, outlineSizer, board));
 
   idb.get('notes').then(s => {
     if (s?.items) state = { groups: [], ...s };

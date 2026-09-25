@@ -24,6 +24,7 @@ import { statusbar } from './ui/statusbar.js';
 import { initTooltips } from './ui/tooltip.js';
 import { toast } from './ui/dialogs.js';
 import { Mascot } from './ui/mascot.js';
+import { careBody, openCareCard } from './ui/pyxlCare.js';
 import { initZen } from './ui/zen.js';
 import { initNotes } from './ui/notes.js';
 
@@ -50,6 +51,10 @@ panels.add('brushSettings', 'Brush Settings', 'sliders', brushSettings(app), { d
 panels.add('layers', 'Layers', 'layers', layersPanel(app), { dock: 'right', order: 1 }, { grow: true });
 panels.add('navigator', 'Navigator', 'navigator', navigatorPanel(app), { dock: 'right', order: 3, hidden: true });
 panels.add('reference', 'Reference', 'image', referencePanel(app), { dock: null, hidden: true, x: 440, y: 60, w: 280, h: 320 });
+panels.add('pyxl', 'Pyxl', 'heart', careBody(mascot), { dock: 'right', order: 4, hidden: true });
+// Clicking Pyxl shows her docked panel when it's open, else her draggable popup (which can dock itself).
+const dockable = () => !['zen', 'notes'].includes(app.mode);
+mascot.openCare = () => (dockable() && panels.isOpen('pyxl') ? openPanel('pyxl') : openCareCard(mascot, dockable() && (() => openPanel('pyxl'))));
 panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hidden: true, x: 440, y: 16, w: 230, h: 320 });
 initPopupPalette(app);
 document.body.classList.toggle('light', app.settings.theme === 'light');

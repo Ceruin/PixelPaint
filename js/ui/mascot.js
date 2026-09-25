@@ -281,7 +281,8 @@ export class Mascot {
   }
 
   // ---- care ----
-  onClick() { this.pet(); openCareCard(this); }
+  // `openCare` can be swapped by the host (e.g. to show her docked panel instead of the popup).
+  onClick() { this.pet(); (this.openCare ?? (() => openCareCard(this)))(); }
 
   pet() {
     const now = Date.now();

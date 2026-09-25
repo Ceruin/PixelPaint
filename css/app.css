@@ -329,7 +329,9 @@ body[data-mode=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 
 /* Pyxl's care card */
 .pyxl-card { position: fixed; z-index: 160; width: 260px; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
-.pc-head { display: flex; align-items: center; gap: 8px; }
+.pc-head { display: flex; align-items: center; gap: 6px; margin: -10px -12px 0; padding: 6px 6px 6px 12px; border-bottom: 1px solid var(--line); cursor: grab; touch-action: none; }
+.pc-head:active { cursor: grabbing; }
+.pc-body { display: flex; flex-direction: column; gap: 8px; }
 .pc-lvl { color: var(--muted); font-size: 12px; }
 .pc-mood { margin: 0; font-size: 12.5px; color: var(--text); }
 .pc-bars { display: flex; flex-direction: column; gap: 5px; }
@@ -402,8 +404,14 @@ body[data-mode=notes] #optionsbar, body[data-mode=notes] .workspace { display: n
 .card-text { flex: 1; padding: 6px 11px 11px; outline: none; overflow: auto; font: 15px/1.45 var(--font); user-select: text; -webkit-user-select: text; white-space: pre-wrap; cursor: text; }
 .card.text .card-text { font-size: 22px; }
 .card-canvas { flex: 1; width: 100%; min-height: 0; background: #fff; touch-action: none; cursor: crosshair; }
-.card-resize { position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; cursor: nwse-resize; touch-action: none; }
-.card-resize::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 6px; height: 6px; border-right: 2px solid rgba(0, 0, 0, .3); border-bottom: 2px solid rgba(0, 0, 0, .3); }
+/* resize handles on every edge and corner of notes and groups */
+.rz { position: absolute; z-index: 2; touch-action: none; }
+.rz-n, .rz-s { left: 10px; right: 10px; height: 8px; cursor: ns-resize; } .rz-n { top: -4px; } .rz-s { bottom: -4px; }
+.rz-e, .rz-w { top: 10px; bottom: 10px; width: 8px; cursor: ew-resize; } .rz-e { right: -4px; } .rz-w { left: -4px; }
+.rz-ne, .rz-nw, .rz-se, .rz-sw { width: 14px; height: 14px; } .rz-ne, .rz-nw { top: -5px; } .rz-se, .rz-sw { bottom: -5px; }
+.rz-ne, .rz-se { right: -5px; } .rz-nw, .rz-sw { left: -5px; } .rz-ne, .rz-sw { cursor: nesw-resize; } .rz-nw, .rz-se { cursor: nwse-resize; }
+.rz-se::after { content: ''; position: absolute; right: 7px; bottom: 7px; width: 6px; height: 6px; border-right: 2px solid rgba(0, 0, 0, .3); border-bottom: 2px solid rgba(0, 0, 0, .3); }
+.note-group > .rz-se::after { border-color: var(--gc); }
 body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 
 @media (max-width: 900px) { .mode-btn > span:not(.ic), .menu-title > span:not(.ic) { display: none; } }
@@ -512,7 +520,7 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 
 /* ---------- notes: outline, titles, groups, focus ---------- */
 .notes-main { flex: 1; display: flex; min-height: 0; }
-.notes-outline { width: 250px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 8px; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); scrollbar-width: thin; }
+.notes-outline { width: 250px; flex: none; position: relative; display: flex; flex-direction: column; gap: 2px; padding: 8px; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); scrollbar-width: thin; }
 .ol-head { display: flex; align-items: center; gap: 6px; padding: 2px 4px 6px; font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
 .notes-search { height: 28px; padding: 0 8px; margin-bottom: 6px; border-radius: var(--r); border: 1px solid var(--line); background: var(--bg); }
 .ol-item, .ol-gname { display: flex; align-items: center; gap: 7px; width: 100%; height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: var(--r); background: none; text-align: left; }
@@ -529,13 +537,14 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .card-title, .grp-name, .focus-title { flex: 1; min-width: 20px; outline: none; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; user-select: text; -webkit-user-select: text; padding: 2px 3px; border-radius: 2px; }
 .card-title:empty::before, .grp-name:empty::before, .focus-title:empty::before { content: attr(data-placeholder); opacity: .45; font-weight: 400; }
 .card-title:focus, .grp-name:focus, .focus-title:focus { background: rgba(0, 0, 0, .08); }
+.outline-sizer { width: 5px; margin-left: -3px; flex: none; cursor: col-resize; touch-action: none; z-index: 21; }
+.outline-sizer:hover { background: var(--accent); }
 .note-group { position: absolute; border: 2px dashed var(--gc); border-radius: 6px; background: color-mix(in srgb, var(--gc) 7%, transparent); }
 .note-group.collapsed { border-style: solid; }
 .grp-head { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 4px; cursor: grab; touch-action: none; color: var(--text); background: color-mix(in srgb, var(--gc) 22%, var(--panel)); border-radius: 4px 4px 0 0; }
 .grp-head > .ic { width: 14px; height: 14px; color: var(--gc); flex: none; }
 .grp-count { font-size: 11px; color: var(--muted); padding: 0 4px; }
 .grp-head .ibtn { width: 24px; height: 24px; }
-.note-group.collapsed .card-resize { display: none; }
 .note-focus { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(8, 10, 14, .55); }
 .focus-card { width: min(900px, 100%); height: min(80vh, 900px); display: flex; flex-direction: column; background: #fff; color: #1b1d23; border-radius: 6px; box-shadow: var(--shadow); overflow: hidden; }
 .focus-head { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px 0 12px; border-bottom: 1px solid rgba(0, 0, 0, .1); }
@@ -544,4 +553,4 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .focus-text { flex: 1; padding: 16px 20px; outline: none; overflow: auto; font: 17px/1.55 var(--font); white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
 .focus-card .card-canvas { flex: 1; object-fit: contain; background: #fff; }
 .notes { position: relative; }
-@media (max-width: 720px) { .notes-outline { position: absolute; z-index: 20; top: 45px; bottom: 0; left: 0; box-shadow: var(--shadow); } .notes .optionsbar .btn span { display: none; } }
+@media (max-width: 720px) { .notes-outline { position: absolute; z-index: 20; top: 45px; bottom: 0; left: 0; box-shadow: var(--shadow); } .notes .optionsbar .btn span { display: none; } .outline-sizer { display: none; } }
