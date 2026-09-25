@@ -33,6 +33,40 @@ export function applyPreset(app, p) {
   app.brushChanged();
 }
 
+// Brush thumbnails are costly (each one paints a whole stroke), so they are drawn once per brush
+// and ink colour, only when their row scrolls into view, a few at a time in idle moments —
+// then copied from the cache whenever the list is rebuilt.
+const thumbs = (() => {
+  const cache = new Map(), queue = [];
+  const key = (p, ink) => `${ink}|${JSON.stringify(p)}`;
+  const idle = window.requestIdleCallback ?? (fn => setTimeout(() => fn({ timeRemaining: () => 8 }), 30));
+  let pumping = false;
+  const pump = () => {
+    if (pumping) return;
+    pumping = true;
+    idle(deadline => {
+      pumping = false;
+      while (queue.length && deadline.timeRemaining() > 4) {
+        const { c, p, ink } = queue.shift();
+        if (!c.isConnected) continue;
+        const k = key(p, ink);
+        if (!cache.has(k)) { const t = document.createElement('canvas'); t.width = 220; t.height = 44; strokePreview(p, t, ink); cache.set(k, t); }
+        c.getContext('2d').drawImage(cache.get(k), 0, 0);
+      }
+      if (queue.length) pump();
+    });
+  };
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { io.unobserve(e.target); queue.push(e.target.job); pump(); } }));
+  return {
+    show(c, p, ink) {
+      const hit = cache.get(key(p, ink));
+      if (hit) return void requestAnimationFrame(() => c.getContext('2d').drawImage(hit, 0, 0));
+      c.job = { c, p, ink };
+      io.observe(c);
+    },
+  };
+})();
+
 export function brushLibrary(app) {
   const list = h('div.brush-list');
   let query = '';
@@ -47,7 +81,7 @@ export function brushLibrary(app) {
       h('summary', {}, icon(CAT_ICONS[cat] ?? 'brush'), cat, h('span.count', {}, all.filter(p => p.cat === cat).length)),
       all.filter(p => p.cat === cat).map(p => {
         const c = h('canvas', { width: 220, height: 44 });
-        requestAnimationFrame(() => strokePreview(p, c, ink()));
+        thumbs.show(c, p, ink());
         return h('div.brush-row', { dataset: { name: p.name }, className: app.brush.name === p.name ? 'on' : '', onclick: e => !e.target.closest('.star') && applyPreset(app, p) },
           h('span.brush-label', {}, p.name), c,
           h('button.star', { type: 'button', className: fav.includes(p.name) ? 'on' : '', 'data-tip': 'Pin to the pop-up palette (right-click canvas)', onclick: () => { toggleFav(p.name); render(); } }, icon('star')));
@@ -55,7 +89,10 @@ export function brushLibrary(app) {
     mark();
   };
   bus.on('brush', mark); bus.on('tool', mark);
-  bus.on('mode', render); bus.on('userBrushes', render); bus.on('favs', render);
+  // Modes only matter if they change the ink colour (light theme / paper): then re-render.
+  let lastInk = ink();
+  bus.on('mode', () => { if (ink() !== lastInk) { lastInk = ink(); render(); } });
+  bus.on('userBrushes', render); bus.on('favs', render);
   render();
   return h('div.brush-lib', {},
     h('div.brush-search', {}, search,

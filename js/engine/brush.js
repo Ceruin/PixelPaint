@@ -129,8 +129,8 @@ export class BrushEngine {
   // Smudge: pick up pixels at the previous dab and lay them down at this one through the tip.
   smear(i, x, y, size) {
     const n = Math.max(2, Math.ceil(size)), p = this.prev[i] ?? { x, y };
-    if (!this.buf || this.buf.width !== n) this.buf = makeCanvas(n, n);
-    const bc = this.buf.getContext('2d');
+    if (!this.buf || this.buf.width !== n) { this.buf = makeCanvas(n, n); this.bctx = this.buf.getContext('2d'); }
+    const bc = this.bctx;
     bc.globalCompositeOperation = 'copy';
     bc.drawImage(this.ctx.canvas, p.x - n / 2, p.y - n / 2, n, n, 0, 0, n, n);
     bc.globalCompositeOperation = 'destination-in';

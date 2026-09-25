@@ -205,7 +205,8 @@ export class Mascot {
 
   get name() { return this.stats.name; }
   awake() { return !this.stats.asleep && !['egg', 'school'].includes(this.stats.need) && !['cocoon', 'hatch'].includes(this.state); }
-  mount(host) { if (host && this.el.parentElement !== host) { host.append(this.el); this.fit(); requestAnimationFrame(() => this.placeBubble()); } }
+  // (No measuring here: this runs mid mode-switch; the ResizeObserver re-fits her after layout.)
+  mount(host) { if (host && this.el.parentElement !== host) { host.append(this.el); this.box = null; requestAnimationFrame(() => this.placeBubble()); } }
 
   fit() {
     const dpr = devicePixelRatio || 1, r = this.el.getBoundingClientRect();

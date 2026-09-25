@@ -104,8 +104,10 @@ export function careBody(pyxl, onPlay) {
   };
   const SHOP_TIPS = { love: 'Love season: flowers bloom around her', bright: 'Nudges her toward Bright', moody: 'Nudges her toward Moody', skills: 'Trains every skill', energy: 'A pick-me-up' };
 
+  // Tabs are built once; a render only swaps the content of the open tab.
+  tabs.append(...TABS.map(([id, label, ic]) => h('button.pc-tab', { type: 'button', role: 'tab', 'data-tip': label, dataset: { tab: id }, onclick: () => { tab = id; local.set('pp.pyxlTab', id); render(); } }, iconCanvas(ic, 2), h('span', {}, label))));
   const render = () => {
-    tabs.replaceChildren(...TABS.map(([id, label, ic]) => h(`button.pc-tab${id === tab ? '.on' : ''}`, { type: 'button', role: 'tab', 'data-tip': label, onclick: () => { tab = id; local.set('pp.pyxlTab', id); render(); } }, iconCanvas(ic, 2), h('span', {}, label))));
+    for (const b of tabs.children) b.classList.toggle('on', b.dataset.tab === tab);
     if (tab === 'chart' && content.contains(document.activeElement)) return;   // don't yank the name field while typing
     content.replaceChildren(...views[tab]().filter(Boolean));
   };

@@ -109,6 +109,8 @@ export class PyxlStats {
     this.update(Math.min(away, 24 * HOUR), { offline: true });
     this.welcomeBack = away > 2 * HOUR;
     setInterval(() => this.update(Date.now() - this.t, { active: this.isActive() }), 20e3);
+    addEventListener('pagehide', () => this.flush());
+    document.addEventListener('visibilitychange', () => document.hidden && this.flush());
   }
 
   // "Active" = the app is visible and you did something in the last two minutes; only that ages her.
@@ -296,7 +298,16 @@ export class PyxlStats {
     }[this.need] ?? (this.emo.anger > 50 ? `${n} is cross with you!` : this.happiness > 60 ? `${n} adores painting with you ✿` : this.food + this.fun + this.love + this.energy > 330 ? `${n} is having a wonderful time ✿` : `${n} is happy and ready to paint.`);
   }
 
+  // Batched: many changes a second (every stroke trains a skill) cost one write and one update
+  // for the UI. `flush` writes now (on hide/close).
   save() {
+    this.dirty = true;
+    this.saveTimer ||= setTimeout(() => this.flush(), 500);
+  }
+  flush() {
+    clearTimeout(this.saveTimer); this.saveTimer = 0;
+    if (!this.dirty) return;
+    this.dirty = false;
     const keys = ['name', 'food', 'fun', 'love', 'energy', 'asleep', 'xp', 'level', 'born', 't', 'lives', 'rings', 'medals', 'wins', 'races', 'chaos',
       'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom'];
     local.set(KEY, Object.fromEntries(keys.map(k => [k, this[k]])));

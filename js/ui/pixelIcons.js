@@ -61,10 +61,12 @@ export function drawIcon(ctx, name, x, y, k = 1, color) {
 
 export const iconSize = name => [Math.max(...ICONS[name].map(r => r.length)), ICONS[name].length];
 
-// A crisp <canvas> of one icon at scale k (for buttons and bars).
+// A crisp icon at scale k for buttons and bars: an <img> from a cached data URL (drawn pixel by
+// pixel once) — far lighter than a canvas per icon when a card re-renders.
+const urls = new Map();
 export function iconCanvas(name, k = 3) {
-  const [w, h] = iconSize(name), c = document.createElement('canvas');
-  c.width = w * k; c.height = h * k; c.className = 'pxicon';
-  drawIcon(c.getContext('2d'), name, 0, 0, k);
-  return c;
+  const [w, h] = iconSize(name), key = `${name}|${k}`;
+  let url = urls.get(key);
+  if (!url) { const m = document.createElement('canvas'); m.width = w * k; m.height = h * k; drawIcon(m.getContext('2d'), name, 0, 0, k); urls.set(key, url = m.toDataURL()); }
+  return Object.assign(document.createElement('img'), { src: url, width: w * k, height: h * k, alt: '', className: 'pxicon', draggable: false });
 }
