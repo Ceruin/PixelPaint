@@ -8,7 +8,7 @@ import { renderDoc } from './compositor.js';
 // its own area, not the whole screen — which also keeps e-ink panels calm.
 export class Viewport {
   constructor(canvas) {
-    Object.assign(this, { el: canvas, zoom: 1, rot: 0, x: 0, y: 0, flip: false, wrap: false, dirty: null, raf: 0, dpr: 1, cw: 1, ch: 1 });
+    Object.assign(this, { el: canvas, zoom: 1, rot: 0, x: 0, y: 0, flip: false, wrap: false, dirty: null, raf: 0, dpr: 0, cw: 1, ch: 1, vw: 1, vh: 1 });
     Object.assign(this, { full: true, pending: null, moved: new Set(), boxes: new WeakMap() });
     this.ctx = canvas.getContext('2d', { alpha: true });
     this.overlays = new Set();
@@ -95,22 +95,25 @@ export class Viewport {
     const { doc, el } = this;
     if (!doc) return;
     this.compose();
-    const all = { x: 0, y: 0, w: el.width, h: el.height };
-    const r = this.full || this.wrap ? all : Rect.clip(Rect.union(this.toScreenRect(this.pending), this.overlayBox()), el.width, el.height);
-    this.full = false; this.pending = null; this.moved.clear();
-    if (!r) return;
+    const all = { x: 0, y: 0, w: this.vw, h: this.vh };
+    const r = this.full || this.wrap ? all : Rect.clip(Rect.union(this.toScreenRect(this.pending), this.overlayBox()), this.vw, this.vh);
+    const strips = this.exposed;
+    this.full = false; this.pending = null; this.moved.clear(); this.exposed = null;
     const c = this.ctx;
-    c.save();
-    if (r !== all) { c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip(); }
-    this.paint(c, r === all || !this.insideDoc(r));
-    c.restore();
+    for (const q of r === all ? [all] : [r, ...(strips ?? [])]) {
+      if (!q?.w || !q.h) continue;
+      c.save();
+      if (q !== all) { c.beginPath(); c.rect(q.x, q.y, q.w, q.h); c.clip(); }
+      this.paint(c, q === all || !this.insideDoc(q));
+      c.restore();
+    }
   }
 
   // One frame (the caller clips it to the region being repainted).
   paint(ctx, shadow) {
-    const { doc, el, dpr } = this;
+    const { doc, dpr } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, el.width, el.height);
+    ctx.clearRect(0, 0, this.vw, this.vh);
     const base = new DOMMatrix().scale(dpr).multiply(this.matrix);
     if (shadow && !this.wrap) this.drawShadow(ctx);
     for (const [i, j] of this.tiles()) {
@@ -221,12 +224,43 @@ export class Viewport {
   resize() {
     const r = this.el.parentElement.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    const cx = this.cw / 2, cy = this.ch / 2;
-    this.dpr = devicePixelRatio || 1;
-    this.el.width = Math.round(r.width * this.dpr);
-    this.el.height = Math.round(r.height * this.dpr);
-    this.x += r.width / 2 - cx; this.y += r.height / 2 - cy;
+    const cx = this.cw / 2, cy = this.ch / 2, ow = this.vw, oh = this.vh;
+    // The backing store grows at once but only shrinks back to the stage after 20 quiet seconds: a mode
+    // switch then just shifts and repaints, while strokes don't pay per frame for a canvas bigger
+    // than the stage.
+    const dpr = devicePixelRatio || 1, el = this.el;
+    let fresh = false;
+    this.vw = Math.round(r.width * dpr); this.vh = Math.round(r.height * dpr);
+    const alloc = (w, h) => { el.width = w; el.height = h; Object.assign(el.style, { width: `${w / dpr}px`, height: `${h / dpr}px` }); };
+    if (dpr !== this.dpr || this.vw > el.width || this.vh > el.height) {
+      this.dpr = dpr; fresh = true;
+      alloc(Math.max(this.vw, el.width), Math.max(this.vh, el.height));
+    }
+    clearTimeout(this.shrink);
+    if (el.width > this.vw || el.height > this.vh) this.shrink = setTimeout(() => {
+      if (this.busy?.()) return this.resize();   // not mid-stroke: try again later
+      alloc(this.vw, this.vh); this.redraw();
+    }, 20000);
+    // Keep the page centred, but move it by whole device pixels: the picture already on screen is
+    // then shifted with one copy and only the newly exposed strips are repainted (a mode switch
+    // that resizes the stage no longer repaints the whole screen).
+    const dx = Math.round((r.width / 2 - cx) * dpr), dy = Math.round((r.height / 2 - cy) * dpr);
+    this.x += dx / dpr; this.y += dy / dpr;
     this.cw = r.width; this.ch = r.height;
-    this.changed();
+    this.m = this.inv = null;
+    bus.emit('view', this);
+    if (fresh || this.full || this.wrap || !this.doc) return this.redraw();
+    if (dx || dy) {
+      const c = this.ctx;
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'copy';
+      c.drawImage(this.el, 0, 0, ow, oh, dx, dy, ow, oh);   // 'copy' also clears everything outside it
+      c.restore();
+      for (const o of this.overlays) { const b = this.boxes.get(o); if (b) this.boxes.set(o, { ...b, x: b.x + dx, y: b.y + dy }); }   // their pixels moved too
+    }
+    // what the shifted old picture doesn't cover
+    const L = Math.max(0, dx), T = Math.max(0, dy), R = Math.min(this.vw, dx + ow), B = Math.min(this.vh, dy + oh);
+    this.exposed = [{ x: 0, y: 0, w: this.vw, h: T }, { x: 0, y: B, w: this.vw, h: this.vh - B }, { x: 0, y: T, w: L, h: B - T }, { x: R, y: T, w: this.vw - R, h: B - T }]
+      .filter(q => q.w > 0 && q.h > 0);
+    this.schedule();
   }
 }

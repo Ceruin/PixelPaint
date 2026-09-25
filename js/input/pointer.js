@@ -19,7 +19,7 @@ export class CanvasInput {
     el.style.touchAction = 'none';
     // Cached canvas position (reading it per hover move would force a layout each time).
     const measure = () => { this.rect = el.getBoundingClientRect(); };
-    new ResizeObserver(measure).observe(el);
+    const ro = new ResizeObserver(measure); ro.observe(el); ro.observe(el.parentElement);   // the stage moves when docks change
     addEventListener('resize', measure);
     addEventListener('scroll', measure, true);
     el.addEventListener('pointerdown', e => this.down(e));

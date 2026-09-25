@@ -87,8 +87,10 @@ export function initNotes(app, sendToCanvas) {
     let canvas;
     const head = h('div.card-grip', {},
       iconBtn(it.collapsed ? 'chevronRight' : 'chevron', 'Collapse / expand', () => { it.collapsed = !it.collapsed; mountCard(it); save(); }),
+      h('span.card-handle', { 'data-tip': 'Drag to move' }),   // always something to grab, however long the title
       icon(KIND_ICON[it.kind]),
       titleField(it, label(it)),
+      h('span.card-space'),
       it.kind === 'note' && !it.collapsed && h('span.dots', {}, COLORS.map(c => h('button.dot', { type: 'button', style: { background: c }, onclick: () => { it.color = c; placeCard(it); save(); } }))),
       iconBtn('expand', 'Open on its own', () => focusNote(it)),
       it.kind === 'sketch' && iconBtn('upload', 'Send to canvas as a layer', () => sendToCanvas(canvas)),

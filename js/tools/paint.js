@@ -4,6 +4,20 @@ import { Rect, drawRect, clipTo, TAU } from '../core/util.js';
 import { haptics } from '../input/haptics.js';
 import { pickLock, project } from '../engine/assistants.js';
 
+// A stroke's preview is a lazy copy of its layer: 64px tiles are copied in the first time a flush or
+// the compositor touches them (copying the whole layer at pen-down cost a frame on big canvases).
+function lazyCopy(pv, src) {
+  const T = 64, cols = Math.ceil(pv.width / T), rows = Math.ceil(pv.height / T), done = new Uint8Array(cols * rows), pc = pv.getContext('2d');
+  pv.ensure = r => {
+    for (let ty = Math.max(0, Math.floor(r.y / T)); ty < rows && ty * T < r.y + r.h; ty++) for (let tx = Math.max(0, Math.floor(r.x / T)); tx < cols && tx * T < r.x + r.w; tx++) {
+      if (done[ty * cols + tx]) continue;
+      done[ty * cols + tx] = 1;
+      const t = { x: tx * T, y: ty * T, w: Math.min(T, pv.width - tx * T), h: Math.min(T, pv.height - ty * T) };
+      pc.clearRect(t.x, t.y, t.w, t.h); drawRect(pc, src, t);
+    }
+  };
+}
+
 const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge' };
 
 // Brush / Eraser / Smudge. Dabs go to a stroke buffer, which is composited over a copy of the
@@ -30,9 +44,9 @@ export class PaintTool {
     const { w, h } = doc, b = this.brush, smudge = this.id === 'smudge';
     Object.assign(this, { layer, total: null, travel: 0 });
     this.preview = acquire(w, h);
-    const pc = this.preview.getContext('2d');
-    pc.clearRect(0, 0, w, h); pc.drawImage(layer.canvas, 0, 0);
-    if (!smudge) { this.buf = acquire(w, h); this.buf.getContext('2d').clearRect(0, 0, w, h); }
+    if (smudge) { const pc = this.preview.getContext('2d'); pc.clearRect(0, 0, w, h); pc.drawImage(layer.canvas, 0, 0); }   // smudge samples it anywhere
+    else lazyCopy(this.preview, layer.canvas);
+    if (!smudge) { this.buf = acquire(w, h); if (this.buf.stale?.w) { const s = this.buf.stale; this.buf.getContext('2d').clearRect(s.x, s.y, s.w, s.h); this.buf.stale = null; } }   // only what the last stroke left
     this.opacity = b.buildup ? 1 : b.opacity;
     this.mode = this.id === 'eraser' ? 'destination-out' : layer.alphaLock ? 'source-atop' : b.blend;
     this.engine = new BrushEngine(b, {
@@ -81,7 +95,8 @@ export class PaintTool {
 
   cleanup() {
     this.app.view.previews.delete(this.layer);
-    release(this.preview); release(this.buf);
+    if (this.preview) this.preview.ensure = null;
+    release(this.preview); release(this.buf, this.total ?? undefined);
     this.engine = this.preview = this.buf = null;
   }
 
@@ -90,6 +105,7 @@ export class PaintTool {
     if (!r) return;
     this.total = Rect.union(this.total, r);
     const mask = doc.selection.clip, pc = this.preview.getContext('2d');
+    this.preview.ensure?.(r);
     if (this.buf) {
       pc.clearRect(r.x, r.y, r.w, r.h);
       drawRect(pc, this.layer.canvas, r);

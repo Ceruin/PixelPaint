@@ -10,12 +10,15 @@ body.light {
   --bg: #e9ebf0; --stage: #d5d8df; --panel: #f7f8fa; --panel2: #eceef2; --panel3: #dfe2e9; --line: #c9ced8;
   --text: #1b1d23; --muted: #5b6273; --shadow: 0 8px 24px rgba(20, 24, 40, .16); color-scheme: light;
 }
-body[data-mode=paper] {
+/* The app chrome follows data-layout, which keeps the last non-Pixel mode while Pixel mode covers
+   it: entering Pixel then changes nothing underneath (no hidden panels re-shown, no re-theme). */
+body[data-layout=paper] {
   --bg: #f4f2ec; --stage: #e6e3da; --panel: #fbfaf6; --panel2: #f1efe8; --panel3: #e4e1d8; --line: #111;
   --text: #111; --muted: #444; --accent: #111; --accent2: #111; --accent-ink: #fff; --shadow: none; color-scheme: light;
 }
 /* e-ink: nothing animates — except the loading splash, which has to show it's working */
-body[data-mode=paper] :not(#splash, #splash *), body[data-mode=paper] :not(#splash, #splash *)::before, body[data-mode=paper] :not(#splash, #splash *)::after { transition: none !important; animation: none !important; }
+/* e-ink: nothing animates. Listed explicitly (a universal selector here restyled every element on each switch). */
+body[data-mode=paper] :is(.toast, .tooltip, .m-bubble, .pc-track i, .pc-track, .sg-star, .welcome, .wl-card, .wl-art) { transition: none !important; animation: none !important; }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
@@ -73,8 +76,8 @@ select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: -1
 .brand em:nth-of-type(4) { color: #7cb1fa; } .brand em:nth-of-type(5) { color: #4f8cf5; }
 .brand b i:nth-of-type(1) { color: #a445ff; } .brand b i:nth-of-type(2) { color: #3b7bff; } .brand b i:nth-of-type(3) { color: #17c06b; }
 .brand b i:nth-of-type(4) { color: #ffd23f; } .brand b i:nth-of-type(5) { color: #ff3b47; }
-body.light .brand em, body[data-mode=paper] .brand em { color: #2f5fd6 !important; }
-body[data-mode=paper] .brand b i { color: #111 !important; }
+body.light .brand em, body[data-layout=paper] #app .brand em { color: #2f5fd6 !important; }
+body[data-layout=paper] #app .brand b i { color: #111 !important; }
 .menus { display: flex; gap: 1px; overflow: hidden; min-width: 0; }
 .menu-title { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r); background: none; color: var(--muted); }
 .menu-title:hover, .menu.open .menu-title { color: var(--text); background: var(--panel2); border-color: var(--line); }
@@ -142,9 +145,9 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 
 /* ---------- workspace, docks, panels ---------- */
 .workspace { position: relative; display: flex; overflow: hidden; }
-.stage { position: relative; flex: 1; min-width: 0; background: var(--stage); }
-.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradient(0deg, transparent 0 27px, rgba(0, 0, 0, .06) 27px 28px); }
+.stage { position: relative; flex: 1; min-width: 0; background: var(--stage); overflow: hidden; }
+.stage canvas { position: absolute; left: 0; top: 0; display: block; }   /* sized by the viewport (grow-only backing) */
+body[data-layout=paper] .workspace .stage { background: var(--stage) repeating-linear-gradient(0deg, transparent 0 27px, rgba(0, 0, 0, .06) 27px 28px); }
 .dock { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: var(--bg); min-height: 0; position: relative; z-index: 4; }
 .dock-left { border-right: 1px solid var(--line); }
 .dock-right { width: var(--dock-w); border-left: 1px solid var(--line); }
@@ -431,10 +434,16 @@ body[data-mode=paper] .pc-medal, body[data-mode=paper] .pc-grade { filter: grays
 
 /* ---------- zen: canvas-first, one strip ---------- */
 .zen { display: none; }
-body[data-mode=zen] .zen { display: block; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); z-index: 50; }
-body[data-mode=zen] .optionsbar, body[data-mode=zen] .statusbar, body[data-mode=zen] .float-layer > .panel:not(.flyout) { display: none; }
-body[data-mode=zen] .dock { width: 0; padding: 0; border: 0; overflow: visible; }
-body[data-mode=zen] .dock > :not(.dock-panels), body[data-mode=zen] .dock .panel:not(.flyout) { display: none !important; }
+body[data-layout=zen] .zen { display: block; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); z-index: 50; }
+/* mode rules name #app's own parts: the Pixel editor reuses class names (.statusbar, .timeline, .stage)
+   and must not be restyled by a mode switch */
+body[data-layout=zen] #app > :is(.optionsbar, .statusbar), body[data-layout=zen] .float-layer > .panel:not(.flyout) { display: none; }
+/* Zen lifts the docks out of the flow and hides them rather than display:none-ing their panels:
+   they keep their styles and layout, so leaving Zen doesn't rebuild hundreds of nodes. Flyouts
+   opened from the Zen strip live in the docks and stay visible. */
+body[data-layout=zen] .dock { position: absolute; top: 0; bottom: 0; visibility: hidden; }
+body[data-layout=zen] .dock-left { left: 0; } body[data-layout=zen] .dock-right { right: 0; }
+body[data-layout=zen] .dock .panel.flyout { visibility: visible; }
 .zen-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; box-shadow: var(--shadow); max-height: calc(100dvh - 60px); overflow: auto; scrollbar-width: none; }
 .zen-sec { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .zen-strip .mascot-slot { margin-top: 0; position: sticky; bottom: -6px; padding-bottom: 6px; background: inherit; }   /* never scrolls out of a short strip */
@@ -447,7 +456,7 @@ body[data-mode=zen] .dock > :not(.dock-panels), body[data-mode=zen] .dock .panel
 
 /* ---------- notes: same chrome, a board instead of a canvas ---------- */
 .notes { display: flex; flex-direction: column; }
-body[data-mode=notes] #optionsbar, body[data-mode=notes] .workspace { display: none; }
+body[data-layout=notes] #optionsbar, body[data-layout=notes] .workspace { display: none; }
 .board { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; background-color: var(--stage); background-image: radial-gradient(circle, var(--line) 1px, transparent 1.2px); }
 .board-inner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .board-slot { position: absolute; right: 10px; bottom: max(8px, env(safe-area-inset-bottom)); z-index: 5; }
@@ -484,7 +493,7 @@ body[data-mode=notes] #optionsbar, body[data-mode=notes] .workspace { display: n
 .rz-ne, .rz-se { right: -5px; } .rz-nw, .rz-sw { left: -5px; } .rz-ne, .rz-sw { cursor: nesw-resize; } .rz-nw, .rz-se { cursor: nwse-resize; }
 .rz-se::after { content: ''; position: absolute; right: 7px; bottom: 7px; width: 6px; height: 6px; border-right: 2px solid rgba(0, 0, 0, .3); border-bottom: 2px solid rgba(0, 0, 0, .3); }
 .note-group > .rz-se::after { border-color: var(--gc); }
-body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
+body[data-layout=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 
 @media (max-width: 900px) { .mode-btn > span:not(.ic) { display: none; } }
 .menus-icons .menu-title > span:not(.ic) { display: none; }
@@ -552,7 +561,7 @@ body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 
 /* ---------- animation timeline (same collapsible strip as the Pixel editor's) ---------- */
 .timeline { display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); max-height: 240px; position: relative; z-index: 3; }
-body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; }
+body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline { display: none; }
 .tl-bar { display: flex; align-items: center; gap: 6px; padding: 4px 10px; min-height: 36px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; border-bottom: 1px solid var(--line); flex: none; }
 .timeline.collapsed .tl-bar { border-bottom: 0; }
 .tl-toggle { display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; color: var(--muted); padding: 0 4px; height: 28px; }
@@ -607,7 +616,12 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .ol-gname small, .ol-head small { color: var(--muted); font-weight: 400; }
 .ol-chev { display: inline-grid; place-items: center; }
 .ol-sub { margin: 8px 4px 2px; font-size: 11px; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; }
-.card-title, .grp-name, .focus-title { flex: 1; min-width: 20px; outline: none; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; user-select: text; -webkit-user-select: text; padding: 2px 3px; border-radius: 2px; }
+.card-title { flex: 0 1 auto; }   /* sized to its text: the rest of the bar is a drag handle */
+.card-space { flex: 1; min-width: 12px; align-self: stretch; }
+.card-handle { flex: none; align-self: stretch; width: 10px; margin: 0 1px; opacity: .45; background: radial-gradient(currentColor 1px, transparent 1.4px) center / 4px 4px; background-clip: content-box; padding: 8px 0; }
+.card:hover .card-handle { opacity: .75; }
+.grp-name, .focus-title { flex: 1; }
+.card-title, .grp-name, .focus-title { min-width: 20px; outline: none; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; user-select: text; -webkit-user-select: text; padding: 2px 3px; border-radius: 2px; }
 .card-title:empty::before, .grp-name:empty::before, .focus-title:empty::before { content: attr(data-placeholder); opacity: .45; font-weight: 400; }
 .card-title:focus, .grp-name:focus, .focus-title:focus { background: rgba(0, 0, 0, .08); }
 .outline-sizer { width: 5px; margin-left: -3px; flex: none; cursor: col-resize; touch-action: none; z-index: 21; }
@@ -635,8 +649,7 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .update-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); padding: 6px 6px 6px 12px; background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: var(--shadow); }
 .update-bar > .ic { color: var(--accent); }
 
-/* ---------- Pixel mode (styles in css/pixel.css): its own top bar replaces ours, and Pyxl
+/* ---------- Pixel mode (styles in css/pixel.css): it covers our chrome with its own, and Pyxl
    floats over the spot it keeps free in its tool rail ---------- */
-body[data-mode=pixel] #app > :is(#menubar, #optionsbar, .workspace, .timeline, .statusbar) { display: none !important; }
-.pixel-pyxl { position: fixed; z-index: 5; pointer-events: none; }
+.pixel-pyxl { position: fixed; z-index: 71; pointer-events: none; }
 .pixel-pyxl .mascot { pointer-events: auto; width: 92px; height: 76px; }

@@ -1,14 +1,23 @@
 /* Pixel mode (the pixel-art editor). Every rule here is scoped to #pixel, and the first rule
    resets whatever the app's own styles (app.css) would set inside it, so the two never bleed
    into each other. SVG is left alone so icons keep their presentation attributes. */
-#pixel { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+/* An overlay over the app (which stays laid out underneath): switching modes then restyles only
+   this box, not the whole app chrome that display:none would throw away. */
+#pixel { position: fixed; inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); z-index: 70; display: flex; flex-direction: column; }
 #pixel[hidden] { display: none !important; }
+/* Loaded but out of Pixel mode: kept painted on its own layer, invisible, behind the app (which
+   takes every touch). Switching is then a compositor-only change: no restyle, relayout or repaint. */
+#pixel { will-change: opacity; }
+#pixel.parked { z-index: -1; opacity: 0; }
 #pixel :where(*:not(svg, svg *)) { all: revert; }   /* :where keeps it below every Pixel rule */
 
 #pixel{
   --bg:#1b1d23; --panel:#23262e; --panel2:#2b2f39; --line:#3a3f4b;
   --text:#e6e8ee; --muted:#9aa1b1; --accent:#5b8cff; --accent2:#3a6bff;
   --danger:#e0556a; --ok:#46c07a;
+  /* every other theme value the app changes on <body> (Paper mode), set here too: then a theme
+     switch leaves this box's computed style unchanged and its ~1000 nodes are never restyled */
+  --stage:#15171c; --panel3:#343945; --accent-ink:#fff; --shadow:0 8px 24px rgba(0,0,0,.4); color-scheme:dark;
 }
 #pixel, #pixel *{box-sizing:border-box;}
 #pixel{

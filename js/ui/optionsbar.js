@@ -9,7 +9,27 @@ import { FONTS } from '../tools/text.js';
 import { sizeToPos, posToSize } from './brushPanel.js';
 import { strokePreview } from '../engine/brush.js';
 
-const preview = b => { const c = h('canvas', { width: 140, height: 40 }); requestAnimationFrame(() => strokePreview(b, c, getComputedStyle(document.body).getPropertyValue('--text').trim())); return c; };
+// Brush stroke previews are drawn once per brush setup and theme colour, in idle time, then copied
+// (the bar is rebuilt on every tool/mode change).
+const previews = new Map();
+let inkFor, ink;
+const preview = b => {
+  const c = h('canvas', { width: 140, height: 40 });
+  const idle = window.requestIdleCallback ?? (f => setTimeout(f, 50));
+  idle(() => {   // off the frame that rebuilt the bar
+    const theme = document.body.className + document.body.dataset.mode;
+    if (theme !== inkFor) { inkFor = theme; ink = getComputedStyle(document.body).getPropertyValue('--text').trim(); }
+    const key = `${JSON.stringify(b)}|${ink}`;
+    let done = previews.get(key);
+    if (!done) {
+      done = h('canvas', { width: 140, height: 40 }); strokePreview(b, done, ink);
+      if (previews.size > 40) previews.delete(previews.keys().next().value);
+      previews.set(key, done);
+    }
+    c.getContext('2d').drawImage(done, 0, 0);
+  }, { timeout: 400 });
+  return c;
+};
 
 const PAINT = ['brush', 'eraser', 'smudge'], SELECT = ['marquee', 'ellipse', 'lasso', 'wand'];
 const btn = (label, id) => h('button.btn.sm', { type: 'button', 'data-action': id, 'data-tip': label, onclick: () => actions.run(id) }, actions.get(id)?.icon && icon(actions.get(id).icon), label);

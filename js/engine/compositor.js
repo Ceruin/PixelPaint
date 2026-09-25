@@ -11,7 +11,22 @@ export function acquire(w, h) {
   c.busy = true;
   return c;
 }
-export const release = c => { if (c) c.busy = false; };
+// `stale` is the only region the user may have left dirty (default: all of it), so the next user
+// that needs a clear canvas can clear just that.
+export const release = (c, stale) => { if (c) { c.busy = false; c.stale = stale ?? { x: 0, y: 0, w: c.width, h: c.height }; } };
+
+// Makes n clean doc-sized scratch canvases ahead of time (idle), so a first stroke doesn't pay to
+// allocate them.
+export function prewarm(w, h, n = 2) {
+  const cs = Array.from({ length: n }, () => acquire(w, h));
+  const dot = makeCanvas(1, 1);
+  cs.forEach(c => {
+    const x = c.getContext('2d');
+    if (c.stale) x.clearRect(0, 0, w, h);
+    x.globalAlpha = 0; x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(dot, 0, 0); x.globalAlpha = 1;   // allocates the backing store now
+    release(c, { x: 0, y: 0, w: 0, h: 0 });
+  });
+}
 
 // A layer is clipped when it has `clip` and the chain below it bottoms out on a raster layer.
 export function isClipped(kids, i) {
@@ -52,11 +67,13 @@ function drawGroup(g, ctx, r, pv, f) {
     }
     const src = pv?.get(n) ?? n.view(f);
     if (!src) continue;
+    src.ensure?.(r);   // a lazily-filled stroke preview
     blit(ctx, src, r, n.opacity, n.blend);
     for (let j = i + 1; j < kids.length && kids[j].type === 'layer' && kids[j].clip; j++) {
       const c = kids[j];
       const cs = pv?.get(c) ?? c.view(f);
       if (!c.visible || !cs) continue;
+      cs.ensure?.(r);
       const t = acquire(W, H), tc = t.getContext('2d');
       tc.clearRect(r.x, r.y, r.w, r.h);
       drawRect(tc, cs, r);

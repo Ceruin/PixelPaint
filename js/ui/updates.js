@@ -18,9 +18,11 @@ const splash = () => document.getElementById('splash');
 // The splash is always up while the app starts. Once it's ready the splash finishes: the bar
 // fills, a last word, a short beat (never less than a moment on screen) — then it fades.
 const MIN_SHOWN = 1200;
-export function hideSplash() {
+// `ready`: work to finish behind the splash first (given up on after 6 s).
+export async function hideSplash(ready) {
   const el = splash();
   if (!el) return;
+  await Promise.race([ready, new Promise(r => setTimeout(r, 6000))]);
   let updated = false;
   try { updated = !!sessionStorage.getItem('pp.updated'); sessionStorage.removeItem('pp.updated'); } catch (e) {}
   const wait = Math.max(0, MIN_SHOWN - performance.now());

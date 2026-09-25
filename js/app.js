@@ -11,6 +11,7 @@ import { assistOverlay } from './tools/assist.js';
 import { gridOverlay } from './tools/grid.js';
 import { selectionOverlay } from './tools/select.js';
 import { Player } from './engine/animation.js';
+import { prewarm } from './engine/compositor.js';
 
 // Application state + controller. UI modules read from it and call its methods; the engine
 // never touches the DOM outside the view canvas.
@@ -33,6 +34,7 @@ export class App {
     this.tools = createTools(this);
     this.tool = this.tools.brush;
     this.input = new CanvasInput(this, canvas);
+    this.view.busy = () => this.input.active != null || this.input.pointers.size > 0;   // the viewport waits to shrink its canvas
     this.tool.activate();
     this.view.overlays.add(gridOverlay(this));
     this.view.overlays.add(assistOverlay(this));
@@ -56,6 +58,8 @@ export class App {
     bus.emit('layers');
     bus.emit('selection');
     bus.emit('history', doc.history);
+    const warm = () => prewarm(doc.w, doc.h);   // stroke scratch canvases, off the critical path
+    window.requestIdleCallback ? requestIdleCallback(warm, { timeout: 2000 }) : setTimeout(warm, 500);
   }
 
   setTool(id) {

@@ -60,18 +60,25 @@ panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hid
 initPopupPalette(app);
 document.body.classList.toggle('light', app.settings.theme === 'light');
 
-// Pixel mode: the pixel-art editor lives in #pixel (styles: css/pixel.css). Its script loads the
-// first time the mode opens, so it sizes itself for a visible stage; its top bar replaces ours.
+// Pixel mode: the pixel-art editor lives in #pixel (styles: css/pixel.css); its top bar replaces ours.
+// Its script boots behind the boot splash, laid out at full size but parked off-screen: that one
+// long task runs while the compositor-animated splash still covers the app. Out of Pixel mode it
+// stays parked rather than display:none, so switching only moves it (no restyle of its ~500 nodes).
 const pixelBox = $('#pixel'), pixelSlot = $('#pixelSlot'), pixelSpot = $('#pyxlSpot');
-let pixelLoaded = false;
+let pixelReady = null;
+const loadPixel = () => pixelReady ??= new Promise(done => {
+  const warm = app.mode !== 'pixel';
+  pixelBox.classList.toggle('parked', warm); pixelBox.hidden = false;
+  const s = Object.assign(document.createElement('script'), { src: 'js/pixel/editor.js' });
+  s.onload = s.onerror = () => { if (app.mode === 'pixel') { if (warm) dispatchEvent(new Event('resize')); requestAnimationFrame(placePixelPyxl); } done(); };
+  document.body.append(s);
+});
 const showPixel = on => {
-  pixelBox.hidden = !on;
   pixelSlot.hidden = true;
+  if (!pixelReady) { if (on) loadPixel(); return; }
+  pixelBox.classList.toggle('parked', !on);
   if (!on) return;
-  if (!pixelLoaded) {
-    pixelLoaded = true;
-    document.body.append(Object.assign(document.createElement('script'), { src: 'js/pixel/editor.js' }));
-  } else dispatchEvent(new Event('resize'));
+  dispatchEvent(new Event('resize'));
   requestAnimationFrame(placePixelPyxl);
 };
 // Pyxl stands in the editor's tool rail, over a spot it keeps free above Help (hidden if there's no room).
@@ -93,14 +100,15 @@ function setMode(mode) {
   app.tool.interrupt?.();
   app.mode = mode;
   document.body.dataset.mode = mode;
+  if (mode !== 'pixel') document.body.dataset.layout = mode;
   local.set('pp.mode', mode);
   app.profile = mode === 'paper' ? { smoothing: 0.3, grain: 0.35 } : {};
-  notes.show(mode === 'notes');
+  if (mode !== 'pixel') notes.show(mode === 'notes');   // Pixel covers the app: leave it as it was
   showPixel(mode === 'pixel');
   mascot.mount(mode === 'zen' ? zen.slot : mode === 'notes' ? notes.slot : mode === 'pixel' ? pixelSlot : $('#mascotSlot'));
   modeBox.replaceChildren(modeSwitch(mode, setMode));
   bus.emit('mode', mode);
-  requestAnimationFrame(() => app.view.resize());
+  if (mode !== 'pixel') requestAnimationFrame(() => app.view.resize());
 }
 
 const timeline = initTimeline(app, $('#timeline'));
@@ -140,5 +148,5 @@ const asked = new URLSearchParams(location.search).get('mode');
 if (asked) history.replaceState(null, '', location.pathname);
 setMode(asked ?? local.get('pp.mode', isTouchDevice ? 'zen' : 'paint'));
 globalThis.pixelpaint = app;
-hideSplash();
+hideSplash(loadPixel());
 await welcome;

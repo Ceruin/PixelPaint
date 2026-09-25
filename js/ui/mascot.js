@@ -220,7 +220,10 @@ export class Mascot {
   // (No measuring here: this runs mid mode-switch; the ResizeObserver re-fits her after layout.)
   mount(host) {
     this.home = host;
-    if (this.floating) return;
+    if (this.floating) {   // a spot saved last session that sits on her home is just home
+      if (!this.homeChecked) { this.homeChecked = true; requestAnimationFrame(() => requestAnimationFrame(() => this.floating && !this.phys && this.nearHome() && this.goHome())); }
+      return;
+    }
     if (host && this.el.parentElement !== host) { host.append(this.el); this.el.style.translate = ''; this.box = null; }
     requestAnimationFrame(() => requestAnimationFrame(() => { this.keepInView(); this.placeBubble(); }));   // after the new mode's layout
   }
@@ -277,8 +280,7 @@ export class Mascot {
     this.pos = PIV[0] - AX;   // stand right under where she hung
     this.phys = document.body.dataset.mode === 'paper' ? null : { settle: new Settle(Math.max(-0.7, Math.min(0.7, ang)), this.phys?.hang?.om ?? 0, -16) };   // e-ink: no wobble
     if (this.phys) this.runPhysics(); else this.keepInView();
-    const home = this.home?.getBoundingClientRect(), me = this.el.getBoundingClientRect();
-    const nearHome = home?.width && Math.hypot(me.left + me.width / 2 - (home.left + home.width / 2), me.bottom - home.bottom) < 80;
+    const nearHome = this.nearHome();
     if (nearHome) this.goHome();
     else local.set('pp.pyxlPos', this.floatPos);
     const long = Date.now() - this.heldAt > 6000;
@@ -289,7 +291,7 @@ export class Mascot {
     const b = this.floatBox, dpr = devicePixelRatio || 1;
     this.floatPos = { x: Math.round(x * dpr) / dpr, y: Math.round(y * dpr) / dpr };
     Object.assign(b.style, { left: `${this.floatPos.x}px`, top: `${this.floatPos.y}px` });
-    if (!this.floating) { this.floating = true; document.body.append(b); b.append(this.el); this.el.classList.add('floating'); this.el.style.translate = ''; }
+    if (!this.floating) { this.floating = true; document.body.append(b); b.append(this.el); this.el.classList.add('floating'); this.el.style.translate = ''; bus.emit('pyxl:stats', this.stats); }
     this.box = null;
     if (!free) this.keepInView();
     if (save) local.set('pp.pyxlPos', this.floatPos);
@@ -346,8 +348,16 @@ export class Mascot {
     const [cx, cy] = centreOfMass(sheet(), SPRITES.raise);
     return Math.atan2(cx - GRIP[0], cy - GRIP[1]) + (this.phys?.hang?.th ?? 0);
   }
+  // Dropped (or restored) on or next to her spot in this mode counts as home.
+  nearHome() {
+    const home = this.home?.getBoundingClientRect(), me = this.el.getBoundingClientRect();
+    if (!home?.width || !me.width) return false;
+    const overlap = me.left < home.right && me.right > home.left && me.top < home.bottom && me.bottom > home.top;
+    return overlap || Math.hypot(me.left + me.width / 2 - (home.left + home.width / 2), me.bottom - home.bottom) < 100;
+  }
   goHome() {
     this.floating = false;
+    bus.emit('pyxl:stats', this.stats);   // her card swaps "Send Pyxl home" for the drag tip
     local.set('pp.pyxlPos', null);
     this.el.classList.remove('floating');
     this.floatBox.remove();
@@ -361,7 +371,7 @@ export class Mascot {
     if (!r.height) return;
     this.k = Math.max(1, Math.floor(Math.min(r.height * dpr / BOX_H, (r.width + 24) * dpr / BOX_W)));
     Object.assign(this.canvas, { width: BOX_W * this.k, height: BOX_H * this.k });
-    this.drawn = null;
+    this.drawn = null; this.box = null;
     this.placeBubble();
     // 1 canvas pixel = 1 device pixel, centred on a whole device pixel (no resampling)
     Object.assign(this.canvas.style, { width: `${BOX_W * this.k / dpr}px`, height: `${BOX_H * this.k / dpr}px`, left: `${Math.round((r.width * dpr - BOX_W * this.k) / 2) / dpr}px` });
@@ -405,10 +415,11 @@ export class Mascot {
     let ax, ay;
     if (this.phys?.hang) { ax = this.grab.x; ay = this.grab.y - 14; }   // over the hand holding her
     else {
-      const c = this.canvas.getBoundingClientRect();
-      if (!c.width || !this.el.offsetParent) { b.style.visibility = 'hidden'; b.at = null; return; }
-      const sc = c.width / BOX_W;
-      ax = c.left + (AX + this.pos) * sc; ay = c.top + (FLOOR - 60) * sc;
+      // her cached box (re-measured at most twice a second, or after she moves) — no layout per frame
+      const e = this.rect(), sc = this.k / (devicePixelRatio || 1);
+      if (!e.width) { b.style.visibility = 'hidden'; b.at = null; return; }
+      const cl = e.left + (e.width - BOX_W * sc) / 2, ct = e.bottom - BOX_H * sc;   // the canvas: centred, on her box's floor
+      ax = cl + (AX + this.pos) * sc; ay = ct + (FLOOR - 60) * sc;
     }
     if (b.sized !== b.textContent) { b.sized = b.textContent; b.size = [b.offsetWidth, b.offsetHeight]; }   // measure once per message
     const [w, hh] = b.size, m = 8, left = Math.round(Math.max(m, Math.min(innerWidth - m - w, ax - w / 2))), top = Math.round(Math.max(m, ay - hh - 6));
@@ -830,7 +841,7 @@ export class Mascot {
   }
 
   // Her on-screen box, re-measured at most twice a second (it only moves when panels do).
-  rect(now) { if (!this.box || now - this.boxAt > 500) { this.box = this.el.getBoundingClientRect(); this.boxAt = now; } return this.box; }
+  rect() { const now = performance.now(); if (!this.box || now - this.boxAt > 500) { this.box = this.el.getBoundingClientRect(); this.boxAt = now; } return this.box; }
 
   // Self-aware idling: she turns to face the cursor when it's near, reaches up when it hovers
   // above her head, and looks toward wherever you're working otherwise.

@@ -135,7 +135,7 @@ export class Doc {
     const cel = layer.cel(f, true), before = grab(cel, r);
     fn(cel.getContext('2d'), r);
     this.touch(layer, r);
-    return this.pixelCmd(label, layer, r, before, grab(cel, r), f);
+    return this.pixelCmd(label, layer, r, before, () => grab(layer.cel(f, true), r), f);
   }
   editPixels(label, layer, rect, fn) { this.history.push(this.pixelEdit(label, layer, rect, fn)); }
 
