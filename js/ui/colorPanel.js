@@ -1,11 +1,12 @@
-import { h, icon, segmented } from './dom.js';
+import { h, icon, iconBtn, segmented, select } from './dom.js';
+import { PALETTES, parsePalette } from '../engine/palettes.js';
+import { pickFile } from '../core/util.js';
 import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
 import { clamp, TAU } from '../core/util.js';
 import { hexToRgb, rgbToHex, hsvToRgb, rgbToHsv } from '../core/color.js';
 
-const PALETTE = ['#000000', '#3c3f47', '#8c93a5', '#ffffff', '#ff3b47', '#ff8a3d', '#ffd23f', '#9be15d', '#17c06b', '#1fb5a8',
-  '#84cee0', '#3b7bff', '#5b4bff', '#a445ff', '#ff5fa2', '#7a4a2e', '#c89f7c', '#f5deb3', '#2e4a7a', '#233d2b'];
+const allPalettes = () => ({ ...PALETTES, ...local.get('pp.palettes', {}) });
 
 function dragPad(el, fn) {
   el.addEventListener('pointerdown', e => {
@@ -85,7 +86,24 @@ export function colorPicker(app) {
 
   dragPad(sv, (x, y) => { ss = x; vv = 1 - y; commit(); });
   dragPad(hue, x => { hh = x * 359.9; drawSV(); commit(); });
-  swatches.append(...PALETTE.map(sw));
+  // Palettes: built-ins, imported files (.gpl / .pal / .hex) and "My palette".
+  let palName = local.get('pp.palette', 'PixelPaint');
+  const palSel = h('span.pal-sel');
+  const renderPalette = () => {
+    const all = allPalettes();
+    if (!all[palName]) palName = 'PixelPaint';
+    palSel.replaceChildren(select(Object.keys(all).map(n => [n, n]), palName, v => { palName = v; local.set('pp.palette', v); renderPalette(); }));
+    swatches.replaceChildren(...all[palName].map(sw));
+  };
+  const saveCustom = (name, colors) => { local.set('pp.palettes', { ...local.get('pp.palettes', {}), [name]: colors }); palName = name; local.set('pp.palette', name); renderPalette(); };
+  const importPal = async () => {
+    const f = await pickFile('.gpl,.pal,.hex,.txt');
+    const colors = f && parsePalette(await f.text());
+    if (colors?.length) saveCustom(f.name.replace(/\.\w+$/, ''), colors.slice(0, 256));
+  };
+  const addColor = () => { const mine = allPalettes()['My palette'] ?? []; saveCustom('My palette', [...new Set([...mine, app.color.fg])]); };
+  const eyedrop = window.EyeDropper && iconBtn('picker', 'Pick a color from anywhere on screen', async () => { try { app.setColor((await new EyeDropper().open()).sRGBHex); } catch { /* cancelled */ } });
+  renderPalette();
   bus.on('color', () => { if (!self) { [hh, ss, vv] = rgbToHsv(...hexToRgb(app.color.fg)); drawSV(); } place(); });
   bus.on('history', hist => {
     if (!['Brush', 'Fill'].includes(hist.done.at(-1)?.label) || recent[0] === app.color.fg) return;
@@ -97,6 +115,7 @@ export function colorPicker(app) {
   return h('div.picker', {},
     segmented([['square', 'Square', 'marquee'], ['wheel', 'Wheel', 'palette']], style, setStyle, true),
     pads,
-    h('div.picker-row', {}, h('div.chips.inline', {}, bg, fg), icon('palette'), hex),
+    h('div.picker-row', {}, h('div.chips.inline', {}, bg, fg), icon('palette'), hex, eyedrop),
+    h('div.picker-row', {}, palSel, iconBtn('plus', 'Add current color to “My palette”', addColor), iconBtn('upload', 'Import palette (.gpl, .pal, .hex)', importPal)),
     swatches, h('div.sub-label', {}, 'Recent'), recents);
 }

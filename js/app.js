@@ -8,6 +8,8 @@ import { createTools } from './tools/index.js';
 import { CanvasInput } from './input/pointer.js';
 import { haptics } from './input/haptics.js';
 import { assistOverlay } from './tools/assist.js';
+import { gridOverlay } from './tools/grid.js';
+import { selectionOverlay } from './tools/select.js';
 import { Player } from './engine/animation.js';
 
 // Application state + controller. UI modules read from it and call its methods; the engine
@@ -17,7 +19,7 @@ export class App {
     this.color = local.get('pp.color', { fg: '#1b1d23', bg: '#ffffff' });
     this.opts = {
       selMode: 'replace', tolerance: 24, contiguous: true, sampleAll: true, transformMode: 'free', uniform: true,
-      symmetry: 'none', radial: 6, wrap: false, onion: false, onionPrev: 1, onionNext: 1, onionAlpha: 0.5, playDir: 'forward', snapAssist: false, showAssist: true, assistKind: 'ruler',
+      symmetry: 'none', radial: 6, wrap: false, grid: false, gridSize: 16, pixelGrid: true, onion: false, onionPrev: 1, onionNext: 1, onionAlpha: 0.5, playDir: 'forward', snapAssist: false, showAssist: true, assistKind: 'ruler',
       shape: 'rect', shapeWidth: 4, shapeFill: false, shapeStroke: true, font: "'Pixelify Sans'", fontSize: 48, bold: false,
       ...local.get('pp.opts', {}),
     };
@@ -32,7 +34,10 @@ export class App {
     this.tool = this.tools.brush;
     this.input = new CanvasInput(this, canvas);
     this.tool.activate();
+    this.view.overlays.add(gridOverlay(this));
     this.view.overlays.add(assistOverlay(this));
+    this.view.overlays.add(selectionOverlay(this));
+    bus.on('selection', () => this.view.redraw());
     this.view.wrap = this.opts.wrap;
     this.player = new Player(this);
     this.syncOnion();

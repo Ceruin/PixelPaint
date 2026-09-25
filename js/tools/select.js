@@ -50,3 +50,17 @@ export class WandTool {
     return false;
   }
 }
+
+// Marching ants around the current selection (animated only while one exists).
+export function selectionOverlay(app) {
+  let dash = 0, timer = 0;
+  const o = {
+    draw(ctx, view) {
+      const sel = app.doc?.selection;
+      if (!sel?.active) { clearInterval(timer); timer = 0; return; }
+      timer ||= setInterval(() => { dash = (dash + 1) % 8; view.redraw(); }, 120);
+      view.strokeDoc(ctx, sel.path, dash);
+    },
+  };
+  return o;
+}

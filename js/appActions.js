@@ -12,6 +12,8 @@ import { bus } from './core/bus.js';
 import { acquire, release } from './engine/compositor.js';
 import { TOOL_META } from './tools/index.js';
 import { MODES } from './ui/modes.js';
+import { hexToRgb } from './core/color.js';
+import { tipFromImage, registerTip } from './engine/tips.js';
 import { showWelcome } from './ui/welcome.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
@@ -103,9 +105,9 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
   // ---- filters with live preview ----
   const filter = key => editable(async layer => {
     const d = doc(), f = FILTERS[key], dst = acquire(d.w, d.h), view = app.view;
-    const vals = Object.fromEntries(f.params.map(p => [p[0], p[4]]));
+    const vals = { ...Object.fromEntries(f.params.map(p => [p[0], p[4]])), ...(f.color && { color: app.color.fg }) };
     let raf = 0;
-    const update = () => { raf = 0; renderFilter(layer.canvas, dst, f.css(vals), d.selection.clip); view.previews.set(layer, dst); view.invalidate(d.bounds); };
+    const update = () => { raf = 0; renderFilter(layer.canvas, dst, f, vals, d.selection.clip); view.previews.set(layer, dst); view.invalidate(d.bounds); };
     update();
     const body = f.params.map(([id, label, min, max, value]) => slider({ label, min, max, value, onInput: v => { vals[id] = v; raf ||= requestAnimationFrame(update); } }).el);
     const ok = !f.params.length || await modal(f.label, body, [['Cancel', null], ['Apply', 'ok', true]]);
@@ -224,6 +226,31 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
     timeline.expand();
   };
 
+  // Replace Color (Aseprite): swaps foreground-coloured pixels for the background colour.
+  const replaceColor = editable(async layer => {
+    const v = await form('Replace Color', [{ id: 'tol', label: 'Tolerance %', value: 10, min: 0, max: 100 }], 'Replace');
+    if (!v) return;
+    const d = doc(), [fr, fg, fb] = hexToRgb(app.color.fg), [tr, tg, tb] = hexToRgb(app.color.bg), t = v.tol * 2.55;
+    d.editPixels('Replace Color', layer, d.bounds, ctx => {
+      const img = ctx.getImageData(0, 0, d.w, d.h), px = img.data;
+      for (let i = 0; i < px.length; i += 4) if (px[i + 3] && Math.abs(px[i] - fr) <= t && Math.abs(px[i + 1] - fg) <= t && Math.abs(px[i + 2] - fb) <= t) { px[i] = tr; px[i + 1] = tg; px[i + 2] = tb; }
+      ctx.putImageData(img, 0, 0);
+    });
+  });
+
+  // New brush tip from the selected pixels (Aseprite's Edit ▸ New Brush).
+  const brushFromSelection = () => {
+    const d = doc(), l = d.activeLayer;
+    if (!l || !d.selection.active) return app.toast('Select part of a layer first');
+    const { canvas } = d.extract(l), id = `custom-${Date.now().toString(36)}`, tip = tipFromImage(canvas, 256);
+    registerTip(id, tip);
+    local.set('pp.tips', { ...local.get('pp.tips', {}), [id]: tip.toDataURL() });
+    Object.assign(app.brushes.brush, { tip: id, name: 'Selection brush', spacing: 0.25, size: Math.max(canvas.width, canvas.height), roundness: 1, angle: 0 });
+    app.setTool('brush');
+    app.brushChanged();
+    app.toast('New brush made from the selection');
+  };
+
   const nudgeSize = k => () => { const b = app.brush; b.size = clamp(Math.round(b.size * k + (k > 1 ? 1 : -1)), 1, 1000); app.brushChanged(); };
   const v = () => app.view;
 
@@ -244,6 +271,8 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
     { id: 'edit.paste', label: 'Paste', key: 'Ctrl+V', run: paste },
     { id: 'edit.clear', label: 'Clear', key: 'Delete', run: editable(l => doc().clearArea(l)) },
     { id: 'edit.fill', label: 'Fill with Foreground', key: 'Alt+Backspace', run: editable(l => doc().fillArea(l, app.color.fg)) },
+    { id: 'edit.replaceColor', label: 'Replace Color…', icon: 'swap', key: 'Shift+R', run: replaceColor },
+    { id: 'brush.fromSelection', label: 'New Brush from Selection', icon: 'brush', key: 'Ctrl+B', run: brushFromSelection },
     { id: 'edit.shortcuts', label: 'Keyboard Shortcuts…', key: 'Ctrl+/', run: shortcuts },
     { id: 'edit.settings', label: 'Settings…', key: 'Ctrl+,', run: settings },
 
@@ -294,6 +323,9 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
     { id: 'view.rotL', label: 'Rotate View Left', key: 'Shift+ArrowLeft', run: () => v().set(v().zoom, v().rot - 15) },
     { id: 'view.rotR', label: 'Rotate View Right', key: 'Shift+ArrowRight', run: () => v().set(v().zoom, v().rot + 15) },
     { id: 'view.resetRot', label: 'Reset View Rotation', key: 'Shift+ArrowUp', run: () => v().set(v().zoom, 0) },
+    { id: 'view.grid', label: 'Show Grid', icon: 'wrap', key: "Ctrl+'", checked: () => app.opts.grid, run: () => app.setOpt('grid', !app.opts.grid) },
+    { id: 'view.pixelGrid', label: 'Pixel Grid (when zoomed in)', icon: 'pixel', key: "Ctrl+Shift+'", checked: () => app.opts.pixelGrid, run: () => app.setOpt('pixelGrid', !app.opts.pixelGrid) },
+    { id: 'view.gridSize', label: 'Grid Settings…', icon: 'sliders', run: async () => { const v = await form('Grid', [{ id: 's', label: 'Cell size (px)', value: app.opts.gridSize, min: 2, max: 1024 }]); if (v) { app.setOpt('gridSize', clamp(Math.round(v.s), 2, 1024)); app.setOpt('grid', true); } } },
     { id: 'view.flip', label: 'Mirror View', icon: 'mirror', key: 'Shift+M', checked: () => v().flip, run: () => v().toggleFlip() },
     { id: 'view.wrap', label: 'Wrap-Around Mode', icon: 'wrap', key: 'Shift+W', checked: () => app.opts.wrap, run: () => app.setOpt('wrap', !app.opts.wrap) },
     { id: 'view.assist', label: 'Show Assistants', icon: 'ruler', checked: () => app.opts.showAssist, run: () => app.setOpt('showAssist', !app.opts.showAssist) },
@@ -336,13 +368,13 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
   return {
     menus: [
       ['File', 'folder', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg', 'file.exportPsd']],
-      ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.fill', '-', 'edit.shortcuts', 'edit.settings']],
+      ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
-      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.assist', 'assist.clear', '-', 'view.theme', 'app.welcome', '-', ...MODES.map(m => `mode.${m[0]}`)]],
+      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.theme', 'app.welcome', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
     ],
   };
