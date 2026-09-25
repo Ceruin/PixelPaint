@@ -56,7 +56,7 @@ select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: -1
 /* ---------- top bar (identical in every mode, and in the Pixel editor) ---------- */
 #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
 #app > * { flex: none; }
-#app > .workspace, #app > .notes, #app > .pixel-mode { flex: 1; min-height: 0; }
+#app > .workspace, #app > .notes { flex: 1; min-height: 0; }
 .menubar {
   display: flex; align-items: center; gap: 4px 8px; padding: 5px 10px; background: var(--panel); border-bottom: 1px solid var(--line);
   position: relative; z-index: 30; min-height: 42px;
@@ -564,9 +564,8 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .update-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 300; display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); padding: 6px 6px 6px 12px; background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; box-shadow: var(--shadow); }
 .update-bar > .ic { color: var(--accent); }
 
-/* ---------- Pixel mode: the pixel editor in a frame, with its own (matching) top bar ---------- */
-.pixel-mode { position: relative; display: flex; }
-.pixel-frame { flex: 1; width: 100%; border: 0; background: var(--bg); }
-body[data-mode=pixel] :is(#menubar, #optionsbar, .workspace, .timeline, .statusbar) { display: none !important; }
-.pixel-pyxl { position: absolute; z-index: 5; pointer-events: none; }
+/* ---------- Pixel mode (styles in css/pixel.css): its own top bar replaces ours, and Pyxl
+   floats over the spot it keeps free in its tool rail ---------- */
+body[data-mode=pixel] #app > :is(#menubar, #optionsbar, .workspace, .timeline, .statusbar) { display: none !important; }
+.pixel-pyxl { position: fixed; z-index: 5; pointer-events: none; }
 .pixel-pyxl .mascot { pointer-events: auto; width: 92px; height: 76px; }

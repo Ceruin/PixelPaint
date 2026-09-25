@@ -1,7 +1,7 @@
 import { $ } from './ui/dom.js';
 import { bus } from './core/bus.js';
 import { local } from './core/storage.js';
-import { bindKeys, isTyping } from './core/actions.js';
+import { actions, bindKeys, isTyping } from './core/actions.js';
 import { isTouchDevice } from './core/util.js';
 import { Doc } from './engine/document.js';
 import { App } from './app.js';
@@ -60,29 +60,33 @@ panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hid
 initPopupPalette(app);
 document.body.classList.toggle('light', app.settings.theme === 'light');
 
-// Pixel mode: the pixel-art editor runs in a frame inside the app (loaded on first use and kept
-// alive, so switching modes never loses its state). Its top bar replaces ours while it's shown.
-const pixelBox = $('#pixel');
-let pixelFrame = null;
+// Pixel mode: the pixel-art editor lives in #pixel (styles: css/pixel.css). Its script loads the
+// first time the mode opens, so it sizes itself for a visible stage; its top bar replaces ours.
+const pixelBox = $('#pixel'), pixelSlot = $('#pixelSlot'), pixelSpot = $('#pyxlSpot');
+let pixelLoaded = false;
 const showPixel = on => {
   pixelBox.hidden = !on;
+  pixelSlot.hidden = true;
   if (!on) return;
-  if (!pixelFrame) {
-    pixelFrame = pixelBox.appendChild(Object.assign(document.createElement('iframe'), { src: 'pixel-editor.html', title: 'Pixel editor', className: 'pixel-frame' }));
-    pixelFrame.addEventListener('load', () => {
-      const w = pixelFrame.contentWindow, spot = w.document.getElementById('pyxlSpot');
-      if (spot) new w.ResizeObserver(placePixelPyxl).observe(spot);
-    });
-  }
-  pixelFrame.focus();
+  if (!pixelLoaded) {
+    pixelLoaded = true;
+    document.body.append(Object.assign(document.createElement('script'), { src: 'js/pixel/editor.js' }));
+  } else dispatchEvent(new Event('resize'));
+  requestAnimationFrame(placePixelPyxl);
 };
-// Pyxl stands in the pixel editor's tool rail (a spot it keeps free above Help); hidden if there's no room.
+// Pyxl stands in the editor's tool rail, over a spot it keeps free above Help (hidden if there's no room).
 const placePixelPyxl = () => {
-  const r = pixelFrame.contentDocument?.getElementById('pyxlSpot')?.getBoundingClientRect(), slot = $('#pixelSlot');
-  slot.hidden = !(r?.width >= 80 && r.height >= 70);
-  if (!slot.hidden) Object.assign(slot.style, { left: `${r.left + (r.width - 92) / 2}px`, top: `${r.bottom - 78}px` });
+  const r = pixelSpot.getBoundingClientRect();
+  pixelSlot.hidden = app.mode !== 'pixel' || r.width < 80 || r.height < 70;
+  if (!pixelSlot.hidden) Object.assign(pixelSlot.style, { left: `${r.left + (r.width - 92) / 2}px`, top: `${r.bottom - 78}px` });
 };
-addEventListener('message', e => e.origin === location.origin && e.data?.ppMode && setMode(e.data.ppMode));
+{ const ro = new ResizeObserver(placePixelPyxl); ro.observe(pixelSpot); ro.observe(pixelSpot.parentElement); }
+pixelBox.addEventListener('click', e => {
+  const b = e.target.closest('.mode-switch [data-mode]');
+  if (b) { e.preventDefault(); setMode(b.dataset.mode); }
+});
+// App-wide items in the editor's Help menu (updates, guide, theme…).
+pixelBox.addEventListener('pp-action', e => actions.run(e.detail));
 
 function setMode(mode) {
   if (!MODES.some(m => m[0] === mode)) mode = 'paint';
@@ -93,7 +97,7 @@ function setMode(mode) {
   app.profile = mode === 'paper' ? { smoothing: 0.3, grain: 0.35 } : {};
   notes.show(mode === 'notes');
   showPixel(mode === 'pixel');
-  mascot.mount(mode === 'zen' ? zen.slot : mode === 'notes' ? notes.slot : mode === 'pixel' ? $('#pixelSlot') : $('#mascotSlot'));
+  mascot.mount(mode === 'zen' ? zen.slot : mode === 'notes' ? notes.slot : mode === 'pixel' ? pixelSlot : $('#mascotSlot'));
   modeBox.replaceChildren(modeSwitch(mode, setMode));
   bus.emit('mode', mode);
   requestAnimationFrame(() => app.view.resize());

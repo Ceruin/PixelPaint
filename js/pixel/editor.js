@@ -1,1606 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>PixelPaint</title>
-<!-- single-file app: the PWA manifest, icons and favicon are generated at runtime (see boot) -->
-<meta name="theme-color" content="#1b1d23" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-title" content="PixelPaint" />
-<style>
-  /* Embedded pixel UI font (Pixelify Sans, latin) — the app is single-file & offline, so the
-     font travels inside it rather than being fetched. woff2, ~20KB total. */
-  @font-face{font-family:'Pixelify Sans';font-style:normal;font-weight:400;font-display:swap;src:url(data:font/woff2;base64,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) format('woff2');}
-  @font-face{font-family:'Pixelify Sans';font-style:normal;font-weight:600;font-display:swap;src:url(data:font/woff2;base64,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) format('woff2');}
-  :root{
-    --bg:#1b1d23; --panel:#23262e; --panel2:#2b2f39; --line:#3a3f4b;
-    --text:#e6e8ee; --muted:#9aa1b1; --accent:#5b8cff; --accent2:#3a6bff;
-    --danger:#e0556a; --ok:#46c07a;
-  }
-  *{box-sizing:border-box;}
-  html,body{height:100%;margin:0;}
-  body{
-    background:var(--bg); color:var(--text);
-    font:13px/1.45 'Pixelify Sans','Segoe UI',system-ui,Roboto,Arial,sans-serif;
-    overflow:hidden; user-select:none;
-    overscroll-behavior:none; touch-action:manipulation; -webkit-tap-highlight-color:transparent;
-  }
-  #app{display:flex; flex-direction:column; height:100vh; height:100dvh;}
-
-  /* ---- top bar ---- */
-  .topbar{
-    display:flex; align-items:center; gap:7px 11px; flex-wrap:wrap;
-    padding:7px 12px; background:var(--panel); border-bottom:1px solid var(--line);
-    position:relative; z-index:3;   /* chrome always paints above the positioned canvas area */
-  }
-  .brand{font-weight:700; letter-spacing:.3px; font-size:15px; white-space:nowrap;}
-  .brand b{color:var(--accent);}   /* fallback: the per-letter hues below normally win */
-  /* The wordmark wears the app icon: "Pixel" takes the brush handle's blues, "Paint" its bristle
-     rainbow — a colour per letter, discrete rather than a gradient, and running left to right in
-     the order the icon reads. */
-  .brand em, .brand b i{font-style:normal;}
-  /* Handle blues, lit edge first. The handle's darkest tone (#2f5fd6) is left out: it manages only
-     2.7:1 against the top bar, where every step used here clears 4.5:1. The two blends fill the
-     gaps between the handle's own three tones. */
-  .brand em:nth-of-type(1){color:#eaf4ff;}   /* the handle's lit edge */
-  .brand em:nth-of-type(2){color:#cbe4ff;}
-  .brand em:nth-of-type(3){color:#a8d5ff;}   /* its light tone */
-  .brand em:nth-of-type(4){color:#7cb1fa;}
-  .brand em:nth-of-type(5){color:#4f8cf5;}   /* its blue */
-  /* Bristle rainbow. Orange is the one of the six left out: it sits closest to red, so dropping it
-     costs the least separation between letters. */
-  .brand b i:nth-of-type(1){color:#a445ff;}
-  .brand b i:nth-of-type(2){color:#3b7bff;}
-  .brand b i:nth-of-type(3){color:#17c06b;}
-  .brand b i:nth-of-type(4){color:#ffd23f;}
-  .brand b i:nth-of-type(5){color:#ff3b47;}
-
-  /* ---- light theme, shared with the main app (Settings ▸ View ▸ Light Theme) ---- */
-  body.light{--bg:#e9ebf0; --panel:#f7f8fa; --panel2:#eceef2; --line:#c9ced8; --text:#1b1d23; --muted:#5b6273; color-scheme:light;}
-  body.light .brand em{color:#2f5fd6 !important;}
-
-  /* ---- shared mode switch (mirrors the main app's top bar) ---- */
-  .mode-switch{display:flex; gap:2px; padding:2px; margin-left:auto; border:1px solid var(--line); border-radius:6px; background:var(--bg); flex:none;}
-  .mode-btn{display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:4px; color:var(--muted); text-decoration:none; white-space:nowrap;}
-  .mode-btn:hover{color:var(--text); background:var(--panel2);}
-  .mode-btn.on{background:var(--accent); color:#fff;}
-  @media (max-width: 900px){ .mode-btn span{display:none;} }
-
-  /* ---- tab bar ---- */
-  .tabbar{display:flex; align-items:flex-end; gap:4px; padding:6px 8px 0; background:var(--panel);
-    border-bottom:1px solid var(--line); overflow-x:auto; overflow-y:hidden; flex:none;
-    position:relative; z-index:3;}
-  .tabs{display:flex; align-items:flex-end; gap:4px; min-width:0;}
-  .tab{display:flex; align-items:center; gap:7px; max-width:170px; padding:7px 8px 7px 12px;
-    background:var(--panel2); border:1px solid var(--line); border-bottom:none;
-    border-radius:8px 8px 0 0; cursor:pointer; color:var(--muted); white-space:nowrap; font-size:12.5px;}
-  .tab:hover{background:#323744; color:var(--text);}
-  .tab.active{background:var(--bg); color:var(--text);}
-  .tab .tname{overflow:hidden; text-overflow:ellipsis; max-width:128px;}
-  .tab .tclose{display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
-    border-radius:5px; opacity:.65; flex:none;}
-  .tab .tclose:hover{background:var(--danger); color:#fff; opacity:1;}
-  .tab-add{align-self:center; min-height:30px; margin-bottom:5px; flex:none;}
-
-  /* ---- timeline (frames / playback / tags) ---- */
-  /* position+z-index so the timeline always wins against the canvas area, which is itself
-     positioned (see .stage) — without this the stage paints straight over these controls. */
-  .timeline{flex:none; background:var(--panel); border-top:1px solid var(--line); display:flex; flex-direction:column;
-    max-height:214px; position:relative; z-index:2;}
-  .tl-bar{display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:1px solid var(--line); flex-wrap:wrap; flex:none;}
-  #tlSummary{display:none; color:var(--muted); font-size:12px; cursor:pointer; white-space:nowrap;}
-  #tlSummary:hover{color:var(--text);}
-  .timeline.collapsed .tl-frames{display:none;}
-  .timeline.collapsed .tl-bar{border-bottom:none;}
-  .timeline.collapsed .tl-bar > *{display:none;}
-  .timeline.collapsed .tl-bar > #tlCollapseBtn{display:inline-flex;}
-  .timeline.collapsed .tl-bar > #tlSummary{display:inline-flex; align-items:center;}
-  .tl-bar .vsep{width:1px; height:22px; background:var(--line);}
-  .tl-bar .tl-grow{flex:1 1 12px;}
-  /* transport cluster: first / prev / play / next / last, kept tight together */
-  .tl-transport{display:inline-flex; align-items:center; gap:2px;}
-  .tl-transport .iconbtn{min-width:28px;}
-  .tl-transport #playBtn{min-width:34px;}
-  /* left-panel option buttons must not overflow the narrow tools rail */
-  #toolOpts button{max-width:100%; overflow:hidden;}
-  #toolOpts button span{overflow:hidden; text-overflow:ellipsis;}
-  /* ---- group tabs: pick which animation the strip shows / plays / exports ---- */
-  .tl-tabs{display:flex; align-items:center; gap:5px; padding:7px 10px 0; flex:none;
-    overflow-x:auto; overflow-y:hidden;}
-  .tl-tabs[hidden]{display:none;}
-  .timeline.collapsed .tl-tabs{display:none;}
-  .tl-tab{flex:none; gap:6px; height:28px; min-height:0; padding:0 10px; border-radius:8px;
-    color:var(--muted); font-size:12.5px;}
-  .tl-tab:hover{color:var(--text);}
-  .tl-tab.active{background:var(--accent2); border-color:var(--accent2); color:#fff; font-weight:600;}
-  .tl-tab .dot{width:8px; height:8px; border-radius:50%; flex:none;}
-  .tl-tab .n{font-size:10px; opacity:.75; font-variant-numeric:tabular-nums;}
-  .tl-field{display:flex; align-items:center; gap:6px;}
-  .tl-field .lbl{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;}
-  .tl-field .muted{color:var(--muted);}
-  .tl-field input[type=number]{width:60px;}
-  #playBtn.playing{background:var(--accent2); border-color:var(--accent2);}
-  /* ---- frame groups: each tagged run of frames gets its own labelled block ---- */
-  /* flex:1+min-height:0 so a crowded control bar squeezes (and scrolls) the frames strip rather
-     than the bar itself getting clipped by the timeline's max-height */
-  .tl-frames{display:flex; align-items:flex-start; gap:10px; padding:9px 10px; overflow:auto; flex:1 1 auto; min-height:0;
-    position:relative;}   /* the drop marker is positioned against this */
-  .tl-group{flex:none; display:flex; flex-direction:column; gap:5px; padding:5px 6px 6px;
-    border:1px solid var(--line); border-radius:9px; background:#0000002e;}
-  .tl-group.ungrouped{border-style:dashed;}
-  .tl-group.ungrouped .tl-ghead .gname{color:var(--muted); font-weight:500;}
-  .tl-ghead{display:flex; align-items:center; gap:5px; font-size:11px; line-height:1;}
-  .tl-ghead .dot{width:8px; height:8px; border-radius:50%; flex:none;}
-  .tl-ghead .gname{font-weight:600; max-width:118px; overflow:hidden; text-overflow:ellipsis;
-    white-space:nowrap; cursor:pointer;}
-  .tl-ghead .gname:hover{color:var(--accent);}
-  .tl-ghead .gcount{color:var(--muted); font-size:10px; font-variant-numeric:tabular-nums;}
-  .tl-ghead .gsp{flex:1; min-width:8px;}
-  .tl-ghead button{min-height:0; height:20px; min-width:20px; padding:0; border-radius:5px;}
-  .tl-gframes{display:flex; align-items:flex-start; gap:7px;}
-  .tl-frame{position:relative; flex:none; display:flex; flex-direction:column; align-items:center; gap:3px;
-    padding:4px; border:2px solid var(--line); border-radius:8px; background:var(--panel2); cursor:pointer;}
-  .tl-frame:hover{border-color:#56607a;}
-  .tl-frame.active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
-  /* the number doubles as the drag grip. touch-action:none only here, so dragging the thumbnail
-     still scrolls the strip on a phone — losing that would make a long strip painful to get around */
-  .tl-frame .tl-num{font-size:10px; color:var(--muted); line-height:1; cursor:grab;
-    padding:1px 7px; border-radius:4px; touch-action:none;}
-  .tl-frame .tl-num:hover{background:#ffffff18; color:var(--text);}
-  .tl-frame.drag-src{opacity:.32;}
-  .tl-drop{position:absolute; width:3px; border-radius:2px; background:var(--accent);
-    box-shadow:0 0 7px var(--accent); pointer-events:none; z-index:4;}
-  .tl-frame .tl-thumb{image-rendering:pixelated; display:block; border:1px solid #0006;
-    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 10px 10px;}
-  .tl-frame .tl-x{position:absolute; top:-7px; right:-7px; width:16px; height:16px; border-radius:50%;
-    background:var(--panel); border:1px solid var(--line); align-items:center; justify-content:center; color:var(--muted); display:none;}
-  .tl-frame:hover .tl-x{display:inline-flex;}
-  .tl-frame .tl-x:hover{background:var(--danger); color:#fff; border-color:var(--danger);}
-
-  /* ---- timeline grid: layers (rows) × frames (columns), tags as bars on top (Aseprite-style) ---- */
-  #tlFrames.tl-grid{display:block; padding:0; overflow:auto;}
-  .tlg{ --tlg-cw:30px; --tlg-lh:134px; --tlg-rh:25px; display:grid; align-content:start; grid-auto-rows:var(--tlg-rh);
-    font-size:11px; width:max-content; min-width:100%;}
-  /* min-width:0 keeps these column-1 items inside their fixed track — grid items default to
-     min-width:auto, which let the corner balloon past the layer column and cover the tag bar */
-  .tlg-corner{position:sticky; left:0; z-index:4; min-width:0; overflow:hidden; background:var(--panel); border-right:1px solid var(--line);}
-  .tlg-corner.tools{width:var(--tlg-lh); box-sizing:border-box; display:flex; align-items:center; padding:0 5px; border-bottom:1px solid var(--line);}
-  .tlg-ltools{display:flex; gap:3px; width:100%; min-width:0;}
-  .tlg-ltools .iconbtn{min-width:0; flex:1 1 0; width:0; height:21px; min-height:21px; padding:0; border-radius:3px; box-shadow:none;}
-  .tlg-ltools .iconbtn.danger-h:hover{background:var(--danger); border-color:var(--danger); color:#fff;}
-  /* tag bars sit in the top row, each spanning its frame columns */
-  .tlg-tagcell{display:flex; align-items:center; padding:0 1px;}
-  .tlg-tag{height:17px; width:100%; border-radius:3px; display:flex; align-items:center; justify-content:center; padding:0 6px; font-size:10px;
-    font-weight:600; color:#fff; overflow:hidden; white-space:nowrap; cursor:pointer; box-shadow:inset 0 0 0 1px #0005; text-shadow:0 1px 1px #0006;}
-  .tlg-tag.sel{outline:2px solid #ffffffcc; outline-offset:-2px;}
-  /* frame number header cells (also the drag grip to reorder) */
-  .tlg-num{height:var(--tlg-rh); display:flex; align-items:center; justify-content:center; color:var(--muted);
-    font-variant-numeric:tabular-nums; border-bottom:1px solid var(--line); border-left:1px solid #ffffff0d;
-    cursor:grab; position:sticky; top:0; background:var(--panel); z-index:2; touch-action:none;}
-  .tlg-num:hover{color:var(--text); background:#2b2f39;}
-  .tlg-num .tlg-del{position:absolute; top:0; right:0; width:14px; height:14px; display:none;
-    align-items:center; justify-content:center; color:var(--muted); background:#0007; border-bottom-left-radius:3px;}
-  .tlg-num:hover .tlg-del{display:flex;}
-  .tlg-num .tlg-del:hover{background:var(--danger); color:#fff;}
-  .tlg-num.inview{color:var(--text);}
-  .tlg-num.here{color:#fff; background:var(--accent2);}
-  .tlg-num.drag-src{opacity:.35;}
-  /* layer header cells down the left, sticky so they stay while frames scroll */
-  .tlg-lhead{position:sticky; left:0; z-index:3; min-width:0; display:flex; align-items:center; gap:5px; height:var(--tlg-rh);
-    padding:0 6px; background:var(--panel2); border-right:1px solid var(--line); border-bottom:1px solid #ffffff0d; cursor:pointer;}
-  .tlg-lhead:hover{background:#30343f;}
-  .tlg-lhead.active{background:#2b3f6b; box-shadow:inset 3px 0 0 var(--accent);}
-  .tlg-lhead .eye{width:17px; flex:none; display:inline-flex; opacity:.9; cursor:pointer; color:var(--text);}
-  .tlg-lhead .eye.off{opacity:.32;}
-  .tlg-lhead .eye:hover{color:var(--accent);}
-  .tlg-lhead .lock{width:14px; flex:none; display:inline-flex; opacity:.3; cursor:pointer;}
-  .tlg-lhead .lock.on{opacity:1; color:var(--accent);}
-  .tlg-lhead .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  /* the cel cells */
-  .tlg-cell{height:var(--tlg-rh); border-bottom:1px solid #ffffff0d; border-left:1px solid #ffffff0d;
-    display:flex; align-items:center; justify-content:center; cursor:pointer;}
-  .tlg-cell.col, .tlg-cell.rowsel{background:#ffffff09;}
-  .tlg-cell.inview{background:#5b8cff12;}
-  .tlg-cell:hover{background:#ffffff17;}
-  .tlg-cell.here{background:#2b3f6b; box-shadow:inset 0 0 0 1px var(--accent);}
-  .tlg-dot{width:9px; height:9px; border-radius:50%;}
-  .tlg-dot.full{background:#cfd6e6; box-shadow:0 0 0 1px #0007;}
-  .tlg-dot.empty{box-shadow:inset 0 0 0 1px #ffffff26;}
-  .tlg-drop{position:absolute; width:3px; border-radius:2px; background:var(--accent); box-shadow:0 0 7px var(--accent); pointer-events:none; z-index:6;}
-
-  /* ---- tilesheet panel ---- */
-  .ts-sum{color:var(--muted); font-size:11.5px; margin:0 0 5px;}
-  .ts-pick{display:flex; align-items:center; gap:6px; color:var(--accent); font-size:12px;
-    font-weight:600; margin:0 0 9px; overflow:hidden;}
-  .ts-pick span:last-child{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .ts-pick svg{flex:none; opacity:.85;}
-  /* the four inserts sit where they act: row above on top, columns either side, row below beneath */
-  .ts-pad{display:grid; grid-template-columns:1fr 1fr; grid-template-areas:"up up" "left right" "down down";
-    gap:6px; margin-top:9px;}
-  .ts-pad .ts-up{grid-area:up;} .ts-pad .ts-left{grid-area:left;}
-  .ts-pad .ts-right{grid-area:right;} .ts-pad .ts-down{grid-area:down;}
-  .ts-pad button{font-size:11px; color:var(--muted);}
-  .ts-pad button:not(:disabled):hover{color:var(--text);}
-  .ts-lb{font-size:11px;}
-  button:disabled{opacity:.42; cursor:default;}
-  button:disabled:hover{border-color:var(--line); background:var(--panel2);}
-
-  /* ---- sub-canvas panel ---- */
-  .rg-row{display:flex; align-items:center; gap:6px; margin-bottom:8px;}
-  .rg-row:last-child{margin-bottom:0;}
-  .rg-lbl{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; width:34px; flex:none;}
-  .rg-row input[type=number]{width:58px;}
-  .rg-x{color:var(--muted);}
-  .group{display:flex; align-items:center; gap:6px;}
-  .sep{width:1px; height:24px; background:var(--line);}
-  label.lbl{color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px;}
-  button, select, input{font:inherit; color:var(--text);}
-  button{
-    background:var(--panel2); border:1px solid var(--line); border-radius:8px;
-    padding:0 12px; min-height:32px; cursor:pointer; transition:.08s; white-space:nowrap;
-    display:inline-flex; align-items:center; justify-content:center; gap:6px; font-weight:500;
-  }
-  button svg{flex:none;}
-  .iconbtn{padding:0; min-width:32px;}   /* square icon-only buttons (zoom, brush +/-) */
-  button:hover{border-color:var(--accent); background:#323744;}
-  button:active{transform:translateY(1px);}
-  button.primary{background:var(--accent2); border-color:var(--accent2);}
-  button.primary:hover{background:var(--accent);}
-  select, input[type=number], input[type=text]{
-    background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:0 9px; height:32px;
-  }
-  select:hover, input[type=text]:hover, input[type=number]:hover{border-color:#4c5366;}
-  input[type=number]{width:54px;}
-
-  /* ---- main ---- */
-  .main{flex:1; display:flex; min-height:0;}
-  .tools{
-    width:156px; flex:none; background:var(--panel); border-right:1px solid var(--line);
-    padding:10px; display:flex; flex-direction:column; gap:6px; overflow-y:auto; overflow-x:hidden;
-    position:relative; z-index:1;
-  }
-  .tools .group{max-width:100%;}
-  .tool{
-    display:flex; align-items:center; justify-content:flex-start; gap:8px; text-align:left; width:100%;
-  }
-  .tool.active{background:var(--accent2); border-color:var(--accent2);}
-  .tool::after{
-    content:attr(data-key); margin-left:auto; font-size:10px; font-weight:700;
-    color:var(--muted); background:#1a1d24; border:1px solid var(--line);
-    border-radius:4px; padding:1px 5px; line-height:1.45;
-  }
-  .tool.active::after{color:#fff; border-color:#ffffff55; background:#ffffff22;}
-  .toolhead{color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin:9px 2px 2px;
-    display:flex; align-items:center; gap:5px;}
-  .toolhead svg{opacity:.8;}   /* these are 10px eyebrow labels — the icon stays subordinate */
-  .toolhead:first-child{margin-top:0;}
-
-  /* z-index:0 makes the stage a stacking context, so #placeOverlay (20) and .place-bar (30)
-     stay *inside* the canvas area instead of floating over the timeline / side panel / status bar. */
-  .stage{
-    flex:1; min-width:0; min-height:0; overflow:auto; display:flex;
-    padding:24px; position:relative; z-index:0; background:
-      radial-gradient(circle at 50% 0%, #20232b, var(--bg));
-  }
-  /* Centred with auto margins instead of align-items/justify-content:center. Flex *centring*
-     makes overflow above/left of the box unreachable, so you could never scroll to the top-left
-     of a canvas zoomed bigger than the stage; auto margins collapse to 0 when space runs out. */
-  .stage > .canvas-wrap{margin:auto; flex:none;}
-  .stage.dragging{outline:3px dashed var(--accent); outline-offset:-12px; background:#222838;}
-  .stage.panning{cursor:grabbing;}   /* the canvas itself is set from JS — a child cursor wins */
-  .place-bar{
-    position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:30;
-    display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px; background:var(--panel);
-    border:1px solid var(--line); border-radius:10px; padding:7px 9px; box-shadow:0 12px 34px #000a;
-    /* An absolute box with left:50% and no right shrinks to fit *half* the stage, so the bar was
-       capped at 505px on a 1010px stage: past that, flex squeezed the readout to 35px and wrapped
-       its text over three lines. max-content takes the width the buttons actually need, and the
-       wrap keeps it in tidy rows when the stage really is too narrow for one. */
-    width:max-content; max-width:calc(100% - 28px);
-  }
-  .place-bar[hidden]{display:none;}
-  /* The bar floats over the stage at z-index 30, so anything it covers can't be grabbed — including
-     the handles of a box near the top of the canvas. It moves out of their way (see
-     positionPlaceBar) rather than quietly eating the clicks. */
-  .place-bar.low{top:auto; bottom:14px;}
-  .place-bar .info{color:var(--muted); font-size:12px; margin:0 4px; display:flex; align-items:center; gap:5px;
-    font-variant-numeric:tabular-nums; white-space:nowrap;}
-  .place-bar .info svg{color:var(--accent);}
-  /* a pressed-in look for the toggles in this bar, distinct from .primary's call to action */
-  .place-bar button.on{background:#2b3f6b; border-color:var(--accent2); color:#dce6ff;}
-  .place-bar button.on svg{color:var(--accent);}
-  .canvas-wrap{
-    box-shadow:0 8px 30px #0008, 0 0 0 1px #0006;
-    image-rendering:pixelated;
-    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 20px 20px;
-  }
-  #view{display:block; image-rendering:pixelated; cursor:crosshair; touch-action:none;}
-  /* full-stage overlay for placing/resizing a pasted image — lets handles live in the gray "no man's land" */
-  #placeOverlay{position:absolute; inset:0; z-index:20; pointer-events:none; touch-action:none;}
-  #placeOverlay[hidden]{display:none;}
-  #placeOverlay.active{pointer-events:auto;}
-
-  .side{
-    width:252px; flex:none; background:var(--panel); border-left:1px solid var(--line);
-    display:flex; flex-direction:column; min-height:0; overflow-y:auto;
-    position:relative; z-index:1;
-    scrollbar-gutter:stable;   /* reserve the scrollbar track so controls never sit under it */
-  }
-  .section{padding:12px 14px; border-bottom:1px solid var(--line);}
-  .section h3{margin:0 0 10px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);
-    display:flex; align-items:center; gap:7px;}   /* flex so the header's icon rides the text's centre line */
-  /* Section headers pin to the top of the side panel while their body scrolls under them.
-     Negative margins pull the sticky strip out to the section edges so nothing shows through
-     beside it; the matching padding puts the text back where it was. */
-  @media (min-width: 769px){
-    .side .section > h3{position:sticky; top:0; z-index:5; background:var(--panel);
-      margin:-12px -14px 9px; padding:12px 14px 9px;}
-    .side .section.collapsed > h3.sec-h{margin-bottom:-12px;}
-  }
-  /* ---- desktop: fold a whole dock away (View menu) so the canvas can have the window ---- */
-  @media (min-width: 769px){
-    body.hide-tools #toolPanel{display:none;}
-    body.hide-side  #sidePanel{display:none;}
-    body.hide-anim  #timeline{display:none;}
-  }
-  @media (max-width: 768px){ .dd-docks{display:none;} }   /* on mobile these are already tabs */
-
-  /* ---- mobile: Color / Layers / Animation become tabs, and the strip pins to the top ---- */
-  .panel-tabs{display:none; gap:5px; padding:8px 10px; position:sticky; top:0; z-index:6;
-    background:var(--panel); border-bottom:1px solid var(--line);}
-  .panel-tabs .ptab{flex:1 1 0; min-width:0; gap:5px; height:36px; min-height:36px;
-    padding:0 6px; border-radius:8px; font-size:12.5px; color:var(--muted);}
-  .panel-tabs .ptab.active{background:var(--accent2); border-color:var(--accent2); color:#fff; font-weight:600;}
-  /* button{display:inline-flex} above is an author rule, so it beats the UA sheet's [hidden] —
-     the Tiles tab has to be told to stay away while there's no grid */
-  .panel-tabs .ptab[hidden]{display:none;}
-
-  .colorrow{display:flex; align-items:center; gap:10px;}
-  .dualswatch{position:relative; width:66px; height:60px; flex:none;}
-  .dualswatch .sw{position:absolute; width:34px; height:34px; border-radius:8px;
-    border:2px solid #0007; box-shadow:0 1px 4px #0007; cursor:pointer;}
-  #primarySwatch{left:0; top:0; z-index:2;}
-  #secondarySwatch{right:0; bottom:0; z-index:1;}    /* (32..66, 26..60) — clear of the swap button */
-  .dualswatch .sw.active{outline:2px solid var(--accent); outline-offset:1px; z-index:3;}
-  .swap{position:absolute; right:0; top:0; z-index:4; width:22px; height:22px;
-    min-width:0; min-height:0; padding:0; border-radius:6px;}
-  .colorrow .col{display:flex; flex-direction:column; gap:6px; flex:1; min-width:0;}
-  .hexrow{display:flex; gap:6px; align-items:center;}
-  .hexrow #hexInput{flex:1; min-width:0;}
-  .hexrow .iconbtn{flex:none;}
-  /* the docked picker sits under the swatch row */
-  /* Keep a usable, colour-bearing floor: in the docked side panel the flex column would otherwise
-     squeeze the picker to a 2px sliver on short screens, which reads as a meaningless grey bar. */
-  #colorSection .cp-sv{margin-top:10px; height:150px; min-height:96px;}
-  .recents{display:flex; flex-wrap:wrap; gap:4px; margin-top:8px; min-height:18px;}
-  .recents .rc{width:18px; height:18px; border-radius:4px; border:1px solid #0006; cursor:pointer;}
-
-  .palette{display:grid; grid-template-columns:repeat(auto-fill, minmax(22px,1fr)); gap:5px; margin-top:10px; max-height:176px; overflow:auto; padding:5px;}
-  .palette .sw{width:100%; aspect-ratio:1; border-radius:5px; border:1px solid #0006; cursor:pointer; position:relative;}
-  .palette .sw:hover{outline:2px solid var(--accent); outline-offset:1px; z-index:1;}
-  /* ---- editable (user-owned) palettes: per-swatch remove badge ---- */
-  .palette.editable .sw .swx{
-    position:absolute; top:-4px; right:-4px; width:14px; height:14px; border-radius:50%;
-    background:var(--panel); border:1px solid var(--line); color:var(--muted);
-    display:none; align-items:center; justify-content:center; z-index:2;
-  }
-  .palette.editable .sw:hover .swx{display:inline-flex;}
-  .palette.editable .sw .swx:hover{background:var(--danger); border-color:var(--danger); color:#fff;}
-  .palette .pal-empty{grid-column:1/-1; color:var(--muted); font-size:11px; line-height:1.5; padding:4px 2px;}
-
-  /* ---- themed color picker (replaces the off-theme OS <input type=color> dialog) ---- */
-  .cp-swatch{
-    height:32px; width:100%; padding:0; border:1px solid var(--line); border-radius:8px;
-    cursor:pointer; background:#000; min-height:32px;
-  }
-  .cp-swatch:hover{border-color:var(--accent);}
-  .cp-pop{
-    position:fixed; z-index:1300; width:238px; background:var(--panel);
-    border:1px solid var(--line); border-radius:11px; padding:11px;
-    box-shadow:0 18px 50px #000c; animation:modalIn .12s ease;
-  }
-  .cp-pop[hidden]{display:none;}
-  .cp-sv{position:relative; height:132px; border-radius:8px; border:1px solid var(--line);
-    cursor:crosshair; touch-action:none; margin-bottom:10px;}
-  .cp-hue{position:relative; height:14px; min-height:14px; flex-shrink:0; border-radius:7px; border:1px solid var(--line);
-    cursor:ew-resize; touch-action:none; margin-bottom:10px;
-    background:linear-gradient(to right,#f00 0%,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00 100%);}
-  .cp-dot{position:absolute; width:13px; height:13px; border-radius:50%; border:2px solid #fff;
-    box-shadow:0 0 0 1px #0009, 0 1px 5px #000a; transform:translate(-50%,-50%); pointer-events:none;}
-  .cp-hue .cp-dot{top:50%;}
-  .cp-row{display:flex; align-items:center; gap:7px; margin-bottom:9px;}
-  .cp-prev{width:32px; height:32px; flex:none; border-radius:7px; border:1px solid var(--line);}
-  .cp-row input[type=text]{flex:1; min-width:0; text-transform:uppercase;}
-  .cp-row button{min-width:34px; padding:0; flex:none;}
-  .cp-rgb{display:flex; gap:6px; margin-bottom:10px;}
-  .cp-rgb label{flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center; gap:3px;
-    color:var(--muted); font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;}
-  .cp-rgb input{width:100%; text-align:center; padding:0 3px;}
-
-  .layers{flex:1 0 auto; min-height:0; display:flex; flex-direction:column;}
-  .layers .bar{display:flex; gap:6px; padding:10px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap;}
-  .layers .bar button{flex:1; min-width:34px;}
-  .layerlist{flex:1; overflow:auto; padding:10px; min-height:150px; max-height:360px;}
-  .layer{
-    display:flex; align-items:center; gap:9px; padding:8px 9px; border:1px solid var(--line);
-    border-radius:9px; margin-bottom:7px; background:var(--panel2); cursor:pointer;
-  }
-  .layer.active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
-  .layer .eye{width:24px; text-align:center; cursor:pointer; opacity:.9;}
-  .layer .eye.off{opacity:.3;}
-  .layer .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .layer .op{width:62px;}
-  .layer .thumb{width:28px; height:28px; border-radius:4px; image-rendering:pixelated;
-    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 8px 8px; border:1px solid #0006;}
-
-  .statusbar{
-    display:flex; gap:18px; align-items:center; padding:5px 12px;
-    background:var(--panel); border-top:1px solid var(--line); color:var(--muted); font-size:12px;
-    position:relative; z-index:2;   /* stay above the positioned canvas area */
-  }
-  .statusbar .sp{flex:1;}
-  .hint{color:var(--muted); font-size:10px; line-height:1.4; margin-top:auto; padding-top:8px;}
-  input[type=range]{width:100%; accent-color:var(--accent);}
-  .chk{display:flex; align-items:center; gap:6px; color:var(--muted); cursor:pointer; user-select:none;}
-
-  /* ---- UI polish ---- */
-  *{scrollbar-width:thin; scrollbar-color:#3a3f4b transparent;}
-  ::-webkit-scrollbar{width:11px; height:11px;}
-  ::-webkit-scrollbar-thumb{background:#3a3f4b; border:3px solid var(--panel); border-radius:8px;}
-  ::-webkit-scrollbar-thumb:hover{background:#4c5366;}
-  ::-webkit-scrollbar-track{background:transparent;}
-  button, select, input, .layer, .recents .rc, .dualswatch .sw, .palette .sw{
-    transition:background .1s, border-color .1s, box-shadow .1s, transform .06s;
-  }
-  :focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
-  button:focus-visible, .tool:focus-visible{outline-offset:1px;}
-  button:disabled, button[disabled]{opacity:.38; cursor:default; pointer-events:none; box-shadow:none;}
-  button.primary{box-shadow:0 2px 10px -3px var(--accent2);}
-  /* A destructive button is usually .primary too, and .primary owns the glow — so without this it
-     lights up accent-blue under a red face. The compound selector wins whatever the source order. */
-  button.danger{background:var(--danger); border-color:var(--danger); color:#fff;}
-  button.danger:hover{background:#ec6a7c; border-color:#ec6a7c;}
-  button.danger, button.primary.danger{box-shadow:0 2px 10px -3px var(--danger);}
-  .tool.active{box-shadow:0 3px 12px -3px var(--accent2);}
-  .layer:hover{border-color:#56607a; background:#30343f;}
-  .layer .eye{transition:color .1s, opacity .1s;}
-  .layer .eye:hover{color:var(--accent);}
-  .recents .rc:hover{transform:scale(1.15); outline:2px solid var(--accent); outline-offset:1px;}
-  .dualswatch .sw:hover{box-shadow:0 3px 9px #000b;}
-  .swap:hover{background:var(--accent2); border-color:var(--accent2);}
-  #installBtn{background:var(--ok); border-color:var(--ok); box-shadow:0 2px 10px -3px var(--ok);}
-  #installBtn:hover{background:#54d089; border-color:#54d089;}
-
-  /* themed modal */
-  .modal-root{position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;}
-  .modal-root[hidden]{display:none;}
-  .modal-backdrop{position:absolute; inset:0; background:#0009;}
-  .modal-card{
-    position:relative; width:min(380px,92vw); background:var(--panel);
-    border:1px solid var(--line); border-radius:12px; padding:18px 18px 15px;
-    box-shadow:0 20px 60px #000b; animation:modalIn .15s ease;
-  }
-  .modal-card h3{margin:0 0 9px; font-size:15px;}
-  .modal-card p{margin:0 0 15px; color:var(--muted); font-size:13px; line-height:1.55; white-space:pre-wrap;}
-  .modal-card p:empty{display:none;}
-  .modal-card #modalInput{width:100%; margin:0 0 15px;}
-  .modal-card #modalBody{margin:0 0 15px;}
-  .modal-card #modalBody:empty{display:none;}
-  .modal-card #modalBody .row{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
-  .modal-card #modalBody .row:last-child{margin-bottom:0;}
-  .modal-card #modalBody .row > label:not(.chk){color:var(--muted); width:78px; flex:none;}
-  .modal-card #modalBody .row > .chk{flex:1; min-width:0; color:var(--text);}
-  .modal-card #modalBody .row > .chk input{flex:none;}
-  .modal-card #modalBody select{flex:1; min-width:0;}
-  .modal-card #modalBody input[type=number]{width:72px;}
-  .modal-card.mid{width:min(510px,94vw);}
-  .modal-card.wide{width:min(780px,95vw);}
-  .modal-actions{display:flex; justify-content:flex-end; gap:8px;}
-
-  /* ---- help / shortcuts sheet ---- */
-  .modal-card.wide #modalBody{max-height:min(66vh,560px); overflow:auto; margin-right:-6px; padding-right:6px;}
-  .help-grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px 22px;}
-  .help-sec h4{
-    display:flex; align-items:center; gap:7px; margin:0 0 6px;
-    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--muted);
-  }
-  .help-sec h4 svg{opacity:.8;}
-  .help-row{display:flex; align-items:center; gap:9px; padding:3px 0; min-height:24px;}
-  .help-row .ic{flex:none; width:16px; display:inline-flex; justify-content:center; color:var(--muted);}
-  .help-row .lb{flex:1; min-width:0; font-size:12.5px;}
-  .help-row .ks{display:flex; align-items:center; gap:3px; flex:none;}
-  .kbd{
-    display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px;
-    padding:0 6px; background:var(--panel2); border:1px solid var(--line); border-bottom-width:2px;
-    border-radius:5px; color:var(--text); font-size:11px; font-weight:700; line-height:1;
-    font-variant-numeric:tabular-nums; white-space:nowrap;
-  }
-  .kbd.wide{font-weight:600; font-size:10.5px; text-transform:none;}
-  .ks .plus{color:var(--muted); font-size:10px;}
-  @media (max-width: 860px){ .help-grid{grid-template-columns:repeat(2,minmax(0,1fr));} }
-  @media (max-width: 620px){ .help-grid{grid-template-columns:1fr; gap:14px;} }
-
-  /* ---- spritesheet import: background swatches + a clickable preview ---- */
-  .shi-sw{display:flex; flex-wrap:wrap; align-items:center; gap:5px; flex:1; min-width:0;}
-  .shi-sw .sw{width:24px; height:24px; border-radius:5px; border:1px solid var(--line);
-    cursor:pointer; position:relative;}
-  .shi-sw .sw::after{content:"×"; position:absolute; inset:0; display:none; align-items:center;
-    justify-content:center; color:#fff; font-weight:700; font-size:14px; text-shadow:0 0 3px #000;}
-  .shi-sw .sw:hover{outline:2px solid var(--danger); outline-offset:1px;}
-  .shi-sw .sw:hover::after{display:flex;}
-  .shi-sw .none{color:var(--muted); font-size:12px;}
-  .shi-prev{flex:1; min-width:0; max-height:190px; overflow:auto;
-    border:1px solid var(--line); border-radius:8px;
-    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 16px 16px;}
-  .shi-prev canvas{display:block; width:100%; height:auto; image-rendering:pixelated; cursor:crosshair;}
-  .shi-hint{color:var(--muted); font-size:11px; line-height:1.45;}
-  /* A packed sheet is as likely to be square as wide, so the preview fits inside a fixed box
-     rather than filling the width the way the (always wide) spritesheet import preview does. */
-  .pk-prev{display:flex; align-items:center; justify-content:center; flex:1; min-width:0;
-    height:206px; padding:6px; overflow:hidden; border:1px solid var(--line); border-radius:8px;
-    background:var(--panel2);}
-  /* The checkerboard sits on the canvas, not the box, and the canvas is sized in script to the
-     sheet's aspect — so what you see checkered is exactly the sheet, edges and all. */
-  .pk-prev canvas{image-rendering:pixelated; display:block; box-shadow:0 0 0 1px #ffffff2e;
-    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 16px 16px;}
-  /* what went into the pack, as chips — a plain list of 400 names would bury the dialog */
-  .pk-list{display:flex; flex-wrap:wrap; gap:4px; flex:1; min-width:0; max-height:82px; overflow:auto;}
-  .pk-i{font-size:10.5px; color:var(--muted); background:var(--panel2); border:1px solid var(--line);
-    border-radius:5px; padding:2px 6px; white-space:nowrap;}
-  .pk-i.more{color:var(--accent); border-color:var(--accent);}
-
-  /* ---- pseudo-3D (voxel) dialog ---- */
-  .vx-wrap{display:flex; gap:12px;}
-  .vx-prev{position:relative; flex:1; min-width:0; height:230px; display:flex; align-items:center; justify-content:center;
-    border:1px solid var(--line); border-radius:8px; overflow:hidden; touch-action:none; cursor:grab;
-    background:repeating-conic-gradient(#3a3f4b 0% 25%, #2b2f39 0% 50%) 0 0 / 18px 18px;}
-  .vx-prev:active{cursor:grabbing;}
-  .vx-prev canvas{image-rendering:pixelated;}
-  .vx-drag{position:absolute; bottom:5px; right:7px; font-size:10px; color:var(--muted); pointer-events:none;}
-  .vx-ctl{width:236px; flex:none; display:flex; flex-direction:column; gap:8px;}
-  .vx-ctl .row{display:flex; align-items:center; gap:8px;}
-  .vx-ctl .row > label:first-child{width:56px; flex:none; color:var(--muted); font-size:11px;}
-  .vx-dirs{display:grid; grid-template-columns:repeat(8,1fr); gap:3px; margin-top:2px;}
-  .vx-dir{width:100%; height:auto; image-rendering:pixelated; background:#0003; border:1px solid var(--line); border-radius:3px; cursor:pointer;}
-  .vx-dir:hover{border-color:#56607a;}
-  .vx-dir.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
-  .st-wrap{display:flex; gap:12px;}
-  .st-view{position:relative; flex:1; min-width:0; height:420px; display:flex; align-items:center; justify-content:center;
-    background:var(--panel); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; touch-action:none;}
-  .st-view canvas{image-rendering:pixelated; cursor:crosshair;}
-  .st-hint{position:absolute; bottom:5px; right:7px; font-size:10px; color:var(--muted); pointer-events:none;}
-  .st-side{width:210px; flex:none; display:flex; flex-direction:column; gap:10px;}
-  .st-side .row{display:flex; align-items:center; gap:8px;}
-  .st-side .row > label:first-child{width:56px; flex:none; color:var(--muted); font-size:11px;}
-  .st-tools{display:flex; gap:4px;}
-  .st-tool{flex:1; padding:6px 0;}
-  .st-tool.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
-  .st-swatch{width:20px; height:20px; border-radius:3px; border:1px solid var(--line); display:inline-block;}
-  .st-tabs{display:flex; gap:4px; margin-bottom:8px;}
-  .st-mode{flex:1; padding:6px 0;}
-  .st-mode.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
-  .st-side .row{margin-top:6px;}
-  .st-bones{display:flex; flex-direction:column; gap:3px; max-height:150px; overflow:auto;}
-  .st-bone{display:flex; align-items:center; gap:6px; padding:4px 6px; border:1px solid var(--line); border-radius:var(--r); cursor:pointer; font-size:12px;}
-  .st-bone.on{border-color:var(--accent); background:var(--panel);}
-  .st-bdot{width:11px; height:11px; border-radius:2px; border:1px solid var(--line); flex:none;}
-  .st-keys{display:flex; flex-wrap:wrap; gap:3px;}
-  .st-key{width:26px; height:24px; padding:0;}
-  .st-key.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
-
-  /* ---- open recent ---- */
-  .rc-list{display:flex; flex-direction:column; gap:5px; max-height:min(52vh,330px); overflow:auto; margin-bottom:9px;}
-  .rc-i{display:flex; align-items:center; gap:10px; padding:6px 8px; background:var(--panel2);
-    border:1px solid var(--line); border-radius:8px; cursor:pointer; text-align:left; width:100%;}
-  .rc-i:hover{border-color:var(--accent);}
-  .rc-th{flex:0 0 44px; width:44px; height:44px; display:flex; align-items:center; justify-content:center;
-    border-radius:6px; overflow:hidden; color:var(--muted);
-    background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 11px 11px;}
-  .rc-th.none{background:var(--panel);}
-  /* blown up to fill the box, pixels kept square: a 8 px sprite is recognisable at 44 px, and
-     nothing is stretched out of shape on the way */
-  .rc-th img{width:100%; height:100%; object-fit:contain; image-rendering:pixelated;}
-  .rc-tx{flex:1; min-width:0;}
-  .rc-nm{display:block; font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .rc-mt{display:block; font-size:10.5px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .rc-x{flex:none; width:22px; height:22px; display:flex; align-items:center; justify-content:center;
-    border-radius:5px; color:var(--muted);}
-  .rc-x:hover{background:#ffffff14; color:var(--danger);}
-  .rc-empty{padding:20px 12px; text-align:center; color:var(--muted); font-size:12px; line-height:1.5;
-    border:1px dashed var(--line); border-radius:8px;}
-  .rc-foot{display:flex; align-items:center; gap:8px;}
-  .rc-note{flex:1; min-width:0; color:var(--muted); font-size:10.5px; line-height:1.4;}
-  /* cache-is-not-a-backup warning at the top of Open recent */
-  .rc-warn{display:flex; gap:9px; align-items:flex-start; margin-bottom:11px; padding:9px 11px;
-    border:1px solid #caa53f55; background:#caa53f1f; border-radius:var(--r,3px);
-    color:#e7d6a3; font-size:11.5px; line-height:1.5;}
-  .rc-warn b{color:#fff2cf;}
-  .rc-warn-ic{flex:none; color:#e0be5a; margin-top:1px;}
-
-  /* ---- about sheet ---- */
-  .about-head{display:flex; align-items:center; gap:14px; margin-bottom:14px;}
-  .about-icon{flex:none; image-rendering:pixelated;}   /* transparent, as the icon is everywhere else */
-  .about-tag{font-size:13px; margin-bottom:3px;}
-  .about-ver{color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums;}
-
-  /* ---- contact / suggestions ---- */
-  .ct-lead{font-size:13px; margin-bottom:10px;}
-  .ct-card{display:flex; align-items:center; gap:12px; padding:11px 12px 11px 14px; text-decoration:none;
-    color:inherit; background:var(--panel2); border:1px solid var(--line); border-radius:10px;}
-  .ct-card:hover{border-color:var(--accent); background:#5b8cff14;}
-  .ct-ic{flex:none; width:34px; height:34px; display:flex; align-items:center; justify-content:center;
-    border-radius:9px; color:#fff; background:linear-gradient(135deg,var(--accent),var(--accent2));}
-  .ct-addr{flex:1; min-width:0; font-size:15px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .ct-copy{flex:none;}
-  .ct-quick{display:flex; gap:8px; margin-top:10px;}
-  .ct-btn{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:7px;
-    padding:8px 10px; font-size:12.5px; text-decoration:none; color:var(--text);
-    background:var(--panel2); border:1px solid var(--line); border-radius:8px;}
-  .ct-btn svg{opacity:.75;}
-  .ct-btn:hover{border-color:var(--accent);}
-  .ct-btn.danger:hover{border-color:var(--danger); color:var(--danger);}
-  .ct-btn.danger:hover svg{opacity:1;}
-
-  /* the tools rail's tips moved into that sheet; this is all that's left in their place */
-  .helpbtn{width:100%; margin-top:auto;}
-  @keyframes modalIn{from{opacity:0; transform:translateY(10px) scale(.98);} to{opacity:1; transform:none;}}
-
-  /* themed toasts */
-  .toast-root{position:fixed; left:50%; bottom:48px; transform:translateX(-50%);
-    z-index:1100; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
-  .toast{
-    pointer-events:auto; display:flex; align-items:center; gap:9px; max-width:82vw;
-    background:var(--panel2); color:var(--text); border:1px solid var(--line);
-    border-left:4px solid var(--accent); border-radius:9px; padding:9px 14px; font-size:13px;
-    box-shadow:0 10px 30px #0008; animation:toastIn .18s ease;
-  }
-  .toast.error{border-left-color:var(--danger);}
-  .toast.success{border-left-color:var(--ok);}
-  .toast.error svg{color:var(--danger);} .toast.success svg{color:var(--ok);} .toast.info svg{color:var(--accent);}
-  @keyframes toastIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
-  @media (prefers-reduced-motion: reduce){ .modal-card,.toast{animation:none;} }
-
-  /* image right-click menu */
-  .ctx-menu{
-    position:fixed; z-index:1200; min-width:184px; background:var(--panel);
-    border:1px solid var(--line); border-radius:9px; padding:5px; box-shadow:0 16px 44px #000c;
-  }
-  .ctx-menu[hidden]{display:none;}
-  .ctx-menu button{
-    display:flex; width:100%; justify-content:flex-start; align-items:center;
-    background:transparent; border:none; border-radius:6px; padding:7px 10px; min-height:0;
-    color:var(--text); font-size:13px;
-  }
-  .ctx-menu button:hover{background:var(--panel2); border:none;}
-  .ctx-sep{height:1px; background:var(--line); margin:5px 4px;}
-  .ctx-sep + .ctx-sep{display:none;}          /* never draw a doubled divider */
-  .ctx-sep:first-child, .ctx-sep:last-child{display:none;}
-
-  /* tighten chrome on smaller windows so the canvas keeps room */
-  @media (max-width: 1100px){
-    .topbar{gap:6px 9px; padding:7px 10px;}
-    .sep{display:none;}
-    .tools{width:138px; padding:9px;}
-    .side{width:236px;}
-    .stage{padding:16px;}
-  }
-  @media (max-width: 900px){
-    .brand{font-size:14px;}
-    .tools{width:126px;}
-    .side{width:216px;}
-    .tool::after{display:none;}        /* drop the keyboard-hint badge to save width */
-    label.lbl{display:none;}
-  }
-  @media (max-width: 720px){
-    .hint{display:none;}
-    .section{padding:10px 11px;}
-    .stage{padding:10px;}
-    .layers .bar{padding:8px 10px;}
-  }
-  @media (max-width: 600px){
-    .topbar{padding:6px 8px;}
-  }
-
-  /* ---- mobile: the tool + color/layer panels become popout drawers ---- */
-  .drawer-btn{display:none;}
-  .panel-backdrop{position:fixed; inset:0; background:#000a; z-index:490;
-    opacity:0; pointer-events:none; transition:opacity .18s;}
-  .panel-backdrop.show{opacity:1; pointer-events:auto;}
-  @media (max-width: 768px){
-    .drawer-btn{display:inline-flex;}
-    .tools{
-      position:fixed; left:0; top:0; bottom:0; z-index:500; width:min(76vw,250px);
-      transform:translateX(-106%); transition:transform .22s ease;
-      box-shadow:14px 0 40px #000a; border-right:1px solid var(--line);
-      padding-bottom:max(12px, env(safe-area-inset-bottom));
-    }
-    .tools.open{transform:none;}
-    .side{
-      position:fixed; right:0; top:0; bottom:0; z-index:500; width:min(86vw,310px);
-      transform:translateX(106%); transition:transform .22s ease;
-      box-shadow:-14px 0 40px #000a; border-left:1px solid var(--line);
-      padding-bottom:max(0px, env(safe-area-inset-bottom));
-    }
-    .side.open{transform:none;}
-    .layerlist{max-height:none;}
-
-    /* single, clean top row — nothing wraps */
-    .topbar{flex-wrap:nowrap; overflow-x:auto; gap:6px; padding:6px 8px;}
-    .topbar .sep{display:none;}
-    .topbar .group{gap:6px;}
-    .brand{font-size:14px;}
-    .btxt{display:none;}                          /* Undo / Redo become icon-only */
-    #undoBtn, #redoBtn{padding:0; min-width:42px;}
-
-    /* compact timeline: one scrollable control row, frames strip never clipped */
-    .timeline{max-height:none;}
-    .tl-bar{flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; gap:6px; padding:6px 8px;}
-    .tl-bar .lbl, .tl-bar .vsep{display:none;}
-    .tl-field input[type=number]{width:58px;}
-    .tl-frames{padding:8px;}
-
-    .statusbar{gap:10px; padding-bottom:max(5px, env(safe-area-inset-bottom));}
-    .place-bar{max-width:96vw; flex-wrap:wrap; justify-content:center;}
-    .toast{max-width:92vw;}
-  }
-  @media (max-width: 374px){ .brand{display:none;} }   /* keep the single row on tiny phones */
-  @media (prefers-reduced-motion: reduce){ .tools,.side,.panel-backdrop{transition:none;} }
-
-  /* ============================================================= redesign */
-  /* ---- menu bar (File / Edit / Sprite / Layer / Frame / Select / View / Help) ---- */
-  .menubar{display:flex; align-items:center; gap:1px; flex:1; min-width:0; overflow-x:auto; overflow-y:hidden;}
-  .menu-item{
-    display:flex; align-items:center; gap:6px;
-    padding:5px 10px; border-radius:6px; color:var(--muted); cursor:pointer;
-    font-size:13px; white-space:nowrap; line-height:1.4; user-select:none;
-  }
-  .menu-item:hover{background:var(--panel2); color:var(--text);}
-  .menu-item.open{background:var(--panel2); color:var(--text);}
-  .menu-dd{ /* dropdown panels reuse the .ctx-menu look via shared rules below */ }
-  .menu-dd .hk{margin-left:auto; padding-left:22px; color:var(--muted); font-size:11px; font-weight:600;}
-  .menu-dd button:hover .hk{color:var(--text);}
-  .menu-dd .mi-check{width:18px; flex:none; color:var(--accent); display:inline-flex; align-items:center; justify-content:center;}
-  /* the View menu carries the real zoom/grid controls; keep them readable inside the dropdown */
-  .menu-dd .dd-row{display:flex; align-items:center; gap:8px; padding:6px 10px;}
-  .menu-dd .dd-row .lbl{color:var(--muted); font-size:12px; flex:1; text-transform:none; letter-spacing:0;}
-  /* One segmented control, not two full-size icon buttons flanking a label: the steppers are flat
-     and only as big as their glyph, so the readout is what carries the row. */
-  .menu-dd .dd-zoom{
-    display:flex; align-items:center; gap:2px;
-    margin:2px 10px 4px; padding:2px;
-    background:var(--panel2); border:1px solid var(--line); border-radius:9px;
-  }
-  .menu-dd .dd-zoom button{
-    flex:none; width:28px; min-width:28px; height:26px; min-height:26px; padding:0;
-    background:transparent; border:none; border-radius:7px;
-    /* .ctx-menu button left-aligns its contents for the menu rows; these are square, so centre
-       them in both axes or the glyphs hug the pill's inner edges at different distances */
-    justify-content:center; align-items:center;
-    font-size:15px; line-height:1; color:var(--text);
-  }
-  /* Both glyphs are axis-aligned bars 2 units thick, which lands on 1.33px at this size: the plus
-     survives it because its strokes cross, the minus washes out to grey. Snapping them to the pixel
-     grid costs nothing for rectangles and makes the pair weigh the same. */
-  .menu-dd .dd-zoom button svg{shape-rendering:crispEdges;}
-  .menu-dd .dd-zoom button:hover{background:#3a4152; border:none;}
-  .menu-dd .dd-zoom button:active{transform:none; background:var(--accent2);}
-  .menu-dd .dd-zoom span#zoomReadout{
-    flex:1; text-align:center; font-size:12.5px; font-variant-numeric:tabular-nums; color:var(--text);
-  }
-  .menu-dd .chk{padding:6px 10px; font-size:13px; color:var(--text);}
-  /* In a dropdown that mixes checkbox rows with plain ones, the plain rows reserve the checkbox's
-     column so every label starts on the same x — otherwise e.g. "Remove sub-canvas" sits a
-     checkbox-width to the left of "Grid". Nested buttons (the zoom steppers) are left alone. */
-  .menu-dd.has-checks > button::before{content:""; width:13px; flex:none;}
-  /* fixed slots, so the alignment is structural rather than a sum of default widths: 13px for the
-     checkbox (or the empty stand-in above), then 16px for the icon, whatever the glyph measures */
-  .menu-dd .chk > input[type=checkbox]{width:13px; height:13px; margin:0; flex:none;}
-  .menu-dd .chk > .mi, .menu-dd.has-checks > button > svg{
-    width:16px; flex:none; display:inline-flex; justify-content:center;
-  }
-
-  /* ---- tools as an icon grid ---- */
-  .tools .toolgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:6px; width:100%;}
-  .tools .tool{justify-content:center; padding:0; min-height:0; aspect-ratio:1; gap:0;}
-  .tools .tool::after{content:none; display:none;}   /* no keyboard badge in the grid */
-  .brushbtns{display:flex; align-items:center; gap:6px; width:100%;}
-  .brushbtns #brushReadout{flex:1; min-width:0; text-align:center;}
-  #toolOpts .toolhead{display:none;}
-  #toolOpts.show-wand .opt-wand,#toolOpts.show-region .opt-region,#toolOpts.show-shape .opt-shape,#toolOpts.show-brush .opt-brush{display:block;}
-  .opt-wand,.opt-region,.opt-shape,.opt-brush{display:none;}
-  .opt-range{display:flex; flex-direction:column; gap:2px; color:var(--muted); font-size:12px; margin-bottom:6px;}
-  .opt-range input{width:100%;}
-  .opt-hint{color:var(--muted); font-size:10px; line-height:1.4; margin-top:5px;}
-
-  /* ---- collapsible side sections with a chevron ---- */
-  .section h3.sec-h{display:flex; align-items:center; gap:7px; cursor:pointer; margin-bottom:10px;}
-  .section h3.sec-h .chev{display:inline-flex; transition:transform .15s; color:var(--muted);}
-  .section.collapsed h3.sec-h{margin-bottom:0;}
-  .section.collapsed h3.sec-h .chev{transform:rotate(-90deg);}
-  .section.collapsed .sec-body{display:none !important;}
-  /* a full-width row of equal icon buttons — always fits, so nothing crowds the scrollbar */
-  .btnrow{display:flex; gap:5px; margin-bottom:9px;}
-  .btnrow button{flex:1 1 0; min-width:0; height:30px; min-height:30px; padding:0; border-radius:7px;}
-
-  /* layer rows: eye · lock · name · thumb  (opacity is a single slider below the list) */
-  .layer .lock{width:22px; text-align:center; cursor:pointer; opacity:.5; flex:none;}
-  .layer .lock.on{opacity:1; color:var(--accent);}
-  .layer .lock:hover{opacity:1; color:var(--accent);}
-  .layer .nm{font-weight:500;}
-  .layer.active .nm{font-weight:700;}
-  .opacity-row{display:flex; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid var(--line);}
-  .opacity-row .lbl{color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; flex:none;}
-  .opacity-row #opacityVal{color:var(--text); width:30px; text-align:right; flex:none; font-variant-numeric:tabular-nums;}
-
-  /* ---- canvas rulers ---- */
-  /* minmax(0,1fr) + min-height:0 stop the grid's automatic minimum size from being driven by the
-     canvas, which would push .main taller than its flex slot and shove the timeline off-screen. */
-  .canvasarea{
-    flex:1; min-width:0; min-height:0; display:grid;
-    grid-template-columns:22px minmax(0,1fr); grid-template-rows:22px minmax(0,1fr);
-    background:var(--bg);
-  }
-  .ruler-corner{grid-column:1; grid-row:1; background:var(--panel); border-right:1px solid var(--line); border-bottom:1px solid var(--line);}
-  #rulerTop{grid-column:2; grid-row:1; width:100%; height:22px; display:block; background:var(--panel); border-bottom:1px solid var(--line);}
-  #rulerLeft{grid-column:1; grid-row:2; width:22px; height:100%; display:block; background:var(--panel); border-right:1px solid var(--line);}
-  .canvasarea .stage{grid-column:2; grid-row:2; padding:22px;}
-
-  /* status-bar zoom + tool chips */
-  .statusbar .sb-btn{display:inline-flex; align-items:center; gap:5px; cursor:pointer; color:var(--muted);}
-  .statusbar .sb-btn:hover{color:var(--text);}
-  .statusbar .sb-btn svg{opacity:.85;}
-
-  /* ---- mobile: tool row on top, panels stacked & collapsible below the canvas ---- */
-  #menuHamburger{display:none;}             /* desktop default; the media query below reveals it */
-  @media (max-width: 768px){
-    .menubar{display:none;}                 /* menus fold into the hamburger */
-    #menuHamburger{display:inline-flex;}
-    .main{flex-direction:column;}
-    .canvasarea{grid-template-columns:0 1fr; grid-template-rows:0 1fr;}
-    #rulerTop,#rulerLeft,.ruler-corner{display:none;}
-    .canvasarea .stage{padding:12px;}
-    /* tools become a persistent horizontal scroll row above the canvas */
-    .tools{
-      position:relative; z-index:1; transform:none; width:auto; flex:none; flex-direction:row;
-      align-items:center; gap:6px; overflow-x:auto; overflow-y:hidden; box-shadow:none;
-      border-right:none; border-bottom:1px solid var(--line); padding:7px 8px;
-    }
-    .tools.open{transform:none;}
-    /* the tool icons scroll in their own row; brush size and the active tool's options wrap under it */
-    .tools{flex-wrap:wrap; overflow-x:hidden;}
-    .tools .toolhead{display:none;}
-    .tools .toolgrid{display:flex; grid-template-columns:none; gap:6px; width:auto; flex:1 1 100%; min-width:0; overflow-x:auto;}
-    .tools .brush-sec{display:flex; align-items:center; margin:0;}
-    .tools #toolOpts{display:flex; align-items:center; gap:10px; flex:1; min-width:0; overflow-x:auto; margin:0;}
-    .tools .opt-hint{display:none;}
-    #toolOpts.show-brush .opt-brush{display:flex; align-items:center; gap:10px;}
-    .tools .opt-range{flex-direction:row; align-items:center; gap:6px; margin:0; white-space:nowrap;}
-    .tools .opt-range input{width:80px;}
-    .tools .opt-brush .chk{white-space:nowrap; margin:0;}
-    .tools .tool{width:44px; height:44px; aspect-ratio:auto; flex:none;}
-    .tools .helpbtn{width:44px; min-width:44px; margin-top:0; padding:0; flex:none;}
-    /* side panel becomes an in-flow stack under the canvas */
-    .side{
-      position:relative; z-index:1; transform:none; width:auto; flex:none;
-      border-left:none; border-top:1px solid var(--line); box-shadow:none;
-      max-height:42vh; overflow-y:auto;
-    }
-    .side.open{transform:none;}
-    /* flex, not block: each row is an icon plus its label, and the icon has to sit on the
-       label's centre line rather than its baseline */
-    #menuSheet .menu-item{display:flex; align-items:center; gap:12px; padding:11px 14px;
-      border-radius:8px; font-size:15px;}
-
-    /* The whole bottom panel is one tabbed surface: the pinned strip picks Color, Layers or
-       Animation, and only that one is in the document flow. Two half-width columns of controls
-       never fit a phone, and the animation strip shouldn't permanently eat the canvas either.
-       #layerSection carries an inline display:flex, hence the !important. */
-    .panel-tabs{display:flex;}
-    /* the tab strip is the header now (specific enough to beat .section h3.sec-h) */
-    .side .section > h3.sec-h{display:none;}
-    .mobile-cols{display:block;}
-    body[data-ptab="color"]  #layerSection{display:none !important;}
-    body[data-ptab="layers"] #colorSection{display:none !important;}
-    body[data-ptab="anim"]   #colorSection,
-    body[data-ptab="anim"]   #layerSection,
-    body[data-ptab="anim"]   #regionSection,
-    body[data-ptab="anim"]   #sheetSection,
-    body[data-ptab="color"]  #sheetSection,
-    body[data-ptab="layers"] #sheetSection,
-    /* the Tiles tab owns the panel outright while it's open */
-    body[data-ptab="tiles"]  #colorSection,
-    body[data-ptab="tiles"]  #layerSection,
-    body[data-ptab="tiles"]  #regionSection,
-    /* "none": every panel is tabbed off and the canvas gets the whole screen */
-    body[data-ptab="none"]   #colorSection,
-    body[data-ptab="none"]   #layerSection,
-    body[data-ptab="none"]   #sheetSection,
-    body[data-ptab="none"]   #regionSection{display:none !important;}
-    body[data-ptab="tiles"]  #sheetSection{display:block !important;}
-    body[data-ptab="none"] .side{overflow:visible; border-bottom:none;}
-    body:not([data-ptab="anim"]) #timeline{display:none;}
-    /* the tab strip already draws the panel's top edge */
-    body[data-ptab="anim"] #timeline{border-top:none; max-height:46vh;}
-    body[data-ptab="anim"] .side{overflow:visible;}
-    #tlCollapseBtn, #tlSummary{display:none !important;}   /* the tab is the collapse control */
-  }
-  /* mobile menu sheet (the hamburger opens a simple list of menus) */
-  #menuSheet{position:fixed; left:8px; top:52px; z-index:1200; min-width:210px; background:var(--panel);
-    border:1px solid var(--line); border-radius:10px; padding:6px; box-shadow:0 18px 50px #000c;}
-  #menuSheet[hidden]{display:none;}
-
-  /* ---- finger-friendly targets: any touch device, or any screen small enough to be in drawer mode ---- */
-  @media (pointer: coarse), (max-width: 768px){
-    button, select, input[type=text], input[type=number]{min-height:42px;}
-    .iconbtn{min-width:42px;}
-    .tool{min-height:44px;}
-    .tool::after{display:none;}          /* keyboard hints are meaningless on touch */
-    .tab{padding:10px 10px 10px 14px;}
-    .tab .tclose{width:24px; height:24px;}
-    .palette{grid-template-columns:repeat(auto-fill, minmax(30px,1fr)); gap:6px; max-height:224px;}
-    .palette.editable .sw .swx{display:inline-flex; width:17px; height:17px;}   /* no hover on touch */
-    .btnrow button{height:40px; min-height:40px;}
-    .recents .rc{width:26px; height:26px;}
-    .layer{padding:10px 9px;}
-    .layer .eye{width:30px;}
-    .layer .op{width:74px;}
-    input[type=range]{height:30px;}
-    .swap{width:28px; height:28px;}
-    .tl-frame .tl-x{display:inline-flex;}   /* no hover on touch — always show the delete button */
-    .tl-frame .tl-num{padding:4px 10px; font-size:11px;}   /* a grip a finger can find */
-    .ctx-menu button{padding:11px 12px;}
-    .tl-tab{height:34px;}                   /* the tabs stay compact, but big enough to hit */
-    .panel-tabs .ptab{height:40px; min-height:40px;}
-    /* the flat zoom steppers stay flat on touch, just big enough to hit reliably */
-    .menu-dd .dd-zoom button{width:36px; min-width:36px; height:34px; min-height:34px;}
-    /* the picker is a floating panel, so it doesn't inherit the panel width — give it the
-       screen on a phone, where a 238px saturation square is a poor finger target */
-    .cp-pop{width:min(340px, calc(100vw - 16px));}
-    .cp-sv{height:158px;}
-    /* Anchor dialogs near the top rather than dead-centre: when the on-screen keyboard opens it eats
-       the lower half of the screen, and a centred dialog would sit behind it. Top-aligned and
-       scrollable, the dialog and its buttons stay reachable above the keyboard. */
-    .modal-root{align-items:flex-start; justify-content:center; padding:10px; overflow-y:auto;}
-    .modal-card{margin:max(8px, env(safe-area-inset-top)) 0 8px; max-height:none;}
-  }
-  /* ===================== retro / pixel-tool pass ===================== */
-  /* Evolves the dark theme toward a pixel-art tool: blocky corners, matte (no gloss), a chunky
-     button bevel, and an Aseprite-style tight, resizable palette. Kept as one late block so it's
-     easy to tune or lift out wholesale. */
-  :root{ --r:3px; }
-  /* blocky corners across the chrome (this block is later in source, so it wins ties) */
-  button, .iconbtn, select, input[type=text], input[type=number], .tool,
-  .layer, .tl-frame, .tl-group, .section, .modal-card, .cp-pop, .cp-swatch,
-  .cp-sv, .cp-hue, .cp-prev, .dualswatch .sw, .swap, .panel-tabs .ptab, .tab,
-  .place-bar, .toast, .recents .rc, .layer .thumb, .tl-frame .tl-thumb, #hexInput{ border-radius:var(--r); }
-  /* matte: drop the glows and the stage sheen */
-  button.primary, button.danger, button.primary.danger, .tool.active{ box-shadow:none; }
-  .stage{ background:var(--bg); }
-  .canvas-wrap{ box-shadow:0 0 0 1px #0007; }
-  /* hard offset drop shadow instead of a soft blur — reads as a pixel-era window */
-  .modal-card, .cp-pop{ box-shadow:0 6px 0 #0006, 0 0 0 1px #0009; }
-  /* chunky bevel on inputs & buttons: lit top edge, shadowed bottom */
-  button, select, input[type=text], input[type=number]{ box-shadow:inset 0 1px 0 #ffffff12, inset 0 -1px 0 #00000040; }
-  button:active{ box-shadow:inset 0 1px 0 #00000038; transform:translateY(1px); }
-  .tool.active, button.primary{ box-shadow:inset 0 1px 0 #ffffff2b, inset 0 -1px 0 #00000047; }
-
-  /* ---- Aseprite-style palette: a tight seamless grid you resize by the grip below it ---- */
-  /* By default the palette grows to fill the panel (no dead space now the Layers dock is gone);
-     dragging the grip switches it to an explicit height set inline by JS. */
-  #paletteGrid.palette{ gap:0; padding:0; margin-top:10px; overflow:auto; background:#00000040;
-    border:1px solid var(--line); border-radius:var(--r) var(--r) 0 0;
-    grid-template-columns:repeat(auto-fill, minmax(18px,1fr)); grid-auto-rows:20px; align-content:start;
-    flex:1 1 auto; min-height:70px; max-height:none; }
-  /* the Color section fills the side panel so the palette can take the slack */
-  @media (min-width:769px){
-    #sidePanel > .mobile-cols{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
-    #colorSection{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
-    #colorSection > .sec-body{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
-    /* when a tilesheet / sub-canvas panel is open below, stop the palette from filling so that
-       panel stays in view — the palette drops to a compact fixed height instead */
-    body.has-side-ctx #sidePanel > .mobile-cols{ flex:0 0 auto; }
-    body.has-side-ctx #colorSection{ flex:0 0 auto; }
-    body.has-side-ctx #paletteGrid.palette{ flex:0 0 auto; height:120px; }
-  }
-  /* fill the whole cell so the grid is seamless — square-ish rather than forced square, the way a
-     tight palette reads in Aseprite */
-  #paletteGrid.palette .sw{ width:100%; height:100%; aspect-ratio:auto; min-height:0;
-    border:0; border-radius:0; box-shadow:inset 0 0 0 1px #00000024; }
-  #paletteGrid.palette .sw:hover{ outline:2px solid #fff; outline-offset:-2px; z-index:2; }
-  #paletteGrid.palette .sw.selected{ outline:2px solid var(--accent); outline-offset:-2px; z-index:3; }
-  #paletteGrid.palette .sw.selected::before{ content:""; position:absolute; inset:0; box-shadow:inset 0 0 0 1px #000; pointer-events:none; }
-  #paletteGrid.palette.editable .sw .swx{ top:0; right:0; width:13px; height:13px; border-radius:0 0 0 3px;
-    background:#000a; border:0; color:#fff; }
-  #paletteGrid.palette .pal-empty{ padding:9px; }
-  /* the draggable splitter — like Aseprite's "|| resize palette" grip */
-  .pal-resize{ height:15px; display:flex; align-items:center; justify-content:center; cursor:ns-resize;
-    color:var(--muted); background:var(--panel2); border:1px solid var(--line); border-top:0;
-    border-radius:0 0 var(--r) var(--r); touch-action:none; }
-  .pal-resize:hover{ color:var(--text); background:#323744; }
-  .pal-resize.drag{ background:var(--accent2); color:#fff; border-color:var(--accent2); }
-  .pal-resize .grip{ width:28px; height:4px; background:repeating-linear-gradient(90deg,currentColor 0 2px,transparent 2px 4px); }
-
-  /* ================= shared PixelPaint look (kept in step with the main app's css/app.css) ================= */
-  button{border-radius:4px; min-height:30px; padding:0 10px; font-weight:400;}
-  button:hover{background:var(--panel2); border-color:var(--muted);}
-  button:active{transform:none;}
-  button.primary, .tool.active{background:var(--accent); border-color:var(--accent); color:#fff;}
-  select, input[type=number], input[type=text]{border-radius:4px; height:30px; background:var(--bg);}
-  .topbar{min-height:42px; padding:5px 10px; gap:4px 8px;}
-  .menu-item{height:28px; padding:0 8px; border-radius:4px; border:1px solid transparent;}
-  .menu-item:hover, .menu-item.open{border-color:var(--line);}
-  #undoBtn, #redoBtn{background:transparent; border-color:transparent; min-height:30px; min-width:30px; padding:0;}
-  #undoBtn:hover, #redoBtn:hover{background:var(--panel2); border-color:var(--line);}
-  .ctx-menu{border-radius:6px;}
-  .ctx-menu button{border-radius:4px;}
-  @media (min-width:769px){
-    .tools{width:106px; padding:8px 6px; gap:4px;}
-    .tools .toolgrid{grid-template-columns:repeat(2,40px); gap:4px; justify-content:center;}
-  }
-  .tools .tool{width:40px; height:40px; aspect-ratio:auto; min-height:0;}
-  .brushbtns{gap:4px;}
-  .brushbtns .iconbtn{min-width:26px; min-height:26px;}
-  .tools .helpbtn{min-height:30px;}
-  .side{width:280px;}
-  .section{padding:10px 12px;}
-  .section h3{font-size:11px; letter-spacing:.8px;}
-  .stage{background:#16181d;}
-  .statusbar{font-size:12px;}
-  .timeline .tl-bar button{min-height:26px;}
-  /* same breakpoints as the main app: menus go icon-only, then fold into the hamburger */
-  @media (min-width:769px) and (max-width:1180px){ .menu-item{font-size:0; gap:0; padding:0 7px;} }
-  @media (max-width:768px){
-    .tools .tool{width:40px; height:40px;}
-    .topbar{gap:4px; padding:5px 6px;}
-    .mode-btn{padding:0 8px;}
-    .brand{font-size:13px;}
-  }
-  @media (max-width:380px){ .brand{display:none;} }
-</style>
-</head>
-<body>
-<script>try{if((JSON.parse(localStorage.getItem("pp.settings"))||{}).theme==="light")document.body.classList.add("light");}catch(e){}</script>
-<div id="app">
-  <!-- TOP BAR: brand + menu bar -->
-  <div class="topbar">
-    <div class="brand"><em>P</em><em>i</em><em>x</em><em>e</em><em>l</em><b><i>P</i><i>a</i><i>i</i><i>n</i><i>t</i></b></div>
-    <button id="menuHamburger" class="iconbtn" data-icon="menu" title="Menu"></button>
-    <div class="menubar" id="menubar">
-      <div class="menu-item" data-menu="file"   data-icon="folder"  data-icon-size="15">File</div>
-      <div class="menu-item" data-menu="edit"   data-icon="undo"    data-icon-size="15">Edit</div>
-      <div class="menu-item" data-menu="sprite" data-icon="image"   data-icon-size="15">Sprite</div>
-      <div class="menu-item" data-menu="layer"  data-icon="copy"    data-icon-size="15">Layer</div>
-      <div class="menu-item" data-menu="frame"  data-icon="play"    data-icon-size="15">Frame</div>
-      <div class="menu-item" data-menu="tiles"  data-icon="grid"    data-icon-size="15">Tiles</div>
-      <div class="menu-item" data-menu="select" data-icon="select"  data-icon-size="15">Select</div>
-      <div class="menu-item" data-menu="view"   data-icon="visible" data-icon-size="15">View</div>
-      <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="15">Help</div>
-    </div>
-    <!-- shared mode switch: the same control as the rest of PixelPaint; this editor runs inside it as Pixel mode -->
-    <nav class="mode-switch" aria-label="Mode"><a class="mode-btn" href="./?mode=paint" data-mode="paint" title="Paint mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.4 2.6a2 2 0 0 1 3 3L11 16l-3-3z"/><path d="M7 14c-2 0-3.5 1.5-3.5 3.5 0 1-.5 2-1.5 2.5 1 .7 2.3 1 3.5 1C8 21 10 19 10 17z"/></svg><span>Paint</span></a><a class="mode-btn" href="./?mode=zen" data-mode="zen" title="Zen mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a4.5 4.5 0 0 0 0 9 4.5 4.5 0 0 1 0 9"/></svg><span>Zen</span></a><a class="mode-btn" href="./?mode=notes" data-mode="notes" title="Notes mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h5"/></svg><span>Notes</span></a><a class="mode-btn" href="./?mode=paper" data-mode="paper" title="Paper mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M9 12h8M9 16h8M9 8h3"/></svg><span>Paper</span></a><span class="mode-btn on" aria-current="page"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h6v6H3zM9 9h6v6H9zM15 3h6v6h-6zM3 15h6v6H3zM15 15h6v6h-6z"/></svg><span>Pixel</span></span></nav>
-    <div class="group">
-      <button id="undoBtn" class="iconbtn" data-icon="undo" title="Undo (Ctrl+Z)"></button>
-      <button id="redoBtn" class="iconbtn" data-icon="redo" title="Redo (Ctrl+Y)"></button>
-    </div>
-    <button id="sideDrawerBtn" class="iconbtn drawer-btn" data-icon="palette" title="Colors, palette &amp; layers"></button>
-    <input type="file" id="openInput" accept=".pxpaint,.json,application/json" style="display:none" />
-    <input type="file" id="sheetInput" accept="image/*" style="display:none" />
-    <input type="file" id="packInput" accept="image/*,.pxpaint,.json,application/json" multiple style="display:none" />
-  </div>
-
-  <!-- TAB BAR (shown only when more than one drawing is open) -->
-  <div class="tabbar" id="tabbar" style="display:none">
-    <div class="tabs" id="tabs"></div>
-    <button id="newTabBtn" class="tab-add iconbtn" data-icon="add" data-icon-size="16" title="New tab"></button>
-  </div>
-
-  <!-- ===================== MENU DROPDOWNS ===================== -->
-  <div id="menu-file" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="new"    data-icon="new"      data-icon-size="16">New canvas…</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="open"   data-icon="folder"   data-icon-size="16">Open project…<span class="hk">Ctrl+O</span></button>
-    <button data-cmd="openrecent" data-icon="clock" data-icon-size="16">Open recent…<span class="hk">Ctrl+Shift+O</span></button>
-    <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
-    <button data-cmd="pack"   data-icon="grid"     data-icon-size="16">Pack files into a sheet…</button>
-    <button data-cmd="save"   data-icon="save"     data-icon-size="16">Save project<span class="hk">Ctrl+S</span></button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
-    <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
-    <button data-cmd="aseprite" data-icon="grid"   data-icon-size="16">Export .aseprite…</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="newtab"   data-icon="add"    data-icon-size="16">New tab</button>
-    <button data-cmd="rename" data-icon="pencil"   data-icon-size="16">Rename tab…</button>
-    <button data-cmd="closetab" data-icon="clear"  data-icon-size="16">Close tab</button>
-    <button id="installBtn" data-cmd="install" data-icon="download" data-icon-size="16" style="display:none">Install app</button>
-  </div>
-  <div id="menu-edit" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="undo" data-icon="undo" data-icon-size="16">Undo<span class="hk">Ctrl+Z</span></button>
-    <button data-cmd="redo" data-icon="redo" data-icon-size="16">Redo<span class="hk">Ctrl+Y</span></button>
-    <div class="ctx-sep"></div>
-    <div class="ctx-sep"></div>
-    <button data-cmd="copysel" data-icon="copy"      data-icon-size="16">Copy selection<span class="hk">Ctrl+C</span></button>
-    <button data-cmd="cutsel"  data-icon="clear"     data-icon-size="16">Cut selection<span class="hk">Ctrl+X</span></button>
-    <button data-cmd="pastesel" data-icon="clipboard" data-icon-size="16">Paste<span class="hk">Ctrl+V</span></button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="fliph" data-icon="swap" data-icon-size="16">Flip horizontal<span class="hk">Shift+H</span></button>
-    <button data-cmd="flipv" data-icon="swap" data-icon-size="16">Flip vertical<span class="hk">Shift+V</span></button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
-  </div>
-  <div id="menu-sprite" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="resize" data-icon="select" data-icon-size="16">Resize canvas…</button>
-    <button data-cmd="trim" data-icon="center" data-icon-size="16">Trim to the artwork</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="rotr" data-icon="rotR" data-icon-size="16">Rotate canvas 90° right</button>
-    <button data-cmd="rotl" data-icon="rotL" data-icon-size="16">Rotate canvas 90° left</button>
-    <button data-cmd="rot180" data-icon="redo" data-icon-size="16">Rotate canvas 180°</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="addimage" data-icon="image" data-icon-size="16">Add image…</button>
-    <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="voxel3d" data-icon="grid" data-icon-size="16">Pseudo-3D…</button>
-    <button data-cmd="voxelstudio" data-icon="grid" data-icon-size="16">3D Voxel Studio…</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
-    <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
-  </div>
-  <div id="menu-layer" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="addlayer" data-icon="add"  data-icon-size="16">New layer</button>
-    <button data-cmd="duplayer" data-icon="copy" data-icon-size="16">Duplicate layer</button>
-    <button data-cmd="dellayer" data-icon="trash" data-icon-size="16">Delete layer</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="uplayer"   data-icon="up"   data-icon-size="16">Move up</button>
-    <button data-cmd="downlayer" data-icon="down" data-icon-size="16">Move down</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="mergedown" data-icon="down"  data-icon-size="16">Merge down</button>
-    <button data-cmd="flatten"   data-icon="image" data-icon-size="16">Flatten this frame</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
-  </div>
-  <div id="menu-frame" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="addframe" data-icon="add"   data-icon-size="16">New frame</button>
-    <button data-cmd="addempty" data-icon="new"   data-icon-size="16">New empty frame</button>
-    <button data-cmd="delframe" data-icon="trash" data-icon-size="16">Delete frame</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="framerate" data-icon="clock" data-icon-size="16">Frame rate…</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="addgroup" data-icon="tag" data-icon-size="16">New frame group…</button>
-    <button data-cmd="addtag"   data-icon="tag" data-icon-size="16">Group existing frames…</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="reverse" data-icon="redo" data-icon-size="16">Reverse frames</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="play"   data-icon="play" data-icon-size="16">Play / stop<span class="hk">Space</span></button>
-    <button data-cmd="sheet"  data-icon="image" data-icon-size="16">Export spritesheet…</button>
-  </div>
-  <div id="menu-tiles" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="tilesetup" data-icon="grid"   data-icon-size="16">Tilesheet setup…</button>
-    <button data-cmd="tiletool"  data-icon="region" data-icon-size="16">Tile tool<span class="hk">T</span></button>
-    <button data-cmd="pack"      data-icon="folder" data-icon-size="16">Pack files into a tilesheet…</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="tilerowup"    data-icon="up"    data-icon-size="16">Add a row above</button>
-    <button data-cmd="tilerowdown"  data-icon="down"  data-icon-size="16">Add a row below</button>
-    <button data-cmd="tilecolleft"  data-icon="left"  data-icon-size="16">Add a column left</button>
-    <button data-cmd="tilecolright" data-icon="right" data-icon-size="16">Add a column right</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="tilejoin"  data-icon="copy"   data-icon-size="16">Join the picked tiles<span class="hk">Shift+click</span></button>
-    <button data-cmd="tilesplit" data-icon="grid"   data-icon-size="16">Split this joined tile</button>
-    <button data-cmd="tileclip"  data-icon="region" data-icon-size="16">Tile clipping on / off</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="tilerename" data-icon="pencil" data-icon-size="16">Rename this tile…</button>
-    <button data-cmd="tileclear"  data-icon="clear"  data-icon-size="16">Clear this tile</button>
-    <button data-cmd="tiledelrow" data-icon="trash"  data-icon-size="16">Delete this row</button>
-    <button data-cmd="tiledelcol" data-icon="trash"  data-icon-size="16">Delete this column</button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="exporttiles" data-icon="download" data-icon-size="16">Export tiles…</button>
-    <button data-cmd="tilesoff"    data-icon="clear"    data-icon-size="16">Turn off the tile grid</button>
-  </div>
-  <div id="menu-select" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="selectall" data-icon="select" data-icon-size="16">Select all<span class="hk">Ctrl+A</span></button>
-    <button data-cmd="deselect"  data-icon="clear"  data-icon-size="16">Deselect<span class="hk">Ctrl+D</span></button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="transform" data-icon="select" data-icon-size="16">Resize / rotate the selection<span class="hk">Ctrl+T</span></button>
-    <div class="ctx-sep"></div>
-    <button data-cmd="wandtool" data-icon="wand" data-icon-size="16">Magic wand tool</button>
-    <button data-cmd="snap" data-icon="palette" data-icon-size="16">Snap to palette</button>
-  </div>
-  <div id="menu-view" class="ctx-menu menu-dd has-checks" hidden>
-    <div class="dd-zoom">
-      <button id="zoomOut" data-icon="minus" data-icon-size="16" title="Zoom out (-)"></button>
-      <span id="zoomReadout">1600%</span>
-      <button id="zoomIn" data-icon="add" data-icon-size="16" title="Zoom in (+)"></button>
-    </div>
-    <button id="zoomFit" data-cmd="fit" data-icon="center" data-icon-size="16">Fit to window</button>
-    <div class="ctx-sep"></div>
-    <label class="chk"><input type="checkbox" id="gridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Grid<span class="hk">G</span></label>
-    <label class="chk"><input type="checkbox" id="centerToggle" checked /><span class="mi" data-icon="center" data-icon-size="15"></span>Center guide</label>
-    <label class="chk"><input type="checkbox" id="onionToggle" /><span class="mi" data-icon="copy" data-icon-size="15"></span>Onion skin<span class="hk">F3</span></label>
-    <label class="chk" id="onionTintRow" style="display:none"><input type="checkbox" id="onionTintToggle" checked /><span class="mi" data-icon="swap" data-icon-size="15"></span>Onion red/blue tint</label>
-    <label class="chk" id="tileGridRow"><input type="checkbox" id="tileGridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Tile grid</label>
-    <label class="chk"><input type="checkbox" id="regionToggleMenu" /><span class="mi" data-icon="region" data-icon-size="15"></span>Sub-canvas</label>
-    <button data-cmd="delregion" data-icon="trash" data-icon-size="16">Remove sub-canvas<span class="hk">Del</span></button>
-    <div class="ctx-sep"></div>
-    <!-- desktop: any dock can be folded away so the canvas gets the window. On mobile these
-         panels are already tabs, so the toggles are hidden there. -->
-    <div class="dd-docks">
-      <label class="chk"><input type="checkbox" id="dockTools" checked /><span class="mi" data-icon="pencil" data-icon-size="15"></span>Tools panel</label>
-      <label class="chk"><input type="checkbox" id="dockSide" checked /><span class="mi" data-icon="palette" data-icon-size="15"></span>Color &amp; layers panel</label>
-      <label class="chk"><input type="checkbox" id="dockAnim" checked /><span class="mi" data-icon="play" data-icon-size="15"></span>Animation panel</label>
-    </div>
-  </div>
-  <div id="menu-help" class="ctx-menu menu-dd" hidden>
-    <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Help &amp; shortcuts<span class="hk">?</span></button>
-    <button data-cmd="contact" data-icon="mail" data-icon-size="16">Contact, suggestions &amp; bugs…</button>
-    <button data-cmd="about" data-icon="info" data-icon-size="16">About PixelPaint<span class="hk" id="menuVersion"></span></button>
-  </div>
-
-  <!-- mobile: hamburger opens a simple stacked menu list. Icons here only — the desktop menu
-       bar stays plain text, the way a menu bar is expected to look. -->
-  <div id="menuSheet" hidden>
-    <div class="menu-item" data-menu="file"   data-icon="folder"  data-icon-size="17">File</div>
-    <div class="menu-item" data-menu="edit"   data-icon="undo"    data-icon-size="17">Edit</div>
-    <div class="menu-item" data-menu="sprite" data-icon="image"   data-icon-size="17">Sprite</div>
-    <div class="menu-item" data-menu="layer"  data-icon="copy"    data-icon-size="17">Layer</div>
-    <div class="menu-item" data-menu="frame"  data-icon="play"    data-icon-size="17">Frame</div>
-    <div class="menu-item" data-menu="tiles"  data-icon="grid"    data-icon-size="17">Tiles</div>
-    <div class="menu-item" data-menu="select" data-icon="select"  data-icon-size="17">Select</div>
-    <div class="menu-item" data-menu="view"   data-icon="visible" data-icon-size="17">View</div>
-    <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="17">Help</div>
-  </div>
-
-  <!-- MAIN -->
-  <div class="main">
-    <!-- TOOLS -->
-    <div class="tools" id="toolPanel">
-      <div class="toolhead" data-icon="pencil" data-icon-size="12">Tools</div>
-      <div class="toolgrid">
-        <button class="tool" data-tool="pencil"     data-icon="pencil"  title="Pencil (B)"></button>
-        <button class="tool" data-tool="brush"      data-icon="brush"   title="Brush - smooth, pressure-sensitive (P)"></button>
-        <button class="tool" data-tool="eraser"     data-icon="eraser"  title="Eraser (E)"></button>
-        <button class="tool" data-tool="bucket"     data-icon="fill"    title="Fill (F)"></button>
-        <button class="tool" data-tool="eyedropper" data-icon="pick"    title="Pick color (I)"></button>
-        <button class="tool" data-tool="line"       data-icon="line"    title="Line (L)"></button>
-        <button class="tool" data-tool="rect"       data-icon="rect"    title="Rectangle (R)"></button>
-        <button class="tool" data-tool="ellipse"    data-icon="ellipse" title="Ellipse (C)"></button>
-        <button class="tool" data-tool="select"     data-icon="select"  title="Rectangle select (M)"></button>
-        <button class="tool" data-tool="wand"       data-icon="wand"    title="Magic wand — select by color (W)"></button>
-        <button class="tool" data-tool="region"     data-icon="region"  title="Sub-canvas — drag a draw area (D)"></button>
-        <button class="tool" data-tool="tile"       data-icon="grid"    title="Tiles — pick a tile, then + to add rows and columns (T)"></button>
-      </div>
-
-      <div class="brush-sec">
-        <div class="toolhead" data-icon="brush" data-icon-size="13">Brush</div>
-        <div class="brushbtns">
-          <button id="brushDown" class="iconbtn" title="Smaller brush ([)">−</button>
-          <span id="brushReadout">1 px</span>
-          <button id="brushUp" class="iconbtn" title="Bigger brush (])">+</button>
-        </div>
-      </div>
-
-      <!-- contextual options for the active tool -->
-      <div id="toolOpts">
-        <div class="opt-brush">
-          <div class="toolhead" data-icon="brush" data-icon-size="12">Brush</div>
-          <label class="opt-range" title="How much paint each dab lays down. Overlapping dabs build up.">Flow <input type="range" id="brushFlow" min="5" max="100" value="100" /></label>
-          <label class="opt-range" title="Steadies the line by trailing the pen. Higher = smoother, laggier.">Smoothing <input type="range" id="brushSmooth" min="0" max="90" value="30" /></label>
-          <label class="chk"><input type="checkbox" id="pressureSize" checked /> Pressure: size</label>
-          <label class="chk"><input type="checkbox" id="pressureFlow" /> Pressure: flow</label>
-        </div>
-        <div class="opt-shape">
-          <div class="toolhead" data-icon="rect" data-icon-size="12">Shape</div>
-          <label class="chk" title="Solid: paint every pixel inside the shape. Off: draw only the 1px outline."><input type="checkbox" id="fillShape" /> Solid fill</label>
-          <div class="opt-hint">Off = outline only.</div>
-        </div>
-        <div class="opt-wand">
-          <div class="toolhead" data-icon="wand" data-icon-size="12">Wand</div>
-          <div class="brushbtns">
-            <span style="color:var(--muted)">Tol</span>
-            <input type="number" id="wandTol" min="0" max="255" value="32" style="flex:1; min-width:0; width:auto" title="Color tolerance: 0 = exact match, higher = looser" />
-          </div>
-          <label class="chk" style="margin-top:8px"><input type="checkbox" id="wandContig" checked /> Contiguous</label>
-        </div>
-        <div class="opt-region">
-          <div class="toolhead" data-icon="region" data-icon-size="12">Sub-canvas</div>
-          <button id="regionCreate2" style="width:100%" data-icon="region" data-icon-size="15">Draw area</button>
-        </div>
-      </div>
-
-      <input type="file" id="imgInput" accept="image/*" hidden />
-      <!-- the tips that used to sit here as permanent small print now live in the help sheet -->
-      <button id="helpBtn" class="helpbtn" data-icon="info" data-icon-size="15"
-              title="Shortcuts, mouse and touch gestures (?)"><span class="btxt">Help</span></button>
-    </div>
-
-    <!-- CANVAS AREA (rulers + stage) -->
-    <div class="canvasarea">
-      <div class="ruler-corner"></div>
-      <canvas id="rulerTop"></canvas>
-      <canvas id="rulerLeft"></canvas>
-      <div class="stage" id="stage">
-        <div class="canvas-wrap" id="wrap">
-          <canvas id="view"></canvas>
-        </div>
-        <canvas id="placeOverlay" hidden></canvas>
-        <div class="place-bar" id="placeBar" hidden>
-          <span class="info"><span data-icon="image" data-icon-size="15"></span><span id="placeSize">—</span></span>
-          <button id="placeActual" title="Actual size (1:1)">1:1</button>
-          <button id="placeFit" title="Fit to canvas">Fit</button>
-          <button id="placeRotL" class="iconbtn" data-icon="rotL" data-icon-size="17" title="Rotate 90° left"></button>
-          <button id="placeRotR" class="iconbtn" data-icon="rotR" data-icon-size="17" title="Rotate 90° right"></button>
-          <button id="placeSnapBtn" data-icon="grid" data-icon-size="15" title="Snap to whole pixels while dragging — hold Shift for the other behaviour, or nudge with the arrow keys">Snap</button>
-          <button id="placeCommit" class="primary" data-icon="check" title="Place image (Enter)">Place</button>
-          <button id="placeCancel" data-icon="clear" title="Cancel / right-click for more (Esc)">Cancel</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- SIDE -->
-    <div class="side" id="sidePanel">
-      <!-- mobile only: switches the panel between Color, Layers and the animation timeline.
-           Stays pinned while the panel body scrolls under it. -->
-      <div class="panel-tabs" id="panelTabs" role="tablist">
-        <button class="ptab" data-ptab="color"  data-icon="palette" data-icon-size="15" title="Color &amp; palette">Color</button>
-        <button class="ptab" data-ptab="anim"   data-icon="play"    data-icon-size="15" title="Frames &amp; layers">Anim</button>
-        <button class="ptab" data-ptab="tiles"  data-icon="grid"    data-icon-size="15" title="Tilesheet grid" hidden>Tiles</button>
-      </div>
-      <div class="mobile-cols">
-      <div class="section collapsible" id="colorSection">
-        <h3 class="sec-h" data-sec="colorSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="palette" data-icon-size="14"></span>Color</h3>
-        <div class="sec-body">
-          <div class="colorrow">
-            <div class="dualswatch">
-              <div class="sw" id="secondarySwatch" title="Background — right-click a palette color, or right-drag on the canvas"></div>
-              <div class="sw" id="primarySwatch" title="Foreground — left-click a palette color, or left-drag on the canvas"></div>
-              <button class="swap" id="swapColors" data-icon="swap" data-icon-size="14" title="Swap foreground / background (X)"></button>
-            </div>
-            <div class="col">
-              <div class="hexrow">
-                <input type="text" id="hexInput" value="#000000" spellcheck="false" />
-                <button id="cpEyedrop" class="iconbtn" data-icon="pick" data-icon-size="16" title="Pick a color from anywhere on screen"></button>
-              </div>
-            </div>
-          </div>
-          <!-- Aseprite-style inline colour picker: SV field, hue bar and RGB, always visible -->
-          <div class="cp-sv" id="cpSV"><div class="cp-dot" id="cpSVDot"></div></div>
-          <div class="cp-hue" id="cpHue"><div class="cp-dot" id="cpHueDot"></div></div>
-          <div class="cp-rgb">
-            <label>R<input type="number" id="cpR" min="0" max="255" /></label>
-            <label>G<input type="number" id="cpG" min="0" max="255" /></label>
-            <label>B<input type="number" id="cpB" min="0" max="255" /></label>
-          </div>
-          <div class="recents" id="recents"></div>
-          <select id="paletteSelect" style="width:100%; margin-top:10px"></select>
-          <div class="palette" id="paletteGrid"></div>
-          <div class="pal-resize" id="palResize" title="Drag to resize the palette"><span class="grip"></span></div>
-          <button id="palAddColor" data-icon="add" data-icon-size="15" style="width:100%; margin-top:8px;" title="Add the current foreground color to this palette">Add current color</button>
-          <div class="btnrow" id="palTools" style="margin-top:7px">
-            <button id="palNew"    data-icon="palette"  data-icon-size="15" title="New empty palette…"></button>
-            <button id="palDup"    data-icon="copy"     data-icon-size="15" title="Duplicate this palette so you can edit it"></button>
-            <button id="palRename" data-icon="pencil"   data-icon-size="15" title="Rename this palette"></button>
-            <button id="palImport" data-icon="folder"   data-icon-size="15" title="Import a palette (.hex .txt .gpl .json)"></button>
-            <button id="palExport" data-icon="download" data-icon-size="15" title="Export this palette as a .hex list"></button>
-            <button id="palDel"    data-icon="trash"    data-icon-size="15" title="Delete this palette"></button>
-          </div>
-          <button id="applyPaletteBtn" data-icon="palette" style="width:100%; margin-top:8px;" title="Remap the active layer (or the current selection) to the nearest colors in this palette">Snap to this palette</button>
-          <input type="file" id="palFileInput" accept=".hex,.txt,.gpl,.json,.pal,text/plain" hidden />
-        </div>
-      </div>
-
-      <!-- Layers moved into the timeline grid (rows = layers), with their toolbar in the grid's
-           top-left corner — the side panel keeps only colour & palette. -->
-      </div>
-
-      <!-- Tilesheet grid (shown when the drawing has a grid, or the Tile tool is picked) -->
-      <div class="section collapsible" id="sheetSection" style="display:none">
-        <h3 class="sec-h" data-sec="sheetSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="grid" data-icon-size="14"></span>Tilesheet</h3>
-        <div class="sec-body">
-        <div id="sheetNone">
-          <button id="tsCreate" data-icon="grid" style="width:100%">Set up a tilesheet…</button>
-          <div class="hint" style="padding:7px 0 0; margin:0">Cuts this canvas into a grid of named tiles — rows and columns, each with its own size. Pick a tile and the four <b>+</b> buttons around it add a row above or below, or a column left or right.</div>
-        </div>
-        <div id="sheetCtl" style="display:none">
-          <div class="ts-sum" id="tsSummary"></div>
-          <div class="ts-pick"><span data-icon="region" data-icon-size="13"></span><span id="tsSel">No tile picked</span></div>
-          <div class="rg-row"><span class="rg-lbl">Name</span>
-            <input type="text" id="tsName" spellcheck="false" data-needsel style="flex:1; min-width:0" title="Name this tile — it becomes the file name when you export tiles separately" /></div>
-          <div class="rg-row"><span class="rg-lbl">Size</span>
-            <input type="number" id="tsTileW" min="1" max="512" data-needsel title="Width of this tile's column" /><span class="rg-x">×</span>
-            <input type="number" id="tsTileH" min="1" max="512" data-needsel title="Height of this tile's row" />
-            <span style="color:var(--muted); font-size:11px">this row / column</span></div>
-          <!-- the four inserts, laid out the way they act -->
-          <div class="ts-pad">
-            <button class="ts-up"    data-cmd="tilerowup"    data-icon="up"    data-icon-size="15" data-needsel title="Add a row above this tile">Row</button>
-            <button class="ts-left"  data-cmd="tilecolleft"  data-icon="left"  data-icon-size="15" data-needsel title="Add a column to the left">Col</button>
-            <button class="ts-right" data-cmd="tilecolright" data-icon="right" data-icon-size="15" data-needsel title="Add a column to the right">Col</button>
-            <button class="ts-down"  data-cmd="tilerowdown"  data-icon="down"  data-icon-size="15" data-needsel title="Add a row below this tile">Row</button>
-          </div>
-          <div class="btnrow" style="margin-top:8px">
-            <button data-cmd="tilerename" data-icon="pencil" data-icon-size="15" data-needsel title="Rename this tile"></button>
-            <button data-cmd="tileclear"  data-icon="clear"  data-icon-size="15" data-needsel title="Clear this tile on the active layer"></button>
-            <button data-cmd="tiledelrow" data-icon="trash"  data-icon-size="15" data-needsel class="danger" title="Delete the row this tile is in"><span class="ts-lb">Row</span></button>
-            <button data-cmd="tiledelcol" data-icon="trash"  data-icon-size="15" data-needsel class="danger" title="Delete the column this tile is in"><span class="ts-lb">Col</span></button>
-          </div>
-          <!-- one bigger tile out of several cells: pick a corner, Shift-click the far one, Join -->
-          <div class="btnrow" style="margin-top:7px">
-            <button id="tsJoin"  data-cmd="tilejoin"  data-icon="copy" data-icon-size="15" title="Make the picked cells act as one larger tile — one sub-canvas, one name, one file on export"><span class="ts-lb">Join</span></button>
-            <button id="tsSplit" data-cmd="tilesplit" data-icon="grid" data-icon-size="15" title="Break a joined tile back into its cells"><span class="ts-lb">Split</span></button>
-          </div>
-          <div class="hint" style="padding:6px 0 0; margin:0">Shift-click a second tile to pick a block, then <b>Join</b> — a 32×32 tile on a 16×16 grid.</div>
-          <div class="rg-row" style="margin-top:9px"><span class="rg-lbl">Gaps</span>
-            <input type="number" id="tsGapIn" min="0" max="64" title="Spacing between tiles" />
-            <span class="rg-x">/</span>
-            <input type="number" id="tsPadIn" min="0" max="64" title="Margin around the whole sheet" />
-            <span style="color:var(--muted); font-size:11px">between / around</span></div>
-          <label class="chk" style="margin-top:2px" title="On by default for a tilesheet: a stroke is fenced into the tile it starts in, so neighbours can't be damaged. Click into any tile to work on it."><input type="checkbox" id="tsClip" /><span data-icon="region" data-icon-size="14"></span> Each tile is its own sub-canvas</label>
-          <div class="btnrow" style="margin-top:9px">
-            <button data-cmd="tilesetup"   data-icon="grid"     data-icon-size="15" title="Grid size, tile size and spacing">Setup</button>
-            <button data-cmd="exporttiles" data-icon="download" data-icon-size="15" title="Export the sheet, or one PNG per tile">Export</button>
-          </div>
-          <button data-cmd="tilesoff" data-icon="clear" data-icon-size="15" style="width:100%; margin-top:7px" title="Keep the artwork, drop the grid">Turn off the tile grid</button>
-        </div>
-        </div>
-      </div>
-
-      <!-- Sub-canvas controls (shown when the Region tool is active) -->
-      <div class="section collapsible" id="regionSection" style="display:none">
-        <h3 class="sec-h" data-sec="regionSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="region" data-icon-size="14"></span>Sub-canvas</h3>
-        <div class="sec-body">
-        <div id="regionNone">
-          <button id="regionCreate" data-icon="region" style="width:100%">Create draw area</button>
-          <div class="hint" style="padding:7px 0 0; margin:0">A box you can draw inside but not outside. Create one, set its size, then Lock it. Or use the Region tool (D) to drag it on the canvas. Remove it any time with the <b>✕</b> on its top-right corner.</div>
-        </div>
-        <div id="regionCtl" style="display:none">
-          <div class="rg-row"><span class="rg-lbl">Size</span>
-            <input type="number" id="rgW" min="1" max="512" /><span class="rg-x">×</span><input type="number" id="rgH" min="1" max="512" /></div>
-          <div class="rg-row"><span class="rg-lbl">Pos</span>
-            <input type="number" id="rgX" min="0" /><span class="rg-x">,</span><input type="number" id="rgY" min="0" /></div>
-          <div class="rg-row" style="gap:8px; margin-top:2px">
-            <label class="chk"><input type="checkbox" id="rgLock" /><span data-icon="lock" data-icon-size="14"></span> Lock</label>
-            <button id="rgCenter">Center</button>
-            <button id="rgRemove" class="danger" title="Delete the sub-canvas and draw on the whole canvas again (Del)">Remove</button>
-          </div>
-          <div class="hint" style="padding:7px 0 0; margin:0">Tap the <b>✕</b> on its top-right corner to remove it. <b>Del</b> and View ▸ Remove sub-canvas work too.</div>
-        </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TIMELINE (frames, playback, tags) -->
-  <div class="timeline" id="timeline">
-    <div class="tl-bar">
-      <button id="tlCollapseBtn" class="iconbtn" title="Collapse / expand the animation panel"></button>
-      <span id="tlSummary" title="Expand the animation panel">Animation</span>
-      <span class="tl-transport">
-        <button id="firstFrameBtn" class="iconbtn" data-icon="first" data-icon-size="16" title="First frame (Home)"></button>
-        <button id="prevFrameBtn"  class="iconbtn" data-icon="left"  data-icon-size="16" title="Previous frame (←)"></button>
-        <button id="playBtn" class="iconbtn" title="Play / stop (Space)"></button>
-        <button id="nextFrameBtn"  class="iconbtn" data-icon="right" data-icon-size="16" title="Next frame (→)"></button>
-        <button id="lastFrameBtn"  class="iconbtn" data-icon="last"  data-icon-size="16" title="Last frame (End)"></button>
-      </span>
-      <label class="chk"><input type="checkbox" id="loopToggle" checked /> Loop</label>
-      <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of this frame (right-click a frame ▸ Frame rate to set them all)" /><span class="muted">ms</span></span>
-      <button id="fpsBtn" data-icon="clock" data-icon-size="15" title="Set the frame rate for every frame (FPS)">FPS…</button>
-      <span class="vsep"></span>
-      <span class="tl-field"><span class="lbl">Opacity</span><input type="range" id="opacitySlider" min="0" max="100" value="100" title="Opacity of the active layer" style="width:88px" /><span id="opacityVal" class="muted">100</span></span>
-      <span class="vsep"></span>
-      <button id="addGroupBtn" data-icon="tag" data-icon-size="15" title="Add a group of frames (idle, walk, jump…) you can play and export on its own">Group</button>
-      <span class="tl-grow"></span>
-      <button id="addFrameBtn" data-icon="add" data-icon-size="16" title="New frame (copies the current one)">Frame</button>
-    </div>
-    <!-- one tab per frame group; the selected tab is what the strip shows and what Play plays -->
-    <div class="tl-tabs" id="tlTabs" hidden></div>
-    <div class="tl-frames" id="tlFrames"></div>
-  </div>
-
-  <!-- STATUS -->
-  <div class="statusbar">
-    <span id="layerInfo">Layer: —</span>
-    <span id="cursorInfo">—</span>
-    <span id="selInfo" style="color:var(--accent)"></span>
-    <span class="sp"></span>
-    <span class="sb-btn" id="docInfo" title="Canvas size — click to resize or trim">32 × 32</span>
-    <span class="sb-btn" id="zoomStat" title="Zoom to fit"><span data-icon="wand" data-icon-size="14"></span><span id="zoomStatVal">600%</span></span>
-    <span class="sb-btn" id="toolStat"><span data-icon="pencil" data-icon-size="14"></span><span id="toolInfo">Pencil</span></span>
-  </div>
-</div>
-
-<!-- dimmer behind the mobile popout drawers -->
-<div id="panelBackdrop" class="panel-backdrop"></div>
-
-<!-- themed modal (confirm / prompt / alert) -->
-<div id="modalRoot" class="modal-root" hidden>
-  <div class="modal-backdrop" id="modalBackdrop"></div>
-  <div class="modal-card" role="dialog" aria-modal="true">
-    <h3 id="modalTitle"></h3>
-    <p id="modalMsg"></p>
-    <div id="modalBody"></div>
-    <input type="text" id="modalInput" spellcheck="false" />
-    <div class="modal-actions">
-      <button id="modalCancel">Cancel</button>
-      <button id="modalOk" class="primary">OK</button>
-    </div>
-  </div>
-</div>
-<!-- themed transient toasts -->
-<div id="toastRoot" class="toast-root"></div>
-
-<!-- themed color picker (in-app, so it matches the rest of the UI) -->
-<!-- (the colour picker is now docked inline in the Color panel) -->
-
-<!-- right-click menu for a pasted/dropped image -->
-<div id="ctxMenu" class="ctx-menu" hidden>
-  <button data-action="actual">Actual size (1:1)</button>
-  <button data-action="fit">Fit to canvas</button>
-  <button data-action="fill">Fill canvas</button>
-  <button data-action="center">Center</button>
-  <div class="ctx-sep"></div>
-  <button data-action="flipH">Flip horizontal</button>
-  <button data-action="flipV">Flip vertical</button>
-  <div class="ctx-sep"></div>
-  <button data-action="rotL">Rotate 90° left</button>
-  <button data-action="rotR">Rotate 90° right</button>
-  <button data-action="rotAny">Rotate by an angle…</button>
-  <div class="ctx-sep"></div>
-  <button data-action="place">Place</button>
-  <button data-action="cancel">Cancel</button>
-</div>
-
-<!-- right-click / long-press menu for a frame in the timeline -->
-<div id="frameMenu" class="ctx-menu" hidden>
-  <button data-action="newframe" data-icon="add"   data-icon-size="16">New frame</button>
-  <button data-action="newempty" data-icon="new"   data-icon-size="16">New empty frame</button>
-  <button data-action="dup"   data-icon="copy"      data-icon-size="16">Duplicate frame</button>
-  <div class="ctx-sep"></div>
-  <button data-action="copy"  data-icon="copy"      data-icon-size="16">Copy frame</button>
-  <button data-action="paste" data-icon="clipboard" data-icon-size="16">Paste frame after</button>
-  <div class="ctx-sep"></div>
-  <button data-action="left"  data-icon="left"  data-icon-size="16">Move left<span class="hk">⇧←</span></button>
-  <button data-action="right" data-icon="right" data-icon-size="16">Move right<span class="hk">⇧→</span></button>
-  <button data-action="reverse" data-icon="redo" data-icon-size="16">Reverse frames</button>
-  <div class="ctx-sep"></div>
-  <button data-action="tag"  data-icon="tag"   data-icon-size="16">New tag…</button>
-  <button data-action="fps"  data-icon="clock" data-icon-size="16">Frame rate (all)…</button>
-  <button data-action="dur"  data-icon="clock" data-icon-size="16">This frame's duration…</button>
-  <div class="ctx-sep"></div>
-  <button data-action="del"   data-icon="trash" data-icon-size="16">Delete frame</button>
-</div>
-
-<!-- right-click menu for a layer row in the timeline grid -->
-<div id="layerMenu" class="ctx-menu" hidden>
-  <button data-action="add"  data-icon="add"  data-icon-size="16">New layer</button>
-  <button data-action="dup"  data-icon="copy" data-icon-size="16">Duplicate layer</button>
-  <div class="ctx-sep"></div>
-  <button data-action="up"   data-icon="up"   data-icon-size="16">Move up</button>
-  <button data-action="down" data-icon="down" data-icon-size="16">Move down</button>
-  <button data-action="merge" data-icon="down" data-icon-size="16">Merge down</button>
-  <button data-action="flatten" data-icon="image" data-icon-size="16">Flatten all</button>
-  <div class="ctx-sep"></div>
-  <button data-action="rename" data-icon="pencil"  data-icon-size="16">Rename…</button>
-  <button data-action="visible" data-icon="visible" data-icon-size="16">Show / hide</button>
-  <button data-action="lock" data-icon="lock" data-icon-size="16">Lock / unlock</button>
-  <button data-action="clear" data-icon="clear" data-icon-size="16">Clear layer</button>
-  <div class="ctx-sep"></div>
-  <button data-action="del"  data-icon="trash" data-icon-size="16">Delete layer</button>
-</div>
-
-<!-- right-click menu for a selection -->
-<div id="selMenu" class="ctx-menu" hidden>
-  <button data-action="transform">Resize / rotate…</button>
-  <div class="ctx-sep"></div>
-  <button data-action="copy">Copy</button>
-  <button data-action="cut">Cut</button>
-  <div class="ctx-sep"></div>
-  <button data-action="fill">Fill with foreground</button>
-  <button data-action="snap">Snap to palette</button>
-  <button data-action="clear">Clear (delete)</button>
-  <div class="ctx-sep"></div>
-  <button data-action="selectall">Select all</button>
-  <button data-action="deselect">Deselect</button>
-</div>
-
-<script>
+// PixelPaint — Pixel mode: the pixel-art editor (tilesheets, sub-canvas, tabs, animation…).
+// A classic script, loaded by js/main.js the first time Pixel mode opens; it works inside
+// #pixel only, and its global key / paste / drop handlers stay quiet in the other modes.
+(function () {
+const PX = document.getElementById("pixel");
+const pxOn = () => document.body.dataset.mode === "pixel";
 "use strict";
 (function(){
 
@@ -1743,10 +146,10 @@ let regionDrag=null;      // active create/move/resize gesture on the region
 // loaded it?", and a date says that without needing a changelog. Bump it when pushing a change.
 const APP_VERSION="2026.08.17";
 
-const $=s=>document.querySelector(s);
-const view=$("#view"), vctx=view.getContext("2d");
+const $=s=>PX.querySelector(s);
+const view=$("#pxView"), vctx=view.getContext("2d");
 const flat=document.createElement("canvas"), fctx=flat.getContext("2d");
-const wrap=$("#wrap"), stage=$("#stage");
+const wrap=$("#wrap"), stage=$("#pxStage");
 const placeOverlay=$("#placeOverlay"), octx=placeOverlay.getContext("2d");
 
 // ------------------------------------------------------------------ icons (inline Material-style SVG, fully offline)
@@ -1854,7 +257,7 @@ function openModal(o){
     const inp=$("#modalInput");
     if(o.input){ inp.style.display=""; inp.value=o.value||""; } else { inp.style.display="none"; }
     $("#modalBody").innerHTML=o.bodyHTML||"";
-    const card=document.querySelector(".modal-card");
+    const card=PX.querySelector(".modal-card");
     card.classList.toggle("wide", !!o.wide);
     card.classList.toggle("mid", !!o.mid);
     const ok=$("#modalOk"); ok.textContent=o.okText||"OK"; ok.classList.toggle("danger", !!o.danger);
@@ -2147,7 +550,7 @@ function updateDocInfo(){
 // stored preference with a decision they didn't make.
 function setTimelineCollapsed(c, opts){
   tlCollapsed=c;
-  $("#timeline").classList.toggle("collapsed",c);
+  $("#pxTimeline").classList.toggle("collapsed",c);
   $("#tlCollapseBtn").innerHTML=iconSVG(c?"chevUp":"chevDown",16);
   $("#tlCollapseBtn").title=c?"Expand the animation panel":"Collapse the animation panel";
   if(!(opts&&opts.auto)){ try{ localStorage.setItem("pp_tlCollapsed", c?"1":"0"); }catch(_){} }
@@ -3778,7 +2181,7 @@ function renderSheetPanel(){
   // On a phone the panels are tabs, so the Tile tool needs a tab to live in — including the
   // "no grid yet" state, which is the only route to the setup dialog there.
   const live=!!sheet || tool==="tile";
-  const tab=document.querySelector('#panelTabs .ptab[data-ptab="tiles"]');
+  const tab=PX.querySelector('#panelTabs .ptab[data-ptab="tiles"]');
   if(tab) tab.hidden=!live;
   const gr=$("#tileGridRow"); if(gr) gr.style.display=sheet?"":"none";   // nothing to toggle without a grid
   const gt=$("#tileGridToggle"); if(gt) gt.checked=showTileGrid;
@@ -7133,7 +5536,7 @@ function openVoxelStudio(model){
     $("#stSwatch").style.background=primary; $("#stHex").textContent=primary; $("#stCount").textContent=studioCount();
   };
   // ---- Sculpt ----
-  const setTool=t=>{ studio.tool=t; document.querySelectorAll(".st-tool").forEach(b=>b.classList.toggle("on", b.dataset.st===t)); };
+  const setTool=t=>{ studio.tool=t; PX.querySelectorAll(".st-tool").forEach(b=>b.classList.toggle("on", b.dataset.st===t)); };
   const sculptAt=(hit)=>{ const m=studio.model, {W,H,D}=m;
     const setV=(x,y,z,v)=>{ if(x<0||y<0||z<0||x>=W||y>=H||z>=D) return; m.vox[(z*H+y)*W+x]=v; };
     const has=(x,y,z)=> x>=0&&y>=0&&z>=0&&x<W&&y<H&&z<D && m.vox[(z*H+y)*W+x]!==0;
@@ -7161,7 +5564,7 @@ function openVoxelStudio(model){
     studio.keys.forEach((k,i)=>{ const b=document.createElement("button"); b.className="st-key"+(i===studio.key?" on":""); b.textContent=i+1;
       b.onclick=()=>{ studio.key=i; syncPoseSliders(); renderKeys(); draw(); }; el.appendChild(b); }); };
   const setMode=mode=>{ studio.mode=mode;
-    document.querySelectorAll(".st-mode").forEach(b=>b.classList.toggle("on", b.dataset.mode===mode));
+    PX.querySelectorAll(".st-mode").forEach(b=>b.classList.toggle("on", b.dataset.mode===mode));
     $("#stSculpt").style.display=mode==="sculpt"?"":"none";
     $("#stRig").style.display=mode==="rig"?"":"none";
     $("#stAnim").style.display=mode==="anim"?"":"none";
@@ -7185,8 +5588,8 @@ function openVoxelStudio(model){
       if(studio.mode==="sculpt"){ sculptAt(hit); draw(); }
       else if(studio.mode==="rig"){ assignAt(hit); renderBoneList(); draw(); } }
     dn=null; });
-  document.querySelectorAll(".st-mode").forEach(b=> b.onclick=()=>setMode(b.dataset.mode));
-  document.querySelectorAll(".st-tool").forEach(b=> b.onclick=()=>setTool(b.dataset.st));
+  PX.querySelectorAll(".st-mode").forEach(b=> b.onclick=()=>setMode(b.dataset.mode));
+  PX.querySelectorAll(".st-tool").forEach(b=> b.onclick=()=>setTool(b.dataset.st));
   $("#stMirror").checked=studio.mirror; $("#stMirror2").checked=studio.mirror;
   const setMirror=v=>{ studio.mirror=v; $("#stMirror").checked=v; $("#stMirror2").checked=v; };
   $("#stMirror").onchange=e=>setMirror(e.target.checked);
@@ -7395,7 +5798,7 @@ let lastPaintTool="pencil";
 function setTool(t){
   tool=t;
   if(PAINT_TOOLS.indexOf(t)>=0) lastPaintTool=t;
-  document.querySelectorAll(".tool").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
+  PX.querySelectorAll(".tool").forEach(b=>b.classList.toggle("active",b.dataset.tool===t));
   const names={pencil:"Pencil",brush:"Brush",eraser:"Eraser",bucket:"Fill",eyedropper:"Pick",line:"Line",rect:"Rectangle",ellipse:"Ellipse",select:"Select",wand:"Wand",region:"Region",tile:"Tile"};
   $("#toolInfo").textContent=names[t];
   const ts=$("#toolStat"); if(ts){ ts.firstChild.outerHTML=iconSVG(TOOL_ICONS[t]||"pencil",14); }
@@ -7469,7 +5872,7 @@ function setPanelTab(name){
   if(name==="tiles" && !sheet && tool!=="tile") name="none";   // no grid and no Tile tool, no tab
   panelTab=name;
   document.body.dataset.ptab=name;
-  document.querySelectorAll("#panelTabs .ptab").forEach(b=>{
+  PX.querySelectorAll("#panelTabs .ptab").forEach(b=>{
     const on = b.dataset.ptab===name;
     b.classList.toggle("active", on);
     b.title = (on?"Hide ":"Show ")+PANEL_NAMES[b.dataset.ptab];
@@ -7481,7 +5884,7 @@ function setPanelTab(name){
   drawRulers();
   paintOverlays();
 }
-document.querySelectorAll("#panelTabs .ptab").forEach(b=>{
+PX.querySelectorAll("#panelTabs .ptab").forEach(b=>{
   b.onclick=()=>setPanelTab(panelTab===b.dataset.ptab ? "none" : b.dataset.ptab);
 });
 // only meaningful on a phone, where the panels are tabs — on desktop they're all on screen anyway
@@ -7501,17 +5904,17 @@ let openMenu=null;
 function menuEl(name){ return $("#menu-"+name); }
 function closeMenus(){
   MENUS.forEach(n=>{ const m=menuEl(n); if(m) m.hidden=true; });
-  document.querySelectorAll(".menu-item.open").forEach(b=>b.classList.remove("open"));
+  PX.querySelectorAll(".menu-item.open").forEach(b=>b.classList.remove("open"));
   openMenu=null;
 }
 function openMenuFor(btn){
   const name=btn.dataset.menu; closeMenus(); const m=menuEl(name); if(!m) return;
-  document.querySelectorAll('.menu-item[data-menu="'+name+'"]').forEach(b=>b.classList.add("open"));
+  PX.querySelectorAll('.menu-item[data-menu="'+name+'"]').forEach(b=>b.classList.add("open"));
   openMenu=name;
   if(isMobileLayout()){ openMenuAt(m, 8, 52); }
   else { const r=btn.getBoundingClientRect(); openMenuAt(m, r.left, r.bottom+4); }
 }
-document.querySelectorAll("#menubar .menu-item, #menuSheet .menu-item").forEach(btn=>{
+PX.querySelectorAll("#pxMenubar .menu-item, #menuSheet .menu-item").forEach(btn=>{
   btn.addEventListener("click", e=>{ e.stopPropagation();
     if(openMenu===btn.dataset.menu) closeMenus();
     else { $("#menuSheet").hidden=true; openMenuFor(btn); }
@@ -7527,6 +5930,7 @@ function needTile(){
   return true;
 }
 function runCmd(cmd){
+  if(cmd.startsWith("app:")) return PX.dispatchEvent(new CustomEvent("pp-action",{detail:cmd.slice(4)}));
   switch(cmd){
     case "new": case "newtab": newCanvasDialog(); break;
     case "open": pickOpenProject(); break;
@@ -7598,7 +6002,7 @@ function runCmd(cmd){
     case "about": showAbout(); break;
   }
 }
-document.querySelectorAll(".menu-dd").forEach(dd=>dd.addEventListener("click",e=>{
+PX.querySelectorAll(".menu-dd").forEach(dd=>dd.addEventListener("click",e=>{
   const b=e.target.closest("[data-cmd]"); if(!b) return;
   runCmd(b.dataset.cmd); closeMenus();
 }));
@@ -7767,12 +6171,12 @@ function showContact(){
 }
 
 // ------------------------------------------------------------------ collapsible side sections
-document.querySelectorAll(".section.collapsible > h3.sec-h").forEach(h=>{
+PX.querySelectorAll(".section.collapsible > h3.sec-h").forEach(h=>{
   h.addEventListener("click",()=>{ h.parentElement.classList.toggle("collapsed"); });
 });
 
 // ------------------------------------------------------------------ wire events
-document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{
+PX.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{
   setTool(b.dataset.tool);
   if(isMobileLayout()) closeDrawers();   // picking a tool returns you to the canvas
 });
@@ -7917,6 +6321,7 @@ document.addEventListener("pointerdown",e=>{
 // Ctrl+V arrives here rather than through the key handler, so an image copied from another program
 // keeps priority; pixels copied inside the app are the fallback when the system clipboard has none.
 window.addEventListener("paste",e=>{
+  if(!pxOn()) return;
   if(!$("#modalRoot").hidden) return;
   const items=(e.clipboardData && e.clipboardData.items)||[];
   for(let i=0;i<items.length;i++){
@@ -7927,8 +6332,8 @@ window.addEventListener("paste",e=>{
   }
   if(pastePixelClip()) e.preventDefault();
 });
-window.addEventListener("dragover",e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="copy"; stage.classList.add("dragging"); });
-window.addEventListener("dragleave",e=>{ if(!e.relatedTarget) stage.classList.remove("dragging"); });
+window.addEventListener("dragover",e=>{ if(!pxOn()) return; e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="copy"; stage.classList.add("dragging"); });
+window.addEventListener("dragleave",e=>{ if(!pxOn()) return; if(!e.relatedTarget) stage.classList.remove("dragging"); });
 // .pxpaint files reach the browser with no MIME type at all, so they have to be recognised by
 // name — an image-type check alone rejects the app's own save format.
 const isProjectFile=f=>/\.(pxpaint|json)$/i.test(f.name||"") || f.type==="application/json";
@@ -7952,6 +6357,7 @@ function withHandle(map,file,fn){
   setTimeout(()=>go(null),500);   // a handle is a bonus; it never holds up opening the file
 }
 window.addEventListener("drop",e=>{
+  if(!pxOn()) return;
   e.preventDefault(); stage.classList.remove("dragging");
   const dt=e.dataTransfer; if(!dt) return;
   if(dt.files && dt.files.length){
@@ -8280,13 +6686,14 @@ $("#modalInput").addEventListener("keydown",e=>{
   else if(e.key==="Escape"){ e.preventDefault(); $("#modalCancel").click(); }
 });
 window.addEventListener("keydown",e=>{
-  if($("#modalRoot").hidden) return;
+  if(!pxOn() || $("#modalRoot").hidden) return;
   if(e.key==="Escape"){ e.preventDefault(); $("#modalCancel").click(); }
   else if(e.key==="Enter" && document.activeElement!==$("#modalInput")){ e.preventDefault(); $("#modalOk").click(); }
 }, true);
 
 // keyboard
 window.addEventListener("keydown",e=>{
+  if(!pxOn()) return;
   if(!$("#modalRoot").hidden) return;   // a dialog is open; it handles its own keys
   // Same reason: a menu's own checkboxes take focus, so Escape has to reach past the guard to
   // shut the frontmost thing on screen.
@@ -8415,22 +6822,9 @@ const icon192=makeIconDataURL(192), icon512=makeIconDataURL(512);
 // maskable icon is meant to be full-bleed under whatever shape the launcher crops it to. Those get
 // the app's own background; the favicons stay transparent.
 const solid192=makeIconDataURL(192, APP_BG), solid512=makeIconDataURL(512, APP_BG);
-{
-  // A 32px icon as well as the big one: the tab renders at 16–32px, and 32 halves to 16 exactly,
-  // so the art stays crisp instead of being smoothed down from 192.
-  const link=(rel,href,sizes)=>{
-    const l=document.createElement("link"); l.rel=rel; l.type="image/png"; l.href=href;
-    if(sizes) l.sizes=sizes; document.head.appendChild(l);
-  };
-  link("icon", makeIconDataURL(32), "32x32");
-  link("icon", icon192, "192x192");
-  link("apple-touch-icon", solid192);
-}
 // The PixelPaint app (index.html) owns the PWA manifest, service worker and updates.
 let deferredPrompt=null;
-window.addEventListener("beforeinstallprompt", e=>{ e.preventDefault(); deferredPrompt=e; $("#installBtn").style.display=""; });
 // install is triggered from the File menu (data-fa="install" -> doInstall)
-window.addEventListener("appinstalled", ()=>{ $("#installBtn").style.display="none"; showToast("PixelPaint installed!","success"); });
 
 $("#menuVersion").textContent=APP_VERSION;
 hydrateIcons();
@@ -8461,21 +6855,4 @@ restoreDocks();
 requestAnimationFrame(()=>{ fitZoom(); composite(); drawRulers(); });
 
 })();
-</script>
-<script>
-// Pixel mode bridge: this editor lives inside the PixelPaint app (index.html). Mode buttons and
-// Alt+1…5 switch modes there; opened on its own, it hands over to the app.
-(function(){
-  const host = window.parent !== window ? window.parent : null, go = m => host ? host.postMessage({ ppMode: m }, location.origin) : (location.href = "./?mode=" + m);
-  if (!host) return go("pixel");
-  // Room for the app's Pyxl in the tool rail, just above Help (the app places her over it).
-  const help = document.getElementById("helpBtn");
-  if (help) help.before(Object.assign(document.createElement("div"), { id: "pyxlSpot", style: "height:80px;flex:none;margin-top:auto" }));
-  document.querySelectorAll(".mode-switch [data-mode]").forEach(a => a.addEventListener("click", e => { e.preventDefault(); go(a.dataset.mode); }));
-  const MODES = ["paint", "zen", "notes", "paper", "pixel"];
-  addEventListener("keydown", e => { if (e.altKey && !e.ctrlKey && /^Digit[1-5]$/.test(e.code)) { e.preventDefault(); go(MODES[+e.code.slice(5) - 1]); } });
-  addEventListener("storage", e => { if (e.key === "pp.settings") try { document.body.classList.toggle("light", (JSON.parse(e.newValue) || {}).theme === "light"); } catch (_) {} });
 })();
-</script>
-</body>
-</html>

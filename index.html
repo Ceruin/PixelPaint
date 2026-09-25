@@ -15,6 +15,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/pixel.css">
 <script type="module" src="js/main.js"></script>
 </head>
 <body data-mode="paint">
@@ -30,7 +31,553 @@
   </main>
   <section id="timeline" class="timeline"></section>
   <section id="notes" class="notes" hidden></section>
-  <section id="pixel" class="pixel-mode" hidden><div class="mascot-slot pixel-pyxl" id="pixelSlot"></div></section>
+  <section id="pixel" hidden>
+<div id="pxApp">
+  <!-- TOP BAR: brand + menu bar -->
+  <div class="topbar">
+    <div class="brand"><em>P</em><em>i</em><em>x</em><em>e</em><em>l</em><b><i>P</i><i>a</i><i>i</i><i>n</i><i>t</i></b></div>
+    <button id="menuHamburger" class="iconbtn" data-icon="menu" title="Menu"></button>
+    <div class="menubar" id="pxMenubar">
+      <div class="menu-item" data-menu="file"   data-icon="folder"  data-icon-size="15">File</div>
+      <div class="menu-item" data-menu="edit"   data-icon="undo"    data-icon-size="15">Edit</div>
+      <div class="menu-item" data-menu="sprite" data-icon="image"   data-icon-size="15">Sprite</div>
+      <div class="menu-item" data-menu="layer"  data-icon="copy"    data-icon-size="15">Layer</div>
+      <div class="menu-item" data-menu="frame"  data-icon="play"    data-icon-size="15">Frame</div>
+      <div class="menu-item" data-menu="tiles"  data-icon="grid"    data-icon-size="15">Tiles</div>
+      <div class="menu-item" data-menu="select" data-icon="select"  data-icon-size="15">Select</div>
+      <div class="menu-item" data-menu="view"   data-icon="visible" data-icon-size="15">View</div>
+      <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="15">Help</div>
+    </div>
+    <!-- shared mode switch (wired by js/main.js) -->
+    <nav class="mode-switch" aria-label="Mode"><a class="mode-btn" href="#" data-mode="paint" title="Paint mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18.4 2.6a2 2 0 0 1 3 3L11 16l-3-3z"/><path d="M7 14c-2 0-3.5 1.5-3.5 3.5 0 1-.5 2-1.5 2.5 1 .7 2.3 1 3.5 1C8 21 10 19 10 17z"/></svg><span>Paint</span></a><a class="mode-btn" href="#" data-mode="zen" title="Zen mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a4.5 4.5 0 0 0 0 9 4.5 4.5 0 0 1 0 9"/></svg><span>Zen</span></a><a class="mode-btn" href="#" data-mode="notes" title="Notes mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8 12h8M8 16h5"/></svg><span>Notes</span></a><a class="mode-btn" href="#" data-mode="paper" title="Paper mode"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M9 12h8M9 16h8M9 8h3"/></svg><span>Paper</span></a><span class="mode-btn on" aria-current="page" data-mode="pixel"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h6v6H3zM9 9h6v6H9zM15 3h6v6h-6zM3 15h6v6H3zM15 15h6v6h-6z"/></svg><span>Pixel</span></span></nav>
+    <div class="group">
+      <button id="undoBtn" class="iconbtn" data-icon="undo" title="Undo (Ctrl+Z)"></button>
+      <button id="redoBtn" class="iconbtn" data-icon="redo" title="Redo (Ctrl+Y)"></button>
+    </div>
+    <button id="sideDrawerBtn" class="iconbtn drawer-btn" data-icon="palette" title="Colors, palette &amp; layers"></button>
+    <input type="file" id="openInput" accept=".pxpaint,.json,application/json" style="display:none" />
+    <input type="file" id="sheetInput" accept="image/*" style="display:none" />
+    <input type="file" id="packInput" accept="image/*,.pxpaint,.json,application/json" multiple style="display:none" />
+  </div>
+
+  <!-- TAB BAR (shown only when more than one drawing is open) -->
+  <div class="tabbar" id="tabbar" style="display:none">
+    <div class="tabs" id="tabs"></div>
+    <button id="newTabBtn" class="tab-add iconbtn" data-icon="add" data-icon-size="16" title="New tab"></button>
+  </div>
+
+  <!-- ===================== MENU DROPDOWNS ===================== -->
+  <div id="menu-file" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="new"    data-icon="new"      data-icon-size="16">New canvas…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="open"   data-icon="folder"   data-icon-size="16">Open project…<span class="hk">Ctrl+O</span></button>
+    <button data-cmd="openrecent" data-icon="clock" data-icon-size="16">Open recent…<span class="hk">Ctrl+Shift+O</span></button>
+    <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
+    <button data-cmd="pack"   data-icon="grid"     data-icon-size="16">Pack files into a sheet…</button>
+    <button data-cmd="save"   data-icon="save"     data-icon-size="16">Save project<span class="hk">Ctrl+S</span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
+    <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
+    <button data-cmd="aseprite" data-icon="grid"   data-icon-size="16">Export .aseprite…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="newtab"   data-icon="add"    data-icon-size="16">New tab</button>
+    <button data-cmd="rename" data-icon="pencil"   data-icon-size="16">Rename tab…</button>
+    <button data-cmd="closetab" data-icon="clear"  data-icon-size="16">Close tab</button>
+    <button id="installBtn" data-cmd="install" data-icon="download" data-icon-size="16" style="display:none">Install app</button>
+  </div>
+  <div id="menu-edit" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="undo" data-icon="undo" data-icon-size="16">Undo<span class="hk">Ctrl+Z</span></button>
+    <button data-cmd="redo" data-icon="redo" data-icon-size="16">Redo<span class="hk">Ctrl+Y</span></button>
+    <div class="ctx-sep"></div>
+    <div class="ctx-sep"></div>
+    <button data-cmd="copysel" data-icon="copy"      data-icon-size="16">Copy selection<span class="hk">Ctrl+C</span></button>
+    <button data-cmd="cutsel"  data-icon="clear"     data-icon-size="16">Cut selection<span class="hk">Ctrl+X</span></button>
+    <button data-cmd="pastesel" data-icon="clipboard" data-icon-size="16">Paste<span class="hk">Ctrl+V</span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="fliph" data-icon="swap" data-icon-size="16">Flip horizontal<span class="hk">Shift+H</span></button>
+    <button data-cmd="flipv" data-icon="swap" data-icon-size="16">Flip vertical<span class="hk">Shift+V</span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
+  </div>
+  <div id="menu-sprite" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="resize" data-icon="select" data-icon-size="16">Resize canvas…</button>
+    <button data-cmd="trim" data-icon="center" data-icon-size="16">Trim to the artwork</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="rotr" data-icon="rotR" data-icon-size="16">Rotate canvas 90° right</button>
+    <button data-cmd="rotl" data-icon="rotL" data-icon-size="16">Rotate canvas 90° left</button>
+    <button data-cmd="rot180" data-icon="redo" data-icon-size="16">Rotate canvas 180°</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="addimage" data-icon="image" data-icon-size="16">Add image…</button>
+    <button data-cmd="importsheet" data-icon="image" data-icon-size="16">Import spritesheet…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="voxel3d" data-icon="grid" data-icon-size="16">Pseudo-3D…</button>
+    <button data-cmd="voxelstudio" data-icon="grid" data-icon-size="16">3D Voxel Studio…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="export" data-icon="download" data-icon-size="16">Export PNG…</button>
+    <button data-cmd="sheet"  data-icon="image"    data-icon-size="16">Export spritesheet…</button>
+  </div>
+  <div id="menu-layer" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="addlayer" data-icon="add"  data-icon-size="16">New layer</button>
+    <button data-cmd="duplayer" data-icon="copy" data-icon-size="16">Duplicate layer</button>
+    <button data-cmd="dellayer" data-icon="trash" data-icon-size="16">Delete layer</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="uplayer"   data-icon="up"   data-icon-size="16">Move up</button>
+    <button data-cmd="downlayer" data-icon="down" data-icon-size="16">Move down</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="mergedown" data-icon="down"  data-icon-size="16">Merge down</button>
+    <button data-cmd="flatten"   data-icon="image" data-icon-size="16">Flatten this frame</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="clearlayer" data-icon="clear" data-icon-size="16">Clear layer</button>
+  </div>
+  <div id="menu-frame" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="addframe" data-icon="add"   data-icon-size="16">New frame</button>
+    <button data-cmd="addempty" data-icon="new"   data-icon-size="16">New empty frame</button>
+    <button data-cmd="delframe" data-icon="trash" data-icon-size="16">Delete frame</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="framerate" data-icon="clock" data-icon-size="16">Frame rate…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="addgroup" data-icon="tag" data-icon-size="16">New frame group…</button>
+    <button data-cmd="addtag"   data-icon="tag" data-icon-size="16">Group existing frames…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="reverse" data-icon="redo" data-icon-size="16">Reverse frames</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="play"   data-icon="play" data-icon-size="16">Play / stop<span class="hk">Space</span></button>
+    <button data-cmd="sheet"  data-icon="image" data-icon-size="16">Export spritesheet…</button>
+  </div>
+  <div id="menu-tiles" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="tilesetup" data-icon="grid"   data-icon-size="16">Tilesheet setup…</button>
+    <button data-cmd="tiletool"  data-icon="region" data-icon-size="16">Tile tool<span class="hk">T</span></button>
+    <button data-cmd="pack"      data-icon="folder" data-icon-size="16">Pack files into a tilesheet…</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="tilerowup"    data-icon="up"    data-icon-size="16">Add a row above</button>
+    <button data-cmd="tilerowdown"  data-icon="down"  data-icon-size="16">Add a row below</button>
+    <button data-cmd="tilecolleft"  data-icon="left"  data-icon-size="16">Add a column left</button>
+    <button data-cmd="tilecolright" data-icon="right" data-icon-size="16">Add a column right</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="tilejoin"  data-icon="copy"   data-icon-size="16">Join the picked tiles<span class="hk">Shift+click</span></button>
+    <button data-cmd="tilesplit" data-icon="grid"   data-icon-size="16">Split this joined tile</button>
+    <button data-cmd="tileclip"  data-icon="region" data-icon-size="16">Tile clipping on / off</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="tilerename" data-icon="pencil" data-icon-size="16">Rename this tile…</button>
+    <button data-cmd="tileclear"  data-icon="clear"  data-icon-size="16">Clear this tile</button>
+    <button data-cmd="tiledelrow" data-icon="trash"  data-icon-size="16">Delete this row</button>
+    <button data-cmd="tiledelcol" data-icon="trash"  data-icon-size="16">Delete this column</button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="exporttiles" data-icon="download" data-icon-size="16">Export tiles…</button>
+    <button data-cmd="tilesoff"    data-icon="clear"    data-icon-size="16">Turn off the tile grid</button>
+  </div>
+  <div id="menu-select" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="selectall" data-icon="select" data-icon-size="16">Select all<span class="hk">Ctrl+A</span></button>
+    <button data-cmd="deselect"  data-icon="clear"  data-icon-size="16">Deselect<span class="hk">Ctrl+D</span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="transform" data-icon="select" data-icon-size="16">Resize / rotate the selection<span class="hk">Ctrl+T</span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="wandtool" data-icon="wand" data-icon-size="16">Magic wand tool</button>
+    <button data-cmd="snap" data-icon="palette" data-icon-size="16">Snap to palette</button>
+  </div>
+  <div id="menu-view" class="ctx-menu menu-dd has-checks" hidden>
+    <div class="dd-zoom">
+      <button id="zoomOut" data-icon="minus" data-icon-size="16" title="Zoom out (-)"></button>
+      <span id="zoomReadout">1600%</span>
+      <button id="zoomIn" data-icon="add" data-icon-size="16" title="Zoom in (+)"></button>
+    </div>
+    <button id="zoomFit" data-cmd="fit" data-icon="center" data-icon-size="16">Fit to window</button>
+    <div class="ctx-sep"></div>
+    <label class="chk"><input type="checkbox" id="gridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Grid<span class="hk">G</span></label>
+    <label class="chk"><input type="checkbox" id="centerToggle" checked /><span class="mi" data-icon="center" data-icon-size="15"></span>Center guide</label>
+    <label class="chk"><input type="checkbox" id="onionToggle" /><span class="mi" data-icon="copy" data-icon-size="15"></span>Onion skin<span class="hk">F3</span></label>
+    <label class="chk" id="onionTintRow" style="display:none"><input type="checkbox" id="onionTintToggle" checked /><span class="mi" data-icon="swap" data-icon-size="15"></span>Onion red/blue tint</label>
+    <label class="chk" id="tileGridRow"><input type="checkbox" id="tileGridToggle" checked /><span class="mi" data-icon="grid" data-icon-size="15"></span>Tile grid</label>
+    <label class="chk"><input type="checkbox" id="regionToggleMenu" /><span class="mi" data-icon="region" data-icon-size="15"></span>Sub-canvas</label>
+    <button data-cmd="delregion" data-icon="trash" data-icon-size="16">Remove sub-canvas<span class="hk">Del</span></button>
+    <div class="ctx-sep"></div>
+    <!-- desktop: any dock can be folded away so the canvas gets the window. On mobile these
+         panels are already tabs, so the toggles are hidden there. -->
+    <div class="dd-docks">
+      <label class="chk"><input type="checkbox" id="dockTools" checked /><span class="mi" data-icon="pencil" data-icon-size="15"></span>Tools panel</label>
+      <label class="chk"><input type="checkbox" id="dockSide" checked /><span class="mi" data-icon="palette" data-icon-size="15"></span>Color &amp; layers panel</label>
+      <label class="chk"><input type="checkbox" id="dockAnim" checked /><span class="mi" data-icon="play" data-icon-size="15"></span>Animation panel</label>
+    </div>
+  </div>
+  <div id="menu-help" class="ctx-menu menu-dd" hidden>
+    <button data-cmd="shortcuts" data-icon="info" data-icon-size="16">Help &amp; shortcuts<span class="hk">?</span></button>
+    <button data-cmd="contact" data-icon="mail" data-icon-size="16">Contact, suggestions &amp; bugs…</button>
+    <button data-cmd="about" data-icon="info" data-icon-size="16">About PixelPaint<span class="hk" id="menuVersion"></span></button>
+    <div class="ctx-sep"></div>
+    <button data-cmd="app:help.guide" data-icon="info" data-icon-size="16">Getting started</button>
+    <button data-cmd="app:app.welcome" data-icon="palette" data-icon-size="16">Say hi to Pyxl</button>
+    <button data-cmd="app:view.theme" data-icon="palette" data-icon-size="16">Light / dark theme</button>
+    <button data-cmd="app:help.update" data-icon="download" data-icon-size="16">Check for updates…</button>
+    <button data-cmd="app:help.reload" data-icon="rotR" data-icon-size="16">Reload app</button>
+  </div>
+
+  <!-- mobile: hamburger opens a simple stacked menu list. Icons here only — the desktop menu
+       bar stays plain text, the way a menu bar is expected to look. -->
+  <div id="menuSheet" hidden>
+    <div class="menu-item" data-menu="file"   data-icon="folder"  data-icon-size="17">File</div>
+    <div class="menu-item" data-menu="edit"   data-icon="undo"    data-icon-size="17">Edit</div>
+    <div class="menu-item" data-menu="sprite" data-icon="image"   data-icon-size="17">Sprite</div>
+    <div class="menu-item" data-menu="layer"  data-icon="copy"    data-icon-size="17">Layer</div>
+    <div class="menu-item" data-menu="frame"  data-icon="play"    data-icon-size="17">Frame</div>
+    <div class="menu-item" data-menu="tiles"  data-icon="grid"    data-icon-size="17">Tiles</div>
+    <div class="menu-item" data-menu="select" data-icon="select"  data-icon-size="17">Select</div>
+    <div class="menu-item" data-menu="view"   data-icon="visible" data-icon-size="17">View</div>
+    <div class="menu-item" data-menu="help"   data-icon="info"    data-icon-size="17">Help</div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- TOOLS -->
+    <div class="tools" id="toolPanel">
+      <div class="toolhead" data-icon="pencil" data-icon-size="12">Tools</div>
+      <div class="toolgrid">
+        <button class="tool" data-tool="pencil"     data-icon="pencil"  title="Pencil (B)"></button>
+        <button class="tool" data-tool="brush"      data-icon="brush"   title="Brush - smooth, pressure-sensitive (P)"></button>
+        <button class="tool" data-tool="eraser"     data-icon="eraser"  title="Eraser (E)"></button>
+        <button class="tool" data-tool="bucket"     data-icon="fill"    title="Fill (F)"></button>
+        <button class="tool" data-tool="eyedropper" data-icon="pick"    title="Pick color (I)"></button>
+        <button class="tool" data-tool="line"       data-icon="line"    title="Line (L)"></button>
+        <button class="tool" data-tool="rect"       data-icon="rect"    title="Rectangle (R)"></button>
+        <button class="tool" data-tool="ellipse"    data-icon="ellipse" title="Ellipse (C)"></button>
+        <button class="tool" data-tool="select"     data-icon="select"  title="Rectangle select (M)"></button>
+        <button class="tool" data-tool="wand"       data-icon="wand"    title="Magic wand — select by color (W)"></button>
+        <button class="tool" data-tool="region"     data-icon="region"  title="Sub-canvas — drag a draw area (D)"></button>
+        <button class="tool" data-tool="tile"       data-icon="grid"    title="Tiles — pick a tile, then + to add rows and columns (T)"></button>
+      </div>
+
+      <div class="brush-sec">
+        <div class="toolhead" data-icon="brush" data-icon-size="13">Brush</div>
+        <div class="brushbtns">
+          <button id="brushDown" class="iconbtn" title="Smaller brush ([)">−</button>
+          <span id="brushReadout">1 px</span>
+          <button id="brushUp" class="iconbtn" title="Bigger brush (])">+</button>
+        </div>
+      </div>
+
+      <!-- contextual options for the active tool -->
+      <div id="toolOpts">
+        <div class="opt-brush">
+          <div class="toolhead" data-icon="brush" data-icon-size="12">Brush</div>
+          <label class="opt-range" title="How much paint each dab lays down. Overlapping dabs build up.">Flow <input type="range" id="brushFlow" min="5" max="100" value="100" /></label>
+          <label class="opt-range" title="Steadies the line by trailing the pen. Higher = smoother, laggier.">Smoothing <input type="range" id="brushSmooth" min="0" max="90" value="30" /></label>
+          <label class="chk"><input type="checkbox" id="pressureSize" checked /> Pressure: size</label>
+          <label class="chk"><input type="checkbox" id="pressureFlow" /> Pressure: flow</label>
+        </div>
+        <div class="opt-shape">
+          <div class="toolhead" data-icon="rect" data-icon-size="12">Shape</div>
+          <label class="chk" title="Solid: paint every pixel inside the shape. Off: draw only the 1px outline."><input type="checkbox" id="fillShape" /> Solid fill</label>
+          <div class="opt-hint">Off = outline only.</div>
+        </div>
+        <div class="opt-wand">
+          <div class="toolhead" data-icon="wand" data-icon-size="12">Wand</div>
+          <div class="brushbtns">
+            <span style="color:var(--muted)">Tol</span>
+            <input type="number" id="wandTol" min="0" max="255" value="32" style="flex:1; min-width:0; width:auto" title="Color tolerance: 0 = exact match, higher = looser" />
+          </div>
+          <label class="chk" style="margin-top:8px"><input type="checkbox" id="wandContig" checked /> Contiguous</label>
+        </div>
+        <div class="opt-region">
+          <div class="toolhead" data-icon="region" data-icon-size="12">Sub-canvas</div>
+          <button id="regionCreate2" style="width:100%" data-icon="region" data-icon-size="15">Draw area</button>
+        </div>
+      </div>
+
+      <input type="file" id="imgInput" accept="image/*" hidden />
+      <!-- the tips that used to sit here as permanent small print now live in the help sheet -->
+      <div id="pyxlSpot"></div>
+      <button id="helpBtn" class="helpbtn" data-icon="info" data-icon-size="15"
+              title="Shortcuts, mouse and touch gestures (?)"><span class="btxt">Help</span></button>
+    </div>
+
+    <!-- CANVAS AREA (rulers + stage) -->
+    <div class="canvasarea">
+      <div class="ruler-corner"></div>
+      <canvas id="rulerTop"></canvas>
+      <canvas id="rulerLeft"></canvas>
+      <div class="stage" id="pxStage">
+        <div class="canvas-wrap" id="wrap">
+          <canvas id="pxView"></canvas>
+        </div>
+        <canvas id="placeOverlay" hidden></canvas>
+        <div class="place-bar" id="placeBar" hidden>
+          <span class="info"><span data-icon="image" data-icon-size="15"></span><span id="placeSize">—</span></span>
+          <button id="placeActual" title="Actual size (1:1)">1:1</button>
+          <button id="placeFit" title="Fit to canvas">Fit</button>
+          <button id="placeRotL" class="iconbtn" data-icon="rotL" data-icon-size="17" title="Rotate 90° left"></button>
+          <button id="placeRotR" class="iconbtn" data-icon="rotR" data-icon-size="17" title="Rotate 90° right"></button>
+          <button id="placeSnapBtn" data-icon="grid" data-icon-size="15" title="Snap to whole pixels while dragging — hold Shift for the other behaviour, or nudge with the arrow keys">Snap</button>
+          <button id="placeCommit" class="primary" data-icon="check" title="Place image (Enter)">Place</button>
+          <button id="placeCancel" data-icon="clear" title="Cancel / right-click for more (Esc)">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDE -->
+    <div class="side" id="sidePanel">
+      <!-- mobile only: switches the panel between Color, Layers and the animation timeline.
+           Stays pinned while the panel body scrolls under it. -->
+      <div class="panel-tabs" id="panelTabs" role="tablist">
+        <button class="ptab" data-ptab="color"  data-icon="palette" data-icon-size="15" title="Color &amp; palette">Color</button>
+        <button class="ptab" data-ptab="anim"   data-icon="play"    data-icon-size="15" title="Frames &amp; layers">Anim</button>
+        <button class="ptab" data-ptab="tiles"  data-icon="grid"    data-icon-size="15" title="Tilesheet grid" hidden>Tiles</button>
+      </div>
+      <div class="mobile-cols">
+      <div class="section collapsible" id="colorSection">
+        <h3 class="sec-h" data-sec="colorSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="palette" data-icon-size="14"></span>Color</h3>
+        <div class="sec-body">
+          <div class="colorrow">
+            <div class="dualswatch">
+              <div class="sw" id="secondarySwatch" title="Background — right-click a palette color, or right-drag on the canvas"></div>
+              <div class="sw" id="primarySwatch" title="Foreground — left-click a palette color, or left-drag on the canvas"></div>
+              <button class="swap" id="swapColors" data-icon="swap" data-icon-size="14" title="Swap foreground / background (X)"></button>
+            </div>
+            <div class="col">
+              <div class="hexrow">
+                <input type="text" id="hexInput" value="#000000" spellcheck="false" />
+                <button id="cpEyedrop" class="iconbtn" data-icon="pick" data-icon-size="16" title="Pick a color from anywhere on screen"></button>
+              </div>
+            </div>
+          </div>
+          <!-- Aseprite-style inline colour picker: SV field, hue bar and RGB, always visible -->
+          <div class="cp-sv" id="cpSV"><div class="cp-dot" id="cpSVDot"></div></div>
+          <div class="cp-hue" id="cpHue"><div class="cp-dot" id="cpHueDot"></div></div>
+          <div class="cp-rgb">
+            <label>R<input type="number" id="cpR" min="0" max="255" /></label>
+            <label>G<input type="number" id="cpG" min="0" max="255" /></label>
+            <label>B<input type="number" id="cpB" min="0" max="255" /></label>
+          </div>
+          <div class="recents" id="recents"></div>
+          <select id="paletteSelect" style="width:100%; margin-top:10px"></select>
+          <div class="palette" id="paletteGrid"></div>
+          <div class="pal-resize" id="palResize" title="Drag to resize the palette"><span class="grip"></span></div>
+          <button id="palAddColor" data-icon="add" data-icon-size="15" style="width:100%; margin-top:8px;" title="Add the current foreground color to this palette">Add current color</button>
+          <div class="btnrow" id="palTools" style="margin-top:7px">
+            <button id="palNew"    data-icon="palette"  data-icon-size="15" title="New empty palette…"></button>
+            <button id="palDup"    data-icon="copy"     data-icon-size="15" title="Duplicate this palette so you can edit it"></button>
+            <button id="palRename" data-icon="pencil"   data-icon-size="15" title="Rename this palette"></button>
+            <button id="palImport" data-icon="folder"   data-icon-size="15" title="Import a palette (.hex .txt .gpl .json)"></button>
+            <button id="palExport" data-icon="download" data-icon-size="15" title="Export this palette as a .hex list"></button>
+            <button id="palDel"    data-icon="trash"    data-icon-size="15" title="Delete this palette"></button>
+          </div>
+          <button id="applyPaletteBtn" data-icon="palette" style="width:100%; margin-top:8px;" title="Remap the active layer (or the current selection) to the nearest colors in this palette">Snap to this palette</button>
+          <input type="file" id="palFileInput" accept=".hex,.txt,.gpl,.json,.pal,text/plain" hidden />
+        </div>
+      </div>
+
+      <!-- Layers moved into the timeline grid (rows = layers), with their toolbar in the grid's
+           top-left corner — the side panel keeps only colour & palette. -->
+      </div>
+
+      <!-- Tilesheet grid (shown when the drawing has a grid, or the Tile tool is picked) -->
+      <div class="section collapsible" id="sheetSection" style="display:none">
+        <h3 class="sec-h" data-sec="sheetSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="grid" data-icon-size="14"></span>Tilesheet</h3>
+        <div class="sec-body">
+        <div id="sheetNone">
+          <button id="tsCreate" data-icon="grid" style="width:100%">Set up a tilesheet…</button>
+          <div class="hint" style="padding:7px 0 0; margin:0">Cuts this canvas into a grid of named tiles — rows and columns, each with its own size. Pick a tile and the four <b>+</b> buttons around it add a row above or below, or a column left or right.</div>
+        </div>
+        <div id="sheetCtl" style="display:none">
+          <div class="ts-sum" id="tsSummary"></div>
+          <div class="ts-pick"><span data-icon="region" data-icon-size="13"></span><span id="tsSel">No tile picked</span></div>
+          <div class="rg-row"><span class="rg-lbl">Name</span>
+            <input type="text" id="tsName" spellcheck="false" data-needsel style="flex:1; min-width:0" title="Name this tile — it becomes the file name when you export tiles separately" /></div>
+          <div class="rg-row"><span class="rg-lbl">Size</span>
+            <input type="number" id="tsTileW" min="1" max="512" data-needsel title="Width of this tile's column" /><span class="rg-x">×</span>
+            <input type="number" id="tsTileH" min="1" max="512" data-needsel title="Height of this tile's row" />
+            <span style="color:var(--muted); font-size:11px">this row / column</span></div>
+          <!-- the four inserts, laid out the way they act -->
+          <div class="ts-pad">
+            <button class="ts-up"    data-cmd="tilerowup"    data-icon="up"    data-icon-size="15" data-needsel title="Add a row above this tile">Row</button>
+            <button class="ts-left"  data-cmd="tilecolleft"  data-icon="left"  data-icon-size="15" data-needsel title="Add a column to the left">Col</button>
+            <button class="ts-right" data-cmd="tilecolright" data-icon="right" data-icon-size="15" data-needsel title="Add a column to the right">Col</button>
+            <button class="ts-down"  data-cmd="tilerowdown"  data-icon="down"  data-icon-size="15" data-needsel title="Add a row below this tile">Row</button>
+          </div>
+          <div class="btnrow" style="margin-top:8px">
+            <button data-cmd="tilerename" data-icon="pencil" data-icon-size="15" data-needsel title="Rename this tile"></button>
+            <button data-cmd="tileclear"  data-icon="clear"  data-icon-size="15" data-needsel title="Clear this tile on the active layer"></button>
+            <button data-cmd="tiledelrow" data-icon="trash"  data-icon-size="15" data-needsel class="danger" title="Delete the row this tile is in"><span class="ts-lb">Row</span></button>
+            <button data-cmd="tiledelcol" data-icon="trash"  data-icon-size="15" data-needsel class="danger" title="Delete the column this tile is in"><span class="ts-lb">Col</span></button>
+          </div>
+          <!-- one bigger tile out of several cells: pick a corner, Shift-click the far one, Join -->
+          <div class="btnrow" style="margin-top:7px">
+            <button id="tsJoin"  data-cmd="tilejoin"  data-icon="copy" data-icon-size="15" title="Make the picked cells act as one larger tile — one sub-canvas, one name, one file on export"><span class="ts-lb">Join</span></button>
+            <button id="tsSplit" data-cmd="tilesplit" data-icon="grid" data-icon-size="15" title="Break a joined tile back into its cells"><span class="ts-lb">Split</span></button>
+          </div>
+          <div class="hint" style="padding:6px 0 0; margin:0">Shift-click a second tile to pick a block, then <b>Join</b> — a 32×32 tile on a 16×16 grid.</div>
+          <div class="rg-row" style="margin-top:9px"><span class="rg-lbl">Gaps</span>
+            <input type="number" id="tsGapIn" min="0" max="64" title="Spacing between tiles" />
+            <span class="rg-x">/</span>
+            <input type="number" id="tsPadIn" min="0" max="64" title="Margin around the whole sheet" />
+            <span style="color:var(--muted); font-size:11px">between / around</span></div>
+          <label class="chk" style="margin-top:2px" title="On by default for a tilesheet: a stroke is fenced into the tile it starts in, so neighbours can't be damaged. Click into any tile to work on it."><input type="checkbox" id="tsClip" /><span data-icon="region" data-icon-size="14"></span> Each tile is its own sub-canvas</label>
+          <div class="btnrow" style="margin-top:9px">
+            <button data-cmd="tilesetup"   data-icon="grid"     data-icon-size="15" title="Grid size, tile size and spacing">Setup</button>
+            <button data-cmd="exporttiles" data-icon="download" data-icon-size="15" title="Export the sheet, or one PNG per tile">Export</button>
+          </div>
+          <button data-cmd="tilesoff" data-icon="clear" data-icon-size="15" style="width:100%; margin-top:7px" title="Keep the artwork, drop the grid">Turn off the tile grid</button>
+        </div>
+        </div>
+      </div>
+
+      <!-- Sub-canvas controls (shown when the Region tool is active) -->
+      <div class="section collapsible" id="regionSection" style="display:none">
+        <h3 class="sec-h" data-sec="regionSection"><span class="chev" data-icon="chevDown" data-icon-size="14"></span><span data-icon="region" data-icon-size="14"></span>Sub-canvas</h3>
+        <div class="sec-body">
+        <div id="regionNone">
+          <button id="regionCreate" data-icon="region" style="width:100%">Create draw area</button>
+          <div class="hint" style="padding:7px 0 0; margin:0">A box you can draw inside but not outside. Create one, set its size, then Lock it. Or use the Region tool (D) to drag it on the canvas. Remove it any time with the <b>✕</b> on its top-right corner.</div>
+        </div>
+        <div id="regionCtl" style="display:none">
+          <div class="rg-row"><span class="rg-lbl">Size</span>
+            <input type="number" id="rgW" min="1" max="512" /><span class="rg-x">×</span><input type="number" id="rgH" min="1" max="512" /></div>
+          <div class="rg-row"><span class="rg-lbl">Pos</span>
+            <input type="number" id="rgX" min="0" /><span class="rg-x">,</span><input type="number" id="rgY" min="0" /></div>
+          <div class="rg-row" style="gap:8px; margin-top:2px">
+            <label class="chk"><input type="checkbox" id="rgLock" /><span data-icon="lock" data-icon-size="14"></span> Lock</label>
+            <button id="rgCenter">Center</button>
+            <button id="rgRemove" class="danger" title="Delete the sub-canvas and draw on the whole canvas again (Del)">Remove</button>
+          </div>
+          <div class="hint" style="padding:7px 0 0; margin:0">Tap the <b>✕</b> on its top-right corner to remove it. <b>Del</b> and View ▸ Remove sub-canvas work too.</div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIMELINE (frames, playback, tags) -->
+  <div class="timeline" id="pxTimeline">
+    <div class="tl-bar">
+      <button id="tlCollapseBtn" class="iconbtn" title="Collapse / expand the animation panel"></button>
+      <span id="tlSummary" title="Expand the animation panel">Animation</span>
+      <span class="tl-transport">
+        <button id="firstFrameBtn" class="iconbtn" data-icon="first" data-icon-size="16" title="First frame (Home)"></button>
+        <button id="prevFrameBtn"  class="iconbtn" data-icon="left"  data-icon-size="16" title="Previous frame (←)"></button>
+        <button id="playBtn" class="iconbtn" title="Play / stop (Space)"></button>
+        <button id="nextFrameBtn"  class="iconbtn" data-icon="right" data-icon-size="16" title="Next frame (→)"></button>
+        <button id="lastFrameBtn"  class="iconbtn" data-icon="last"  data-icon-size="16" title="Last frame (End)"></button>
+      </span>
+      <label class="chk"><input type="checkbox" id="loopToggle" checked /> Loop</label>
+      <span class="tl-field"><span class="lbl">Frame</span><input type="number" id="frameDur" min="10" max="5000" value="120" title="Duration of this frame (right-click a frame ▸ Frame rate to set them all)" /><span class="muted">ms</span></span>
+      <button id="fpsBtn" data-icon="clock" data-icon-size="15" title="Set the frame rate for every frame (FPS)">FPS…</button>
+      <span class="vsep"></span>
+      <span class="tl-field"><span class="lbl">Opacity</span><input type="range" id="opacitySlider" min="0" max="100" value="100" title="Opacity of the active layer" style="width:88px" /><span id="opacityVal" class="muted">100</span></span>
+      <span class="vsep"></span>
+      <button id="addGroupBtn" data-icon="tag" data-icon-size="15" title="Add a group of frames (idle, walk, jump…) you can play and export on its own">Group</button>
+      <span class="tl-grow"></span>
+      <button id="addFrameBtn" data-icon="add" data-icon-size="16" title="New frame (copies the current one)">Frame</button>
+    </div>
+    <!-- one tab per frame group; the selected tab is what the strip shows and what Play plays -->
+    <div class="tl-tabs" id="tlTabs" hidden></div>
+    <div class="tl-frames" id="tlFrames"></div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="statusbar">
+    <span id="layerInfo">Layer: —</span>
+    <span id="cursorInfo">—</span>
+    <span id="selInfo" style="color:var(--accent)"></span>
+    <span class="sp"></span>
+    <span class="sb-btn" id="docInfo" title="Canvas size — click to resize or trim">32 × 32</span>
+    <span class="sb-btn" id="zoomStat" title="Zoom to fit"><span data-icon="wand" data-icon-size="14"></span><span id="zoomStatVal">600%</span></span>
+    <span class="sb-btn" id="toolStat"><span data-icon="pencil" data-icon-size="14"></span><span id="toolInfo">Pencil</span></span>
+  </div>
+</div>
+
+<!-- dimmer behind the mobile popout drawers -->
+<div id="panelBackdrop" class="panel-backdrop"></div>
+
+<!-- themed modal (confirm / prompt / alert) -->
+<div id="modalRoot" class="modal-root" hidden>
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <h3 id="modalTitle"></h3>
+    <p id="modalMsg"></p>
+    <div id="modalBody"></div>
+    <input type="text" id="modalInput" spellcheck="false" />
+    <div class="modal-actions">
+      <button id="modalCancel">Cancel</button>
+      <button id="modalOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+<!-- themed transient toasts -->
+<div id="toastRoot" class="toast-root"></div>
+
+<!-- themed color picker (in-app, so it matches the rest of the UI) -->
+<!-- (the colour picker is now docked inline in the Color panel) -->
+
+<!-- right-click menu for a pasted/dropped image -->
+<div id="ctxMenu" class="ctx-menu" hidden>
+  <button data-action="actual">Actual size (1:1)</button>
+  <button data-action="fit">Fit to canvas</button>
+  <button data-action="fill">Fill canvas</button>
+  <button data-action="center">Center</button>
+  <div class="ctx-sep"></div>
+  <button data-action="flipH">Flip horizontal</button>
+  <button data-action="flipV">Flip vertical</button>
+  <div class="ctx-sep"></div>
+  <button data-action="rotL">Rotate 90° left</button>
+  <button data-action="rotR">Rotate 90° right</button>
+  <button data-action="rotAny">Rotate by an angle…</button>
+  <div class="ctx-sep"></div>
+  <button data-action="place">Place</button>
+  <button data-action="cancel">Cancel</button>
+</div>
+
+<!-- right-click / long-press menu for a frame in the timeline -->
+<div id="frameMenu" class="ctx-menu" hidden>
+  <button data-action="newframe" data-icon="add"   data-icon-size="16">New frame</button>
+  <button data-action="newempty" data-icon="new"   data-icon-size="16">New empty frame</button>
+  <button data-action="dup"   data-icon="copy"      data-icon-size="16">Duplicate frame</button>
+  <div class="ctx-sep"></div>
+  <button data-action="copy"  data-icon="copy"      data-icon-size="16">Copy frame</button>
+  <button data-action="paste" data-icon="clipboard" data-icon-size="16">Paste frame after</button>
+  <div class="ctx-sep"></div>
+  <button data-action="left"  data-icon="left"  data-icon-size="16">Move left<span class="hk">⇧←</span></button>
+  <button data-action="right" data-icon="right" data-icon-size="16">Move right<span class="hk">⇧→</span></button>
+  <button data-action="reverse" data-icon="redo" data-icon-size="16">Reverse frames</button>
+  <div class="ctx-sep"></div>
+  <button data-action="tag"  data-icon="tag"   data-icon-size="16">New tag…</button>
+  <button data-action="fps"  data-icon="clock" data-icon-size="16">Frame rate (all)…</button>
+  <button data-action="dur"  data-icon="clock" data-icon-size="16">This frame's duration…</button>
+  <div class="ctx-sep"></div>
+  <button data-action="del"   data-icon="trash" data-icon-size="16">Delete frame</button>
+</div>
+
+<!-- right-click menu for a layer row in the timeline grid -->
+<div id="layerMenu" class="ctx-menu" hidden>
+  <button data-action="add"  data-icon="add"  data-icon-size="16">New layer</button>
+  <button data-action="dup"  data-icon="copy" data-icon-size="16">Duplicate layer</button>
+  <div class="ctx-sep"></div>
+  <button data-action="up"   data-icon="up"   data-icon-size="16">Move up</button>
+  <button data-action="down" data-icon="down" data-icon-size="16">Move down</button>
+  <button data-action="merge" data-icon="down" data-icon-size="16">Merge down</button>
+  <button data-action="flatten" data-icon="image" data-icon-size="16">Flatten all</button>
+  <div class="ctx-sep"></div>
+  <button data-action="rename" data-icon="pencil"  data-icon-size="16">Rename…</button>
+  <button data-action="visible" data-icon="visible" data-icon-size="16">Show / hide</button>
+  <button data-action="lock" data-icon="lock" data-icon-size="16">Lock / unlock</button>
+  <button data-action="clear" data-icon="clear" data-icon-size="16">Clear layer</button>
+  <div class="ctx-sep"></div>
+  <button data-action="del"  data-icon="trash" data-icon-size="16">Delete layer</button>
+</div>
+
+<!-- right-click menu for a selection -->
+<div id="selMenu" class="ctx-menu" hidden>
+  <button data-action="transform">Resize / rotate…</button>
+  <div class="ctx-sep"></div>
+  <button data-action="copy">Copy</button>
+  <button data-action="cut">Cut</button>
+  <div class="ctx-sep"></div>
+  <button data-action="fill">Fill with foreground</button>
+  <button data-action="snap">Snap to palette</button>
+  <button data-action="clear">Clear (delete)</button>
+  <div class="ctx-sep"></div>
+  <button data-action="selectall">Select all</button>
+  <button data-action="deselect">Deselect</button>
+</div>
+  </section>
+  <div class="mascot-slot pixel-pyxl" id="pixelSlot" hidden></div>
   <footer class="statusbar" id="statusbar"></footer>
 </div>
 </body>
