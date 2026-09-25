@@ -36,36 +36,42 @@ export function setOutfit(hex) {
   c.putImageData(img, 0, 0);
 }
 const sheet = () => (outfitHex ? outfitAtlas : atlas);
-// name: [x, y, w, h, anchorX (beret centre), feet line]
+// name: [x, y, w, h, anchorX (beret centre), feet line]. 'side' faces left natively, action poses face right.
 export const SPRITES = {
-  idle0: [0, 5, 48, 54, 23, 52], idle1: [49, 5, 50, 54, 22, 52], walk: [100, 5, 51, 54, 22, 52], brush: [152, 5, 61, 54, 22, 52],
-  paint: [214, 5, 89, 54, 29, 51], raise: [304, 1, 56, 58, 20, 54], point: [361, 1, 59, 58, 23, 53], floor: [421, 8, 64, 51, 26, 49],
-  cheer: [486, 1, 61, 58, 21, 50], spray: [548, 0, 86, 59, 33, 53], happy: [635, 0, 64, 59, 22, 55], oops: [700, 0, 62, 59, 23, 55],
-  drowsy: [763, 5, 58, 54, 21, 48], sleep: [822, 16, 75, 43, 29, 34],
+  front: [0, 6, 34, 53, 15, 51], frontBlink: [35, 6, 34, 53, 15, 51], side: [70, 7, 31, 52, 17, 50], back: [102, 8, 33, 51, 16, 50],
+  idle0: [136, 5, 48, 54, 23, 52], idle1: [185, 5, 50, 54, 22, 52], walk: [236, 5, 51, 54, 22, 52], brush: [288, 5, 61, 54, 22, 52],
+  paint: [350, 5, 89, 54, 29, 51], raise: [440, 1, 56, 58, 20, 54], point: [497, 1, 59, 58, 23, 53], floor: [557, 8, 64, 51, 26, 49],
+  cheer: [622, 1, 61, 58, 21, 50], spray: [684, 0, 86, 59, 33, 53], happy: [771, 0, 64, 59, 22, 55], oops: [836, 0, 62, 59, 23, 55],
+  drowsy: [899, 5, 58, 54, 21, 48], sleep: [958, 16, 75, 43, 29, 34],
 };
 
 // Draws a pose with its beret centre at x and feet at y (native pixels), scaled by integer k.
-export function drawPose(ctx, name, x, y, k, flip = false) {
-  const [sx, sy, w, hh, ax, by] = SPRITES[name];
+// `breath` sinks everything above the waist by that many pixels (a 1px exhale reads as breathing).
+export function drawPose(ctx, name, x, y, k, flip = false, breath = 0) {
+  const [sx, sy, w, hh, ax, by] = SPRITES[name], cut = Math.max(0, by - 22);
+  const part = (y0, y1, dy) => y1 > y0 && ctx.drawImage(sheet(), sx, sy + y0, w, y1 - y0, flip ? -ax * k : (x - ax) * k, (y - by + y0 + dy) * k, w * k, (y1 - y0) * k);
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  if (flip) { ctx.translate(x * k, 0); ctx.scale(-1, 1); ctx.drawImage(sheet(), sx, sy, w, hh, -ax * k, (y - by) * k, w * k, hh * k); }
-  else ctx.drawImage(sheet(), sx, sy, w, hh, (x - ax) * k, (y - by) * k, w * k, hh * k);
+  if (flip) { ctx.translate(x * k, 0); ctx.scale(-1, 1); }
+  part(cut, hh, 0);
+  part(0, cut, breath);
   ctx.restore();
 }
 
 const BOX_W = 92, BOX_H = 76, AX = 36, FLOOR = 74;
 
-// Behaviour table: poses to cycle (fps), duration (or hold), and motion flavour.
+// Behaviour table: poses to cycle (fps), duration (or hold), breathing period (s) and motion flavour.
 const STATES = {
-  idle: { poses: ['idle0', 'idle1'], fps: 1.5 },
-  look: { poses: ['idle0'], dur: 1800, turn: true },
-  walk: { poses: ['walk', 'idle1', 'walk', 'idle0'], fps: 6, dur: 2600, walk: true },
+  idle: { poses: ['front'], hold: true, breath: 1.8 },
+  glance: { poses: ['front', 'side', 'side', 'side', 'front'], fps: 1.6, dur: 3000, breath: 1.8 },
+  peek: { poses: ['side', 'back', 'back', 'back', 'side'], fps: 1.6, dur: 3000, breath: 1.8 },
+  stretch: { poses: ['front', 'raise', 'raise', 'front'], fps: 1.4, dur: 2800, breath: 1.2 },
+  walk: { poses: ['idle0', 'idle1', 'walk', 'idle1'], fps: 6, hold: true, walk: true },
   wave: { poses: ['raise', 'idle1'], fps: 3, dur: 1600 },
   paint: { poses: ['brush', 'paint'], fps: 4, dur: 1300 },
   spray: { poses: ['spray'], dur: 1100 },
-  point: { poses: ['point'], hold: true },
-  raise: { poses: ['raise'], hold: true },
+  point: { poses: ['point'], hold: true, breath: 1.8 },
+  raise: { poses: ['raise'], hold: true, breath: 1.8 },
   reach: { poses: ['raise', 'point'], fps: 2, hold: true },
   cheer: { poses: ['cheer', 'happy'], fps: 4, dur: 2200, hop: true },
   dance: { poses: ['cheer', 'happy', 'raise', 'happy'], fps: 3, hold: true, hop: true },
@@ -73,10 +79,12 @@ const STATES = {
   eat: { poses: ['happy', 'idle1'], fps: 3, dur: 2000 },
   oops: { poses: ['oops'], dur: 900, shake: true },
   refuse: { poses: ['oops'], dur: 1300, shake: true },
-  sit: { poses: ['floor'], hold: true },
-  drowsy: { poses: ['drowsy'], hold: true },
-  sleep: { poses: ['sleep'], hold: true },
+  sit: { poses: ['floor'], hold: true, breath: 2.2 },
+  drowsy: { poses: ['drowsy'], hold: true, breath: 2.6 },
+  sleep: { poses: ['sleep'], hold: true, breath: 3 },
 };
+const FIDGETS = ['glance', 'walk', 'peek', 'stretch', 'glance', 'walk', 'wave', 'paint'];
+const RANGE = [-10, 20]; // how far (native px) she strolls from her spot
 const NEED_ICON = { hungry: 'onigiri', lonely: 'heart', bored: 'dots', tired: 'moon' };
 const ACTIONS = [
   [/^(Brush|Smudge|Shape|Eraser)$/, 'paint', null],
@@ -93,7 +101,7 @@ export class Mascot {
     this.canvas = h('canvas.pyxl-canvas');
     this.bubble = h('div.m-bubble');
     this.el = h('div.mascot', { 'data-tip': 'Pyxl — click to care for her' }, this.canvas, this.bubble);
-    Object.assign(this, { parts: [], k: 1, flip: false, pets: [], lastUndone: 0, lastActive: Date.now(), nextFidget: Date.now() + 9000, nextNeed: 0 });
+    Object.assign(this, { parts: [], k: 1, flip: false, pets: [], lastUndone: 0, lastActive: Date.now(), nextFidget: Date.now() + 6000, nextNeed: 0, pos: 0, path: [], blinkAt: Date.now() + 3000 });
     this.el.addEventListener('click', () => this.onClick());
     this.el.addEventListener('pointerenter', () => this.greet());
     this.el.addEventListener('pointerleave', () => { this.hovered = false; });
@@ -127,7 +135,9 @@ export class Mascot {
     this.state = name;
     this.started = performance.now();
     this.until = st.hold && dur == null ? Infinity : Date.now() + (dur ?? st.dur ?? 1500);
-    if (flip != null) this.flip = flip; else if (!st.turn && !st.walk && name !== 'point') this.flip = false;
+    if (flip != null) this.flip = flip; else if (!st.walk && !st.breath) this.flip = false;
+    if (st.walk) this.path = [RANGE[0] + Math.random() * (RANGE[1] - RANGE[0]), Math.random() < 0.5 ? 0 : RANGE[0] + Math.random() * (RANGE[1] - RANGE[0])].map(Math.round);
+    if (name === 'glance') this.flip = Math.random() < 0.5;
     this.say(say);
     this.el.dataset.state = name;
   }
@@ -164,34 +174,50 @@ export class Mascot {
     if (this.stats.energy < 10 && !this.stats.asleep) { this.stats.sleep(true); this.say('So sleepy…'); this.play('sleep'); }
     if (this.stats.asleep && this.stats.energy >= 100) { this.stats.sleep(false); this.react('happy', { icon: 'sparkle', say: 'Good morning!' }); }
     if (this.state === 'idle' && now > this.nextFidget) {
-      this.nextFidget = now + 8000 + Math.random() * 9000;
-      const pick = this.stats.need === 'lonely' ? 'wave' : ['look', 'walk', 'wave', 'look', 'paint'][Math.floor(Math.random() * 5)];
+      this.nextFidget = now + 5000 + Math.random() * 7000;
+      const pick = this.stats.need === 'lonely' ? 'wave' : FIDGETS[Math.floor(Math.random() * FIDGETS.length)];
       this.play(pick, pick === 'wave' && this.stats.need === 'lonely' ? { say: 'Hey! Over here!' } : {});
     }
     if (this.state === 'idle' && this.stats.need === 'bored' && now - this.lastActive > 20000) this.play('sit');
+    if (st?.walk) this.stroll();
+    if (now > this.blinkAt + 150) this.blinkAt = now + 2500 + Math.random() * 3500 * (Math.random() < 0.2 ? 0.1 : 1);
     this.watchCursor(now);
     const need = this.stats.need;
     if (NEED_ICON[need] && now > this.nextNeed && !this.stats.asleep) { this.nextNeed = now + 4000; this.parts.push({ icon: NEED_ICON[need], x: AX + 10, y: FLOOR - 64, vx: 0, vy: -0.15, life: 26 }); }
     this.render();
   }
 
+  // Walks her along `path` one pixel per tick, turning to face each leg; home again when done.
+  stroll() {
+    const to = this.path[0];
+    if (to == null) return this.base();
+    if (to === this.pos) return void this.path.shift();
+    this.flip = to < this.pos;
+    this.pos += Math.sign(to - this.pos);
+  }
+
   render() {
     const ctx = this.canvas.getContext('2d'), k = this.k, st = STATES[this.state], t = (performance.now() - this.started) / 1000;
     if (!atlas.complete || !st) return;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    const pose = st.poses[st.fps ? Math.floor(t * st.fps) % st.poses.length : 0];
-    let x = AX, y = FLOOR, flip = this.flip;
+    let pose = st.poses[st.fps ? Math.floor(t * st.fps) % st.poses.length : 0];
+    let x = AX + this.pos, y = FLOOR, flip = this.flip;
+    if (this.state === 'idle' && this.gaze) { pose = 'side'; flip = this.gaze < 0; }
+    if (pose === 'front' && Date.now() > this.blinkAt) pose = 'frontBlink';
+    if (pose === 'side') flip = !flip; // side view is drawn facing left
     if (st.hop) y -= Math.round(Math.abs(Math.sin(t * 9)) * 3);
     if (st.shake) x += Math.floor(t * 18) % 2 ? 1 : -1;
-    if (st.walk) { x += Math.round(Math.sin(t * 2.4) * 8); flip = Math.cos(t * 2.4) < 0; }
-    if (st.turn) flip = t > 0.9;
-    drawPose(ctx, pose, x, y, k, flip);
+    if (st.walk && Math.floor(t * st.fps) % 2) y -= 1; // bob on each step
+    const [, , w, , ax] = SPRITES[pose], [l, r] = flip ? [w - ax, ax] : [ax, w - ax];
+    x = Math.max(l, Math.min(BOX_W - r, x)); // wide poses never clip out of her box
+    const breath = st.breath && (t % st.breath) / st.breath > 0.55 ? 1 : 0;
+    drawPose(ctx, pose, x, y, k, flip, breath);
     this.parts = this.parts.filter(p => p.life-- > 0);
     for (const p of this.parts) {
       p.x += p.vx; p.y += p.vy;
       ctx.globalAlpha = Math.min(1, p.life / 8);
       const [w] = iconSize(p.icon);
-      drawIcon(ctx, p.icon, p.x - w / 2, p.y, k, p.color);
+      drawIcon(ctx, p.icon, p.x + this.pos - w / 2, p.y, k, p.color);
     }
     ctx.globalAlpha = 1;
   }
@@ -225,7 +251,7 @@ export class Mascot {
 
   // Points her brush at a tooltip: raised when it's above her, mirrored when it's to her left.
   aim(r) {
-    if (this.stats.asleep || !['idle', 'look', 'point', 'raise', 'sit'].includes(this.state)) return;
+    if (this.stats.asleep || !['idle', 'glance', 'peek', 'point', 'raise', 'sit'].includes(this.state)) return;
     const m = this.el.getBoundingClientRect();
     if (!m.width) return;
     const dx = r.left + r.width / 2 - (m.left + m.width / 2), dy = r.top + r.height / 2 - (m.top + m.height / 2);
@@ -235,7 +261,7 @@ export class Mascot {
   // Hovering over her: a wave, or a shy giggle if you linger or keep coming back.
   greet() {
     this.hovered = true;
-    if (!['idle', 'look', 'sit', 'reach'].includes(this.state)) return;
+    if (!['idle', 'glance', 'peek', 'sit', 'reach'].includes(this.state)) return;
     this.greets = (this.greets ?? 0) + 1;
     if (this.greets % 3 === 0) this.react('happy', { icon: 'heart', n: 1, say: 'Hehe…', dur: 1200 });
     else this.react('wave', { dur: 1200 });
@@ -245,12 +271,13 @@ export class Mascot {
   // above her head, and looks toward wherever you're working otherwise.
   watchCursor(now) {
     const c = this.cursor;
-    if (!c || now - c.t > 4000 || this.stats.asleep || !['idle', 'look', 'reach'].includes(this.state)) return;
-    const r = this.el.getBoundingClientRect(), cx = r.left + r.width / 2, head = r.bottom - 50 * this.k / (devicePixelRatio || 1);
+    this.gaze = 0;
+    if (!c || now - c.t > 4000 || this.stats.asleep || !['idle', 'reach'].includes(this.state)) return;
+    const r = this.el.getBoundingClientRect(), cx = r.left + (AX + this.pos) * this.k / (devicePixelRatio || 1), head = r.bottom - 50 * this.k / (devicePixelRatio || 1);
     const dx = c.x - cx, dy = c.y - head, near = Math.hypot(dx, dy) < 220;
     if (near && dy < -12 && Math.abs(dx) < 70 && !this.hovered) { if (this.state !== 'reach') this.play('reach', { flip: dx < 0 }); else this.flip = dx < 0; return; }
     if (this.state === 'reach') return this.base();
-    if (this.state === 'idle') this.flip = dx < -8;
+    if (this.state === 'idle' && near && Math.abs(dx) > 40) this.gaze = Math.sign(dx);
   }
 
   // ---- care ----

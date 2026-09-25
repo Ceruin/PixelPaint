@@ -98,7 +98,7 @@ body[data-mode=paper] .brand b i { color: #111 !important; }
 
 /* ---------- tool options bar ---------- */
 .optionsbar {
-  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 5px 12px; overflow-x: auto; scrollbar-width: thin;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 44px; padding: 5px 12px; overflow-x: auto; scrollbar-width: thin;
   background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; z-index: 5; scrollbar-width: none;
 }
 .optionsbar::-webkit-scrollbar { display: none; }
@@ -171,6 +171,7 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 .float-layer > * { pointer-events: auto; }
 
 .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex: none; }
+.dock .panel:not(.collapsed):not(.flyout) { flex-shrink: 1; min-height: 96px; }
 .dock .panel.grow:not(.collapsed) { flex: 1 1 200px; min-height: 180px; }
 .dock .panel[data-panel=layers]:not(.collapsed) { flex: 2 1 300px; min-height: 260px; }
 .panel.floating { position: absolute; box-shadow: var(--shadow); resize: both; min-width: 64px; min-height: 60px; }
@@ -542,3 +543,4 @@ body[data-mode=zen] .timeline, body[data-mode=notes] .timeline { display: none; 
 .focus-card .card-canvas { flex: 1; object-fit: contain; background: #fff; }
 .notes { position: relative; }
 @media (max-width: 720px) { .notes-outline { position: absolute; z-index: 20; top: 45px; bottom: 0; left: 0; box-shadow: var(--shadow); } .notes .optionsbar .btn span { display: none; } }
+@media (max-width: 1200px) { .slider.mini { width: 100px; } .optionsbar { gap: 6px 10px; } }
