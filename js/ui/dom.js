@@ -54,10 +54,10 @@ export function toggle(label, value, onChange) {
   return h('label.toggle', {}, i, h('span.tg'), h('span', {}, label));
 }
 
-export function segmented(options, value, onChange) {
+export function segmented(options, value, onChange, labels = false) {
   const el = h('div.seg');
   const render = v => el.replaceChildren(...options.map(([id, label, ic]) =>
-    h('button', { type: 'button', className: id === v ? 'on' : '', 'data-tip': ic ? label : null, onclick: () => { render(id); onChange(id); } }, ic ? icon(ic) : label)));
+    h('button', { type: 'button', className: id === v ? 'on' : '', 'data-tip': ic && !labels ? label : null, onclick: () => { render(id); onChange(id); } }, ic && icon(ic), (!ic || labels) && label)));
   render(value);
   return el;
 }

@@ -24,6 +24,7 @@ export function createProject(app) {
 
   const autosave = debounce(() => saveLocal(true), 2000);
   bus.on('history', autosave);
+  bus.on('assist', autosave);
   addEventListener('visibilitychange', () => document.hidden && saveLocal(true));
 
   const restore = async () => { const p = await idb.get('autosave'); return p ? unpackDoc(p) : null; };

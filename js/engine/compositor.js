@@ -32,6 +32,15 @@ function drawGroup(g, ctx, r, pv) {
   for (let i = 0; i < kids.length; i++) {
     const n = kids[i];
     if (!n.visible || isClipped(kids, i)) continue;
+    if (n.type === 'filter') {
+      // Adjust what's beneath in place; source-atop keeps its alpha, opacity fades the effect.
+      const t = acquire(W, H), tc = t.getContext('2d');
+      tc.clearRect(r.x, r.y, r.w, r.h);
+      tc.filter = n.css; drawRect(tc, ctx.canvas, r); tc.filter = 'none';
+      blit(ctx, t, r, n.opacity, 'source-atop');
+      release(t);
+      continue;
+    }
     if (n.type === 'group') {
       if (n.blend === 'pass' && n.opacity === 1) { drawGroup(n, ctx, r, pv); continue; }
       const t = acquire(W, H), tc = t.getContext('2d');

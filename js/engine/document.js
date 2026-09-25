@@ -4,6 +4,7 @@ import { History } from '../core/history.js';
 import { StateCommand, Compound } from './commands.js';
 import { Selection } from './selection.js';
 import { flatten } from './compositor.js';
+import { FILTERS } from './filters.js';
 
 let uid = 1;
 class Node {
@@ -26,9 +27,18 @@ export class Group extends Node {
   }
 }
 
+// Non-destructive adjustment: re-colours everything composited beneath it (Krita filter layer).
+export class FilterLayer extends Node {
+  constructor(filter, vals) {
+    super(FILTERS[filter].label);
+    Object.assign(this, { type: 'filter', filter, vals: { ...vals }, blend: 'source-over' });
+  }
+  get css() { return FILTERS[this.filter].css(this.vals); }
+}
+
 export class Doc {
   constructor(w, h, { bg = '#ffffff', empty = false } = {}) {
-    Object.assign(this, { w, h, name: 'Untitled', root: new Group('root'), active: null, count: 0, groups: 0 });
+    Object.assign(this, { w, h, name: 'Untitled', root: new Group('root'), active: null, count: 0, groups: 0, assistants: [] });
     this.history = new History();
     this.selection = new Selection(this);
     if (empty) return;
@@ -132,7 +142,14 @@ export class Doc {
     });
   }
 
+  addFilterLayer(filter) {
+    const f = FILTERS[filter], l = new FilterLayer(filter, Object.fromEntries(f.params.map(p => [p[0], p[4]])));
+    this.editTree('New Filter Layer', () => { this.insert(l); this.active = l; });
+    return l;
+  }
+
   clone(n) {
+    if (n.type === 'filter') return Object.assign(new FilterLayer(n.filter, n.vals), { visible: n.visible, opacity: n.opacity });
     const c = n.type === 'group' ? new Group(n.name) : new Layer(this.w, this.h, n.name);
     for (const k of ['visible', 'opacity', 'blend', 'locked', 'alphaLock', 'clip', 'collapsed']) if (k in n) c[k] = n[k];
     if (n.type === 'group') c.children = n.children.map(k => this.clone(k));

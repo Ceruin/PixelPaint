@@ -38,6 +38,8 @@ export class CanvasInput {
   down(e) {
     const { app } = this;
     this.rect = this.el.getBoundingClientRect();
+    document.activeElement?.blur?.();
+    e.preventDefault();
     this.el.setPointerCapture(e.pointerId);
     if (e.pointerType === 'pen') this.penSeen = true;
     this.pointers.set(e.pointerId, { x: e.clientX - this.rect.left, y: e.clientY - this.rect.top });
@@ -45,7 +47,8 @@ export class CanvasInput {
     const touch = e.pointerType === 'touch';
     if (touch && (this.penSeen || !app.settings.fingerDraw || this.pointers.size > 1)) return this.startGesture(e);
     if (this.active != null) return;
-    if (e.button === 1 || e.button === 2 || app.keys.space) { this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
+    if (e.button === 2) { bus.emit('popup', { x: e.clientX, y: e.clientY }); return; }
+    if (e.button === 1 || app.keys.space) { this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
     if (e.button !== 0) return;
     if (app.tool.down(this.point(e), e) !== false) Object.assign(this, { active: e.pointerId, activeTouch: touch, activeAt: e.timeStamp });
   }

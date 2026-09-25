@@ -1,9 +1,13 @@
 import { clamp, makeCanvas, Rect, TAU, DEG } from '../core/util.js';
 import { tipMask, tint } from './tips.js';
 
+// Stroke smoothing methods (after Krita): none, basic (weighted average), stabilizer (pulled
+// string / dead zone) and dynamic (mass + drag physics).
+export const SMOOTHING = [['none', 'None'], ['basic', 'Basic'], ['stabilizer', 'Stabilizer'], ['dynamic', 'Dynamic']];
+
 export const DEFAULT_BRUSH = {
   name: 'Round', cat: 'Paint', tip: 'round', size: 24, minSize: 0.15, opacity: 1, flow: 1, spacing: 0.1,
-  hardness: 0.85, roundness: 1, angle: 0, smoothing: 0.3, scatter: 0, sizeJitter: 0, angleJitter: 0,
+  hardness: 0.85, roundness: 1, angle: 0, smoothing: 0.3, smoothMode: 'basic', scatter: 0, sizeJitter: 0, angleJitter: 0,
   followDir: false, pressureSize: true, pressureOpacity: false, tilt: true, buildup: false, blend: 'source-over',
 };
 
@@ -14,8 +18,8 @@ const mix = (a, b, t) => ({ ...b, x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y)
 // Dab-based stroke engine. Input points {x, y, p, alt, az} in doc space; output dabs on `target`.
 // Pure rendering: no knowledge of layers, UI or history.
 export class BrushEngine {
-  constructor(brush, { target, color, symmetry, profile = {}, alphaMul = 1, smudge = false }) {
-    Object.assign(this, { b: brush, ctx: target, sym: symmetry, profile, alphaMul, smudge, dirty: null });
+  constructor(brush, { target, color, symmetry, profile = {}, alphaMul = 1, smudge = false, wrap = null }) {
+    Object.assign(this, { b: brush, ctx: target, sym: symmetry, profile, alphaMul, smudge, wrap, dirty: null });
     this.res = clamp(2 ** Math.ceil(Math.log2(Math.max(1, brush.size * 2))), 16, 512);
     this.mask = tipMask(brush.tip, brush.hardness, this.res);
     this.tip = smudge ? null : tint(this.mask, color);
@@ -33,15 +37,40 @@ export class BrushEngine {
     this.next = this.step(p.p);
   }
 
-  // Exponential stabilizer: higher smoothing = more lag, steadier line.
+  get smoothing() { return Math.min(0.94, this.b.smoothing + (this.profile.smoothing ?? 0)); }
+  get mode() { return this.smoothing ? this.b.smoothMode ?? 'basic' : 'none'; }
+
   move(p) {
-    const k = 1 - Math.min(0.94, this.b.smoothing + (this.profile.smoothing ?? 0)), s = this.s;
-    s.x += (p.x - s.x) * k; s.y += (p.y - s.y) * k; s.p += (p.p - s.p) * k;
+    const s = this.s, amt = this.smoothing;
+    switch (this.mode) {
+      case 'none': Object.assign(s, p); break;
+      case 'stabilizer': {
+        const r = amt * 40, dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
+        if (d <= r) return;
+        const k = 1 - r / d;
+        s.x += dx * k; s.y += dy * k; s.p += (p.p - s.p) * k;
+        break;
+      }
+      case 'dynamic': {
+        const v = this.v ??= { x: 0, y: 0 }, mass = 1 + amt * 10, drag = 0.5 + amt * 0.35;
+        v.x = (v.x + (p.x - s.x) / mass) * drag; v.y = (v.y + (p.y - s.y) / mass) * drag;
+        s.x += v.x; s.y += v.y; s.p += (p.p - s.p) * 0.5;
+        break;
+      }
+      default: {
+        const k = 1 - amt;
+        s.x += (p.x - s.x) * k; s.y += (p.y - s.y) * k; s.p += (p.p - s.p) * k;
+      }
+    }
     s.alt = p.alt; s.az = p.az;
     this.line(s);
   }
 
-  end(p) { if (p) for (let i = 0; i < 12; i++) this.move(p); }
+  end(p) {
+    if (!p) return;
+    if (this.mode === 'stabilizer' || this.mode === 'none') this.line({ ...this.s, ...p });
+    else for (let i = 0; i < 12; i++) this.move(p);
+  }
 
   line(to) {
     const a = this.last, d = Math.hypot(to.x - a.x, to.y - a.y);
@@ -72,7 +101,17 @@ export class BrushEngine {
     });
   }
 
+  // Wrap-around mode: dabs land on the tile and repeat across whichever edges they cross.
   stamp(i, x, y, size, ang, squash, alpha) {
+    if (!this.wrap) return this.stamp1(i, x, y, size, ang, squash, alpha);
+    const { w, h } = this.wrap, r = size * 0.75, bx = ((x % w) + w) % w, by = ((y % h) + h) % h;
+    for (const ox of [0, -w, w]) for (const oy of [0, -h, h]) {
+      const X = bx + ox, Y = by + oy;
+      if (X + r >= 0 && X - r <= w && Y + r >= 0 && Y - r <= h) this.stamp1(i, X, Y, size, ang, squash, alpha);
+    }
+  }
+
+  stamp1(i, x, y, size, ang, squash, alpha) {
     if (size < 0.3 || alpha <= 0) return;
     const c = this.ctx;
     c.globalAlpha = Math.min(1, alpha);

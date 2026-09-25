@@ -74,5 +74,11 @@ export const ICONS = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   wrap: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>',
   filterLayer: '<circle cx="9" cy="9" r="6"/><circle cx="15" cy="15" r="6"/>',
+  pencil: '<path d="M17 3l4 4L8 20H4v-4z"/><path d="m14 6 4 4"/>',
+  pen: '<path d="m12 19 7-7 3 3-7 7z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18z"/><circle cx="11" cy="11" r="2"/><path d="m2 2 7.6 7.6"/>',
+  texture: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 11 11 3M3 19 19 3M11 21 21 11"/>',
+  mirror: '<path d="M12 3v18"/><path d="M8 7H4v10h4M16 7h4v10h-4"/>',
+  heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
 };
+ICONS.assist = ICONS.ruler;

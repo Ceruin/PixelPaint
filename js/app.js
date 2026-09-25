@@ -7,6 +7,7 @@ import { preset } from './engine/presets.js';
 import { createTools } from './tools/index.js';
 import { CanvasInput } from './input/pointer.js';
 import { haptics } from './input/haptics.js';
+import { assistOverlay } from './tools/assist.js';
 
 // Application state + controller. UI modules read from it and call its methods; the engine
 // never touches the DOM outside the view canvas.
@@ -15,7 +16,9 @@ export class App {
     this.color = local.get('pp.color', { fg: '#1b1d23', bg: '#ffffff' });
     this.opts = {
       selMode: 'replace', tolerance: 24, contiguous: true, sampleAll: true, transformMode: 'free', uniform: true,
-      symmetry: 'none', radial: 6, ...local.get('pp.opts', {}),
+      symmetry: 'none', radial: 6, wrap: false, snapAssist: false, showAssist: true, assistKind: 'ruler',
+      shape: 'rect', shapeWidth: 4, shapeFill: false, shapeStroke: true, font: "'Pixelify Sans'", fontSize: 48, bold: false,
+      ...local.get('pp.opts', {}),
     };
     this.brushes = { brush: preset('Round'), eraser: preset('Soft Eraser'), smudge: preset('Smudge'), ...local.get('pp.brushes', {}) };
     this.settings = { haptics: true, fingerDraw: true, ...local.get('pp.settings', {}) };
@@ -28,6 +31,8 @@ export class App {
     this.tool = this.tools.brush;
     this.input = new CanvasInput(this, canvas);
     this.tool.activate();
+    this.view.overlays.add(assistOverlay(this));
+    this.view.wrap = this.opts.wrap;
     bus.on('brush', () => local.set('pp.brushes', this.brushes));
   }
 
@@ -64,7 +69,7 @@ export class App {
   }
   swapColors() { const { fg, bg } = this.color; this.setColor(bg, 'fg'); this.setColor(fg, 'bg'); }
 
-  setOpt(k, v) { this.opts[k] = v; local.set('pp.opts', this.opts); bus.emit('opts', this.opts); this.view.redraw(); }
+  setOpt(k, v) { this.opts[k] = v; local.set('pp.opts', this.opts); if (k === 'wrap') this.view.setWrap(v); bus.emit('opts', this.opts); this.view.redraw(); }
   setSetting(k, v) { this.settings[k] = v; local.set('pp.settings', this.settings); haptics.enabled = this.settings.haptics; }
 
   symmetry() { return symmetryFns(this.opts.symmetry, this.doc.w / 2, this.doc.h / 2, this.opts.radial); }

@@ -57,6 +57,10 @@
   .brand b i:nth-of-type(4){color:#ffd23f;}
   .brand b i:nth-of-type(5){color:#ff3b47;}
 
+  /* ---- light theme, shared with the main app (Settings ▸ View ▸ Light Theme) ---- */
+  body.light{--bg:#e9ebf0; --panel:#f7f8fa; --panel2:#eceef2; --line:#c9ced8; --text:#1b1d23; --muted:#5b6273; color-scheme:light;}
+  body.light .brand em{color:#2f5fd6 !important;}
+
   /* ---- shared mode switch (mirrors the main app's top bar) ---- */
   .mode-switch{display:flex; gap:2px; padding:2px; margin-left:auto; border:1px solid var(--line); border-radius:6px; background:var(--bg); flex:none;}
   .mode-btn{display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 10px; border-radius:4px; color:var(--muted); text-decoration:none; white-space:nowrap;}
@@ -1020,6 +1024,7 @@
 </style>
 </head>
 <body>
+<script>try{if((JSON.parse(localStorage.getItem("pp.settings"))||{}).theme==="light")document.body.classList.add("light");}catch(e){}</script>
 <div id="app">
   <!-- TOP BAR: brand + menu bar -->
   <div class="topbar">

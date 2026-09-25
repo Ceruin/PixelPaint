@@ -3,6 +3,9 @@ import { bus } from '../core/bus.js';
 import { actions } from '../core/actions.js';
 import { isClipped } from '../engine/compositor.js';
 import { BLEND_MODES, GROUP_MODES } from '../engine/blend.js';
+import { FILTERS, LAYER_FILTERS } from '../engine/filters.js';
+import { modal } from './dialogs.js';
+import { popMenu } from './menubar.js';
 
 const BLEND_SHORT = Object.fromEntries(BLEND_MODES.map(([k, l]) => [k, l]));
 
@@ -27,6 +30,7 @@ export function layersPanel(app) {
     const n = doc().active;
     blend.replaceChildren(...(n?.type === 'group' ? GROUP_MODES : BLEND_MODES).map(([v, l]) => h('option', { value: v }, l)));
     blend.value = n?.blend ?? 'source-over';
+    blend.disabled = n?.type === 'filter';
     opacity.set(Math.round((n?.opacity ?? 1) * 100));
     flags.forEach(f => { const k = f.dataset.flag; f.classList.toggle('on', !!n?.[k]); f.disabled = !n || !(k in n); });
   };
@@ -73,8 +77,8 @@ export function layersPanel(app) {
       clipped && h('span.clip-mark', {}, '↳'),
       n.type === 'group'
         ? [h('button.ibtn.sm', { type: 'button', onclick: () => { n.collapsed = !n.collapsed; render(); } }, icon(n.collapsed ? 'chevronRight' : 'chevron')), h('span.folder', {}, icon('folder'))]
-        : h('span.thumb-wrap', {}, thumb(n)),
-      h('span.layer-meta', {}, h('span.layer-name', {}, n.name), h('span.layer-sub', {}, `${Math.round(n.opacity * 100)}% · ${BLEND_SHORT[n.blend] ?? 'Pass Through'}`)),
+        : n.type === 'filter' ? h('span.thumb-wrap.fx', {}, icon('sparkle')) : h('span.thumb-wrap', {}, thumb(n)),
+      h('span.layer-meta', {}, h('span.layer-name', {}, n.name), h('span.layer-sub', {}, `${Math.round(n.opacity * 100)}% · ${n.type === 'filter' ? 'Filter layer' : BLEND_SHORT[n.blend] ?? 'Pass Through'}`)),
       h('span.badges', {}, n.clip && icon('clip'), n.alphaLock && icon('alpha'), n.locked && icon('lock')));
     el.node = n;
     el.addEventListener('pointerdown', e => !e.target.closest('button') && startDrag(n, e));
@@ -98,10 +102,21 @@ export function layersPanel(app) {
     input.focus(); input.select();
   };
 
+  // Live-edits a filter layer's parameters; one undo step on OK.
+  const editFilter = async n => {
+    const f = FILTERS[n.filter], old = { ...n.vals };
+    const body = f.params.map(([id, label, min, max]) => slider({ label, min, max, value: n.vals[id], onInput: v => { n.vals[id] = v; bus.emit('dirty', doc().bounds); } }).el);
+    const ok = !f.params.length || await modal(f.label, [body, h('p.muted', {}, 'Tip: double-click the layer later to adjust again.')], [['Cancel', null], ['Apply', 'ok', true]]);
+    const vals = { ...n.vals };
+    n.vals = old;
+    if (ok) doc().editProps('Adjust Filter', n, { vals }, { vals: old });
+    else bus.emit('dirty', doc().bounds);
+  };
+
   // Pointer-based drag reorder (works for mouse, pen and touch). Drop into a group's middle band.
   const startDrag = (n, e) => {
     const d = doc(), now = e.timeStamp;
-    if (lastTap.id === n.id && now - lastTap.t < 380) { lastTap = { id: 0, t: 0 }; return rename(n); }
+    if (lastTap.id === n.id && now - lastTap.t < 380) { lastTap = { id: 0, t: 0 }; return n.type === 'filter' ? editFilter(n) : rename(n); }
     lastTap = { id: n.id, t: now };
     if (d.active !== n) d.setActive(n);
     let target = null;
@@ -129,11 +144,13 @@ export function layersPanel(app) {
   };
 
   bus.on('layers', render);
+  bus.on('filterLayer', n => editFilter(n));
   bus.on('dirty', scheduleThumbs);
 
   const foot = h('div.layer-foot', {},
     iconBtn('plus', 'New layer', () => actions.run('layer.new'), { 'data-action': 'layer.new' }),
     iconBtn('folderPlus', 'Group layer', () => actions.run('layer.group'), { 'data-action': 'layer.group' }),
+    iconBtn('sparkle', 'New filter layer', e => popMenu(e.currentTarget, LAYER_FILTERS.map(k => `layer.filter.${k}`))),
     iconBtn('copy', 'Duplicate', () => actions.run('layer.dup'), { 'data-action': 'layer.dup' }),
     iconBtn('merge', 'Merge down', () => actions.run('layer.mergeDown'), { 'data-action': 'layer.mergeDown' }),
     iconBtn('trash', 'Delete layer', () => actions.run('layer.del'), { 'data-action': 'layer.del' }));

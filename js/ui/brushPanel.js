@@ -1,9 +1,9 @@
-import { h, slider, select, toggle } from './dom.js';
+import { h, icon, iconBtn, slider, select, toggle } from './dom.js';
 import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
-import { pickFile } from '../core/util.js';
+import { pickFile, download, readJSON } from '../core/util.js';
 import { PRESETS } from '../engine/presets.js';
-import { strokePreview } from '../engine/brush.js';
+import { strokePreview, SMOOTHING } from '../engine/brush.js';
 import { TIPS, tipFromImage, registerTip, customTips } from '../engine/tips.js';
 import { BLEND_MODES } from '../engine/blend.js';
 
@@ -21,8 +21,12 @@ export function loadCustomTips() {
   });
 }
 
+const CAT_ICONS = { Sketch: 'pencil', Ink: 'pen', Paint: 'brush', Texture: 'texture', Eraser: 'eraser', Blend: 'smudge', 'My Brushes': 'star' };
+const QUICK_SIZES = [2, 4, 8, 16, 32, 64, 128, 256];
+export const favs = () => local.get('pp.favs', ['Pencil HB', 'Ink Pen', 'Brush Pen', 'Round', 'Soft Round', 'Airbrush', 'Marker', 'Chalk']);
+
 // Presets apply to the matching tool; any brush can be loaded into the eraser, like Procreate.
-function applyPreset(app, p) {
+export function applyPreset(app, p) {
   const tool = p.cat === 'Eraser' ? 'eraser' : p.cat === 'Blend' ? 'smudge' : app.tool.id === 'eraser' ? 'eraser' : 'brush';
   app.brushes[tool] = structuredClone(p);
   app.setTool(tool);
@@ -31,24 +35,57 @@ function applyPreset(app, p) {
 
 export function brushLibrary(app) {
   const list = h('div.brush-list');
-  const ink = () => getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e7e9ee';
+  let query = '';
+  const search = h('input', { type: 'search', placeholder: 'Search brushes…', oninput: () => { query = search.value.toLowerCase(); render(); } });
+  const ink = () => getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e6e8ee';
+  const mark = () => list.querySelectorAll('.brush-row').forEach(r => r.classList.toggle('on', r.dataset.name === app.brush.name));
   const render = () => {
-    const all = [...PRESETS, ...userBrushes().map(b => ({ ...b, cat: b.cat === 'Eraser' || b.cat === 'Blend' ? b.cat : 'My Brushes' }))];
-    const cats = [...new Set(all.map(p => p.cat))];
+    const all = [...PRESETS, ...userBrushes().map(b => ({ ...b, cat: b.cat === 'Eraser' || b.cat === 'Blend' ? b.cat : 'My Brushes' }))]
+      .filter(p => !query || `${p.name} ${p.cat}`.toLowerCase().includes(query));
+    const cats = [...new Set(all.map(p => p.cat))], fav = favs();
     list.replaceChildren(...cats.map(cat => h('details.brush-cat', { open: true },
-      h('summary', {}, cat, h('span.count', {}, all.filter(p => p.cat === cat).length)),
+      h('summary', {}, icon(CAT_ICONS[cat] ?? 'brush'), cat, h('span.count', {}, all.filter(p => p.cat === cat).length)),
       all.filter(p => p.cat === cat).map(p => {
         const c = h('canvas', { width: 220, height: 44 });
         requestAnimationFrame(() => strokePreview(p, c, ink()));
-        return h('button.brush-row', { type: 'button', className: app.brush.name === p.name ? 'on' : '', onclick: () => applyPreset(app, p) }, h('span.brush-label', {}, p.name), c);
-      }))));
+        return h('div.brush-row', { dataset: { name: p.name }, className: app.brush.name === p.name ? 'on' : '', onclick: e => !e.target.closest('.star') && applyPreset(app, p) },
+          h('span.brush-label', {}, p.name), c,
+          h('button.star', { type: 'button', className: fav.includes(p.name) ? 'on' : '', 'data-tip': 'Pin to the pop-up palette (right-click canvas)', onclick: () => { toggleFav(p.name); render(); } }, icon('star')));
+      }))), query && !all.length ? h('p.muted', {}, 'No brushes match.') : '');
+    mark();
   };
-  bus.on('brush', () => list.querySelectorAll('.brush-row').forEach(r => r.classList.toggle('on', r.firstChild.textContent === app.brush.name)));
-  bus.on('tool', () => list.querySelectorAll('.brush-row').forEach(r => r.classList.toggle('on', r.firstChild.textContent === app.brush.name)));
-  bus.on('mode', render);
-  bus.on('userBrushes', render);
+  bus.on('brush', mark); bus.on('tool', mark);
+  bus.on('mode', render); bus.on('userBrushes', render); bus.on('favs', render);
   render();
-  return list;
+  return h('div.brush-lib', {},
+    h('div.brush-search', {}, search,
+      iconBtn('upload', 'Import brush bundle…', importBundle),
+      iconBtn('download', 'Export my brushes as a bundle…', exportBundle)),
+    list);
+}
+
+function toggleFav(name) {
+  const f = favs();
+  local.set('pp.favs', f.includes(name) ? f.filter(n => n !== name) : [...f, name].slice(-12));
+  bus.emit('favs');
+}
+
+// Brush bundles (Krita's resource bundles, simplified): user presets + their custom tips as JSON.
+function exportBundle() {
+  const tips = local.get('pp.tips', {}), brushes = userBrushes();
+  const used = Object.fromEntries(Object.entries(tips).filter(([id]) => brushes.some(b => b.tip === id)));
+  download(new Blob([JSON.stringify({ type: 'pixelpaint-brushes', version: 1, brushes, tips: used }, null, 1)], { type: 'application/json' }), 'pixelpaint-brushes.json');
+}
+async function importBundle() {
+  const f = await pickFile('.json');
+  if (!f) return;
+  const j = await readJSON(f);
+  if (j.type !== 'pixelpaint-brushes') return;
+  local.set('pp.tips', { ...local.get('pp.tips', {}), ...j.tips });
+  const names = new Set(j.brushes.map(b => b.name));
+  local.set('pp.userBrushes', [...userBrushes().filter(b => !names.has(b.name)), ...j.brushes]);
+  loadCustomTips();
+  setTimeout(() => bus.emit('userBrushes'), 100);
 }
 
 export function brushSettings(app) {
@@ -62,9 +99,12 @@ export function brushSettings(app) {
     const tips = [...TIPS, ...customTips().map(id => [id, `Custom ${id.slice(7)}`])];
     root.replaceChildren(
       h('div.bs-head', {}, h('strong', {}, b.name), h('span.muted', {}, ` · ${PAINT_TOOLS.includes(app.tool.id) ? app.tool.id : 'brush'}`)),
+      h('div.quick-sizes', {}, QUICK_SIZES.map(s => h('button', { type: 'button', className: b.size === s ? 'on' : '', 'data-tip': `${s}px`, onclick: () => { app.brush.size = s; app.brushChanged(); } },
+        h('i', { style: { width: `${Math.max(2, Math.sqrt(s) * 1.6)}px`, height: `${Math.max(2, Math.sqrt(s) * 1.6)}px` } })))),
       slider({ label: 'Size', value: sizeToPos(b.size), step: 0.1, fmt: () => `${app.brush.size}px`, onInput: v => set('size', posToSize(v)) }).el,
       pct('Opacity', 'opacity'), pct('Flow', 'flow'), pct('Hardness', 'hardness'), pct('Spacing', 'spacing', 200),
-      pct('Stabilizer', 'smoothing', 94), pct('Min size (pressure)', 'minSize'), pct('Roundness', 'roundness'),
+      h('label.field', {}, h('span', {}, 'Smoothing'), select(SMOOTHING, b.smoothMode ?? 'basic', v => set('smoothMode', v))),
+      pct('Smoothing amount', 'smoothing', 94), pct('Min size (pressure)', 'minSize'), pct('Roundness', 'roundness'),
       slider({ label: 'Angle', min: -180, max: 180, value: b.angle, fmt: v => `${v}°`, onInput: v => set('angle', v) }).el,
       pct('Scatter', 'scatter', 300), pct('Size jitter', 'sizeJitter'), pct('Angle jitter', 'angleJitter'),
       h('div.bs-grid', {},

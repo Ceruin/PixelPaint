@@ -4,14 +4,16 @@ import { actions, comboOf } from './core/actions.js';
 import { local } from './core/storage.js';
 import { clamp, download, pickFile, readJSON, toBlob } from './core/util.js';
 import { Doc } from './engine/document.js';
-import { FILTERS, renderFilter } from './engine/filters.js';
+import { FILTERS, LAYER_FILTERS, renderFilter } from './engine/filters.js';
+import { encodePSD } from './engine/psd.js';
+import { bus } from './core/bus.js';
 import { acquire, release } from './engine/compositor.js';
 import { TOOL_META } from './tools/index.js';
 import { MODES } from './ui/modes.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
-const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['history', 'History', 'history']];
+const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
 
 export function defineActions(app, { panels, project, setMode }) {
@@ -190,6 +192,7 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'file.exportProject', label: 'Download Project (.ora)', key: 'Ctrl+Shift+S', run: project.exportProject },
     { id: 'file.exportPng', label: 'Export PNG', key: 'Ctrl+Shift+E', run: () => project.exportImage('image/png') },
     { id: 'file.exportJpg', label: 'Export JPG', run: () => project.exportImage('image/jpeg') },
+    { id: 'file.exportPsd', label: 'Export Photoshop (.psd)', icon: 'download', run: () => download(encodePSD(doc()), `${doc().name}.psd`) },
 
     { id: 'edit.undo', label: 'Undo', key: 'Ctrl+Z', run: () => app.undo() },
     { id: 'edit.redo', label: 'Redo', key: 'Ctrl+Shift+Z', run: () => app.redo() },
@@ -215,6 +218,7 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'layer.del', label: 'Delete Layer', key: 'Ctrl+Backspace', run: () => doc().remove() },
     { id: 'layer.mergeDown', label: 'Merge Down', key: 'Ctrl+E', run: () => doc().mergeDown() },
     { id: 'layer.flatten', label: 'Flatten Image', run: () => doc().flatten() },
+    ...LAYER_FILTERS.map(k => ({ id: `layer.filter.${k}`, label: `${FILTERS[k].label} Layer`, icon: 'sparkle', run: () => { const l = doc().addFilterLayer(k); if (FILTERS[k].params.length) bus.emit('filterLayer', l); } })),
     { id: 'layer.clip', label: 'Clipping Mask', key: 'Ctrl+Alt+G', checked: () => !!doc().active?.clip, run: () => { const n = doc().activeLayer; if (n) doc().editProps('Clipping Mask', n, { clip: !n.clip }); } },
     { id: 'layer.alphaLock', label: 'Alpha Lock', key: '/', checked: () => !!doc().active?.alphaLock, run: () => { const n = doc().activeLayer; if (n) doc().editProps('Alpha Lock', n, { alphaLock: !n.alphaLock }); } },
 
@@ -232,6 +236,11 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'view.rotL', label: 'Rotate View Left', key: 'Shift+ArrowLeft', run: () => v().set(v().zoom, v().rot - 15) },
     { id: 'view.rotR', label: 'Rotate View Right', key: 'Shift+ArrowRight', run: () => v().set(v().zoom, v().rot + 15) },
     { id: 'view.resetRot', label: 'Reset View Rotation', key: 'Shift+ArrowUp', run: () => v().set(v().zoom, 0) },
+    { id: 'view.flip', label: 'Mirror View', icon: 'mirror', key: 'Shift+M', checked: () => v().flip, run: () => v().toggleFlip() },
+    { id: 'view.wrap', label: 'Wrap-Around Mode', icon: 'wrap', key: 'Shift+W', checked: () => app.opts.wrap, run: () => app.setOpt('wrap', !app.opts.wrap) },
+    { id: 'view.assist', label: 'Show Assistants', icon: 'ruler', checked: () => app.opts.showAssist, run: () => app.setOpt('showAssist', !app.opts.showAssist) },
+    { id: 'assist.clear', label: 'Clear Assistants', icon: 'trash', run: () => { doc().assistants.length = 0; bus.emit('assist'); v().redraw(); } },
+    { id: 'view.theme', label: 'Light Theme', icon: 'sun', checked: () => app.settings.theme === 'light', run: () => { app.setSetting('theme', app.settings.theme === 'light' ? 'dark' : 'light'); document.body.classList.toggle('light', app.settings.theme === 'light'); bus.emit('mode', app.mode); } },
 
     ...MODES.map(([id, label, ic, key]) => ({ id: `mode.${id}`, label: `${label} Mode`, icon: ic, key, checked: () => app.mode === id, run: () => setMode(id) })),
     { id: 'mode.toggleZen', label: 'Toggle Zen Mode', icon: 'zen', key: 'Tab', run: () => setMode(app.mode === 'zen' ? 'paint' : 'zen') },
@@ -267,13 +276,13 @@ export function defineActions(app, { panels, project, setMode }) {
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg']],
+      ['File', 'folder', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg', 'file.exportPsd']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.fill', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
-      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
+      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
-      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', '-', ...MODES.map(m => `mode.${m[0]}`)]],
+      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.assist', 'assist.clear', '-', 'view.theme', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
     ],
   };

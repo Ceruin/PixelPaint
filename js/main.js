@@ -13,6 +13,8 @@ import { colorPicker } from './ui/colorPanel.js';
 import { brushLibrary, brushSettings, loadCustomTips } from './ui/brushPanel.js';
 import { layersPanel } from './ui/layersPanel.js';
 import { historyPanel } from './ui/historyPanel.js';
+import { navigatorPanel, referencePanel } from './ui/navigator.js';
+import { initPopupPalette } from './ui/popupPalette.js';
 import { menubar } from './ui/menubar.js';
 import { MODES, modeSwitch } from './ui/modes.js';
 import { optionsBar } from './ui/optionsbar.js';
@@ -43,7 +45,11 @@ panels.add('color', 'Color', 'palette', colorPicker(app), { dock: 'right', order
 panels.add('brushes', 'Brushes', 'grid', brushLibrary(app), { dock: 'right', order: 1 }, { grow: true });
 panels.add('brushSettings', 'Brush Settings', 'sliders', brushSettings(app), { dock: null, hidden: true, x: 130, y: 16, w: 290, h: 520 });
 panels.add('layers', 'Layers', 'layers', layersPanel(app), { dock: 'right', order: 2 }, { grow: true });
+panels.add('navigator', 'Navigator', 'navigator', navigatorPanel(app), { dock: 'right', order: 3, hidden: true });
+panels.add('reference', 'Reference', 'image', referencePanel(app), { dock: null, hidden: true, x: 440, y: 60, w: 280, h: 320 });
 panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hidden: true, x: 440, y: 16, w: 230, h: 320 });
+initPopupPalette(app);
+document.body.classList.toggle('light', app.settings.theme === 'light');
 
 function setMode(mode) {
   if (mode === 'pixel') { location.href = 'pixel/'; return; }

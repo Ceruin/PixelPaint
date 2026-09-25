@@ -2,6 +2,7 @@ import { acquire, release } from '../engine/compositor.js';
 import { BrushEngine } from '../engine/brush.js';
 import { Rect, drawRect, clipTo, TAU } from '../core/util.js';
 import { haptics } from '../input/haptics.js';
+import { pickLock, project } from '../engine/assistants.js';
 
 const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge' };
 
@@ -29,8 +30,11 @@ export class PaintTool {
     this.mode = this.id === 'eraser' ? 'destination-out' : layer.alphaLock ? 'source-atop' : b.blend;
     this.engine = new BrushEngine(b, {
       target: (smudge ? this.preview : this.buf).getContext('2d'), color: app.color.fg, symmetry: app.symmetry(),
-      profile: app.profile, alphaMul: b.buildup ? b.opacity : 1, smudge,
+      profile: app.profile, alphaMul: b.buildup ? b.opacity : 1, smudge, wrap: app.opts.wrap ? { w, h } : null,
     });
+    this.start = p;
+    this.lock = null;
+    this.snap = app.opts.snapAssist && doc.assistants.length > 0;
     app.view.previews.set(layer, this.preview);
     this.engine.begin(p);
     this.flush();
@@ -44,14 +48,16 @@ export class PaintTool {
     this.travel += Math.hypot(last.x - (this.hoverPt?.x ?? last.x), last.y - (this.hoverPt?.y ?? last.y)) * this.app.view.zoom;
     if (this.travel > 40) { this.travel = 0; haptics.tick(); }
     this.hoverPt = last;
-    pts.forEach(p => this.engine.move(p));
+    if (this.snap && !this.lock && Math.hypot(last.x - this.start.x, last.y - this.start.y) > 4 / this.app.view.zoom) this.lock = pickLock(this.app.doc.assistants, this.start, last);
+    if (this.snap && !this.lock) return;
+    pts.forEach(p => this.engine.move(this.lock ? project(this.lock, p) : p));
     this.flush();
   }
 
   up(p) {
     if (this.picking) { this.picking = false; return; }
     if (!this.engine) return;
-    this.engine.end(p);
+    this.engine.end(this.lock ? project(this.lock, p) : p);
     this.flush();
     const r = this.total, pv = this.preview;
     if (r) this.app.doc.editPixels(LABEL[this.id], this.layer, r, ctx => { ctx.clearRect(r.x, r.y, r.w, r.h); drawRect(ctx, pv, r); });

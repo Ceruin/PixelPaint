@@ -382,3 +382,41 @@ body[data-mode=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 
 @media (max-width: 900px) { .mode-btn span, .menu-title span { display: none; } }
 @media (max-width: 720px) { :root { --dock-w: 240px; } }
+
+/* ---------- pop-up palette (right-click / pen barrel button) ---------- */
+.popup-palette { position: fixed; width: 300px; height: 300px; z-index: 150; }
+.pp-disc { position: absolute; inset: 22px; border-radius: 50%; background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.pp-hue { position: absolute; left: 60px; top: 60px; width: 180px; height: 180px; border-radius: 50%; cursor: crosshair; }
+.pp-center { position: absolute; left: 126px; top: 126px; width: 48px; height: 48px; border-radius: 50%; border: 0; padding: 0; }
+.pp-dot { position: absolute; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--panel); padding: 0; }
+.pp-brush { position: absolute; width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); padding: 0; overflow: hidden; display: grid; place-items: center; }
+.pp-brush canvas { width: 48px; height: 20px; }
+.pp-brush:hover, .pp-brush.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.pp-hint { position: absolute; left: 0; right: 0; bottom: -28px; text-align: center; color: var(--muted); display: flex; gap: 6px; justify-content: center; }
+
+/* ---------- brush library extras ---------- */
+.brush-lib { display: flex; flex-direction: column; min-height: 0; }
+.brush-row { position: relative; grid-template-columns: 92px 1fr 22px; cursor: pointer; }
+.star { width: 22px; height: 22px; border: 0; background: none; padding: 0; color: var(--muted); opacity: .35; display: grid; place-items: center; }
+.star .ic { width: 14px; height: 14px; }
+.brush-row:hover .star { opacity: .8; }
+.star.on { opacity: 1; color: #ffd23f; }
+.star.on svg { fill: currentColor; }
+.quick-sizes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; margin-bottom: 4px; }
+.quick-sizes button { height: 30px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); display: grid; place-items: center; padding: 0; }
+.quick-sizes button.on { border-color: var(--accent); }
+.quick-sizes i { display: block; max-width: 22px; max-height: 22px; border-radius: 50%; background: var(--text); }
+.pads { display: flex; flex-direction: column; gap: 8px; }
+.wheel { display: block; width: 100%; max-width: 240px; aspect-ratio: 1; margin: 0 auto; touch-action: none; cursor: crosshair; }
+.picker > .seg { align-self: flex-start; }
+
+/* ---------- navigator, reference, filter layers, text ---------- */
+.navigator { display: flex; flex-direction: column; gap: 4px; }
+.nav-thumb { width: 100%; height: auto; background: var(--stage); border-radius: var(--r); cursor: grab; touch-action: none; }
+.reference { display: flex; flex-direction: column; height: 100%; }
+.ref-img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: crosshair; }
+.thumb-wrap.fx { background: var(--panel3); color: var(--accent); }
+.text-editor {
+  position: absolute; z-index: 20; min-width: 60px; min-height: 1.3em; padding: 0; margin: 0; resize: none; overflow: hidden;
+  background: transparent; border: 1px dashed var(--accent); outline: none; line-height: 1.25; white-space: pre; user-select: text;
+}

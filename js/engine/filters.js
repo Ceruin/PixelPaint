@@ -2,7 +2,7 @@ import { acquire, release } from './compositor.js';
 
 // Filters are CSS filter chains run on the GPU through ctx.filter.
 export const FILTERS = {
-  blur: { label: 'Gaussian Blur', params: [['radius', 'Radius', 0, 100, 4]], css: p => `blur(${p.radius}px)` },
+  blur: { label: 'Gaussian Blur', local: false, params: [['radius', 'Radius', 0, 100, 4]], css: p => `blur(${p.radius}px)` },
   hsl: {
     label: 'Hue / Saturation',
     params: [['hue', 'Hue', -180, 180, 0], ['sat', 'Saturation', 0, 300, 100], ['light', 'Lightness', 0, 200, 100]],
@@ -14,6 +14,9 @@ export const FILTERS = {
 };
 
 // Writes the filtered layer into `dst` (doc-sized), limited to the selection mask when given.
+// Filters usable as filter layers: per-pixel only (no neighbourhood), so dirty rects stay exact.
+export const LAYER_FILTERS = Object.keys(FILTERS).filter(k => FILTERS[k].local !== false);
+
 export function renderFilter(src, dst, css, mask) {
   const { width: w, height: h } = src, d = dst.getContext('2d');
   const t = acquire(w, h), tc = t.getContext('2d');

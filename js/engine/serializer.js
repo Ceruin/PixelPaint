@@ -1,7 +1,7 @@
 import { toBlob, makeCanvas } from '../core/util.js';
 import { flatten } from './compositor.js';
 import { zip, unzip } from './zip.js';
-import { Doc, Layer, Group } from './document.js';
+import { Doc, Layer, Group, FilterLayer } from './document.js';
 
 // Autosave snapshot: JSON tree + PNG blob per layer (kept in IndexedDB).
 const VERSION = 1;
@@ -14,24 +14,26 @@ export async function packDoc(doc, cache = new WeakMap()) {
     const o = Object.fromEntries(PROPS.filter(k => k in n).map(k => [k, n[k]]));
     o.type = n.type;
     if (n.type === 'group') { o.children = await Promise.all(n.children.map(node)); return o; }
+    if (n.type === 'filter') return Object.assign(o, { filter: n.filter, vals: n.vals });
     let hit = cache.get(n);
     if (hit?.v !== n.version) cache.set(n, hit = { v: n.version, blob: await toBlob(n.canvas) });
     o.blob = blobs.push(hit.blob) - 1;
     o.active = n === doc.active;
     return o;
   };
-  const meta = { version: VERSION, w: doc.w, h: doc.h, name: doc.name, tree: await node(doc.root) };
+  const meta = { version: VERSION, w: doc.w, h: doc.h, name: doc.name, assistants: doc.assistants, tree: await node(doc.root) };
   return { meta, blobs };
 }
 
 export async function unpackDoc({ meta, blobs }) {
   const doc = new Doc(meta.w, meta.h, { empty: true });
   doc.name = meta.name;
+  doc.assistants = meta.assistants ?? [];
   const build = async o => {
-    const n = o.type === 'group' ? new Group(o.name) : new Layer(meta.w, meta.h, o.name);
+    const n = o.type === 'group' ? new Group(o.name) : o.type === 'filter' ? new FilterLayer(o.filter, o.vals) : new Layer(meta.w, meta.h, o.name);
     PROPS.forEach(k => { if (k in o) n[k] = o[k]; });
     if (o.type === 'group') n.children = await Promise.all(o.children.map(build));
-    else {
+    else if (o.type === 'layer') {
       n.ctx.drawImage(await createImageBitmap(blobs[o.blob]), 0, 0);
       if (o.active) doc.active = n;
       doc.count++;
@@ -58,6 +60,10 @@ export async function encodeORA(doc) {
       const kids = [];
       for (const k of [...x.children].reverse()) kids.push(await node(k, pad + ' '));
       return `${pad}<stack ${common} composite-op="${toOp(x.blend, true)}" isolation="${x.blend === 'pass' ? 'auto' : 'isolate'}">\n${kids.join('')}${pad}</stack>\n`;
+    }
+    if (x.type === 'filter') {
+      if (!files.some(f => f.name === 'data/empty.png')) files.push({ name: 'data/empty.png', data: await toBlob(makeCanvas(1, 1)) });
+      return `${pad}<layer ${common} src="data/empty.png" x="0" y="0" composite-op="svg:src-over" pp:filter="${x.filter}" pp:vals="${esc(JSON.stringify(x.vals))}"/>\n`;
     }
     const src = `data/layer${n++}.png`;
     files.push({ name: src, data: await toBlob(x.canvas) });
@@ -93,6 +99,10 @@ export async function decodeORA(blob) {
         g.blend = c.getAttribute('isolation') === 'isolate' ? fromOp(c.getAttribute('composite-op')) : 'pass';
         g.children = await build(c);
         kids.push(g);
+      } else if (c.tagName === 'layer' && c.getAttributeNS(NS, 'filter')) {
+        const f = new FilterLayer(c.getAttributeNS(NS, 'filter'), JSON.parse(c.getAttributeNS(NS, 'vals') || '{}'));
+        props(c, f);
+        kids.push(f);
       } else if (c.tagName === 'layer' && files.has(c.getAttribute('src'))) {
         const l = new Layer(w, h, c.getAttribute('name') || `Layer ${doc.count + 1}`);
         props(c, l);

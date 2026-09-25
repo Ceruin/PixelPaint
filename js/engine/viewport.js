@@ -6,7 +6,7 @@ import { renderDoc } from './compositor.js';
 // The view canvas uses a desynchronized (low-latency) context to cut pen-to-pixel delay.
 export class Viewport {
   constructor(canvas) {
-    Object.assign(this, { el: canvas, zoom: 1, rot: 0, x: 0, y: 0, dirty: null, raf: 0, dpr: 1, cw: 1, ch: 1 });
+    Object.assign(this, { el: canvas, zoom: 1, rot: 0, x: 0, y: 0, flip: false, wrap: false, dirty: null, raf: 0, dpr: 1, cw: 1, ch: 1 });
     this.ctx = canvas.getContext('2d', { desynchronized: true });
     this.overlays = new Set();
     this.previews = new Map();
@@ -28,27 +28,38 @@ export class Viewport {
     this.invalidate(doc.bounds);
   }
 
-  get matrix() { return new DOMMatrix().translate(this.x, this.y).rotate(this.rot).scale(this.zoom); }
+  get matrix() { return new DOMMatrix().translate(this.x, this.y).rotate(this.rot).scale(this.zoom * (this.flip ? -1 : 1), this.zoom); }
   toDoc(sx, sy) { return this.matrix.inverse().transformPoint({ x: sx, y: sy }); }
   toScreen(x, y) { return this.matrix.transformPoint({ x, y }); }
 
   fit() {
     const { doc, cw, ch } = this, pad = cw < 600 ? 16 : 48;
-    this.rot = 0;
-    this.zoom = Math.min((cw - pad) / doc.w, (ch - pad) / doc.h, 4);
-    this.x = (cw - doc.w * this.zoom) / 2;
-    this.y = (ch - doc.h * this.zoom) / 2;
-    this.changed();
+    this.set(Math.min((cw - pad) / doc.w, (ch - pad) / doc.h, 4), 0, cw / 2, ch / 2, { x: doc.w / 2, y: doc.h / 2 });
   }
 
   // Sets zoom/rotation while keeping doc point under screen point (sx, sy).
   set(zoom, rot, sx = this.cw / 2, sy = this.ch / 2, anchor = this.toDoc(sx, sy)) {
     this.zoom = clamp(zoom, 0.02, 64);
     this.rot = rot;
-    const q = new DOMMatrix().rotate(this.rot).scale(this.zoom).transformPoint(anchor);
+    const q = new DOMMatrix().rotate(this.rot).scale(this.zoom * (this.flip ? -1 : 1), this.zoom).transformPoint(anchor);
     this.x = sx - q.x; this.y = sy - q.y;
     this.changed();
   }
+  // Mirror the view (not the image) around the screen centre — a classic check for drawing errors.
+  toggleFlip() { const a = this.toDoc(this.cw / 2, this.ch / 2); this.flip = !this.flip; this.set(this.zoom, this.rot, this.cw / 2, this.ch / 2, a); }
+  setWrap(on) { this.wrap = on; this.redraw(); }
+
+  // Tile offsets covering the screen in wrap-around mode.
+  tiles() {
+    if (!this.wrap) return [[0, 0]];
+    const { w, h } = this.doc, inv = this.matrix.inverse();
+    const pts = [[0, 0], [this.cw, 0], [0, this.ch], [this.cw, this.ch]].map(([x, y]) => inv.transformPoint({ x, y }));
+    const xs = pts.map(p => Math.floor(p.x / w)), ys = pts.map(p => Math.floor(p.y / h)), out = [];
+    for (let i = Math.max(Math.min(...xs), -4); i <= Math.min(Math.max(...xs), 4); i++)
+      for (let j = Math.max(Math.min(...ys), -4); j <= Math.min(Math.max(...ys), 4); j++) out.push([i, j]);
+    return out;
+  }
+
   zoomAt(f, sx, sy) { this.set(this.zoom * f, this.rot, sx, sy); }
   pan(dx, dy) { this.x += dx; this.y += dy; this.changed(); }
 
@@ -72,13 +83,16 @@ export class Viewport {
     this.compose();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, el.width, el.height);
-    ctx.setTransform(new DOMMatrix().scale(dpr).multiply(this.matrix));
-    ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 24 * dpr;
-    ctx.fillStyle = this.checker; ctx.fillRect(0, 0, doc.w, doc.h);
-    ctx.shadowColor = 'transparent';
-    ctx.imageSmoothingEnabled = this.zoom < 2;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(this.comp, 0, 0);
+    const base = new DOMMatrix().scale(dpr).multiply(this.matrix);
+    for (const [i, j] of this.tiles()) {
+      ctx.setTransform(base.translate(i * doc.w, j * doc.h));
+      if (!this.wrap) { ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 24 * dpr; }
+      ctx.fillStyle = this.checker; ctx.fillRect(0, 0, doc.w, doc.h);
+      ctx.shadowColor = 'transparent';
+      ctx.imageSmoothingEnabled = this.zoom < 2;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(this.comp, 0, 0);
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.overlays.forEach(o => o.draw(ctx, this));
   }
