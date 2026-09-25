@@ -25,7 +25,7 @@ export const GRADES = ['E', 'D', 'C', 'B', 'A', 'S'];
 const GAIN = [12, 15, 18, 21, 24, 27];     // points per level-up, by grade
 export const SKILLS = [
   ['line', 'Line', 'pencilPx', '#17c06b'], ['colour', 'Colour', 'drop', '#ffd23f'], ['shape', 'Shape', 'star', '#a445ff'],
-  ['power', 'Power', 'bang', '#ff3b47'], ['stamina', 'Stamina', 'onigiri', '#ff9f2b'],
+  ['power', 'Power', 'bolt', '#ff3b47'], ['stamina', 'Stamina', 'onigiri', '#ff9f2b'],
 ];
 const HIDDEN = ['luck', 'smarts'];
 export const TYPES = { line: 'Sketcher', colour: 'Colourist', shape: 'Designer', power: 'Bold', normal: 'All-rounder' };

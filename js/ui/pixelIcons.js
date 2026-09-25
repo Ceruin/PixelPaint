@@ -1,3 +1,5 @@
+import { hasArt, artCanvas } from './pixelArt.js';
+
 // Tiny pixel-art icons (one char per pixel, '.' = clear) drawn at integer scale, so Pyxl's
 // particles, snacks and need-bubbles match her sprite style.
 const C = {
@@ -64,9 +66,15 @@ export const iconSize = name => [Math.max(...ICONS[name].map(r => r.length)), IC
 // A crisp icon at scale k for buttons and bars: an <img> from a cached data URL (drawn pixel by
 // pixel once) — far lighter than a canvas per icon when a card re-renders.
 const urls = new Map();
+// Items with 16×16 art (pixelArt.js) use it: at 16px for small spots, 32px for big tiles.
 export function iconCanvas(name, k = 3) {
-  const [w, h] = iconSize(name), key = `${name}|${k}`;
+  const hd = hasArt(name), s = k >= 3 ? 2 : 1, key = `${name}|${k}`;
   let url = urls.get(key);
-  if (!url) { const m = document.createElement('canvas'); m.width = w * k; m.height = h * k; drawIcon(m.getContext('2d'), name, 0, 0, k); urls.set(key, url = m.toDataURL()); }
-  return Object.assign(document.createElement('img'), { src: url, width: w * k, height: h * k, alt: '', className: 'pxicon', draggable: false });
+  if (!url) {
+    if (hd) url = artCanvas(name, s).toDataURL();
+    else { const [w, h] = iconSize(name), m = document.createElement('canvas'); m.width = w * k; m.height = h * k; drawIcon(m.getContext('2d'), name, 0, 0, k); url = m.toDataURL(); }
+    urls.set(key, url);
+  }
+  const [w, h] = hd ? [16 * s, 16 * s] : iconSize(name).map(v => v * k);
+  return Object.assign(document.createElement('img'), { src: url, width: w, height: h, alt: '', className: 'pxicon', draggable: false });
 }

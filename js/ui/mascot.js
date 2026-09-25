@@ -1,6 +1,7 @@
 import { h } from './dom.js';
 import { bus } from '../core/bus.js';
 import { drawIcon, iconSize } from './pixelIcons.js';
+import { artCanvas } from './pixelArt.js';
 import { PyxlStats, LESSONS, TYPES, currentLesson } from './pyxlStats.js';
 import { openCareCard, startStarGame } from './pyxlCare.js';
 import { startRace, RACES, medalName } from './pyxlRace.js';
@@ -470,15 +471,15 @@ export class Mascot {
   // Held instruments, toys and finished drawings.
   drawProp(ctx, st, x, top, t, k) {
     const e = this.extra;
-    const big = (name, px, py, sc) => drawIcon(ctx, name, Math.round(px / sc), Math.round(py / sc), k * sc);
+    const art = (name, px, py) => { ctx.imageSmoothingEnabled = false; ctx.drawImage(artCanvas(name, k), Math.round(px) * k, Math.round(py) * k); };   // 16×16 toy art at her pixel scale
     switch (st.prop) {
       case 'instrument': return drawIcon(ctx, e ?? 'bell', x + 12, top + 18 + (Math.floor(t * 5) % 2), k);
       case 'drawing': ctx.fillStyle = '#221822'; ctx.fillRect((x + 12) * k, (top + 2) * k, 13 * k, 12 * k); ctx.fillStyle = '#fff'; ctx.fillRect((x + 13) * k, (top + 3) * k, 11 * k, 10 * k); return drawIcon(ctx, e ?? 'sun', x + 14, top + 4, k);
-      case 'ball': { const bx = AX + 14 + Math.abs(((t * 18) % 40) - 20); return drawIcon(ctx, 'ball', bx, FLOOR - 6 - Math.round(Math.abs(Math.sin(t * 6)) * 5), k); }
-      case 'box': return t < 2 ? big('box', x - 10, FLOOR - 24, 3) : big('box', x + 16, FLOOR - 15, 3);
-      case 'radio': return big('radio', 2, FLOOR - 12, 2);
-      case 'tv': return big('tv', BOX_W - 16, FLOOR - 16, 2);
-      case 'crayons': return drawIcon(ctx, 'crayons', x + 10, FLOOR - 4, k);
+      case 'ball': { const bx = AX + 10 + Math.abs(((t * 18) % 40) - 20); return art('ball', bx, FLOOR - 16 - Math.round(Math.abs(Math.sin(t * 6)) * 5)); }
+      case 'box': return t < 2 ? art('box', x - 8, FLOOR - 22) : art('box', x + 12, FLOOR - 16);
+      case 'radio': return art('radio', 1, FLOOR - 16);
+      case 'tv': return art('tv', BOX_W - 17, FLOOR - 16);
+      case 'crayons': return art('crayons', x + 8, FLOOR - 15);
     }
   }
 

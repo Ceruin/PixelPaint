@@ -1,4 +1,4 @@
-import { h, icon, keepOnScreen } from './dom.js';
+import { h, icon, keepOnScreen, morph } from './dom.js';
 import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
 import { clamp } from '../core/util.js';
@@ -23,7 +23,7 @@ export function careBody(pyxl, onPlay) {
 
   const views = {
     care() {
-      const snacks = h('div.pc-grid', { hidden: true }, SNACKS.map(sn => h('button.pc-item', { type: 'button', 'data-tip': sn[1], 'aria-label': sn[1], onclick: () => pyxl.feed(sn) }, iconCanvas(sn[0], 3))));
+      const snacks = h('div.pc-grid', { hidden: true, dataset: { sticky: '' } }, SNACKS.map(sn => h('button.pc-item', { type: 'button', 'data-tip': sn[1], 'aria-label': sn[1], onclick: () => pyxl.feed(sn) }, iconCanvas(sn[0], 3))));
       return [
         h('p.pc-mood', {}, s.mood),
         h('div.pc-bars', {}, NEEDS.map(([k, name, ic, color]) => h(`div.pc-bar${s[k] < 28 ? '.low' : ''}`, { 'data-tip': name }, iconCanvas(ic, 2), h('span', {}, name), bar(s[k], color)))),
@@ -108,8 +108,9 @@ export function careBody(pyxl, onPlay) {
   tabs.append(...TABS.map(([id, label, ic]) => h('button.pc-tab', { type: 'button', role: 'tab', 'data-tip': label, dataset: { tab: id }, onclick: () => { tab = id; local.set('pp.pyxlTab', id); render(); } }, iconCanvas(ic, 2), h('span', {}, label))));
   const render = () => {
     for (const b of tabs.children) b.classList.toggle('on', b.dataset.tab === tab);
-    if (tab === 'chart' && content.contains(document.activeElement)) return;   // don't yank the name field while typing
-    content.replaceChildren(...views[tab]().filter(Boolean));
+    const next = h('div', {}, ...views[tab]().filter(Boolean));
+    if (content.dataset.tab !== tab) { content.dataset.tab = tab; content.replaceChildren(...next.childNodes); }
+    else morph(content, next);                                          // same tab: update in place
   };
   // Re-render at most once a frame, and only while visible (the docked panel may be hidden).
   let raf = 0, stale = false;

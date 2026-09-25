@@ -19,6 +19,30 @@ export function h(tag, props, ...kids) {
 
 export const $ = (s, r = document) => r.querySelector(s);
 
+// Updates `el`'s children in place to match `next` (a freshly built element), touching only what
+// changed — so re-rendering a panel never swaps a button out from under a finger mid-tap.
+// A button whose label or tooltip changed is replaced outright (its click handler goes with it);
+// `data-sticky` keeps an element's own `hidden` state (e.g. an open picker).
+export function morph(el, next) {
+  const a = [...el.childNodes], b = [...next.childNodes];
+  b.forEach((nb, i) => {
+    const na = a[i];
+    if (!na) return el.append(nb);
+    if (na.nodeType !== nb.nodeType || na.nodeName !== nb.nodeName || (na.nodeName === 'BUTTON' && (na.textContent !== nb.textContent || na.dataset.tip !== nb.dataset.tip))) return na.replaceWith(nb);
+    if (na.nodeType === 3) { if (na.data !== nb.data) na.data = nb.data; return; }
+    if (na.nodeType !== 1) return;
+    for (const { name, value } of nb.attributes) {
+      if (name === 'hidden' && na.dataset.sticky != null) continue;
+      if (na.getAttribute(name) !== value) na.setAttribute(name, value);
+    }
+    for (const { name } of [...na.attributes]) if (!nb.hasAttribute(name) && !(name === 'hidden' && na.dataset.sticky != null)) na.removeAttribute(name);
+    if (na.nodeName === 'INPUT' && document.activeElement !== na && na.value !== nb.value) na.value = nb.value;
+    if ('disabled' in na && na.disabled !== nb.disabled) na.disabled = nb.disabled;
+    morph(na, nb);
+  });
+  for (let i = a.length - 1; i >= b.length; i--) a[i].remove();
+}
+
 // Nudges a fixed-position popup back inside the viewport (and caps its height), now and
 // whenever its size changes — e.g. a section expanding inside it.
 export function keepOnScreen(el, m = 8) {
