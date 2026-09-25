@@ -1,5 +1,6 @@
 import { h, icon, iconBtn } from './dom.js';
 import { bus } from '../core/bus.js';
+import { actions } from '../core/actions.js';
 import { sizeToPos, posToSize } from './brushPanel.js';
 
 // Zen / touch mode: the canvas fills the window; one floating strip (styled like every other
@@ -25,7 +26,7 @@ export function initZen(app, panels) {
     h('div.zen-sec', {},
       vslider('Size', () => sizeToPos(app.brush.size), v => { app.brush.size = posToSize(v); app.brushChanged(); }, 0),
       vslider('Opacity', () => app.brush.opacity * 100, v => { app.brush.opacity = v / 100; app.brushChanged(); }, 1)),
-    h('div.zen-sec', {}, chip, fly('brushes', 'grid', 'Brushes'), fly('brushSettings', 'sliders', 'Brush settings'), fly('layers', 'layers', 'Layers')),
+    h('div.zen-sec', {}, chip, fly('brushes', 'grid', 'Brushes'), fly('brushSettings', 'sliders', 'Brush settings'), fly('layers', 'layers', 'Layers'), iconBtn('trash', 'Clear canvas…', () => actions.run('edit.clearCanvas'))),
     slot));
 
   const sync = () => {

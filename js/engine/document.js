@@ -139,6 +139,16 @@ export class Doc {
   }
   editPixels(label, layer, rect, fn) { this.history.push(this.pixelEdit(label, layer, rect, fn)); }
 
+  // Wipes every layer on this frame in one undoable step; a layer named "Background" goes back to
+  // plain white rather than transparent.
+  clearCanvas() {
+    const cmds = this.layers.filter(l => l.view(this.frame)).map(l => this.pixelEdit('Clear Canvas', l, this.bounds, ctx => {
+      ctx.clearRect(0, 0, this.w, this.h);
+      if (/^background$/i.test(l.name)) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.w, this.h); }
+    }));
+    if (cmds.some(Boolean)) this.history.push(new Compound('Clear Canvas', cmds));
+  }
+
   // Replaces every cel of every layer (resize, crop, flip, rotate) as one undoable step.
   remap(label, w, h, draw) {
     const state = () => ({ w: this.w, h: this.h, cels: this.layers.map(l => [l, [...l.cels]]) });

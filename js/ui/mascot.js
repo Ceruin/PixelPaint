@@ -141,7 +141,7 @@ const ACTIONS = [
   [/^Fill$/, 'spray', 'drop', 'colour', 8],
   [/Replace Colo|Hue|Brightness|Desaturate|Invert/, 'cheer', 'sparkle', 'colour', 8],
   [/^(New Layer|New Group|Group Layer|Duplicate|New Frame|Duplicate Frame|New Tag|New Filter Layer|Import Frames)$/, 'wave', 'plus', 'shape', 3],
-  [/^(Delete Layer|Delete Frame|Clear|Cut|Blank Cel|Clear Cel)$/, 'oops', 'bang', null, 0],
+  [/^(Delete Layer|Delete Frame|Clear|Cut|Blank Cel|Clear Cel|Clear Canvas)$/, 'oops', 'bang', null, 0],
   [/Select|Lasso|Wand|Marquee|Deselect|Invert Selection|Feather/, 'think', null, 'shape', 4],
   [/Transform|Text|Move/, 'point', 'sparkle', 'shape', 6],
   [/Rotate|Flip|Resize|Crop|Canvas Size|Image Size/, 'spin', null, 'shape', 4],

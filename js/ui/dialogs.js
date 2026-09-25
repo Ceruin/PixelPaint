@@ -13,7 +13,7 @@ export function modal(title, body, buttons = [['Cancel', null], ['OK', 'ok', tru
       h(`div.modal${cls ? '.' + cls : ''}`, {},
         h('h3', {}, title),
         h('div.modal-body', {}, body),
-        h('div.modal-foot', {}, buttons.map(([label, v, primary]) => h('button.btn', { type: 'button', className: primary ? 'primary' : '', onclick: () => done(v) }, label)))));
+        h('div.modal-foot', {}, buttons.map(([label, v, primary]) => h('button.btn', { type: 'button', className: primary === 'danger' ? 'primary danger' : primary ? 'primary' : '', onclick: () => done(v) }, label)))));
     addEventListener('keydown', key, true);
     document.body.append(back);
     back.querySelector('input, select')?.focus();

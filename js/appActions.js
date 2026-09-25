@@ -273,6 +273,10 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
     { id: 'edit.copy', label: 'Copy', key: 'Ctrl+C', run: () => doc().activeLayer && copy(doc().activeLayer) },
     { id: 'edit.paste', label: 'Paste', key: 'Ctrl+V', run: paste },
     { id: 'edit.clear', label: 'Clear', key: 'Delete', run: editable(l => doc().clearArea(l)) },
+    { id: 'edit.clearCanvas', label: 'Clear Canvas…', key: 'Ctrl+Shift+Delete', run: async () => {
+      const ok = await modal('Clear the canvas?', h('p', {}, 'This wipes every layer on this frame. You can undo it with Ctrl+Z (or a two-finger tap).'), [['Cancel', null], ['Clear canvas', 'ok', 'danger']]);
+      if (ok) { doc().clearCanvas(); app.toast('Canvas cleared — undo to bring it back'); }
+    } },
     { id: 'edit.fill', label: 'Fill with Foreground', key: 'Alt+Backspace', run: editable(l => doc().fillArea(l, app.color.fg)) },
     { id: 'edit.replaceColor', label: 'Replace Color…', icon: 'swap', key: 'Shift+R', run: replaceColor },
     { id: 'brush.fromSelection', label: 'New Brush from Selection', icon: 'brush', key: 'Ctrl+B', run: brushFromSelection },
@@ -362,7 +366,7 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
   // Icons shown next to menu items (tools, modes and panels set their own).
   const ICON = {
     'file.new': 'file', 'file.open': 'folder', 'file.import': 'image', 'file.save': 'save', 'file.exportProject': 'download', 'file.exportPng': 'image', 'file.exportJpg': 'image',
-    'edit.undo': 'undo', 'edit.redo': 'redo', 'edit.cut': 'scissors', 'edit.copy': 'copy', 'edit.paste': 'paste', 'edit.clear': 'eraser', 'edit.fill': 'fill', 'edit.shortcuts': 'keyboard', 'edit.settings': 'settings',
+    'edit.undo': 'undo', 'edit.redo': 'redo', 'edit.cut': 'scissors', 'edit.copy': 'copy', 'edit.paste': 'paste', 'edit.clear': 'eraser', 'edit.clearCanvas': 'trash', 'edit.fill': 'fill', 'edit.shortcuts': 'keyboard', 'edit.settings': 'settings',
     'image.size': 'image', 'image.canvas': 'crop', 'image.flipH': 'flipH', 'image.flipV': 'flipV', 'image.rotCW': 'rotCW', 'image.rotCCW': 'rotCCW',
     'layer.new': 'plus', 'layer.newGroup': 'folderPlus', 'layer.group': 'folder', 'layer.dup': 'copy', 'layer.del': 'trash', 'layer.mergeDown': 'merge', 'layer.flatten': 'layers', 'layer.clip': 'clip', 'layer.alphaLock': 'alpha',
     'sel.all': 'select', 'sel.none': 'x', 'sel.invert': 'swap', 'sel.feather': 'sparkle',
@@ -375,7 +379,7 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
   return {
     menus: [
       ['File', 'folder', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg', 'file.exportPsd']],
-      ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
+      ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'anim.import', 'anim.export']],
