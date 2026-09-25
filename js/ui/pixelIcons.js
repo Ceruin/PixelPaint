@@ -1,4 +1,4 @@
-// Tiny pixel-art icons (one char per pixel, '.' = clear) drawn at integer scale, so Pip's
+// Tiny pixel-art icons (one char per pixel, '.' = clear) drawn at integer scale, so Pyxl's
 // particles, snacks and need-bubbles match her sprite style.
 const C = {
   k: '#221822', w: '#ffffff', r: '#e0485a', p: '#ff8fa3', y: '#ffd23f', o: '#ff9f2b', g: '#2fb36b', G: '#1a7a45',

@@ -3,7 +3,7 @@ import { local } from '../core/storage.js';
 import { wordmark } from './menubar.js';
 import { drawPose } from './mascot.js';
 
-// First-visit welcome: Pip's full art, the wordmark, and little Pip walking across the bottom
+// First-visit welcome: Pyxl's full art, the wordmark, and little Pyxl walking across the bottom
 // leaving a rainbow brush trail while the app warms up. Click / key / 4.5 s to continue.
 export function showWelcome(force = false) {
   if (!force && local.get('pp.welcomed', false)) return Promise.resolve();
@@ -12,7 +12,7 @@ export function showWelcome(force = false) {
     const trail = h('canvas.wl-trail'), walker = h('canvas.wl-walker', { width: 96 * 2, height: 64 * 2 }), bar = h('i');
     const root = h('div.welcome', {},
       h('div.wl-card', {},
-        h('img.wl-art', { src: 'assets/pip-art.webp', alt: 'Pip the painter' }),
+        h('img.wl-art', { src: 'assets/pyxl-art.webp', alt: 'Pyxl the painter' }),
         h('div.wl-text', {}, wordmark(), h('p', {}, 'Paint · sketch · take notes · pixel art · animate'), h('div.wl-bar', {}, bar), h('small.muted', {}, 'Click anywhere to start'))),
       trail, walker);
     document.body.append(root);

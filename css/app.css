@@ -309,22 +309,22 @@ body[data-mode=paper] .stage { background: var(--stage) repeating-linear-gradien
 .tooltip.show { opacity: 1; }
 .tooltip kbd { font: inherit; font-size: 11px; opacity: .6; }
 
-/* ---------- mascot: Pip (pixel sprites, integer-scaled on a canvas) ---------- */
+/* ---------- mascot: Pyxl (pixel sprites, integer-scaled on a canvas) ---------- */
 .mascot { position: relative; width: 64px; height: 64px; flex: none; }
 .mascot { cursor: pointer; }
-.pip-canvas { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); image-rendering: pixelated; pointer-events: none; }
+.pyxl-canvas { position: absolute; left: 50%; bottom: 0; transform: translateX(-50%); image-rendering: pixelated; pointer-events: none; }
 .m-bubble {
   position: absolute; left: 50%; bottom: 100%; transform: translateX(-30%); margin-bottom: 4px; padding: 3px 8px; border-radius: var(--r);
   white-space: nowrap; background: var(--text); color: var(--bg); font-size: 12px; pointer-events: none; opacity: 0; transition: opacity .2s; z-index: 5;
 }
 .m-bubble::after { content: ''; position: absolute; left: 30%; top: 100%; border: 5px solid transparent; border-top-color: var(--text); }
 .m-bubble:not(:empty) { opacity: 1; }
-body[data-mode=paper] .pip-canvas { filter: grayscale(1) contrast(1.15); }
+body[data-mode=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .dock.folded .mascot { width: 38px; height: 44px; }
 .pxicon { image-rendering: pixelated; flex: none; }
 
-/* Pip's care card */
-.pip-card { position: fixed; z-index: 160; width: 260px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+/* Pyxl's care card */
+.pyxl-card { position: fixed; z-index: 160; width: 260px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
 .pc-head { display: flex; align-items: center; gap: 8px; }
 .pc-lvl { color: var(--muted); font-size: 12px; }
 .pc-mood { margin: 0; font-size: 12.5px; color: var(--text); }

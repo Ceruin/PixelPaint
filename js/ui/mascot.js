@@ -1,13 +1,13 @@
 import { h } from './dom.js';
 import { bus } from '../core/bus.js';
 import { drawIcon, iconSize } from './pixelIcons.js';
-import { PipStats } from './pipStats.js';
-import { openCareCard, startStarGame } from './pipCare.js';
+import { PyxlStats } from './pyxlStats.js';
+import { openCareCard, startStarGame } from './pyxlCare.js';
 
-// Pip — pixel sprites rebuilt from the character sheet at their native resolution (one art pixel
+// Pyxl — pixel sprites rebuilt from the character sheet at their native resolution (one art pixel
 // per sprite pixel, shared palette, 1px outline). Always drawn at an integer scale so she stays crisp.
 const atlas = new Image();
-atlas.src = 'assets/pip-pixel.webp';
+atlas.src = 'assets/pyxl-pixel.webp';
 export const atlasReady = atlas.decode().catch(() => {});
 // name: [x, y, w, h, anchorX (beret centre), feet line]
 export const SPRITES = {
@@ -61,10 +61,10 @@ const ACTIONS = [
 export class Mascot {
   constructor(app) {
     this.app = app;
-    this.stats = new PipStats();
-    this.canvas = h('canvas.pip-canvas');
+    this.stats = new PyxlStats();
+    this.canvas = h('canvas.pyxl-canvas');
     this.bubble = h('div.m-bubble');
-    this.el = h('div.mascot', { 'data-tip': 'Pip — click to care for her' }, this.canvas, this.bubble);
+    this.el = h('div.mascot', { 'data-tip': 'Pyxl — click to care for her' }, this.canvas, this.bubble);
     Object.assign(this, { parts: [], k: 1, flip: false, pets: [], lastUndone: 0, lastActive: Date.now(), nextFidget: Date.now() + 9000, nextNeed: 0 });
     this.el.addEventListener('click', () => this.onClick());
     this.el.addEventListener('pointerenter', () => this.greet());
@@ -178,7 +178,7 @@ export class Mascot {
     bus.on('saved', e => { if (!e?.auto) { this.stats.gainXp(5); this.react('cheer', { icon: 'star', n: 4, say: 'Saved!' }); } });
     bus.on('mode', () => this.react('walk'));
     bus.on('play', on => (on ? this.react('dance') : this.state === 'dance' && this.base()));
-    bus.on('pip:level', lv => this.react('cheer', { icon: 'star', n: 6, say: `Level ${lv}!`, force: true }));
+    bus.on('pyxl:level', lv => this.react('cheer', { icon: 'star', n: 6, say: `Level ${lv}!`, force: true }));
     let colorAt = 0;
     bus.on('color', c => { if (Date.now() - colorAt > 2500 && this.state === 'idle') { colorAt = Date.now(); this.react('paint', { icon: 'drop', n: 1, color: c.fg, dur: 900 }); } });
     bus.on('tip', r => this.aim(r));

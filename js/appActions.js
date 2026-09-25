@@ -330,7 +330,7 @@ export function defineActions(app, { panels, project, setMode, timeline }) {
     { id: 'view.wrap', label: 'Wrap-Around Mode', icon: 'wrap', key: 'Shift+W', checked: () => app.opts.wrap, run: () => app.setOpt('wrap', !app.opts.wrap) },
     { id: 'view.assist', label: 'Show Assistants', icon: 'ruler', checked: () => app.opts.showAssist, run: () => app.setOpt('showAssist', !app.opts.showAssist) },
     { id: 'assist.clear', label: 'Clear Assistants', icon: 'trash', run: () => { doc().assistants.length = 0; bus.emit('assist'); v().redraw(); } },
-    { id: 'app.welcome', label: 'Say Hi to Pip', icon: 'heart', run: () => showWelcome(true) },
+    { id: 'app.welcome', label: 'Say Hi to Pyxl', icon: 'heart', run: () => showWelcome(true) },
     { id: 'view.theme', label: 'Light Theme', icon: 'sun', checked: () => app.settings.theme === 'light', run: () => { app.setSetting('theme', app.settings.theme === 'light' ? 'dark' : 'light'); document.body.classList.toggle('light', app.settings.theme === 'light'); bus.emit('mode', app.mode); } },
 
     ...MODES.map(([id, label, ic, key]) => ({ id: `mode.${id}`, label: `${label} Mode`, icon: ic, key, checked: () => app.mode === id, run: () => setMode(id) })),

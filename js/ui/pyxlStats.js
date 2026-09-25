@@ -1,9 +1,9 @@
 import { local } from '../core/storage.js';
 import { bus } from '../core/bus.js';
 
-// Pip's care model (Tamagotchi-style): four needs that drift over real time — including while
+// Pyxl's care model (Tamagotchi-style): four needs that drift over real time — including while
 // the app is closed, gently — plus experience and levels earned by caring for her and by painting.
-const KEY = 'pp.pip';
+const KEY = 'pp.pyxl';
 const HOUR = 3600e3;
 // Change per hour while awake / asleep.
 const AWAKE = { food: -7, fun: -9, love: -5, energy: -5 };
@@ -16,10 +16,10 @@ export const SNACKS = [
 
 const clamp = v => Math.max(0, Math.min(100, v));
 
-export class PipStats {
+export class PyxlStats {
   constructor() {
     const now = Date.now();
-    Object.assign(this, { food: 80, fun: 80, love: 70, energy: 90, asleep: false, xp: 0, level: 1, born: now, t: now }, local.get(KEY, {}));
+    Object.assign(this, { food: 80, fun: 80, love: 70, energy: 90, asleep: false, xp: 0, level: 1, born: now, t: now }, local.get(KEY, null) ?? local.get('pp.pip', {}));
     const away = now - this.t;
     this.update(Math.min(away, 24 * HOUR), true);
     this.welcomeBack = away > 2 * HOUR;
@@ -45,7 +45,7 @@ export class PipStats {
     if (!n) return;
     this.xp += n;
     const need = this.level * 40;
-    if (this.xp >= need) { this.xp -= need; this.level++; bus.emit('pip:level', this.level); }
+    if (this.xp >= need) { this.xp -= need; this.level++; bus.emit('pyxl:level', this.level); }
   }
 
   sleep(on) { this.asleep = on; this.save(); }
@@ -63,10 +63,10 @@ export class PipStats {
 
   get mood() {
     return {
-      asleep: 'Pip is fast asleep. Zzz…', tired: 'Pip can barely keep her eyes open.', hungry: 'Pip’s tummy is rumbling…',
-      lonely: 'Pip wants some attention!', bored: 'Pip is bored. Paint something, or play with her!',
-    }[this.need] ?? (this.food + this.fun + this.love + this.energy > 330 ? 'Pip is having a wonderful time ✿' : 'Pip is happy and ready to paint.');
+      asleep: 'Pyxl is fast asleep. Zzz…', tired: 'Pyxl can barely keep her eyes open.', hungry: 'Pyxl’s tummy is rumbling…',
+      lonely: 'Pyxl wants some attention!', bored: 'Pyxl is bored. Paint something, or play with her!',
+    }[this.need] ?? (this.food + this.fun + this.love + this.energy > 330 ? 'Pyxl is having a wonderful time ✿' : 'Pyxl is happy and ready to paint.');
   }
 
-  save() { const { food, fun, love, energy, asleep, xp, level, born, t } = this; local.set(KEY, { food, fun, love, energy, asleep, xp, level, born, t }); bus.emit('pip:stats', this); }
+  save() { const { food, fun, love, energy, asleep, xp, level, born, t } = this; local.set(KEY, { food, fun, love, energy, asleep, xp, level, born, t }); bus.emit('pyxl:stats', this); }
 }
