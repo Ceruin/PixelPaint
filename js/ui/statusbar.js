@@ -16,8 +16,14 @@ export function statusbar(app, el, canvas) {
   const brushInfo = () => { tt.textContent = `${app.brush.name} · ${app.brush.size}px`; };
   bus.on('brush', brushInfo); bus.on('tool', brushInfo); brushInfo();
   bus.on('saved', e => { svt.textContent = `${e?.auto ? 'Auto-saved' : 'Saved'} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; });
+  // Cursor position: at most once per frame, from the input's cached canvas rect (no layout reads).
+  let last = null, raf = 0;
   canvas.addEventListener('pointermove', e => {
-    const r = canvas.getBoundingClientRect(), p = app.view.toDoc(e.clientX - r.left, e.clientY - r.top);
-    pt.textContent = `${Math.floor(p.x)}, ${Math.floor(p.y)}`;
-  });
+    last = e;
+    raf ||= requestAnimationFrame(() => {
+      raf = 0;
+      const r = app.input.rect, p = app.view.toDoc(last.clientX - r.left, last.clientY - r.top), s = `${Math.floor(p.x)}, ${Math.floor(p.y)}`;
+      if (pt.textContent !== s) pt.textContent = s;
+    });
+  }, { passive: true });
 }

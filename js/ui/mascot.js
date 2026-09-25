@@ -273,13 +273,16 @@ export class Mascot {
     else this.react('wave', { dur: 1200 });
   }
 
+  // Her on-screen box, re-measured at most twice a second (it only moves when panels do).
+  rect(now) { if (!this.box || now - this.boxAt > 500) { this.box = this.el.getBoundingClientRect(); this.boxAt = now; } return this.box; }
+
   // Self-aware idling: she turns to face the cursor when it's near, reaches up when it hovers
   // above her head, and looks toward wherever you're working otherwise.
   watchCursor(now) {
     const c = this.cursor;
     this.gaze = 0;
     if (!c || now - c.t > 4000 || this.stats.asleep || !['idle', 'reach'].includes(this.state)) return;
-    const r = this.el.getBoundingClientRect(), cx = r.left + (AX + this.pos) * this.k / (devicePixelRatio || 1), head = r.bottom - 50 * this.k / (devicePixelRatio || 1);
+    const r = this.rect(now), cx = r.left + (AX + this.pos) * this.k / (devicePixelRatio || 1), head = r.bottom - 50 * this.k / (devicePixelRatio || 1);
     const dx = c.x - cx, dy = c.y - head, near = Math.hypot(dx, dy) < 220;
     if (near && dy < -12 && Math.abs(dx) < 70 && !this.hovered) { if (this.state !== 'reach') this.play('reach', { flip: dx < 0 }); else this.flip = dx < 0; return; }
     if (this.state === 'reach') return this.base();

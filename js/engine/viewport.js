@@ -1,25 +1,22 @@
-import { makeCanvas, Rect, clamp, drawRect } from '../core/util.js';
+import { makeCanvas, Rect, clamp } from '../core/util.js';
 import { bus } from '../core/bus.js';
 import { renderDoc } from './compositor.js';
 
 // Screen presentation: doc composite (dirty-rect cached) → transformed blit → overlays.
-// The view canvas uses a desynchronized (low-latency) context to cut pen-to-pixel delay. Frames
-// are painted into a back buffer and copied to the screen in one write, and only the region
-// that changed is repainted — so nothing half-drawn ever shows (no flicker on tablets or e-ink)
-// and a brush stroke costs its own area, not the whole screen.
+// The view canvas is a normal double-buffered one (the browser shows each frame whole, so it
+// can't flicker), and only the screen region that changed is repainted: a brush stroke costs
+// its own area, not the whole screen — which also keeps e-ink panels calm.
 export class Viewport {
   constructor(canvas) {
     Object.assign(this, { el: canvas, zoom: 1, rot: 0, x: 0, y: 0, flip: false, wrap: false, dirty: null, raf: 0, dpr: 1, cw: 1, ch: 1 });
     Object.assign(this, { full: true, pending: null, moved: new Set(), boxes: new WeakMap() });
-    this.ctx = canvas.getContext('2d', { desynchronized: true });
-    this.back = makeCanvas(1, 1);
-    this.bctx = this.back.getContext('2d');
+    this.ctx = canvas.getContext('2d', { alpha: true });
     this.overlays = new Set();
     this.previews = new Map();
     const t = makeCanvas(16, 16), tc = t.getContext('2d');
     tc.fillStyle = '#fff'; tc.fillRect(0, 0, 16, 16);
     tc.fillStyle = '#e4e6eb'; tc.fillRect(0, 0, 8, 8); tc.fillRect(8, 8, 8, 8);
-    this.checker = this.bctx.createPattern(t, 'repeat');
+    this.checker = this.ctx.createPattern(t, 'repeat');
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
     bus.on('dirty', r => this.invalidate(r));
     this.onion = null;
@@ -102,21 +99,18 @@ export class Viewport {
     const r = this.full || this.wrap ? all : Rect.clip(Rect.union(this.toScreenRect(this.pending), this.overlayBox()), el.width, el.height);
     this.full = false; this.pending = null; this.moved.clear();
     if (!r) return;
-    const b = this.bctx, c = this.ctx;
-    b.save(); b.beginPath(); b.rect(r.x, r.y, r.w, r.h); b.clip();
-    this.paint(b, r === all || !this.insideDoc(r));
-    b.restore();
-    c.save(); c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip();
-    c.globalCompositeOperation = 'copy';
-    drawRect(c, this.back, r);
+    const c = this.ctx;
+    c.save();
+    if (r !== all) { c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip(); }
+    this.paint(c, r === all || !this.insideDoc(r));
     c.restore();
   }
 
-  // One frame into the back buffer (the caller clips it to the region being repainted).
+  // One frame (the caller clips it to the region being repainted).
   paint(ctx, shadow) {
-    const { doc, back, dpr } = this;
+    const { doc, el, dpr } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, back.width, back.height);
+    ctx.clearRect(0, 0, el.width, el.height);
     const base = new DOMMatrix().scale(dpr).multiply(this.matrix);
     if (shadow && !this.wrap) this.drawShadow(ctx);
     for (const [i, j] of this.tiles()) {
@@ -229,8 +223,8 @@ export class Viewport {
     if (!r.width || !r.height) return;
     const cx = this.cw / 2, cy = this.ch / 2;
     this.dpr = devicePixelRatio || 1;
-    this.el.width = this.back.width = Math.round(r.width * this.dpr);
-    this.el.height = this.back.height = Math.round(r.height * this.dpr);
+    this.el.width = Math.round(r.width * this.dpr);
+    this.el.height = Math.round(r.height * this.dpr);
     this.x += r.width / 2 - cx; this.y += r.height / 2 - cy;
     this.cw = r.width; this.ch = r.height;
     this.changed();

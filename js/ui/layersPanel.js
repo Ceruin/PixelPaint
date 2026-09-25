@@ -146,7 +146,8 @@ export function layersPanel(app) {
 
   bus.on('layers', render);
   bus.on('filterLayer', n => editFilter(n));
-  bus.on('dirty', scheduleThumbs);
+  // Layers only change on commit (strokes paint a preview), so thumbnails follow history, not every frame.
+  bus.on('history', scheduleThumbs);
   bus.on('frame', scheduleThumbs);
 
   const foot = h('div.layer-foot', {},

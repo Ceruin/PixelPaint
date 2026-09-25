@@ -22,7 +22,10 @@ export function createProject(app) {
     }
   }));
 
-  const autosave = debounce(() => saveLocal(true), 2000);
+  // Autosave when you pause — never mid-stroke, and in idle time, so reading layers back never
+  // lands on the start of your next stroke.
+  const whenIdle = fn => (app.input?.active != null ? setTimeout(() => whenIdle(fn), 1000) : (window.requestIdleCallback ?? setTimeout)(fn, { timeout: 3000 }));
+  const autosave = debounce(() => whenIdle(() => saveLocal(true)), 2500);
   bus.on('history', autosave);
   bus.on('assist', autosave);
   addEventListener('visibilitychange', () => document.hidden && saveLocal(true));
