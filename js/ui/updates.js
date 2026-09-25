@@ -15,30 +15,30 @@ let beforeReload = () => {};
 
 // The splash (inline in index.html): hidden once the app has booted, shown again while updating.
 const splash = () => document.getElementById('splash');
-// Once the app is up: a splash that was showing (slow start, or just after an update) finishes
-// its animation — the bar fills, a last word — before it fades; one that never showed just goes.
+// The splash is always up while the app starts. Once it's ready the splash finishes: the bar
+// fills, a last word, a short beat (never less than a moment on screen) — then it fades.
+const MIN_SHOWN = 1200;
 export function hideSplash() {
   const el = splash();
   if (!el) return;
   let updated = false;
   try { updated = !!sessionStorage.getItem('pp.updated'); sessionStorage.removeItem('pp.updated'); } catch (e) {}
-  if (!updated && +getComputedStyle(el).opacity < 0.05) { el.hidden = true; return; }
-  el.classList.add('now');
-  const bar = el.querySelector('.sp-bar');
-  bar.classList.add('pct');
-  requestAnimationFrame(() => { bar.firstChild.style.width = '100%'; });
+  el.querySelector('.sp-bar').classList.add('done');
   el.querySelector('.sp-msg').textContent = updated ? 'All set — enjoy the new version!' : 'Ready!';
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; }, 500); }, updated ? 1700 : 800);
+  const wait = Math.max(0, MIN_SHOWN - performance.now()) + (updated ? 1300 : 500);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; }, 500); }, wait);
 }
 function showSplash(msg) {
   const el = splash();
   el.hidden = false;
   el.style.transition = 'none';          // cover the whole app at once, no fade-in
   el.classList.remove('out');
-  el.classList.add('now');
+  const bar = el.querySelector('.sp-bar'), fill = bar.firstElementChild;
   el.querySelector('.sp-msg').textContent = msg;
-  const bar = el.querySelector('.sp-bar');
-  return { progress: f => { bar.classList.add('pct'); bar.firstChild.style.width = `${Math.round(f * 100)}%`; }, say: m => { el.querySelector('.sp-msg').textContent = m; } };
+  return {
+    progress: f => { bar.classList.add('done'); fill.style.transform = `scaleX(${f})`; },
+    say: m => { el.querySelector('.sp-msg').textContent = m; },
+  };
 }
 
 // Updating: Pyxl's splash covers the app while your work is saved and every file the app uses is
