@@ -13,10 +13,38 @@ async function latest() {
 
 let beforeReload = () => {};
 
+// The splash (inline in index.html): hidden once the app has booted, shown again while updating.
+const splash = () => document.getElementById('splash');
+export function hideSplash() {
+  const el = splash();
+  if (!el) return;
+  el.classList.add('out');
+  setTimeout(() => { if (el.classList.contains('out')) el.hidden = true; }, 350);
+}
+function showSplash(msg) {
+  const el = splash();
+  el.hidden = false;
+  el.classList.remove('out');
+  el.classList.add('now');
+  el.querySelector('.sp-msg').textContent = msg;
+  const bar = el.querySelector('.sp-bar');
+  return { progress: f => { bar.classList.add('pct'); bar.firstChild.style.width = `${Math.round(f * 100)}%`; }, say: m => { el.querySelector('.sp-msg').textContent = m; } };
+}
+
+// Updating: Pyxl's splash covers the app while your work is saved and every file the app uses is
+// fetched fresh in the background (the service worker keeps the new copies); then one reload,
+// served from that warm cache.
 export async function reloadFresh() {
+  const sp = showSplash('Saving your work…');
   await Promise.resolve(beforeReload()).catch(() => {});
-  await caches?.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).catch(() => {});
+  sp.say('Downloading the new version…');
+  const here = location.href.split('#')[0].split('?')[0];
+  const urls = [...new Set([here, ...performance.getEntriesByType('resource').map(e => e.name.split('#')[0])])]
+    .filter(u => new URL(u).origin === location.origin && !u.includes('version.js?'));
+  let done = 0;
+  await Promise.all(urls.map(u => fetch(u, { cache: 'reload' }).catch(() => {}).finally(() => sp.progress(++done / urls.length))));
   await navigator.serviceWorker?.getRegistration().then(r => r?.update()).catch(() => {});
+  sp.say('Starting…');
   location.reload();
 }
 

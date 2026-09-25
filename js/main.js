@@ -25,7 +25,7 @@ import { initTooltips } from './ui/tooltip.js';
 import { toast } from './ui/dialogs.js';
 import { Mascot } from './ui/mascot.js';
 import { careBody, openCareCard } from './ui/pyxlCare.js';
-import { watchForUpdates } from './ui/updates.js';
+import { watchForUpdates, hideSplash } from './ui/updates.js';
 import { initZen } from './ui/zen.js';
 import { initNotes } from './ui/notes.js';
 
@@ -140,4 +140,5 @@ const asked = new URLSearchParams(location.search).get('mode');
 if (asked) history.replaceState(null, '', location.pathname);
 setMode(asked ?? local.get('pp.mode', isTouchDevice ? 'zen' : 'paint'));
 globalThis.pixelpaint = app;
+hideSplash();
 await welcome;
