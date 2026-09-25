@@ -4,9 +4,12 @@ import { actions } from '../core/actions.js';
 import { TOOL_META } from '../tools/index.js';
 import { SYMMETRY } from '../engine/symmetry.js';
 import { sizeToPos, posToSize } from './brushPanel.js';
+import { strokePreview } from '../engine/brush.js';
+
+const preview = b => { const c = h('canvas', { width: 140, height: 40 }); requestAnimationFrame(() => strokePreview(b, c, getComputedStyle(document.body).getPropertyValue('--text').trim())); return c; };
 
 const PAINT = ['brush', 'eraser', 'smudge'], SELECT = ['marquee', 'ellipse', 'lasso', 'wand'];
-const btn = (label, id) => h('button.btn.sm', { type: 'button', 'data-action': id, 'data-tip': label, onclick: () => actions.run(id) }, label);
+const btn = (label, id) => h('button.btn.sm', { type: 'button', 'data-action': id, 'data-tip': label, onclick: () => actions.run(id) }, actions.get(id)?.icon && icon(actions.get(id).icon), label);
 
 // Context-sensitive tool options. Own edits are guarded so a drag isn't rebuilt mid-gesture.
 export function optionsBar(app, el, openBrushes) {
@@ -20,7 +23,7 @@ export function optionsBar(app, el, openBrushes) {
     const t = app.tool.id, o = app.opts, b = app.brush;
     const parts = [h('span.opt-tool', {}, icon(t), TOOL_META.find(m => m[0] === t)[1])];
     if (PAINT.includes(t)) parts.push(
-      h('button.brush-name', { type: 'button', 'data-tip': 'Brush library', onclick: openBrushes }, b.name, icon('chevron')),
+      h('button.brush-name', { type: 'button', 'data-tip': 'Brush library', onclick: openBrushes }, preview(b), b.name, icon('chevron')),
       mini({ label: 'Size', value: sizeToPos(b.size), step: 0.1, fmt: () => `${app.brush.size}px`, onInput: v => setBrush('size')(posToSize(v)) }),
       mini({ label: 'Opacity', value: b.opacity * 100, fmt: v => `${Math.round(v)}%`, onInput: v => setBrush('opacity')(v / 100) }),
       mini({ label: 'Flow', value: b.flow * 100, fmt: v => `${Math.round(v)}%`, onInput: v => setBrush('flow')(v / 100) }),
@@ -42,6 +45,7 @@ export function optionsBar(app, el, openBrushes) {
     el.replaceChildren(...parts.filter(Boolean));
   };
   bus.on('tool', render);
+  bus.on('mode', render);
   bus.on('brush', () => !busy && render());
   render();
 }

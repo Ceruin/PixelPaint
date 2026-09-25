@@ -7,11 +7,11 @@ import { Doc } from './engine/document.js';
 import { FILTERS, renderFilter } from './engine/filters.js';
 import { acquire, release } from './engine/compositor.js';
 import { TOOL_META } from './tools/index.js';
+import { MODES } from './ui/modes.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
-const PANELS = [['tools', 'Tools'], ['color', 'Color'], ['brushes', 'Brushes'], ['brushSettings', 'Brush Settings'], ['layers', 'Layers'], ['history', 'History']];
-const MODES = [['studio', 'Studio', 'Alt+1'], ['zen', 'Zen / Touch', 'Alt+2'], ['notes', 'Notes', 'Alt+3'], ['paper', 'Paper (E-Ink)', 'Alt+4']];
+const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['history', 'History', 'history']];
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
 
 export function defineActions(app, { panels, project, setMode }) {
@@ -187,10 +187,9 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'file.open', label: 'Open…', key: 'Ctrl+O', run: project.open },
     { id: 'file.import', label: 'Import Image as Layer…', key: 'Ctrl+Shift+O', run: async () => { const f = await pickFile('image/*'); if (f) project.importLayer(f, f.name); } },
     { id: 'file.save', label: 'Save to Browser', key: 'Ctrl+S', run: () => project.saveLocal(false) },
-    { id: 'file.exportProject', label: 'Download Project (.ppaint)', key: 'Ctrl+Shift+S', run: project.exportProject },
+    { id: 'file.exportProject', label: 'Download Project (.ora)', key: 'Ctrl+Shift+S', run: project.exportProject },
     { id: 'file.exportPng', label: 'Export PNG', key: 'Ctrl+Shift+E', run: () => project.exportImage('image/png') },
     { id: 'file.exportJpg', label: 'Export JPG', run: () => project.exportImage('image/jpeg') },
-    { id: 'file.pixel', label: 'Classic Pixel Editor ↗', run: () => open('pixel/', '_blank') },
 
     { id: 'edit.undo', label: 'Undo', key: 'Ctrl+Z', run: () => app.undo() },
     { id: 'edit.redo', label: 'Redo', key: 'Ctrl+Shift+Z', run: () => app.redo() },
@@ -234,8 +233,8 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'view.rotR', label: 'Rotate View Right', key: 'Shift+ArrowRight', run: () => v().set(v().zoom, v().rot + 15) },
     { id: 'view.resetRot', label: 'Reset View Rotation', key: 'Shift+ArrowUp', run: () => v().set(v().zoom, 0) },
 
-    ...MODES.map(([id, label, key]) => ({ id: `mode.${id}`, label: `${label} Mode`, key, checked: () => app.mode === id, run: () => setMode(id) })),
-    { id: 'mode.toggleZen', label: 'Toggle Zen Mode', key: 'Tab', run: () => setMode(app.mode === 'zen' ? 'studio' : 'zen') },
+    ...MODES.map(([id, label, ic, key]) => ({ id: `mode.${id}`, label: `${label} Mode`, icon: ic, key, checked: () => app.mode === id, run: () => setMode(id) })),
+    { id: 'mode.toggleZen', label: 'Toggle Zen Mode', icon: 'zen', key: 'Tab', run: () => setMode(app.mode === 'zen' ? 'paint' : 'zen') },
 
     ...TOOL_META.map(([id, label, key]) => ({ id: `tool.${id}`, label: `${label} Tool`, key, run: () => app.setTool(id) })),
     { id: 'tool.commit', label: 'Apply Transform', key: 'Enter', enabled: () => !!app.tools.transform.s, run: () => app.tools.transform.commit() },
@@ -245,7 +244,7 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'color.swap', label: 'Swap Colors', key: 'X', run: () => app.swapColors() },
     { id: 'color.reset', label: 'Default Colors', key: 'D', run: () => { app.setColor('#1b1d23'); app.setColor('#ffffff', 'bg'); } },
 
-    ...PANELS.map(([id, label]) => ({ id: `panel.${id}`, label, checked: () => panels.isOpen(id), run: () => panels.toggle(id) })),
+    ...PANELS.map(([id, label, ic]) => ({ id: `panel.${id}`, label, icon: ic, checked: () => panels.isOpen(id), run: () => panels.toggle(id) })),
     { id: 'layout.save', label: 'Save Layout…', run: saveLayout },
     { id: 'layout.manage', label: 'Manage Layouts…', run: manageLayouts },
     { id: 'layout.export', label: 'Export Layout…', run: exportLayout },
@@ -253,17 +252,29 @@ export function defineActions(app, { panels, project, setMode }) {
     { id: 'layout.reset', label: 'Reset Layout', run: () => panels.reset() },
   ]);
 
+  // Icons shown next to menu items (tools, modes and panels set their own).
+  const ICON = {
+    'file.new': 'file', 'file.open': 'folder', 'file.import': 'image', 'file.save': 'save', 'file.exportProject': 'download', 'file.exportPng': 'image', 'file.exportJpg': 'image',
+    'edit.undo': 'undo', 'edit.redo': 'redo', 'edit.cut': 'scissors', 'edit.copy': 'copy', 'edit.paste': 'paste', 'edit.clear': 'eraser', 'edit.fill': 'fill', 'edit.shortcuts': 'keyboard', 'edit.settings': 'settings',
+    'image.size': 'image', 'image.canvas': 'crop', 'image.flipH': 'flipH', 'image.flipV': 'flipV', 'image.rotCW': 'rotCW', 'image.rotCCW': 'rotCCW',
+    'layer.new': 'plus', 'layer.newGroup': 'folderPlus', 'layer.group': 'folder', 'layer.dup': 'copy', 'layer.del': 'trash', 'layer.mergeDown': 'merge', 'layer.flatten': 'layers', 'layer.clip': 'clip', 'layer.alphaLock': 'alpha',
+    'sel.all': 'select', 'sel.none': 'x', 'sel.invert': 'swap', 'sel.feather': 'sparkle',
+    'view.in': 'zoom', 'view.out': 'zoomOut', 'view.fit': 'fit', 'view.actual': 'expand', 'view.rotL': 'rotCCW', 'view.rotR': 'rotCW', 'view.resetRot': 'undo',
+    'brush.smaller': 'minus', 'brush.bigger': 'plus', 'color.swap': 'swap', 'color.reset': 'palette', 'tool.commit': 'check', 'tool.cancel': 'x',
+    'layout.save': 'save', 'layout.manage': 'window', 'layout.export': 'download', 'layout.import': 'upload', 'layout.reset': 'undo',
+  };
+  for (const a of actions.all()) a.icon ??= ICON[a.id] ?? (a.id.startsWith('filter.') ? 'sparkle' : a.id.startsWith('tool.') ? a.id.slice(5) : undefined);
+
   return {
     menus: [
-      ['File', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg', '-', 'file.pixel']],
-      ['Edit', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.fill', '-', 'edit.shortcuts', 'edit.settings']],
-      ['Image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
-      ['Layer', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
-      ['Select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
-      ['Filter', Object.keys(FILTERS).map(k => `filter.${k}`)],
-      ['View', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', '-', ...MODES.map(m => `mode.${m[0]}`)]],
-      ['Window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
+      ['File', 'folder', ['file.new', 'file.open', 'file.import', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportJpg']],
+      ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.fill', '-', 'edit.shortcuts', 'edit.settings']],
+      ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
+      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
+      ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
+      ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
+      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', '-', ...MODES.map(m => `mode.${m[0]}`)]],
+      ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
     ],
-    modes: MODES,
   };
 }

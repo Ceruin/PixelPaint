@@ -1,8 +1,10 @@
-import { toBlob } from '../core/util.js';
+import { toBlob, makeCanvas } from '../core/util.js';
+import { flatten } from './compositor.js';
+import { zip, unzip } from './zip.js';
 import { Doc, Layer, Group } from './document.js';
 
-// Project format (.ppaint): "PPNT" | u32 json length | JSON manifest | concatenated PNG layer blobs.
-const MAGIC = 'PPNT', VERSION = 1;
+// Autosave snapshot: JSON tree + PNG blob per layer (kept in IndexedDB).
+const VERSION = 1;
 const PROPS = ['name', 'visible', 'opacity', 'blend', 'locked', 'alphaLock', 'clip', 'collapsed'];
 
 // Encodes changed layers only; `cache` (WeakMap) remembers each layer's last PNG by version.
@@ -41,20 +43,70 @@ export async function unpackDoc({ meta, blobs }) {
   return doc;
 }
 
-export async function encodeFile(doc) {
-  const { meta, blobs } = await packDoc(doc);
-  meta.sizes = blobs.map(b => b.size);
-  const json = new TextEncoder().encode(JSON.stringify(meta)), head = new Uint8Array(8);
-  head.set([...MAGIC].map(c => c.charCodeAt(0)));
-  new DataView(head.buffer).setUint32(4, json.length, true);
-  return new Blob([head, json, ...blobs], { type: 'application/x-pixelpaint' });
+// ---- OpenRaster (.ora): the open layered format read by Krita, GIMP and MyPaint ----
+const NS = 'https://pixelpaint.net/ora';
+const toOp = (b, group) => (group && b === 'pass' ? 'svg:src-over' : b === 'source-over' ? 'svg:src-over' : b === 'lighter' ? 'svg:plus' : `svg:${b}`);
+const fromOp = op => { const b = (op ?? 'svg:src-over').replace(/^svg:/, ''); return b === 'src-over' ? 'source-over' : b === 'plus' ? 'lighter' : b; };
+const esc = s => String(s).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`);
+
+export async function encodeORA(doc) {
+  const files = [{ name: 'mimetype', data: 'image/openraster' }];
+  let n = 0;
+  const node = async (x, pad) => {
+    const common = `name="${esc(x.name)}" visibility="${x.visible ? 'visible' : 'hidden'}" opacity="${x.opacity}"`;
+    if (x.type === 'group') {
+      const kids = [];
+      for (const k of [...x.children].reverse()) kids.push(await node(k, pad + ' '));
+      return `${pad}<stack ${common} composite-op="${toOp(x.blend, true)}" isolation="${x.blend === 'pass' ? 'auto' : 'isolate'}">\n${kids.join('')}${pad}</stack>\n`;
+    }
+    const src = `data/layer${n++}.png`;
+    files.push({ name: src, data: await toBlob(x.canvas) });
+    return `${pad}<layer ${common} src="${src}" x="0" y="0" composite-op="${toOp(x.blend)}"${x.locked ? ' edit-locked="true"' : ''}${x.alphaLock ? ' alpha-preserve="true"' : ''}${x.clip ? ' pp:clip="true"' : ''}${x === doc.active ? ' selected="true"' : ''}/>\n`;
+  };
+  let body = '';
+  for (const k of [...doc.root.children].reverse()) body += await node(k, '  ');
+  const merged = flatten(doc), s = Math.min(1, 256 / Math.max(doc.w, doc.h)), thumb = makeCanvas(Math.max(1, Math.round(doc.w * s)), Math.max(1, Math.round(doc.h * s)));
+  thumb.getContext('2d').drawImage(merged, 0, 0, thumb.width, thumb.height);
+  files.push(
+    { name: 'stack.xml', data: `<?xml version="1.0" encoding="UTF-8"?>\n<image version="0.0.5" w="${doc.w}" h="${doc.h}" xres="72" yres="72" xmlns:pp="${NS}">\n <stack>\n${body} </stack>\n</image>\n` },
+    { name: 'mergedimage.png', data: await toBlob(merged) },
+    { name: 'Thumbnails/thumbnail.png', data: await toBlob(thumb) });
+  return zip(files, 'image/openraster');
 }
 
-export async function decodeFile(blob) {
-  const buf = await blob.arrayBuffer();
-  if (new TextDecoder().decode(buf.slice(0, 4)) !== MAGIC) throw new Error('Not a PixelPaint project');
-  const len = new DataView(buf).getUint32(4, true), meta = JSON.parse(new TextDecoder().decode(buf.slice(8, 8 + len)));
-  let off = 8 + len;
-  const blobs = meta.sizes.map(s => blob.slice(off, off += s, 'image/png'));
-  return unpackDoc({ meta, blobs });
+export async function decodeORA(blob) {
+  const files = await unzip(blob), xml = files.get('stack.xml');
+  if (!xml) throw new Error('Not an OpenRaster file');
+  const img = new DOMParser().parseFromString(await xml.text(), 'application/xml').documentElement;
+  const w = +img.getAttribute('width') || +img.getAttribute('w'), h = +img.getAttribute('h');
+  const doc = new Doc(w, h, { empty: true });
+  const props = (el, n) => {
+    n.visible = el.getAttribute('visibility') !== 'hidden';
+    n.opacity = +(el.getAttribute('opacity') ?? 1);
+  };
+  const build = async el => {
+    const kids = [];
+    for (const c of [...el.children].reverse()) {
+      if (c.tagName === 'stack') {
+        const g = new Group(c.getAttribute('name') || `Group ${++doc.groups}`);
+        props(c, g);
+        g.blend = c.getAttribute('isolation') === 'isolate' ? fromOp(c.getAttribute('composite-op')) : 'pass';
+        g.children = await build(c);
+        kids.push(g);
+      } else if (c.tagName === 'layer' && files.has(c.getAttribute('src'))) {
+        const l = new Layer(w, h, c.getAttribute('name') || `Layer ${doc.count + 1}`);
+        props(c, l);
+        Object.assign(l, { blend: fromOp(c.getAttribute('composite-op')), locked: c.getAttribute('edit-locked') === 'true', alphaLock: c.getAttribute('alpha-preserve') === 'true', clip: c.getAttributeNS(NS, 'clip') === 'true' });
+        l.ctx.drawImage(await createImageBitmap(files.get(c.getAttribute('src'))), +c.getAttribute('x') || 0, +c.getAttribute('y') || 0);
+        if (c.getAttribute('selected') === 'true') doc.active = l;
+        doc.count++;
+        kids.push(l);
+      }
+    }
+    return kids;
+  };
+  const top = img.querySelector('stack');
+  doc.root.children = top ? await build(top) : [];
+  doc.active ??= doc.layers.at(-1) ?? null;
+  return doc;
 }

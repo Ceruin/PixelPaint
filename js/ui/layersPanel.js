@@ -74,11 +74,8 @@ export function layersPanel(app) {
       n.type === 'group'
         ? [h('button.ibtn.sm', { type: 'button', onclick: () => { n.collapsed = !n.collapsed; render(); } }, icon(n.collapsed ? 'chevronRight' : 'chevron')), h('span.folder', {}, icon('folder'))]
         : h('span.thumb-wrap', {}, thumb(n)),
-      h('span.layer-name', {}, n.name),
-      h('span.badges', {},
-        n.alphaLock && icon('alpha'), n.locked && icon('lock'),
-        BLEND_SHORT[n.blend] && n.blend !== 'source-over' && h('small', {}, BLEND_SHORT[n.blend]),
-        n.opacity < 1 && h('small', {}, `${Math.round(n.opacity * 100)}%`)));
+      h('span.layer-meta', {}, h('span.layer-name', {}, n.name), h('span.layer-sub', {}, `${Math.round(n.opacity * 100)}% · ${BLEND_SHORT[n.blend] ?? 'Pass Through'}`)),
+      h('span.badges', {}, n.clip && icon('clip'), n.alphaLock && icon('alpha'), n.locked && icon('lock')));
     el.node = n;
     el.addEventListener('pointerdown', e => !e.target.closest('button') && startDrag(n, e));
     return el;
@@ -91,7 +88,7 @@ export function layersPanel(app) {
   };
 
   const rename = n => {
-    const el = [...list.children].find(r => r.node === n)?.querySelector('.layer-name');
+    const el = [...list.children].find(r => r.node === n)?.querySelector('.layer-meta');
     if (!el) return;
     const input = h('input.rename', { value: n.name });
     const done = ok => { if (ok && input.value.trim() && input.value !== n.name) doc().editProps('Rename', n, { name: input.value.trim() }); else render(); };

@@ -22,7 +22,7 @@ export class App {
     haptics.enabled = this.settings.haptics;
     this.profile = {};
     this.keys = {};
-    this.mode = 'studio';
+    this.mode = 'paint';
     this.view = new Viewport(canvas);
     this.tools = createTools(this);
     this.tool = this.tools.brush;

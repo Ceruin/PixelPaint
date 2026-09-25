@@ -2,11 +2,11 @@ import { bus } from './core/bus.js';
 import { idb } from './core/storage.js';
 import { debounce, download, pickFile, toBlob, makeCanvas } from './core/util.js';
 import { Doc } from './engine/document.js';
-import { packDoc, unpackDoc, encodeFile, decodeFile } from './engine/serializer.js';
+import { packDoc, unpackDoc, encodeORA, decodeORA } from './engine/serializer.js';
 import { flatten } from './engine/compositor.js';
 import { haptics } from './input/haptics.js';
 
-// Persistence: IndexedDB autosave (incremental PNG re-encode per layer), .ppaint files, image export.
+// Persistence: IndexedDB autosave (incremental PNG re-encode per layer), OpenRaster projects, image export.
 export function createProject(app) {
   const cache = new WeakMap();
   let pending = Promise.resolve();
@@ -30,9 +30,9 @@ export function createProject(app) {
 
   async function openFile(f) {
     try {
-      if (/\.ppaint$/i.test(f.name)) {
-        const doc = await decodeFile(f);
-        doc.name = f.name.replace(/\.ppaint$/i, '');
+      if (/\.ora$/i.test(f.name)) {
+        const doc = await decodeORA(f);
+        doc.name = f.name.replace(/\.ora$/i, '');
         app.setDoc(doc);
       } else if (f.type.startsWith('image/')) {
         const img = await createImageBitmap(f), doc = new Doc(img.width, img.height, { bg: null });
@@ -65,7 +65,7 @@ export function createProject(app) {
 
   return {
     saveLocal, restore, openFile, importLayer, exportImage,
-    open: async () => { const f = await pickFile('.ppaint,image/*'); if (f) openFile(f); },
-    exportProject: async () => { download(await encodeFile(app.doc), `${app.doc.name}.ppaint`); bus.emit('saved', { auto: false }); },
+    open: async () => { const f = await pickFile('.ora,image/*'); if (f) openFile(f); },
+    exportProject: async () => { download(await encodeORA(app.doc), `${app.doc.name}.ora`); bus.emit('saved', { auto: false }); },
   };
 }

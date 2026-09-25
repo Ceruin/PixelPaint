@@ -3,34 +3,42 @@ import { local } from '../core/storage.js';
 import { clamp, debounce } from '../core/util.js';
 import { bus } from '../core/bus.js';
 
-// Dockable / floating / collapsible panels. A layout is plain JSON:
-// { dockWidth, panels: { id: { dock: 'left'|'right'|null, order, x, y, w, h, collapsed, hidden } } }
+// Dockable / floating / collapsible panels. Each side dock collapses to an icon rail whose
+// buttons open panels as flyouts (the same flyouts Zen mode uses). A layout is plain JSON:
+// { dockWidth, docks: { left, right }, panels: { id: { dock, order, x, y, w, h, collapsed, hidden } } }
 export class Panels {
   constructor(ws) {
     this.ws = ws;
-    this.docks = { left: ws.querySelector('#dockLeft .dock-panels'), right: ws.querySelector('#dockRight .dock-panels') };
+    this.sides = { left: ws.querySelector('#dockLeft'), right: ws.querySelector('#dockRight') };
+    this.docks = { left: this.sides.left.querySelector('.dock-panels'), right: this.sides.right.querySelector('.dock-panels') };
+    this.rails = {};
+    for (const side of ['left', 'right']) this.sides[side].prepend(this.rails[side] = h('div.dock-rail'));
     this.float = ws.querySelector('#floatLayer');
     this.map = new Map();
     this.defaults = {};
+    this.folded = { left: false, right: false };
+    this.fly = null;
     this.save = debounce(() => local.set('pp.layout', this.layout()), 300);
     this.initResizer(ws.querySelector('#dockRight .dock-resizer'));
     new ResizeObserver(() => this.map.forEach(p => !p.s.dock && this.clampFloat(p))).observe(ws);
+    document.addEventListener('pointerdown', e => {
+      if (this.fly && !this.fly.p.el.contains(e.target) && !this.fly.anchor.contains(e.target) && !e.target.closest('.modal-back, .menu-drop')) this.closeFlyout();
+    }, true);
   }
 
-  add(id, title, body, def, { tools = [], grow = false } = {}) {
+  add(id, title, ic, body, def, { grow = false } = {}) {
     const el = h(`section.panel${grow ? '.grow' : ''}`, { dataset: { panel: id } },
       h('header.panel-head', {},
-        h('span.panel-title', {}, title),
-        ...tools,
-        h('button.ibtn.sm', { type: 'button', 'data-tip': 'Collapse', onclick: () => this.patch(id, { collapsed: !this.map.get(id).s.collapsed }) }, icon('chevron')),
-        h('button.ibtn.sm', { type: 'button', 'data-tip': 'Close', onclick: () => this.patch(id, { hidden: true }) }, icon('x'))),
+        icon(ic), h('span.panel-title', {}, title),
+        h('button.ibtn.sm.fold', { type: 'button', 'data-tip': 'Collapse', onclick: () => this.patch(id, { collapsed: !this.map.get(id).s.collapsed }) }, icon('chevron')),
+        h('button.ibtn.sm', { type: 'button', 'data-tip': 'Close', onclick: () => (this.fly?.p.id === id ? this.closeFlyout() : this.patch(id, { hidden: true })) }, icon('x'))),
       h('div.panel-body', {}, body));
-    const p = { id, title, el, s: { ...def } };
+    const p = { id, title, icon: ic, el, s: { ...def } };
     this.defaults[id] = def;
     this.map.set(id, p);
-    el.querySelector('.panel-head').addEventListener('pointerdown', e => !e.target.closest('button, select, input') && this.drag(p, e));
+    el.querySelector('.panel-head').addEventListener('pointerdown', e => !e.target.closest('button') && !el.classList.contains('flyout') && this.drag(p, e));
     new ResizeObserver(() => {
-      if (p.s.dock || p.s.collapsed || !el.offsetWidth) return;
+      if (p.s.dock || p.s.collapsed || !el.offsetWidth || el.classList.contains('flyout')) return;
       p.s.w = el.offsetWidth; p.s.h = el.offsetHeight; this.save();
     }).observe(el);
     return el;
@@ -39,14 +47,43 @@ export class Panels {
   patch(id, s) { Object.assign(this.map.get(id).s, s); this.placeAll(); this.save(); }
   toggle(id) { this.patch(id, { hidden: !this.map.get(id).s.hidden }); }
   isOpen(id) { return !this.map.get(id)?.s.hidden; }
+  fold(side, on = !this.folded[side]) { this.folded[side] = on; this.closeFlyout(); this.placeAll(); this.save(); }
+
+  // Shows a panel as a popover beside `anchor` (collapsed dock rails, Zen strip).
+  flyout(id, anchor) {
+    const p = this.map.get(id), again = this.fly?.p === p;
+    this.closeFlyout();
+    if (again) return;
+    this.fly = { p, anchor };
+    const r = anchor.getBoundingClientRect(), right = r.left > innerWidth / 2;
+    p.el.classList.add('flyout');
+    Object.assign(p.el.style, {
+      top: `${clamp(r.top, 8, innerHeight - 340)}px`, width: '', height: '',
+      left: right ? 'auto' : `${r.right + 8}px`, right: right ? `${innerWidth - r.left + 8}px` : 'auto',
+    });
+    anchor.classList.add('on');
+  }
+  closeFlyout() {
+    if (!this.fly) return;
+    const { p, anchor } = this.fly;
+    this.fly = null;
+    p.el.classList.remove('flyout');
+    anchor.classList.remove('on');
+    this.place(p);
+  }
 
   layout() {
-    return { dockWidth: this.ws.style.getPropertyValue('--dock-w') || null, panels: Object.fromEntries([...this.map].map(([id, p]) => [id, { ...p.s }])) };
+    return {
+      dockWidth: this.ws.style.getPropertyValue('--dock-w') || null,
+      docks: { ...this.folded },
+      panels: Object.fromEntries([...this.map].map(([id, p]) => [id, { ...p.s }])),
+    };
   }
 
   apply(layout) {
     if (layout?.dockWidth) this.ws.style.setProperty('--dock-w', layout.dockWidth);
     else this.ws.style.removeProperty('--dock-w');
+    this.folded = { left: false, right: false, ...layout?.docks };
     this.map.forEach((p, id) => { p.s = { ...this.defaults[id], ...layout?.panels?.[id] }; });
     this.placeAll();
     this.save();
@@ -55,26 +92,42 @@ export class Panels {
 
   placeAll() {
     const sorted = [...this.map.values()].sort((a, b) => (a.s.order ?? 0) - (b.s.order ?? 0));
-    for (const p of sorted) {
-      const { el, s } = p;
+    sorted.forEach(p => this.place(p));
+    for (const side of ['left', 'right']) this.renderRail(side, sorted.filter(p => p.s.dock === side && !p.s.hidden));
+    bus.emit('panels');
+  }
+
+  place(p) {
+    const { el, s } = p;
+    if (el.classList.contains('flyout')) return;
+    {
       el.hidden = !!s.hidden;
       el.classList.toggle('collapsed', !!s.collapsed);
       el.classList.toggle('floating', !s.dock);
       if (s.dock) {
-        Object.assign(el.style, { left: '', top: '', width: '', height: '' });
+        Object.assign(el.style, { left: '', top: '', right: '', width: '', height: '' });
         this.docks[s.dock].append(el);
       } else {
-        Object.assign(el.style, { left: `${s.x}px`, top: `${s.y}px`, width: `${s.w}px`, height: s.collapsed ? '' : `${s.h}px` });
+        Object.assign(el.style, { left: `${s.x}px`, top: `${s.y}px`, right: '', width: `${s.w}px`, height: s.collapsed ? '' : `${s.h}px` });
         this.float.append(el);
         this.clampFloat(p);
       }
     }
-    bus.emit('panels');
+  }
+
+  renderRail(side, docked) {
+    const folded = this.folded[side], dock = this.sides[side];
+    dock.classList.toggle('folded', folded);
+    dock.classList.toggle('empty', !docked.length);
+    const arrow = (side === 'left') === folded ? 'chevronsRight' : 'chevronsLeft';
+    this.rails[side].replaceChildren(
+      h('button.ibtn.sm.rail-toggle', { type: 'button', 'data-tip': folded ? 'Expand side panel' : 'Collapse side panel', onclick: () => this.fold(side) }, icon(arrow)),
+      ...(folded ? docked : []).map(p => h('button.ibtn.rail-btn', { type: 'button', 'data-tip': p.title, onclick: e => this.flyout(p.id, e.currentTarget) }, icon(p.icon))));
   }
 
   clampFloat({ el, s }) {
     const W = this.ws.clientWidth, H = this.ws.clientHeight;
-    s.x = clamp(s.x, 0, Math.max(0, W - 60)); s.y = clamp(s.y, 0, Math.max(0, H - 36));
+    s.x = clamp(s.x, 0, Math.max(0, W - 60)); s.y = clamp(s.y, 0, Math.max(0, H - 32));
     el.style.left = `${s.x}px`; el.style.top = `${s.y}px`;
   }
 
@@ -94,14 +147,14 @@ export class Panels {
       s.x = ev.clientX - wr.left - off.x; s.y = ev.clientY - wr.top - off.y;
       this.clampFloat(p);
       zone = this.dockZone(ev, p);
-      this.ws.querySelectorAll('.dock').forEach(d => d.classList.toggle('drop', d.id === (zone && (zone.side === 'left' ? 'dockLeft' : 'dockRight'))));
+      for (const side of ['left', 'right']) this.sides[side].classList.toggle('drop', zone?.side === side);
     };
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
-      this.ws.querySelectorAll('.dock').forEach(d => d.classList.remove('drop'));
+      for (const side of ['left', 'right']) this.sides[side].classList.remove('drop');
       el.style.zIndex = '';
       if (!moved) return;
-      if (zone) Object.assign(s, { dock: zone.side, order: zone.order });
+      if (zone) { Object.assign(s, { dock: zone.side, order: zone.order }); this.folded[zone.side] = false; }
       this.normalize();
       this.placeAll();
       this.save();
@@ -112,9 +165,8 @@ export class Panels {
 
   dockZone(ev, self) {
     for (const side of ['left', 'right']) {
-      const box = this.docks[side].parentElement.getBoundingClientRect();
-      const near = side === 'left' ? ev.clientX < box.right + 24 : ev.clientX > box.left - 24;
-      if (!near) continue;
+      const box = this.sides[side].getBoundingClientRect();
+      if (!(side === 'left' ? ev.clientX < box.right + 24 : ev.clientX > box.left - 24)) continue;
       const docked = [...this.map.values()].filter(p => p !== self && p.s.dock === side && !p.s.hidden).sort((a, b) => a.s.order - b.s.order);
       const hit = docked.find(p => ev.clientY < p.el.getBoundingClientRect().top + p.el.offsetHeight / 2);
       return { side, order: hit ? hit.s.order - 0.5 : (docked.at(-1)?.s.order ?? 0) + 1 };

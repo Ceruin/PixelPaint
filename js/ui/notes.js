@@ -2,7 +2,6 @@ import { h, icon, iconBtn } from './dom.js';
 import { idb } from '../core/storage.js';
 import { debounce, clamp } from '../core/util.js';
 import { BrushEngine, DEFAULT_BRUSH } from '../engine/brush.js';
-import { actions } from '../core/actions.js';
 
 const COLORS = ['#fff3a8', '#ffd1dc', '#c8f0d8', '#cfe6ff', '#e6dcff', '#ffffff'];
 const PEN = { ...DEFAULT_BRUSH, name: 'Note pen', size: 3.5, minSize: 0.35, hardness: 0.95, spacing: 0.05, smoothing: 0.35 };
@@ -11,7 +10,7 @@ const SKETCH_W = 640, SKETCH_H = 480;
 // Note-taking board: infinite pan/zoom surface with sticky notes, text blocks and sketch cards.
 export function initNotes(app, sendToCanvas) {
   const root = document.getElementById('notes');
-  const inner = h('div.board-inner'), board = h('div.board', {}, inner), slot = h('div.mascot-slot');
+  const inner = h('div.board-inner'), slot = h('div.mascot-slot.board-slot'), board = h('div.board', {}, inner, slot);
   let state = { items: [], view: { x: 40, y: 40, z: 1 } }, uid = 1;
   const save = debounce(() => idb.set('notes', state), 400);
   const applyView = () => { const v = state.view; inner.style.transform = `translate(${v.x}px,${v.y}px) scale(${v.z})`; board.style.backgroundPosition = `${v.x}px ${v.y}px`; board.style.backgroundSize = `${24 * v.z}px ${24 * v.z}px`; };
@@ -82,6 +81,7 @@ export function initNotes(app, sendToCanvas) {
   // Board pan (drag empty space), zoom (wheel / pinch via ctrl+wheel), double-click = new note.
   board.addEventListener('pointerdown', e => {
     if (e.target !== board && e.target !== inner) return;
+    e.preventDefault();
     board.setPointerCapture(e.pointerId);
     let x = e.clientX, y = e.clientY;
     board.onpointermove = ev => { state.view.x += ev.clientX - x; state.view.y += ev.clientY - y; x = ev.clientX; y = ev.clientY; applyView(); };
@@ -100,15 +100,13 @@ export function initNotes(app, sendToCanvas) {
   }, { passive: false });
 
   root.append(
-    h('div.notes-bar', {},
-      h('strong', {}, 'Notes'),
-      h('button.btn', { type: 'button', onclick: () => add('note') }, icon('note'), 'Sticky'),
-      h('button.btn', { type: 'button', onclick: () => add('text') }, icon('text'), 'Text'),
-      h('button.btn', { type: 'button', onclick: () => add('sketch') }, icon('sketch'), 'Sketch'),
-      h('button.btn', { type: 'button', onclick: () => { state.view = { x: 40, y: 40, z: 1 }; applyView(); } }, 'Reset view'),
-      h('span.spacer'), h('span.muted', {}, 'Double-click the board for a quick note'),
-      h('button.btn.primary', { type: 'button', onclick: () => actions.run('mode.studio') }, 'Back to canvas'),
-      slot),
+    h('div.optionsbar', {},
+      h('span.opt-tool', {}, icon('note'), 'Notes'),
+      h('button.btn.sm', { type: 'button', onclick: () => add('note') }, icon('note'), 'Sticky note'),
+      h('button.btn.sm', { type: 'button', onclick: () => add('text') }, icon('text'), 'Text'),
+      h('button.btn.sm', { type: 'button', onclick: () => add('sketch') }, icon('sketch'), 'Sketch'),
+      h('button.btn.sm', { type: 'button', onclick: () => { state.view = { x: 40, y: 40, z: 1 }; applyView(); save(); } }, icon('fit'), 'Reset view'),
+      h('span.muted', {}, 'Double-click the board for a quick note · drag empty space to pan · Ctrl+wheel to zoom')),
     board);
 
   idb.get('notes').then(s => {

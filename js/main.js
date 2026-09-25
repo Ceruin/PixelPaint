@@ -1,4 +1,4 @@
-import { $, h, segmented } from './ui/dom.js';
+import { $ } from './ui/dom.js';
 import { bus } from './core/bus.js';
 import { local } from './core/storage.js';
 import { bindKeys, isTyping } from './core/actions.js';
@@ -14,6 +14,7 @@ import { brushLibrary, brushSettings, loadCustomTips } from './ui/brushPanel.js'
 import { layersPanel } from './ui/layersPanel.js';
 import { historyPanel } from './ui/historyPanel.js';
 import { menubar } from './ui/menubar.js';
+import { MODES, modeSwitch } from './ui/modes.js';
 import { optionsBar } from './ui/optionsbar.js';
 import { statusbar } from './ui/statusbar.js';
 import { initTooltips } from './ui/tooltip.js';
@@ -28,18 +29,25 @@ const project = createProject(app);
 const panels = new Panels($('#workspace'));
 const mascot = new Mascot();
 const zen = initZen(app, panels);
-const notes = initNotes(app, c => { setMode('studio'); project.importLayer(c, 'Sketch note'); });
+const notes = initNotes(app, c => { setMode('paint'); project.importLayer(c, 'Sketch note'); });
 
-const openPanel = id => (app.mode === 'zen' ? zen.pop(id) : panels.patch(id, { hidden: false, collapsed: false }));
+// Opens a panel where it lives; in Zen, or when its dock is folded, as a flyout by the clicked control.
+const openPanel = (id, e) => {
+  const s = panels.map.get(id).s;
+  if (e?.currentTarget && (app.mode === 'zen' || (s.dock && panels.folded[s.dock]))) return panels.flyout(id, e.currentTarget);
+  panels.patch(id, { hidden: false, collapsed: false });
+};
 
-panels.add('tools', 'Tools', toolbar(app, () => openPanel('color')), { dock: 'left', order: 0 });
-panels.add('color', 'Color', colorPicker(app), { dock: 'right', order: 0 });
-panels.add('brushes', 'Brushes', brushLibrary(app), { dock: 'right', order: 1 }, { grow: true });
-panels.add('brushSettings', 'Brush Settings', brushSettings(app), { dock: null, hidden: true, x: 70, y: 16, w: 290, h: 520 });
-panels.add('layers', 'Layers', layersPanel(app), { dock: 'right', order: 2 }, { grow: true });
-panels.add('history', 'History', historyPanel(app), { dock: null, hidden: true, x: 380, y: 16, w: 230, h: 320 });
+panels.add('tools', 'Tools', 'brush', toolbar(app, e => openPanel('color', e)), { dock: 'left', order: 0 });
+panels.add('color', 'Color', 'palette', colorPicker(app), { dock: 'right', order: 0 });
+panels.add('brushes', 'Brushes', 'grid', brushLibrary(app), { dock: 'right', order: 1 }, { grow: true });
+panels.add('brushSettings', 'Brush Settings', 'sliders', brushSettings(app), { dock: null, hidden: true, x: 130, y: 16, w: 290, h: 520 });
+panels.add('layers', 'Layers', 'layers', layersPanel(app), { dock: 'right', order: 2 }, { grow: true });
+panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hidden: true, x: 440, y: 16, w: 230, h: 320 });
 
 function setMode(mode) {
+  if (mode === 'pixel') { location.href = 'pixel/'; return; }
+  if (!MODES.some(m => m[0] === mode)) mode = 'paint';
   app.tool.interrupt?.();
   app.mode = mode;
   document.body.dataset.mode = mode;
@@ -47,16 +55,15 @@ function setMode(mode) {
   app.profile = mode === 'paper' ? { smoothing: 0.3, grain: 0.35 } : {};
   notes.show(mode === 'notes');
   mascot.mount(mode === 'zen' ? zen.slot : mode === 'notes' ? notes.slot : $('#mascotSlot'));
+  modeBox.replaceChildren(modeSwitch(mode, setMode));
   bus.emit('mode', mode);
   requestAnimationFrame(() => app.view.resize());
 }
 
-const { menus, modes } = defineActions(app, { panels, project, setMode });
-const modeSwitch = h('div.mode-switch');
-const renderModes = () => modeSwitch.replaceChildren(segmented(modes.map(([id, label]) => [id, label.split(' ')[0]]), app.mode, setMode));
-bus.on('mode', renderModes);
-menubar($('#menubar'), menus, modeSwitch);
-optionsBar(app, $('#optionsbar'), () => openPanel('brushes'));
+const { menus } = defineActions(app, { panels, project, setMode });
+const modeBox = document.createElement('div');
+menubar($('#menubar'), menus, modeBox);
+optionsBar(app, $('#optionsbar'), e => openPanel('brushes', e));
 statusbar(app, $('#statusbar'), $('#view'));
 initTooltips();
 bindKeys();
@@ -72,10 +79,13 @@ const stage = $('#stage');
 stage.addEventListener('dragover', e => e.preventDefault());
 stage.addEventListener('drop', e => {
   e.preventDefault();
-  for (const f of e.dataTransfer.files) /\.ppaint$/i.test(f.name) ? project.openFile(f) : f.type.startsWith('image/') && project.importLayer(f, f.name);
+  for (const f of e.dataTransfer.files) /\.ora$/i.test(f.name) ? project.openFile(f) : f.type.startsWith('image/') && project.importLayer(f, f.name);
 });
 
 const doc = await project.restore().catch(() => null) ?? new Doc(1920, 1080);
 app.setDoc(doc);
-setMode(local.get('pp.mode', isTouchDevice ? 'zen' : 'studio'));
+// ?mode=… (links from the Pixel editor) wins over the remembered mode.
+const asked = new URLSearchParams(location.search).get('mode');
+if (asked) history.replaceState(null, '', location.pathname);
+setMode(asked ?? local.get('pp.mode', isTouchDevice ? 'zen' : 'paint'));
 globalThis.pixelpaint = app;
