@@ -23,14 +23,14 @@
 .sp-strip { width: 3138px; height: 177px; background: url(assets/pyxl-pixel.webp) 0 0 / 3138px 177px no-repeat; image-rendering: pixelated; transform: translate(-408px, -15px); animation: sp-walk .6s infinite; will-change: transform; }
 .sp-brand { font-weight: 700; font-size: 22px; letter-spacing: .5px; color: #cbe4ff; } .sp-brand i { font-style: normal; color: #ffd23f; }
 .sp-bar { width: 180px; height: 4px; border-radius: 2px; background: #2b2f39; overflow: hidden; }
-.sp-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #a445ff, #3b7bff, #17c06b, #ffd23f, #ff3b47); transform-origin: left; animation: sp-load 1.1s ease-in-out infinite; will-change: transform; }
-.sp-bar.done i { animation: none; transform: none; transition: transform .45s ease-out; }
+.sp-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #a445ff, #3b7bff, #17c06b, #ffd23f, #ff3b47); transform-origin: left; transform: scaleX(var(--from, 0)); animation: sp-fill 7s cubic-bezier(.12, .7, .3, 1) forwards; will-change: transform; }
 .sp-msg { margin: 0; min-height: 1.4em; }
 @keyframes sp-walk { 0% { transform: translate(-408px, -15px); } 33.3% { transform: translate(-708px, -15px); } 66.6% { transform: translate(-555px, -15px); } 100% { transform: translate(-408px, -15px); } }
 .sp-strip { animation-timing-function: step-end; }
 @keyframes sp-bob { to { transform: translateY(-4px); } }
-@keyframes sp-load { 0% { transform: translateX(-100%) scaleX(.35); } 100% { transform: translateX(100%) scaleX(.35); } }
-@media (prefers-reduced-motion: reduce) { .sp-win, .sp-strip, .sp-bar i { animation: none; } }
+/* one steady fill: fast at first, easing toward 92% until the app says it's ready, then to 100% */
+@keyframes sp-fill { from { transform: scaleX(var(--from, 0)); } to { transform: scaleX(.92); } }
+@media (prefers-reduced-motion: reduce) { .sp-win { animation: none; } }   /* keep her walk and the progress bar; drop the bob */
 </style>
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/app.css">
@@ -40,7 +40,8 @@
 <body data-mode="paint">
 <div id="splash" aria-live="polite"><div class="sp-win"><div class="sp-strip"></div></div><div class="sp-brand">Pixel<i>Paint</i></div><div class="sp-bar"><i></i></div><p class="sp-msg">Loading…</p></div>
 <script>
-try { if (sessionStorage.getItem('pp.updated')) document.querySelector('#splash .sp-msg').textContent = 'Updating PixelPaint…'; } catch (e) {}
+// Coming back from an update: carry on the same loading bar from where it stopped.
+try { const u = sessionStorage.getItem('pp.updated'); if (u) { document.querySelector('#splash .sp-msg').textContent = 'Updating PixelPaint…'; document.querySelector('#splash .sp-bar i').style.setProperty('--from', Math.min(0.9, +u || 0.6)); } } catch (e) {}
 // Safety net: if starting ever stalls, let the user through instead of waiting forever.
 setTimeout(() => { const s = document.getElementById('splash'); if (s && !s.hidden && !s.classList.contains('out')) { s.querySelector('.sp-msg').textContent = 'Taking longer than usual… tap to continue'; s.onclick = () => s.classList.add('out'); } }, 12000);
 </script>

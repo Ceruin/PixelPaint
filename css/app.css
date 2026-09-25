@@ -14,7 +14,8 @@ body[data-mode=paper] {
   --bg: #f4f2ec; --stage: #e6e3da; --panel: #fbfaf6; --panel2: #f1efe8; --panel3: #e4e1d8; --line: #111;
   --text: #111; --muted: #444; --accent: #111; --accent2: #111; --accent-ink: #fff; --shadow: none; color-scheme: light;
 }
-body[data-mode=paper] *, body[data-mode=paper] *::before, body[data-mode=paper] *::after { transition: none !important; animation: none !important; }
+/* e-ink: nothing animates — except the loading splash, which has to show it's working */
+body[data-mode=paper] :not(#splash, #splash *), body[data-mode=paper] :not(#splash, #splash *)::before, body[data-mode=paper] :not(#splash, #splash *)::after { transition: none !important; animation: none !important; }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }

@@ -23,20 +23,38 @@ export function hideSplash() {
   if (!el) return;
   let updated = false;
   try { updated = !!sessionStorage.getItem('pp.updated'); sessionStorage.removeItem('pp.updated'); } catch (e) {}
-  el.querySelector('.sp-bar').classList.add('done');
-  el.querySelector('.sp-msg').textContent = updated ? 'All set — enjoy the new version!' : 'Ready!';
-  const wait = Math.max(0, MIN_SHOWN - performance.now()) + (updated ? 1300 : 500);
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; }, 500); }, wait);
+  const wait = Math.max(0, MIN_SHOWN - performance.now());
+  setTimeout(() => {
+    el.querySelector('.sp-msg').textContent = updated ? 'All set — enjoy the new version!' : 'Ready!';
+    fillTo(1, 0.45);
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => { el.hidden = true; }, 500); }, updated ? 1300 : 650);
+  }, wait);
 }
+
+// Takes the bar over from its running fill animation (keeping where it is) and eases it to `f`.
+// It only ever moves forward.
+function fillTo(f, secs = 0.3) {
+  const fill = splash()?.querySelector('.sp-bar i');
+  if (!fill) return;
+  const now = new DOMMatrix(getComputedStyle(fill).transform).a || 0;
+  fill.style.animation = 'none';
+  fill.style.transition = 'none';
+  fill.style.transform = `scaleX(${now})`;
+  fill.getBoundingClientRect();
+  fill.style.transition = `transform ${secs}s ease-out`;
+  fill.style.transform = `scaleX(${Math.max(now, f)})`;
+}
+
 function showSplash(msg) {
   const el = splash();
   el.hidden = false;
   el.style.transition = 'none';          // cover the whole app at once, no fade-in
   el.classList.remove('out');
-  const bar = el.querySelector('.sp-bar'), fill = bar.firstElementChild;
+  const fill = el.querySelector('.sp-bar i');
+  Object.assign(fill.style, { animation: 'none', transition: 'none', transform: 'scaleX(0)' });
   el.querySelector('.sp-msg').textContent = msg;
   return {
-    progress: f => { bar.classList.add('done'); fill.style.transform = `scaleX(${f})`; },
+    progress: f => fillTo(0.08 + f * 0.62),
     say: m => { el.querySelector('.sp-msg').textContent = m; },
   };
 }
@@ -55,7 +73,7 @@ export async function reloadFresh() {
   await Promise.all(urls.map(u => fetch(u, { cache: 'reload' }).catch(() => {}).finally(() => sp.progress(++done / urls.length))));
   await navigator.serviceWorker?.getRegistration().then(r => r?.update()).catch(() => {});
   sp.say('Starting…');
-  try { sessionStorage.setItem('pp.updated', '1'); } catch (e) {}
+  try { sessionStorage.setItem('pp.updated', '0.72'); } catch (e) {}   // the next page's bar picks up here
   location.reload();
 }
 
