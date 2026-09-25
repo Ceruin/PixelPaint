@@ -239,7 +239,7 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 /* while she's carried elsewhere her spot keeps her size, so dropping her back on it (even after a
    restart) is recognised as home */
 .mascot-slot:empty { width: 92px; height: 76px; }
-.zen-strip .mascot-slot:empty { width: 48px; height: 62px; }
+.zen-strip .mascot-slot:empty { width: 48px; height: 62px; position: static; background: none; }   /* her spot while she's away: not pinned over the tools */
 .dock.folded .mascot-slot:empty { width: 38px; height: 44px; }
 
 /* ---------- color picker ---------- */
@@ -464,9 +464,10 @@ body[data-layout=zen] .dock-left { left: 0; } body[data-layout=zen] .dock-right 
 body[data-layout=zen] .dock .panel.flyout { visibility: visible; }
 .zen-strip { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; box-shadow: var(--shadow); max-height: 100%; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-gutter: stable; }
 .zen-strip > * { flex: none; }
-.zen-strip.more-down { -webkit-mask: linear-gradient(#000 calc(100% - 28px), transparent); mask: linear-gradient(#000 calc(100% - 28px), transparent); }
-.zen-strip.more-up { -webkit-mask: linear-gradient(transparent, #000 28px); mask: linear-gradient(transparent, #000 28px); }
-.zen-strip.more-up.more-down { -webkit-mask: linear-gradient(transparent, #000 28px, #000 calc(100% - 28px), transparent); mask: linear-gradient(transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+/* more to scroll: an inner shadow at that end (the strip's border stays whole) */
+.zen-strip.more-down { box-shadow: inset 0 -18px 14px -14px rgba(0, 0, 0, .35); }
+.zen-strip.more-up { box-shadow: inset 0 18px 14px -14px rgba(0, 0, 0, .35); }
+.zen-strip.more-up.more-down { box-shadow: inset 0 18px 14px -14px rgba(0, 0, 0, .35), inset 0 -18px 14px -14px rgba(0, 0, 0, .35); }
 .zen-sec { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .zen-strip .mascot-slot { margin-top: 0; position: sticky; bottom: -6px; padding-bottom: 6px; background: inherit; }   /* never scrolls out of a short strip */
 .zen-strip .mascot { width: 48px; height: 62px; }
