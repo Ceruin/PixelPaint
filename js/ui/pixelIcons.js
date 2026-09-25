@@ -48,6 +48,7 @@ export const ICONS = {
   house: ['...r...', '..rrr..', '.rrrrr.', '.twtnt.', '.tttnt.'],
   // bits and bobs
   medal: ['r...r', '.r.r.', '..y..', '.yyy.', '.yYy.', '..y..'], ring: ['.yyy.', 'y...y', 'y...y', '.yyy.'],
+  bolt: ['..oo', '.oo.', 'oooo', '.oo.', 'oo..'],
   pill: ['.rrww.', 'rrrwww', '.rrww.'], bag: ['.nnn.', 'n...n', 'bbbbb', 'bbybb', 'bbbbb'], bloom: ['.p.', 'pyp', '.p.'],
 };
 
@@ -63,18 +64,23 @@ export function drawIcon(ctx, name, x, y, k = 1, color) {
 
 export const iconSize = name => [Math.max(...ICONS[name].map(r => r.length)), ICONS[name].length];
 
-// A crisp icon at scale k for buttons and bars: an <img> from a cached data URL (drawn pixel by
-// pixel once) — far lighter than a canvas per icon when a card re-renders.
+// Device pixels per art pixel for a CSS pixel size, rounded to a whole number so every art pixel
+// covers the same number of screen pixels (no mixels on 1.25×, 1.5×, 2.625× … screens).
+export const devPx = css => Math.max(1, Math.round(css * (devicePixelRatio || 1)));
+
+// A crisp icon for buttons and bars: an <img> from a cached data URL. Every UI icon shares one pixel
+// size (2 CSS px; 3 for the big star-game stars) so icons never mix pixel sizes: small spots (k < 3)
+// use the mini sprite, tiles (k ≥ 3) use the 16×16 art when there is one.
 const urls = new Map();
-// Items with 16×16 art (pixelArt.js) use it: at 16px for small spots, 32px for big tiles.
 export function iconCanvas(name, k = 3) {
-  const hd = hasArt(name), s = k >= 3 ? 2 : 1, key = `${name}|${k}`;
+  const p = devPx(k >= 6 ? 3 : 2), hd = k >= 3 && hasArt(name), key = `${name}|${hd}|${p}`;
+  const [w, h] = hd ? [16, 16] : iconSize(name);
   let url = urls.get(key);
   if (!url) {
-    if (hd) url = artCanvas(name, s).toDataURL();
-    else { const [w, h] = iconSize(name), m = document.createElement('canvas'); m.width = w * k; m.height = h * k; drawIcon(m.getContext('2d'), name, 0, 0, k); url = m.toDataURL(); }
+    if (hd) url = artCanvas(name, p).toDataURL();
+    else { const m = document.createElement('canvas'); m.width = w * p; m.height = h * p; drawIcon(m.getContext('2d'), name, 0, 0, p); url = m.toDataURL(); }
     urls.set(key, url);
   }
-  const [w, h] = hd ? [16 * s, 16 * s] : iconSize(name).map(v => v * k);
-  return Object.assign(document.createElement('img'), { src: url, width: w, height: h, alt: '', className: 'pxicon', draggable: false });
+  const dpr = devicePixelRatio || 1;
+  return Object.assign(document.createElement('img'), { src: url, alt: '', className: 'pxicon', draggable: false, style: `width:${w * p / dpr}px;height:${h * p / dpr}px` });
 }

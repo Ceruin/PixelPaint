@@ -19,15 +19,15 @@
    page is busy starting up. Pyxl walks in place: the sprite atlas (×3) slides behind a window. */
 #splash { position: fixed; inset: 0; z-index: 2000; display: grid; place-content: center; justify-items: center; gap: 14px; background: #1b1d23; color: #9aa1b1; font: 13px 'Pixelify Sans', system-ui, sans-serif; transition: opacity .45s; }
 #splash.out { opacity: 0; pointer-events: none; }
-.sp-win { width: 156px; height: 162px; overflow: hidden; animation: sp-bob .3s ease-in-out infinite alternate; will-change: transform; }
-.sp-strip { width: 3138px; height: 177px; background: url(assets/pyxl-pixel.webp) 0 0 / 3138px 177px no-repeat; image-rendering: pixelated; transform: translate(-408px, -15px); animation: sp-walk .6s infinite; will-change: transform; }
+.sp-win { --p: var(--sp-p, 3px); width: calc(52 * var(--p)); height: calc(54 * var(--p)); overflow: hidden; animation: sp-bob .3s step-end infinite alternate; will-change: transform; }
+.sp-strip { width: calc(1034 * var(--p)); height: calc(59 * var(--p)); background: url(assets/pyxl-pixel.webp) 0 0 / 100% 100% no-repeat; image-rendering: pixelated; transform: translate(calc(-133 * var(--p)), calc(-5 * var(--p))); animation: sp-walk .6s infinite; will-change: transform; }
 .sp-brand { font-weight: 700; font-size: 22px; letter-spacing: .5px; color: #cbe4ff; } .sp-brand i { font-style: normal; color: #ffd23f; }
 .sp-bar { width: 180px; height: 4px; border-radius: 2px; background: #2b2f39; overflow: hidden; }
 .sp-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #a445ff, #3b7bff, #17c06b, #ffd23f, #ff3b47); transform-origin: left; transform: scaleX(var(--from, 0)); animation: sp-fill 7s cubic-bezier(.12, .7, .3, 1) forwards; will-change: transform; }
 .sp-msg { margin: 0; min-height: 1.4em; }
-@keyframes sp-walk { 0% { transform: translate(-408px, -15px); } 33.3% { transform: translate(-708px, -15px); } 66.6% { transform: translate(-555px, -15px); } 100% { transform: translate(-408px, -15px); } }
+@keyframes sp-walk { 0%, 100% { transform: translate(calc(-133 * var(--p)), calc(-5 * var(--p))); } 33.3% { transform: translate(calc(-232 * var(--p)), calc(-5 * var(--p))); } 66.6% { transform: translate(calc(-181 * var(--p)), calc(-5 * var(--p))); } }
 .sp-strip { animation-timing-function: step-end; }
-@keyframes sp-bob { to { transform: translateY(-4px); } }
+@keyframes sp-bob { to { transform: translateY(calc(-1 * var(--p))); } }
 /* one steady fill: fast at first, easing toward 92% until the app says it's ready, then to 100% */
 @keyframes sp-fill { from { transform: scaleX(var(--from, 0)); } to { transform: scaleX(.92); } }
 @media (prefers-reduced-motion: reduce) { .sp-win { animation: none; } }   /* keep her walk and the progress bar; drop the bob */
@@ -35,6 +35,7 @@
 <link rel="stylesheet" href="css/fonts.css">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/pixel.css">
+<script>/* splash art pixel = 3 CSS px, rounded to whole device pixels (no mixels) */ document.documentElement.style.setProperty('--sp-p', Math.max(1, Math.round(3 * devicePixelRatio)) / devicePixelRatio + 'px');</script>
 <script type="module" src="js/main.js"></script>
 </head>
 <body data-mode="paint">

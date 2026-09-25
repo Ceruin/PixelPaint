@@ -1,6 +1,7 @@
 import { h, icon } from './dom.js';
 import { drawPose, tinted, SPRITES } from './mascot.js';
 import { drawIcon } from './pixelIcons.js';
+import { pixelText, textWidth } from './pixelFont.js';
 import { LUCKY_NAMES } from './pyxlStats.js';
 
 // Pyxl races (after the Chao Races): four racers over a course of Line (running), Colour
@@ -38,11 +39,13 @@ export function startRace(pyxl, level = 0) {
   const card = h('div.race-card', {}, h('div.race-head', {}, icon('film'), h('strong', {}, `${title} Race`), h('span.spacer'), close), cv, h('div.race-foot', {}, cheer, h('small.muted', {}, 'Tap, click or press Space to cheer — it costs stamina!')));
   const layer = h('div.race-layer', {}, card);
   document.body.append(layer);
-  const fitScale = () => { const k = Math.max(1, Math.floor(Math.min(Math.min(innerWidth * 0.92, 960) / W, innerHeight * 0.66 / H))); cv.style.width = `${W * k}px`; cv.style.height = `${H * k}px`; };
+  const fitScale = () => {   // a whole number of device pixels per scene pixel
+    const dpr = devicePixelRatio || 1, n = Math.max(1, Math.floor(Math.min(Math.min(innerWidth * 0.96 - 26, 960) / W, innerHeight * 0.66 / H) * dpr));
+    Object.assign(cv.style, { width: `${W * n / dpr}px`, height: `${H * n / dpr}px` });
+  };
   fitScale(); addEventListener('resize', fitScale);
 
   let t0 = performance.now(), last = t0, raf = 0, finished = [], over = false, results = 0;
-  document.fonts?.load("8px 'Pixelify Sans'");
   const boost = () => { if (me.st > 6 && !me.done && performance.now() - t0 > 3000) { me.boost = 0.6; me.st -= 7; } };
   cheer.onclick = boost;
   cv.addEventListener('pointerdown', boost);
@@ -80,12 +83,21 @@ export function startRace(pyxl, level = 0) {
   const SEC = { colour: 'drop', shape: 'star', power: 'bang' };
   const clouds = [[20, 14, 3], [110, 26, 2], [190, 10, 3], [270, 30, 2], [350, 18, 3]];
   const rect = (x, y, w, hh, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, hh); };
-  const cloud = (x, y, k) => { rect(x + k, y, 6 * k, k, '#fff'); rect(x, y + k, 8 * k, 2 * k, '#fff'); rect(x + k, y + 3 * k, 6 * k, k, '#e3f1ff'); };
-  const text = (str, x, y, col = '#221822', size = 8, align = 'left', outline = null) => {
-    ctx.font = `${size}px 'Pixelify Sans', monospace`; ctx.textAlign = align; ctx.textBaseline = 'top';
-    if (outline) { ctx.fillStyle = outline; for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) ctx.fillText(str, x + ox, y + oy); }
-    ctx.fillStyle = col; ctx.fillText(str, x, y);
+  // Puffy clouds drawn at 1 scene pixel per pixel (k only sets their size), cached per size.
+  const cloudArt = new Map(), cloud = (x, y, k) => {
+    if (!cloudArt.has(k)) {
+      const c = document.createElement('canvas'), w = 8 * k, hh = 4 * k, x2 = c.getContext('2d'); c.width = w; c.height = hh;
+      const puffs = [[2.4 * k, 2.6 * k, 1.5 * k], [4.4 * k, 1.9 * k, 1.9 * k], [6 * k, 2.7 * k, 1.4 * k]];
+      for (let j = 0; j < hh; j++) for (let i = 0; i < w; i++) {
+        const px = i + 0.5, py = j + 0.5;
+        if (!(puffs.some(([cx, cy, r]) => Math.hypot(px - cx, py - cy) < r) || (py > 2.6 * k && px > k && px < 7 * k))) continue;
+        x2.fillStyle = py > hh - k * 0.9 ? '#e3f1ff' : '#fff'; x2.fillRect(i, j, 1, 1);
+      }
+      cloudArt.set(k, c);
+    }
+    ctx.drawImage(cloudArt.get(k), Math.round(x), Math.round(y));
   };
+  const text = (str, x, y, col = '#221822', size = 8, align = 'left', outline = null) => pixelText(ctx, str, x, y, col, { size, align, outline });
   const checker = (x, y0, y1, cols = 2) => { for (let y = y0; y < y1; y += 3) for (let c = 0; c < cols; c++) rect(x + c * 3, y, 3, 3, ((y / 3 + c) | 0) % 2 ? '#221822' : '#ffffff'); };
   const ordinal = n => `${n}${['st', 'nd', 'rd'][n - 1] ?? 'th'}`;
   const standing = () => [...racers].sort((p, q) => (p.done && q.done ? p.done - q.done : p.done ? -1 : q.done ? 1 : q.d - p.d));
@@ -159,9 +171,7 @@ export function startRace(pyxl, level = 0) {
       if (seg === 'line' && moving && Math.floor(T * 10 + r.lane) % 3 === 0) { rect(x - 12, base - 3, 2, 2, '#d9bf92'); rect(x - 16, base - 5, 1, 1, '#d9bf92'); }
       if (r.boost > 0) { drawIcon(ctx, 'sparkle', x + 12, y - 34, 1); drawIcon(ctx, 'sparkle', x - 18, y - 22, 1); }
       // name tag
-      const top = y - SPRITES[pose][5] - 9, label = r.me ? `★ ${r.name}` : r.name;
-      ctx.font = "8px 'Pixelify Sans', monospace";
-      const tw = Math.ceil(ctx.measureText(label).width) + 6;
+      const top = y - SPRITES[pose][5] - 9, label = r.name, tw = textWidth(label) + 4;
       rect(x - tw / 2, top, tw, 9, r.me ? '#221822' : 'rgba(34,24,34,.55)');
       rect(x - tw / 2, top + 9, tw, 1, r.colour ?? '#2fb3a4');
       text(label, x, top + 1, r.me ? '#ffd23f' : '#ffffff', 8, 'center');

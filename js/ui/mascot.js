@@ -61,6 +61,7 @@ export const SPRITES = {
 // Draws a pose with its beret centre at x and feet at y (native pixels), scaled by integer k.
 // `breath` sinks everything above the waist by that many pixels (a 1px exhale reads as breathing).
 export function drawPose(ctx, name, x, y, k, flip = false, breath = 0, src = sheet()) {
+  x = Math.round(x); y = Math.round(y);   // whole sprite pixels only: fractional positions sample into mixels
   const [sx, sy, w, hh, ax, by] = SPRITES[name], cut = Math.max(0, by - 22);
   const part = (y0, y1, dy) => y1 > y0 && ctx.drawImage(src, sx, sy + y0, w, y1 - y0, flip ? -ax * k : (x - ax) * k, (y - by + y0 + dy) * k, w * k, (y1 - y0) * k);
   ctx.save();
@@ -284,7 +285,8 @@ export class Mascot {
     Object.assign(this.canvas, { width: BOX_W * this.k, height: BOX_H * this.k });
     this.drawn = null;
     this.placeBubble();
-    Object.assign(this.canvas.style, { width: `${BOX_W * this.k / dpr}px`, height: `${BOX_H * this.k / dpr}px` });
+    // 1 canvas pixel = 1 device pixel, centred on a whole device pixel (no resampling)
+    Object.assign(this.canvas.style, { width: `${BOX_W * this.k / dpr}px`, height: `${BOX_H * this.k / dpr}px`, left: `${Math.round((r.width * dpr - BOX_W * this.k) / 2) / dpr}px` });
   }
 
   // A hello that depends on the time of day and how long you've been away.
