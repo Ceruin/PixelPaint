@@ -52,7 +52,7 @@ export class PaintTool {
     this.mode = this.erasing(e) ? 'destination-out' : layer.alphaLock ? 'source-atop' : b.blend;
     this.engine = this.makeEngine((smudge ? this.preview : this.buf).getContext('2d'), b, smudge);
     this.start = p;
-    this.lock = null;
+    this.lock = null; this.decided = false;
     this.snap = app.opts.snapAssist && doc.assistants.length > 0;
     app.view.previews.set(layer, this.preview);
     this.engine.begin(p);
@@ -77,8 +77,9 @@ export class PaintTool {
     if (this.travel > 40) { this.travel = 0; haptics.tick(); }
     this.hoverPt = last;
     this.app.view.redrawOverlays(this);
-    if (this.snap && !this.lock && Math.hypot(last.x - this.start.x, last.y - this.start.y) > 4 / this.app.view.zoom) this.lock = pickLock(this.app.doc.assistants, this.start, last);
-    if (this.snap && !this.lock) return;
+    // snapping decides once the stroke has a direction: locked to a guide it heads along, or free
+    if (this.snap && !this.decided && Math.hypot(last.x - this.start.x, last.y - this.start.y) > 4 / this.app.view.zoom) { this.lock = pickLock(this.app.doc.assistants, this.start, last); this.decided = true; }
+    if (this.snap && !this.decided) return;
     pts.forEach(p => this.engine.move(this.lock ? project(this.lock, p) : p));
     this.flush();
   }

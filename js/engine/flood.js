@@ -28,11 +28,17 @@ export function floodMask({ data, width: w, height: h }, sx, sy, tolerance, cont
   return out;
 }
 
-// Grows the mask by one pixel so fills tuck under anti-aliased line art.
-export function dilate(m, w, h) {
-  const o = m.slice();
+// Grows the mask by one pixel so fills tuck under anti-aliased line art — but only into soft edge
+// pixels (closer to the filled colour than to the line). A hard 1px line is never painted over.
+export function dilate(m, w, h, img, seed) {
+  const o = m.slice(), d = img?.data, k0 = seed * 4, lim = 0.5 * 255;
+  const soft = i => {
+    if (!d) return true;
+    const k = i * 4;
+    return Math.max(Math.abs(d[k] - d[k0]), Math.abs(d[k + 1] - d[k0 + 1]), Math.abs(d[k + 2] - d[k0 + 2]), Math.abs(d[k + 3] - d[k0 + 3])) <= lim;
+  };
   for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++)
-    if (!m[i] && ((x > 0 && m[i - 1]) || (x < w - 1 && m[i + 1]) || (y > 0 && m[i - w]) || (y < h - 1 && m[i + w]))) o[i] = 1;
+    if (!m[i] && ((x > 0 && m[i - 1]) || (x < w - 1 && m[i + 1]) || (y > 0 && m[i - w]) || (y < h - 1 && m[i + w])) && soft(i)) o[i] = 1;
   return o;
 }
 

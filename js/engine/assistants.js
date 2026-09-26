@@ -1,10 +1,12 @@
 // Drawing assistants (after Krita): rulers and vanishing points that steer strokes.
 // A stroke picks the assistant whose direction best matches its first movement, then every
-// point is projected onto the line through the stroke's start in that direction.
+// point is projected onto the line through the stroke's start in that direction. Only a stroke
+// that already heads along a guide (within ~20°) snaps; curves and other directions stay free.
+const ALIGN = Math.cos(20 * Math.PI / 180);
 export function pickLock(assistants, start, next) {
   const mx = next.x - start.x, my = next.y - start.y, ml = Math.hypot(mx, my);
   if (!assistants?.length || ml < 1e-6) return null;
-  let best = null, score = -1;
+  let best = null, score = ALIGN;
   for (const a of assistants) {
     let dx, dy;
     if (a.type === 'ruler') { dx = a.b.x - a.a.x; dy = a.b.y - a.a.y; }
@@ -12,7 +14,7 @@ export function pickLock(assistants, start, next) {
     const l = Math.hypot(dx, dy);
     if (!l) continue;
     const s = Math.abs((dx * mx + dy * my) / (l * ml));
-    if (s > score) { score = s; best = { x: dx / l, y: dy / l }; }
+    if (s >= score) { score = s; best = { x: dx / l, y: dy / l }; }
   }
   return best && { o: { x: start.x, y: start.y }, u: best };
 }

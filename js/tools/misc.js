@@ -15,7 +15,7 @@ export function regionMask(app, p, rgba = 0xffffffff, grow = false, tolerance = 
   if (x < 0 || y < 0 || x >= doc.w || y >= doc.h) return null;
   const img = sampleSource(app).getContext('2d').getImageData(0, 0, doc.w, doc.h);
   let m = floodMask(img, x, y, tolerance, opts.contiguous);
-  if (grow) m = dilate(m, doc.w, doc.h);
+  if (grow) m = dilate(m, doc.w, doc.h, img, y * doc.w + x);
   return maskToCanvas(m, doc.w, doc.h, rgba);
 }
 

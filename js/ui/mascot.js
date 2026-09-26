@@ -137,11 +137,12 @@ const NEED_ICON = { hungry: 'onigiri', lonely: 'heart', bored: 'dots', tired: 'm
 const DANCES = { gogo: 'gogo', shake: 'shake', spin: 'spin', step: 'step' };
 const DRAWINGS = ['sun', 'flower', 'cake', 'car', 'house'];
 const SONGS = ['La la la ♪', 'Do re mi ♪', 'Paint it bright ♪', 'Pixels in a row ♪', 'We make art together ♪'];
+const AIMED = new Set(['spray', 'point', 'paint']);
 const SICK = { cough: ['drowsy', 'dots'], stomach: ['floor', 'swirl'], cold: ['floor', 'drop'], rash: ['front', 'plus'], hiccups: ['front', 'bang'], nose: ['drowsy', 'drop'] };
 // Things she likes to mention while you work (chatty Pyxls mention them more).
 const TIPS = ['Tip: [ and ] resize the brush.', 'Tip: hold Space to pan around.', 'Tip: two-finger tap undoes!', 'Tip: Alt-click picks a colour.',
-  'Tip: right-click for a quick palette.', 'Tip: Tab hides everything (Zen).', 'Tip: Shift+M mirrors the view.', 'Tip: onion skin shows other frames.',
-  'Tip: F1 opens the guide.', 'Tip: Ctrl+J duplicates a layer.', 'Tip: Alt+1…5 switch modes.'];
+  'Tip: right-click for a quick palette.', 'Tip: Tab hides everything (Focus).', 'Tip: Shift+M mirrors the view.', 'Tip: onion skin shows other frames.',
+  'Tip: F1 opens the guide.', 'Tip: Ctrl+J duplicates a layer.', 'Tip: Alt+1 and Alt+2 switch Draw and Notes.'];
 const ACTIONS = [
   // [label pattern, reaction, particle, skill trained, amount]
   [/^(Brush|Smudge|Shape|Eraser)$/, 'paint', null, 'line', 6],
@@ -379,6 +380,16 @@ export class Mascot {
     this.keepInView();
   }
 
+  // Aimed poses (spraying a fill, pointing, painting) face what you just worked on: the last spot
+  // you touched on the canvas, else the canvas's middle. They're drawn facing right.
+  facesLeft() {
+    const me = this.el.getBoundingClientRect(), stage = document.getElementById('stage')?.getBoundingClientRect();
+    if (!me.width) return false;
+    const c = this.cursor, recent = c && Date.now() - c.t < 4000;
+    const tx = recent ? c.x : stage?.width ? stage.left + stage.width / 2 : innerWidth / 2;
+    return tx < me.left + me.width / 2;
+  }
+
   // A hello that depends on the time of day and how long you've been away.
   greeting() {
     if (!this.awake()) return;
@@ -447,7 +458,7 @@ export class Mascot {
 
   react(name, { icon, n = 3, say, color, dur, force, extra } = {}) {
     if (!force && (!this.awake() || this.state === 'dance' || this.state === 'held')) return;
-    this.play(name, { dur, say, extra });
+    this.play(name, { dur, say, extra, flip: AIMED.has(name) ? this.facesLeft() : undefined });
     if (icon) this.burst(icon, n, color);
   }
 
