@@ -199,14 +199,15 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex: none; }
 .dock .panel.grow:not(.collapsed) { flex: 1 1 200px; min-height: 200px; }
 .dock .panel[data-panel=layers]:not(.collapsed) { flex: 2 1 300px; min-height: 260px; }
-.panel.floating { position: absolute; box-shadow: var(--shadow); resize: both; min-width: 64px; min-height: 60px; }
+.panel.floating { position: absolute; box-shadow: var(--shadow); min-width: 64px; min-height: 60px; }
 .panel.floating.collapsed { resize: none; }
 .panel-head .pin, .panel-head .undock { opacity: .6; }
 .panel:not(.floating) .panel-head .pin, .panel.flyout .panel-head :is(.pin, .undock) { display: none; }
 .panel.pinned .panel-head .pin { opacity: 1; color: var(--accent); }
 .panel-resize { display: none; }
 .panel.floating:not(.collapsed) .panel-resize { display: block; position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, var(--muted) 50%, var(--muted) 58%, transparent 58%, transparent 70%, var(--muted) 70%, var(--muted) 78%, transparent 78%); opacity: .6; }
+  background: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2210%22%20height%3D%2210%22%3E%3Cg%20fill%3D%22%239aa1b1%22%3E%3Ccircle%20cx%3D%228.5%22%20cy%3D%221.5%22%20r%3D%221.3%22/%3E%3Ccircle%20cx%3D%228.5%22%20cy%3D%225%22%20r%3D%221.3%22/%3E%3Ccircle%20cx%3D%225%22%20cy%3D%225%22%20r%3D%221.3%22/%3E%3Ccircle%20cx%3D%228.5%22%20cy%3D%228.5%22%20r%3D%221.3%22/%3E%3Ccircle%20cx%3D%225%22%20cy%3D%228.5%22%20r%3D%221.3%22/%3E%3Ccircle%20cx%3D%221.5%22%20cy%3D%228.5%22%20r%3D%221.3%22/%3E%3C/g%3E%3C/svg%3E") no-repeat right 4px bottom 4px / 10px 10px; opacity: .45; transition: opacity .15s; }
+.panel.floating .panel-resize:hover { opacity: 1; }
 .panels-locked .panel.floating { resize: none; }
 .panels-locked .panel-resize, .panels-locked .dock-resizer { display: none !important; }
 .panels-locked .panel-head { cursor: default; }
