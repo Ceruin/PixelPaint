@@ -365,15 +365,15 @@ export function initNotes(app, sendToCanvas) {
   bus.on('mode', syncFocus); syncFocus();
   addEventListener('keydown', e => { if (e.key === 'Escape' && app.focus && app.mode === 'notes' && !root.querySelector('.note-focus') && !document.querySelector('.modal-back')) actions.run('view.focus'); });
   setOutline(showOutline);
-  const btn = (ic, text, fn, tip) => h('button.btn.sm', { type: 'button', 'data-tip': tip, onclick: fn }, icon(ic), h('span', {}, text));
+  const btn = (ic, text, fn, tip, make = false) => h('button.btn.sm', { type: 'button', 'data-tip': tip, 'aria-label': tip, className: make ? 'make' : '', onclick: fn }, icon(ic), h('span', {}, text));
 
   root.append(
     h('div.optionsbar', {},
       h('span.opt-tool', {}, icon('note'), 'Notes'), outlineBtn, focusBtn,
-      btn('note', 'Sticky', () => add('note'), 'New sticky note'),
-      btn('text', 'Text', () => add('text'), 'New text block'),
-      btn('sketch', 'Sketch', () => add('sketch'), 'New sketch card'),
-      btn('folderPlus', 'Group', addGroup, 'New named group — drop notes into it'),
+      btn('note', 'Sticky', () => add('note'), 'New sticky note', true),
+      btn('text', 'Text', () => add('text'), 'New text block', true),
+      btn('sketch', 'Sketch', () => add('sketch'), 'New sketch card', true),
+      btn('folderPlus', 'Group', addGroup, 'New named group — drop notes into it', true),
       h('span.tl-sep'),
       btn('chevronRight', 'Collapse all', () => collapseAll(true), 'Collapse every note and group'),
       btn('chevron', 'Expand all', () => collapseAll(false), 'Expand every note and group'),

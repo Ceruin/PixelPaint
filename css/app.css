@@ -795,7 +795,7 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .focus-text { flex: 1; padding: 16px 20px; outline: none; overflow: auto; font: 17px/1.55 var(--font); white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
 .focus-card .card-canvas { flex: 1; min-height: 0; width: 100% !important; height: auto !important; object-fit: contain; object-position: left top; background: #fff; }
 .notes { position: relative; }
-@media (max-width: 720px) { .notes-outline { position: absolute; z-index: 20; top: 51px; bottom: 0; left: 0; box-shadow: var(--shadow); } .notes .optionsbar .btn span { display: none; } .outline-sizer { display: none; } }
+@media (max-width: 720px) { .notes-outline { position: absolute; z-index: 20; top: 51px; bottom: 0; left: 0; box-shadow: var(--shadow); } .notes .optionsbar { overflow-x: auto; scrollbar-width: none; } .notes .optionsbar .btn { flex: none; min-width: 36px; justify-content: center; } .notes .optionsbar .btn:not(.make) span:not(.ic) { display: none; } .notes .optionsbar > .muted, .notes .optionsbar > .opt-tool { display: none; } .outline-sizer { display: none; } }
 .guide { display: flex; flex-direction: column; gap: 12px; }
 .guide-sec { display: grid; grid-template-columns: 18px 1fr; gap: 10px; }
 .guide-sec > .ic { width: 18px; height: 18px; color: var(--accent); margin-top: 1px; }
