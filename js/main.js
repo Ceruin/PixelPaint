@@ -145,7 +145,7 @@ function setTheme(theme) {
 
 const timeline = initTimeline(app, $('#timeline'));
 const modeBox = document.createElement('div');
-const { menus } = defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline });
+const { menus } = defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline, mascot });
 // Hand-offs between Draw and the Pixel editor: the picture opens there as a new pixel drawing, and
 // the Pixel editor's current frame comes back to Draw as a layer.
 actions.define([

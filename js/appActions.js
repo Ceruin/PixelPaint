@@ -18,6 +18,7 @@ import { tipFromImage, registerTip } from './engine/tips.js';
 import { showWelcome } from './ui/welcome.js';
 import { checkForUpdates, reloadFresh } from './ui/updates.js';
 import { showGuide } from './ui/guide.js';
+import { startTour } from './ui/tour.js';
 import { VERSION } from './version.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ...PAGES, ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
@@ -26,7 +27,7 @@ const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['br
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
 const SCALES = [1, 2, 4, 8, 16, 32].map(k => [String(k), `×${k}`]);
 
-export function defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline }) {
+export function defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline, mascot }) {
   const doc = () => app.doc;
   const editable = fn => () => {
     const l = doc().activeLayer;
@@ -427,7 +428,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'view.assist', label: 'Show Assistants', icon: 'ruler', checked: () => app.opts.showAssist, run: () => app.setOpt('showAssist', !app.opts.showAssist) },
     { id: 'assist.clear', label: 'Clear Assistants', icon: 'trash', run: () => { doc().assistants.length = 0; bus.emit('assist'); v().redraw(); } },
     { id: 'app.welcome', label: 'Say Hi to Pyxl', icon: 'heart', run: () => showWelcome(true) },
-    { id: 'help.guide', label: 'Getting Started', icon: 'info', key: 'F1', run: showGuide },
+    { id: 'help.guide', label: 'Getting Started', icon: 'info', key: 'F1', run: () => showGuide(() => startTour(mascot)) },
+    { id: 'help.tour', label: 'Guided Tour', icon: 'play', run: () => startTour(mascot) },
     { id: 'help.update', label: 'Check for Updates…', icon: 'download', run: () => checkForUpdates() },
     { id: 'help.reload', label: 'Reload App', icon: 'rotCW', run: reloadFresh },
     { id: 'help.about', label: 'About PixelPaint', icon: 'bubble', run: () => modal('About PixelPaint', h('p', {}, `PixelPaint ${VERSION} — a painting, pixel art, animation and notes app that runs in your browser and works offline. Your work autosaves on this device.`), [['OK', 'ok', true]]) },
@@ -482,7 +484,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
       ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.lock', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
-      ['Help', 'info', ['help.guide', 'edit.shortcuts', '-', 'help.update', 'help.reload', '-', 'help.about']],
+      ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],
   };
 }
