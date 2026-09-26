@@ -6,6 +6,7 @@ import { NEEDS, SNACKS, SHOP, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, L
 import { RACES, raceUnlocked, medalName } from './pyxlRace.js';
 import { iconCanvas } from './pixelIcons.js';
 import { radio } from './pyxlAudio.js';
+import { GAMES } from './pyxlGames.js';
 
 
 // Pyxl's care body, in five tabs (after the Chao Kindergarten): Care (needs, food, toys), Chart
@@ -95,15 +96,13 @@ export function careBody(pyxl, onPlay) {
     },
     games() {
       return [
-        h('div.pc-game', {}, iconCanvas('star', 3), h('div', {}, h('b', {}, 'Catch the stars'), h('small', {}, 'Tap stars before they vanish. Builds luck.')),
-          h('button.btn.sm', { type: 'button', onclick: () => { onPlay?.(); pyxl.playGame(); } }, 'Play')),
-        h('div.pc-label', {}, 'Races — skills and stamina decide who wins'),
-        ...RACES.map(([id, label], i) => {
+        h('div.pc-games', {}, GAMES.map(([id, name, ic, desc]) => h('button.pc-gtile', { type: 'button', 'data-tip': desc, onclick: () => { onPlay?.(); pyxl.playGame(id); } }, iconCanvas(ic, 2), h('b', {}, name)))),
+        h('div.pc-label', {}, 'Races — her skills decide'),
+        h('div.pc-races', {}, RACES.map(([id, label], i) => {
           const open = raceUnlocked(s, i), m = s.medals[id];
-          return h('div.pc-game', {}, iconCanvas('medal', 3),
-            h('div', {}, h('b', {}, `${label} Race`), h('small', {}, open ? m != null ? `Best: ${medalName(m)}` : 'No medal yet' : `Win gold in the ${RACES[i - 1][1]} race`)),
-            h('button.btn.sm', { type: 'button', disabled: !open, onclick: () => { onPlay?.(); pyxl.race(i); } }, open ? 'Race' : icon('lock')));
-        }),
+          return h('button.pc-race', { type: 'button', disabled: !open, className: m != null ? `m${m}` : '', 'data-tip': open ? m != null ? `Best: ${medalName(m)}` : 'No medal yet' : `Win gold in the ${RACES[i - 1][1]} race first`, onclick: () => { onPlay?.(); pyxl.race(i); } },
+            open ? iconCanvas('medal', 2) : icon('lock'), h('span', {}, label));
+        })),
       ];
     },
     shop() {
@@ -177,30 +176,4 @@ export function openCareCard(pyxl, dock) {
   addEventListener('pointerdown', outside, true);
   const stopClamp = keepOnScreen(card);
   card.stop = () => { stopClamp?.(); removeEventListener('pointerdown', outside, true); };
-}
-
-// "Catch the stars": stars pop up around the screen for a moment; click as many as you can.
-export function startStarGame(pyxl) {
-  const layer = h('div.star-game'), score = h('div.sg-score', {}, '0 / 8');
-  layer.append(score);
-  document.body.append(layer);
-  let caught = 0, shown = 0;
-  const spawn = () => {
-    if (shown >= 8) return setTimeout(end, 600);
-    shown++;
-    const star = h('button.sg-star', { type: 'button', style: { left: `${40 + Math.random() * (innerWidth - 120)}px`, top: `${60 + Math.random() * (innerHeight - 180)}px` } }, iconCanvas('star', 6));
-    const gone = setTimeout(() => { star.remove(); spawn(); }, 1150);
-    star.addEventListener('pointerdown', e => {
-      e.stopPropagation();
-      clearTimeout(gone);
-      caught++;
-      score.textContent = `${caught} / 8`;
-      star.classList.add('pop');
-      pyxl.burst('sparkle', 2);
-      setTimeout(() => { star.remove(); spawn(); }, 180);
-    });
-    layer.append(star);
-  };
-  const end = () => { layer.remove(); pyxl.gameOver(caught); };
-  setTimeout(spawn, 500);
 }

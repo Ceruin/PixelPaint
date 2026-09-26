@@ -5,7 +5,8 @@ import { drawIcon, iconSize } from './pixelIcons.js';
 import { artCanvas } from './pixelArt.js';
 import { rotated, centreOfMass, Pendulum, Settle } from './pyxlPhysics.js';
 import { PyxlStats, LESSONS, TYPES, currentLesson } from './pyxlStats.js';
-import { openCareCard, startStarGame } from './pyxlCare.js';
+import { openCareCard } from './pyxlCare.js';
+import { startGame } from './pyxlGames.js';
 import { startRace, RACES, medalName } from './pyxlRace.js';
 import { radio, sfx } from './pyxlAudio.js';
 
@@ -1046,11 +1047,11 @@ export class Mascot {
     setTimeout(() => { s.cure(); this.react('cheer', { icon: 'sparkle', n: 4, say: 'All better! Thank you!', force: true }); }, 900);
   }
 
-  playGame() {
+  playGame(id = 'stars') {
     if (!this.awake()) return this.say('Zzz…');
     if (this.stats.energy < 20) return this.react('refuse', { say: 'Too tired to play…' });
-    this.react('wave', { say: 'Catch the stars!' });
-    startStarGame(this);
+    this.react('wave', { say: 'Let’s play!' });
+    startGame(this, id);
   }
 
   race(level) {
@@ -1074,13 +1075,14 @@ export class Mascot {
     else this.react(s.is('crybaby') ? 'cry' : 'oops', { say: 'Aww… I’ll train harder!', force: true });
   }
 
-  gameOver(score) {
-    const s = this.stats;
-    s.change({ fun: 8 + score * 6, energy: -10, love: 4 }, score * 2);
-    s.earn(score); s.happy(score >= 6 ? 2 : 1); s.train('luck', score * 5);
-    if (score >= 6) this.react('cheer', { icon: 'star', n: 5, say: `${score} stars! Amazing!`, force: true });
-    else if (score >= 3) this.react('happy', { icon: 'star', n: 3, say: `${score} stars, nice!` });
-    else this.react(s.is('crybaby') ? 'cry' : 'oops', { say: score ? `Only ${score}… again?` : 'Aww, missed them all!' });
+  // Any mini-game's result: `score` of `max`, training `skill`; `line` is what she says about it.
+  gameOver(score, max = 8, skill = 'luck', line) {
+    const s = this.stats, k = Math.round(score / max * 8);
+    s.change({ fun: 8 + k * 6, energy: -10, love: 4 }, k * 2);
+    s.earn(k); s.happy(k >= 6 ? 2 : 1); s.train(skill, k * 5);
+    if (k >= 6) this.react('cheer', { icon: 'star', n: 5, say: line ?? `${score} / ${max}! Amazing! +${k} rings`, force: true });
+    else if (k >= 3) this.react('happy', { icon: 'star', n: 3, say: line ?? `${score} / ${max}, nice! +${k} rings`, force: true });
+    else this.react(s.is('crybaby') ? 'cry' : 'oops', { say: line ?? (score ? `Only ${score}… again?` : 'Aww, none!'), force: true });
   }
 
   nap() { this.setRadio(false); this.stats.sleep(true); this.say('Night night…'); this.play('sleep'); }

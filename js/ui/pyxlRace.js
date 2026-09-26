@@ -3,6 +3,7 @@ import { drawPose, tinted, SPRITES } from './mascot.js';
 import { drawIcon } from './pixelIcons.js';
 import { pixelText, textWidth } from './pixelFont.js';
 import { LUCKY_NAMES } from './pyxlStats.js';
+import { stageBox } from './pyxlGames.js';
 
 // Pyxl races (after the Chao Races): four racers over a course of Line (running), Colour
 // (swimming a paint river), Shape (flying over a gap) and Power (climbing a wall) sections —
@@ -39,8 +40,9 @@ export function startRace(pyxl, level = 0) {
   const card = h('div.race-card', {}, h('div.race-head', {}, icon('film'), h('strong', {}, `${title} Race`), h('span.spacer'), close), cv, h('div.race-foot', {}, cheer, h('small.muted', {}, 'Tap, click or press Space to cheer — it costs stamina!')));
   const layer = h('div.race-layer', {}, card);
   document.body.append(layer);
-  const fitScale = () => {   // a whole number of device pixels per scene pixel
-    const dpr = devicePixelRatio || 1, n = Math.max(1, Math.floor(Math.min(Math.min(innerWidth * 0.96 - 26, 960) / W, innerHeight * 0.66 / H) * dpr));
+  const fitScale = () => {   // on the canvas area, a whole number of device pixels per scene pixel
+    const b = stageBox(), dpr = devicePixelRatio || 1, n = Math.max(1, Math.floor(Math.min((b.width - 26) / W, (b.height - 110) / H) * dpr));
+    Object.assign(layer.style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` });
     Object.assign(cv.style, { width: `${W * n / dpr}px`, height: `${H * n / dpr}px` });
   };
   fitScale(); addEventListener('resize', fitScale);

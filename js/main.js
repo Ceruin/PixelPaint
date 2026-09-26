@@ -37,6 +37,7 @@ const app = new App($('#view'));
 const project = createProject(app);
 const panels = new Panels($('#workspace'));
 const mascot = new Mascot(app);
+mascot.keepDrawing = (c, name) => { setMode('paint'); project.importLayer(c, name); };
 const zen = initZen(app, panels);
 const notes = initNotes(app, c => { setMode('paint'); project.importLayer(c, 'Sketch note'); });
 
