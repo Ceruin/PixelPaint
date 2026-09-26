@@ -218,16 +218,18 @@ export class PyxlStats {
   cure() { this.sick = null; this.happy(2); this.feel('joy', 20); this.save(); }
 
   // ---- kindergarten ----
-  attend(id, now = Date.now()) { this.school = { id, until: now + LESSON_TIME }; this.save(); }
+  // `focus`: a study session with you (a pomodoro) — she learns the lesson and earns rings for it
+  attend(id, now = Date.now(), ms = LESSON_TIME, focus = false) { this.school = { id, until: now + ms, focus }; this.save(); }
   finishSchool() {
-    const id = this.school?.id;
+    const { id, focus } = this.school ?? {};
     this.school = null;
+    if (focus) { this.pomos = (this.pomos ?? 0) + 1; this.earn(5); this.train('smarts', 12); }
     if (!id) return null;
     const lv = this.learned[id] ?? 0, max = id === 'song' || id === 'drawing' ? 5 : 1;
     this.learned[id] = Math.min(max, lv + 1);
     this.happy(1); this.feel('joy', 25);
     this.save();
-    return { id, level: this.learned[id], fresh: lv < this.learned[id] };
+    return { id, level: this.learned[id], fresh: lv < this.learned[id], focus };
   }
   knows(kind) { return LESSONS.filter(l => l[2] === kind && this.learned[l[0]]).map(l => l[0]); }
 
@@ -291,7 +293,7 @@ export class PyxlStats {
   get mood() {
     const n = this.name;
     return {
-      egg: `${n}’s egg is warm… tap it to help her hatch!`, school: `${n} is at kindergarten.`,
+      egg: `${n}’s egg is warm… tap it to help her hatch!`, school: this.school?.focus ? `${n} is studying while you focus.` : `${n} is at kindergarten.`,
       asleep: `${n} is fast asleep. Zzz…`, sick: `${n} has ${ILLNESSES[this.sick]}. The doctor can help.`,
       tired: `${n} can barely keep her eyes open.`, hungry: `${n}’s tummy is rumbling…`, sad: `${n} is feeling blue…`,
       lonely: `${n} wants some attention!`, bored: `${n} is bored. Paint something, or play with her!`,
@@ -309,7 +311,7 @@ export class PyxlStats {
     if (!this.dirty) return;
     this.dirty = false;
     const keys = ['name', 'food', 'fun', 'love', 'energy', 'asleep', 'xp', 'level', 'born', 't', 'lives', 'rings', 'medals', 'wins', 'races', 'chaos',
-      'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom'];
+      'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom', 'pomos'];
     local.set(KEY, Object.fromEntries(keys.map(k => [k, this[k]])));
     bus.emit('pyxl:stats', this);
   }

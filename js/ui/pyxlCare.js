@@ -5,6 +5,7 @@ import { clamp } from '../core/util.js';
 import { NEEDS, SNACKS, SHOP, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
 import { RACES, raceUnlocked, medalName } from './pyxlRace.js';
 import { iconCanvas } from './pixelIcons.js';
+import { radio } from './pyxlAudio.js';
 
 
 // Pyxl's care body, in five tabs (after the Chao Kindergarten): Care (needs, food, toys), Chart
@@ -12,7 +13,8 @@ import { iconCanvas } from './pixelIcons.js';
 // classroom's rotating lessons), Games (stars and races) and Shop (special fruit for rings).
 // Used by the popup card and the dockable "Pyxl" panel; it re-renders as her stats change.
 const TABS = [['care', 'Care', 'heart'], ['chart', 'Chart', 'pill'], ['school', 'School', 'bag'], ['games', 'Games', 'star'], ['shop', 'Shop', 'ring']];
-const TOYS = [['ball', 'Ball'], ['box', 'Box'], ['radio', 'Radio'], ['tv', 'TV'], ['crayons', 'Crayons']];
+const TOYS = [['ball', 'Ball'], ['box', 'Box'], ['radio', 'Radio'], ['crayons', 'Crayons'], ['tv', 'TV']];
+const clock = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const HAPPY_WORDS = [[60, 'Overjoyed'], [30, 'Happy'], [0, 'Content'], [-30, 'Down'], [-101, 'Miserable']];
 let tab = local.get('pp.pyxlTab', 'care');
 
@@ -35,8 +37,12 @@ export function careBody(pyxl, onPlay) {
           h('button.btn.sm', { type: 'button', onclick: () => (s.asleep ? pyxl.wake() : pyxl.nap()) }, icon(s.asleep ? 'sun' : 'zen'), h('span.lbl', {}, s.asleep ? 'Wake' : 'Nap'))),
         snacks,
         h('div.pc-label', {}, 'Toys'),
-        h('div.pc-grid', {}, TOYS.map(([id, name]) => h('button.pc-item', { type: 'button', 'data-tip': name, 'aria-label': name, onclick: () => pyxl.toy(id) }, iconCanvas(id, 3)))),
-        pyxl.floating ? h('button.btn.sm', { type: 'button', onclick: () => { pyxl.goHome(); pyxl.react('happy', { say: 'Home sweet home!' }); } }, iconCanvas('bag', 2), h('span.lbl', {}, 'Send Pyxl home')) : h('p.pc-note', {}, 'Tip: drag Pyxl to carry her anywhere.'),
+        h('div.pc-toys', {}, TOYS.map(([id, name]) => h('button.pc-toy', { type: 'button', className: id === 'radio' && radio.on ? 'on' : '', 'aria-label': name, onclick: () => pyxl.toy(id) }, iconCanvas(id, 3), h('small', {}, id === 'radio' && radio.on ? 'Stop' : name)))),
+        radio.on && h('div.pc-radio', {},
+          h('button.ibtn.sm', { type: 'button', 'data-tip': 'Previous track', onclick: () => pyxl.setRadio(true, radio.index - 1) }, icon('first')),
+          h('span', {}, iconCanvas('note', 2), ` ${radio.name}`),
+          h('button.ibtn.sm', { type: 'button', 'data-tip': 'Next track', onclick: () => pyxl.setRadio(true, radio.index + 1) }, icon('last')),
+          h('button.ibtn.sm', { type: 'button', 'data-tip': 'Switch the radio off', onclick: () => pyxl.setRadio(false) }, icon('pause'))),
       ];
     },
     chart() {
@@ -70,16 +76,21 @@ export function careBody(pyxl, onPlay) {
       ];
     },
     school() {
-      const [id, name, kind] = currentLesson(), left = Math.ceil((LESSON_SLOT - (Date.now() % LESSON_SLOT)) / 1000);
-      const at = s.school, learned = LESSONS.filter(l => s.learned[l[0]]);
+      const [id, name, kind] = currentLesson(), now = Date.now(), left = LESSON_SLOT - (now % LESSON_SLOT);
+      const at = s.school, learned = LESSONS.filter(l => s.learned[l[0]]), brk = pyxl.breakUntil > now;
+      const focusBtn = min => h('button.btn.sm', { type: 'button', disabled: !!at || !pyxl.awake(), onclick: () => pyxl.school(min) }, `${min} min`);
       return [
-        h('p.pc-mood', {}, at ? `${s.name} is in ${LESSONS.find(l => l[0] === at.id)?.[1]} class — back in ${Math.max(0, Math.ceil((at.until - Date.now()) / 1000))}s.` : `Now in class: ${name}. Next lesson in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}.`),
+        h('p.pc-mood', {}, at?.focus ? `Focusing — ${clock(at.until - now)} left.` : at ? `In ${LESSONS.find(l => l[0] === at.id)?.[1]} class — back in ${clock(at.until - now)}.` : brk ? `Break — ${clock(pyxl.breakUntil - now)}. Stretch!` : `Next lesson in ${clock(left)}.`),
+        at && h('button.btn.sm', { type: 'button', onclick: () => pyxl.leaveSchool() }, icon('x'), h('span.lbl', {}, at.focus ? 'Stop focusing' : 'Bring her home')),
+        h('div.pc-label', {}, 'Focus together'),
+        h('div.pc-focus', {}, iconCanvas('moon', 3), h('small', {}, `She studies while you work, then you both take a break.${s.pomos ? ` ${s.pomos} done.` : ''}`), h('div.pc-focus-btns', {}, [15, 25, 50].map(focusBtn))),
+        h('div.pc-label', {}, 'Kindergarten'),
         h('div.pc-lesson', {}, iconCanvas(kind === 'instrument' ? id : kind === 'dance' ? 'note' : kind === 'song' ? 'note' : kind === 'drawing' ? 'crayons' : 'star', 3),
           h('div', {}, h('b', {}, name), h('small', {}, `${kind[0].toUpperCase()}${kind.slice(1)}${s.learned[id] ? ` · learned${kind === 'song' || kind === 'drawing' ? ` (level ${s.learned[id]}/5)` : ''}` : ''}`)),
           h('button.btn.sm.primary', { type: 'button', disabled: !!at || !pyxl.awake(), onclick: () => pyxl.school() }, h('span.lbl', {}, 'Send to class'))),
         h('div.pc-label', {}, `Learned ${learned.length} / ${LESSONS.length}`),
         h('div.pc-learned', {}, LESSONS.map(([lid, lname]) => h(`span${s.learned[lid] ? '.on' : ''}`, { 'data-tip': lname }, lname))),
-        h('p.pc-note', {}, 'She shows off what she learns while you work. Lessons rotate every 3 minutes, like the Chao Kindergarten.'),
+        h('p.pc-note', {}, 'She shows off what she learns. Lessons change every 3 minutes.'),
       ];
     },
     games() {
@@ -108,6 +119,7 @@ export function careBody(pyxl, onPlay) {
   // Tabs are built once; a render only swaps the content of the open tab.
   tabs.append(...TABS.map(([id, label, ic]) => h('button.pc-tab', { type: 'button', role: 'tab', 'data-tip': label, dataset: { tab: id }, onclick: () => { tab = id; local.set('pp.pyxlTab', id); render(); } }, iconCanvas(ic, 2), h('span', {}, label))));
   const render = () => {
+    renderTop();
     for (const b of tabs.children) b.classList.toggle('on', b.dataset.tab === tab);
     const next = h('div', {}, ...views[tab]().filter(Boolean));
     if (content.dataset.tab !== tab) { content.dataset.tab = tab; content.replaceChildren(...next.childNodes); }
@@ -116,7 +128,12 @@ export function careBody(pyxl, onPlay) {
   // Re-render at most once a frame, and only while visible (the docked panel may be hidden).
   let raf = 0, stale = false;
   const schedule = () => { raf ||= requestAnimationFrame(() => { raf = 0; if (el.offsetParent) render(); else stale = true; }); };
-  const el = h('div.pc-body', {}, tabs, content);
+  // always at hand: send her home (when she's away from her spot) and quiet mode
+  const top = h('div.pc-top');
+  const renderTop = () => morph(top, h('div', {},
+    h('button.btn.sm', { type: 'button', disabled: !pyxl.floating, 'data-tip': pyxl.floating ? 'Back to her spot' : 'She’s home — drag her to carry her anywhere', onclick: () => { pyxl.goHome(); pyxl.react('happy', { say: 'Home sweet home!' }); } }, iconCanvas('house', 2), h('span.lbl', {}, 'Send home')),
+    h('button.btn.sm', { type: 'button', className: pyxl.silent ? 'on' : '', 'data-tip': pyxl.silent ? 'Let her talk again' : 'No chatter or reactions (she won’t like it)', onclick: () => pyxl.setSilent(!pyxl.silent) }, iconCanvas('dots', 2), h('span.lbl', {}, pyxl.silent ? 'Quiet: on' : 'Quiet'))));
+  const el = h('div.pc-body', {}, top, tabs, content);
   new IntersectionObserver(([e]) => { if (e.isIntersecting && stale) { stale = false; render(); } }).observe(el);
   render();
   const off = bus.on('pyxl:stats', schedule), timer = setInterval(() => tab === 'school' && schedule(), 1000);
@@ -156,7 +173,7 @@ export function openCareCard(pyxl, dock) {
     head.onpointermove = ev => place(ev.clientX - ox, ev.clientY - oy);
     head.onpointerup = () => { head.onpointermove = null; const b = card.getBoundingClientRect(); Object.assign(saved, { x: b.left, y: b.top }); local.set('pp.pyxlCard', saved); };
   });
-  const outside = e => { if (card && !saved.pinned && !card.contains(e.target) && !pyxl.el.contains(e.target)) close(); };
+  const outside = e => { if (card && !saved.pinned && !card.contains(e.target) && !pyxl.el.contains(e.target) && e.target !== pyxl.bubble) close(); };
   addEventListener('pointerdown', outside, true);
   const stopClamp = keepOnScreen(card);
   card.stop = () => { stopClamp?.(); removeEventListener('pointerdown', outside, true); };

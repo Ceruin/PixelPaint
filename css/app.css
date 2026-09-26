@@ -440,6 +440,23 @@ body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-item:hover:not(:disabled) { border-color: var(--accent); }
 .pc-item:disabled { opacity: .45; }
 .pc-item small { max-width: 100%; color: var(--muted); text-align: center; overflow-wrap: break-word; hyphens: auto; }
+.pc-top { display: flex; gap: 4px; }
+.pc-top > div { display: contents; }
+.pc-top .btn { flex: 1; justify-content: center; gap: 5px; min-width: 0; }
+.pc-top .btn:disabled { opacity: .45; }
+.pc-top .btn.on { border-color: var(--accent); color: var(--accent); }
+.pc-toys { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.pc-toy { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 5px 2px 4px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--text); cursor: pointer; }
+.pc-toy:hover { border-color: var(--accent); }
+.pc-toy.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--bg)); }
+.pc-toy small { color: var(--muted); font-size: 10.5px; }
+.pc-radio { display: flex; align-items: center; gap: 2px; padding: 3px 4px; border: 1px solid var(--accent); border-radius: var(--r); background: var(--bg); }
+.pc-radio > span { flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+.pc-focus { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+.pc-focus small { color: var(--muted); }
+.pc-focus-btns { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.pc-focus-btns .btn { justify-content: center; }
+.m-bubble:not(:empty) { pointer-events: auto; cursor: pointer; }
 .pc-price { display: flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
 .pc-namerow { display: flex; gap: 4px; }
 .pc-name { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--text); font: inherit; font-weight: 700; }
