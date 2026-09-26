@@ -15,6 +15,7 @@ export function modeSwitch(current, { focus, theme }) {
     h('div.mode-switch', { role: 'tablist' }, MODES.map(([id, label, ic]) =>
       h('button.mode-btn', { type: 'button', role: 'tab', className: id === current ? 'on' : '', 'data-tip': `${label} workspace`, 'data-action': `mode.${id}`, onclick: () => actions.run(`mode.${id}`) },
         icon(ic), h('span', {}, label)))),
+    current === 'paint' && iconBtn('folder', 'My Art: your saved drawings (Ctrl+Shift+O)', () => actions.run('file.library'), { 'data-action': 'file.library' }),
     current !== 'pixel' && iconBtn('expand', 'Focus: full-screen canvas', () => actions.run('view.focus'), { className: `ibtn${focus ? ' on' : ''}`, 'data-action': 'view.focus' }),
     iconBtn(tIcon, `Theme: ${tLabel} (click for the next)`, () => actions.run('view.theme'), { 'data-action': 'view.theme' }));
 }

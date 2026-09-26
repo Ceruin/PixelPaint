@@ -121,6 +121,7 @@ export function createProject(app) {
       app.setDoc(doc);
     },
     async rename(id, name) { const index = await idb.get('library') ?? {}; if (index[id]) { index[id].name = name; await idb.set('library', index); } if (app.doc.libId === id) app.doc.name = name; },
+    async update(id, patch) { const index = await idb.get('library') ?? {}; if (index[id]) { Object.assign(index[id], patch); await idb.set('library', index); } },
     async remove(id) { const index = await idb.get('library') ?? {}; delete index[id]; await idb.set('library', index); await idb.del(`lib:${id}`); if (app.doc.libId === id) app.doc.libId = null; },
   };
 

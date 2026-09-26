@@ -931,3 +931,14 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .nb-mitem:hover { background: rgba(0, 0, 0, .05); }
 .nb .board-slot { position: absolute; right: 12px; bottom: 60px; z-index: 3; }
 body[data-theme=dark] .notes.nb, body:not([data-theme]) .notes.nb { background: #2a2c31; }
+.gallery { position: fixed; inset: 0; z-index: 180; display: flex; background: #e9e8e3; color: #1b1d23; --paper: #fbfaf6; --ink: #1b1d23; --nb-line: #d8d6cf; --nb-muted: #6d6f76; --nb-accent: #34416f; }
+.gallery .nb-sort.on { color: var(--nb-accent); font-weight: 700; }
+.gallery .nb-sort { display: inline-flex; align-items: center; gap: 4px; }
+.gallery .nb-sort .ic { width: 14px; height: 14px; }
+.gal-thumb { object-fit: contain !important; background: repeating-conic-gradient(#0000000f 0 25%, #fff 0 50%) 0 0 / 12px 12px !important; }
+.nb-grid .gal-thumb { aspect-ratio: 4 / 3 !important; }
+.gal-recent { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 190px); gap: 16px; overflow-x: auto; padding: 14px 2px 18px; scrollbar-width: thin; }
+.gal-recent .nb-open { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.gal-recent .gal-thumb { width: 100%; aspect-ratio: 4 / 3; }
+.gal-recent .nb-item { position: relative; }
+.gal-recent .nb-acts { position: absolute; top: 4px; right: 4px; background: rgba(251, 250, 246, .92); border-radius: 6px; }

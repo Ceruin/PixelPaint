@@ -14,7 +14,7 @@ const LAYER_ACTS = [['layer.new', 'New', 'plus'], ['layer.dup', 'Duplicate', 'co
   ['layer.alphaLock', 'Lock alpha', 'alpha'], ['layer.clip', 'Clip', 'clip'], ['layer.group', 'Group', 'folder'], ['layer.del', 'Delete', 'trash']];
 const MORE_ACTS = [['sel.all', 'Select all', 'select'], ['sel.invert', 'Invert sel.', 'swap'], ['sel.none', 'Deselect', 'x'], ['view.fit', 'Fit view', 'fit'],
   ['view.resetRot', 'Reset turn', 'rotCW'], ['view.flip', 'Mirror view', 'mirror'], ['view.assist', 'Guides', 'ruler'], ['image.flipH', 'Flip canvas', 'flipH'],
-  ['file.save', 'Save', 'save'], ['file.share', 'Share', 'upload'], ['file.exportPng', 'Export PNG', 'image'], ['edit.clearCanvas', 'Clear all', 'trash']];
+  ['file.library', 'My Art', 'folder'], ['file.save', 'Save', 'save'], ['file.share', 'Share', 'upload'], ['file.exportPng', 'Export PNG', 'image'], ['edit.clearCanvas', 'Clear all', 'trash']];
 const SEL_ACTS = [['edit.copy', 'Copy', 'copy'], ['edit.cut', 'Cut', 'scissors'], ['edit.paste', 'Paste', 'paste'], ['tool.transform', 'Move', 'transform'],
   ['edit.fill', 'Fill', 'fill'], ['edit.clear', 'Clear', 'eraser'], ['sel.invert', 'Invert', 'swap'], ['sel.none', 'Deselect', 'x']];
 const XFORM_ACTS = [['tool.commit', 'Apply', 'check'], ['tool.cancel', 'Cancel', 'x']];

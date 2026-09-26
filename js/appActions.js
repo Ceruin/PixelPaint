@@ -19,6 +19,7 @@ import { showWelcome } from './ui/welcome.js';
 import { checkForUpdates, reloadFresh } from './ui/updates.js';
 import { showGuide } from './ui/guide.js';
 import { startTour } from './ui/tour.js';
+import { showGallery } from './ui/gallery.js';
 import { VERSION } from './version.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ...PAGES, ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
@@ -66,19 +67,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
   const startTransform = () => { const t = app.tools.transform; t.commit(); app.setTool('transform'); t.begin(); };
 
   // ---- the browser library: every project saved here, with a thumbnail ----
-  async function openLibrary() {
-    const list = await project.library.list(), grid = h('div.lib-grid');
-    let pick = null;
-    const render = items => grid.replaceChildren(...(items.length ? items.map(it => h('div.lib-item', { className: it.id === doc().libId ? 'on' : '' },
-      h('button.lib-open', { type: 'button', 'data-tip': 'Open', onclick: () => { pick = it.id; grid.closest('.modal-back')?.querySelector('.modal-foot .primary')?.click(); } },
-        h('img', { src: it.thumb, alt: '' }), h('b', {}, it.name), h('small', {}, `${it.w} × ${it.h} · ${new Date(it.date).toLocaleString()}`)),
-      h('div.lib-acts', {},
-        iconBtn('text', 'Rename', async () => { const v = await form('Rename', [{ id: 'n', label: 'Name', type: 'text', value: it.name }], 'Rename'); if (v) { await project.library.rename(it.id, String(v.n).trim() || it.name); render(await project.library.list()); } }),
-        iconBtn('trash', 'Delete', async () => { if (await modal('Delete project?', h('p', {}, `“${it.name}” will be removed from this browser.`), [['Cancel', null], ['Delete', 'ok', 'danger']])) { await project.library.remove(it.id); render(await project.library.list()); } }))))
-      : [h('p.muted', {}, 'Nothing saved here yet — use File ▸ Save to Browser (Ctrl+S).')]));
-    render(list);
-    if (await modal('Open from Browser', grid, [['Cancel', null], ['Open', 'ok', true]], 'wide') && pick) project.library.open(pick);
-  }
+  const openLibrary = () => showGallery(project);
 
   // ---- share the finished picture (merged) or the whole project (all layers, .pp) ----
   async function shareDialog() {
@@ -323,9 +312,9 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
         name = String(v.n).trim() || 'My painting';
       }
       await project.library.save(name);
-      app.toast(`Saved “${name}” in this browser — File ▸ Open from Browser`);
+      app.toast(`Saved “${name}” in this browser — find it in My Art`);
     } },
-    { id: 'file.library', label: 'Open from Browser…', icon: 'folder', run: openLibrary },
+    { id: 'file.library', label: 'My Art (saved drawings)…', icon: 'folder', key: 'Ctrl+Shift+O', run: openLibrary },
     { id: 'file.exportProject', label: 'Download Project (.pp)', key: 'Ctrl+Shift+S', run: project.exportProject },
     { id: 'file.exportOra', label: 'Export OpenRaster (.ora, for Krita / GIMP)', run: project.exportOra },
     { id: 'file.share', label: 'Share…', icon: 'upload', run: shareDialog },
