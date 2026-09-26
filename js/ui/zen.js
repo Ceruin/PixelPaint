@@ -11,7 +11,7 @@ export function initZen(app, panels) {
   const toolBtn = (id, tip) => h('button.ibtn.tool', { type: 'button', 'data-tip': tip, 'data-action': `tool.${id}`, dataset: { tool: id }, onclick: () => app.setTool(id) }, icon(id));
   // painting tools, or on a pixel canvas the pixel tools
   const paintTools = [toolBtn('brush', 'Brush'), toolBtn('smudge', 'Smudge'), toolBtn('eraser', 'Eraser')];
-  const pixelTools = [toolBtn('pencil', 'Pixel Pencil'), toolBtn('pxshape', 'Pixel line & shapes'), toolBtn('fill', 'Fill')];
+  const pixelTools = [toolBtn('pencil', 'Pencil'), toolBtn('pxshape', 'Shapes'), toolBtn('fill', 'Fill')];
   const tools = [...paintTools, ...pixelTools, toolBtn('lasso', 'Lasso'), toolBtn('transform', 'Transform')];
   const kind = () => { const px = !!app.doc?.pixelArt; paintTools.forEach(b => { b.hidden = px; }); pixelTools.forEach(b => { b.hidden = !px; }); };
   bus.on('doc', kind);
@@ -27,7 +27,7 @@ export function initZen(app, panels) {
   };
 
   root.append(h('div.zen-strip.panel', {},
-    h('div.zen-sec', {}, iconBtn('chevronsRight', 'Leave Focus (Tab)', () => actions.run('view.focus')), iconBtn('undo', 'Undo', () => actions.run('edit.undo')), iconBtn('redo', 'Redo', () => actions.run('edit.redo'))),
+    h('div.zen-sec', {}, h('button.zen-exit', { type: 'button', 'data-tip': 'Leave Focus and bring the menus back (Tab)', onclick: () => actions.run('view.focus') }, icon('x'), h('span', {}, 'Exit')), iconBtn('undo', 'Undo', () => actions.run('edit.undo')), iconBtn('redo', 'Redo', () => actions.run('edit.redo'))),
     h('div.zen-sec', {}, tools),
     h('div.zen-sec', {},
       vslider('Size', () => sizeToPos(app.brush.size), v => { app.brush.size = posToSize(v); app.brushChanged(); }, 0),

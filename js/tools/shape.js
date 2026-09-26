@@ -1,8 +1,9 @@
 import { Rect, makeCanvas, TAU } from '../core/util.js';
+import { addPanels, panelBorder } from './comic.js';
 
 // Vector-style shapes, rasterised onto the active layer on release. Bubbles and panels cover
 // the comic-making basics (Krita's word-bubble library / CSP frame borders).
-export const SHAPES = [['rect', 'Rectangle', 'marquee'], ['ellipse', 'Ellipse', 'ellipse'], ['line', 'Line', 'minus'], ['bubble', 'Speech bubble', 'bubble'], ['thought', 'Thought bubble', 'sparkle'], ['panel', 'Comic panel', 'crop']];
+export const SHAPES = [['rect', 'Rectangle', 'marquee'], ['ellipse', 'Ellipse', 'ellipse'], ['line', 'Line', 'minus'], ['bubble', 'Speech bubble', 'bubble'], ['thought', 'Thought bubble', 'sparkle'], ['panel', 'Comic panel (cuts a window in the Panels layer)', 'crop']];
 
 function shapePath(kind, a, b) {
   const p = new Path2D(), x = Math.min(a.x, b.x), y = Math.min(a.y, b.y), w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
@@ -67,7 +68,7 @@ export class ShapeTool {
     const { opts, color } = this.app, kind = opts.shape, path = shapePath(kind, this.a, this.b);
     const comic = ['bubble', 'thought', 'panel'].includes(kind);
     ctx.lineJoin = ctx.lineCap = 'round';
-    ctx.lineWidth = kind === 'panel' ? Math.max(6, opts.shapeWidth) : opts.shapeWidth;
+    ctx.lineWidth = kind === 'panel' ? panelBorder(this.app.doc) : opts.shapeWidth;
     if ((opts.shapeFill || comic) && kind !== 'line' && kind !== 'panel') { ctx.fillStyle = comic ? '#ffffff' : color.bg; ctx.fill(path); }
     if (opts.shapeStroke || comic || kind === 'line') { ctx.strokeStyle = color.fg; ctx.stroke(path); }
   }
@@ -77,6 +78,11 @@ export class ShapeTool {
     view.overlays.delete(this);
     view.redraw();
     if (Math.hypot(this.b.x - this.a.x, this.b.y - this.a.y) < 2) return;
+    if (opts.shape === 'panel') {   // panels live on their own layer (see comic.js)
+      const r = Rect.fromPoints([this.a, this.b]);
+      if (r.w > 8 && r.h > 8) addPanels(doc, [[r.x, r.y, r.w, r.h]]);
+      return;
+    }
     const pad = opts.shapeWidth + 8, r = Rect.fromPoints([this.a, this.b]), h = r.h;
     const box = { x: r.x - pad, y: r.y - pad, w: r.w + pad * 2, h: h * 1.4 + pad * 2 };
     const t = makeCanvas(doc.w, doc.h), tc = t.getContext('2d');

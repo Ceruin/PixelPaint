@@ -1,5 +1,6 @@
+import { bus } from '../core/bus.js';
 import { acquire, release } from '../engine/compositor.js';
-import { BrushEngine } from '../engine/brush.js';
+import { BrushEngine, tonePattern } from '../engine/brush.js';
 import { PixelEngine, PixelShapeEngine } from '../engine/pixel.js';
 import { Rect, drawRect, clipTo, TAU } from '../core/util.js';
 import { haptics } from '../input/haptics.js';
@@ -7,6 +8,11 @@ import { pickLock, project } from '../engine/assistants.js';
 
 // A stroke's preview is a lazy copy of its layer: 64px tiles are copied in the first time a flush or
 // the compositor touches them (copying the whole layer at pen-down cost a frame on big canvases).
+let smudgeCv = null;
+const smudgeCanvas = (w, h) => {
+  if (smudgeCv?.width !== w || smudgeCv.height !== h) { smudgeCv = document.createElement('canvas'); smudgeCv.width = w; smudgeCv.height = h; smudgeCv.getContext('2d', { willReadFrequently: true }); }
+  return smudgeCv;
+};
 function lazyCopy(pv, src) {
   const T = 64, cols = Math.ceil(pv.width / T), rows = Math.ceil(pv.height / T), done = new Uint8Array(cols * rows), pc = pv.getContext('2d');
   pv.ensure = r => {
@@ -20,12 +26,32 @@ function lazyCopy(pv, src) {
   };
 }
 
-const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge', pencil: 'Pixel Pencil', pxshape: 'Pixel Shape' };
+const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge', pencil: 'Pencil', pxshape: 'Pixel Shape' };
 
 // Brush / Eraser / Smudge. Dabs go to a stroke buffer, which is composited over a copy of the
 // layer (the preview) inside the dirty rect only; the layer itself is written once, on pen-up.
 export class PaintTool {
-  constructor(app, id) { Object.assign(this, { app, id, cursor: 'crosshair', hoverPt: null, engine: null }); }
+  constructor(app, id) {
+    Object.assign(this, { app, id, cursor: 'crosshair', hoverPt: null, engine: null });
+    // while the size changes, the brush's outline shows on the canvas (at the pen, else the middle)
+    let last = null;
+    bus.on('brush', () => {
+      if (app.tool !== this) return;
+      const size = this.brush.size;
+      if (last != null && size !== last && !this.engine) {
+        this.sizeShow = performance.now() + 900;
+        app.view.redrawOverlays(this);
+        clearTimeout(this.sizeTimer); this.sizeTimer = setTimeout(() => { this.sizeShow = 0; app.view.redrawOverlays(this); }, 950);
+      }
+      last = size;
+    });
+  }
+  // where the cursor ring goes: the pen, or the canvas middle while previewing a new size
+  ringAt() {
+    if (this.hoverPt) return this.hoverPt;
+    if (this.sizeShow > performance.now()) { const v = this.app.view; return v.toDoc(v.cw / 2, v.ch / 2); }
+    return null;
+  }
   get brush() { return this.app.brushes[this.id]; }
   activate() { this.app.view.overlays.add(this); }
   deactivate() { this.cancel(); this.app.view.overlays.delete(this); }
@@ -33,7 +59,7 @@ export class PaintTool {
   hover(p) { this.hoverPt = p; this.app.view.redrawOverlays(this); }
   // Screen rect of the brush ring, so moving it repaints only around it.
   bounds(view) {
-    const p = this.hoverPt, r = p && this.brush.size / 2 * view.zoom;
+    const p = this.ringAt(), r = p && this.brush.size / 2 * view.zoom;
     if (!p || r < 2) return null;
     const s = view.toScreen(p.x, p.y);
     return { x: s.x - r - 2, y: s.y - r - 2, w: 2 * r + 4, h: 2 * r + 4 };
@@ -45,7 +71,8 @@ export class PaintTool {
     if (!layer || layer.locked || !layer.visible) { app.toast(layer ? 'Layer is locked or hidden' : 'Select a layer to paint on'); return false; }
     const { w, h } = doc, b = this.brush, smudge = this.id === 'smudge';
     Object.assign(this, { layer, total: null, travel: 0 });
-    this.preview = acquire(w, h);
+    // smudge reads pixels back every dab: it gets its own CPU-side canvas; brushes use the pool
+    this.preview = smudge ? smudgeCanvas(w, h) : acquire(w, h);
     if (smudge) { const pc = this.preview.getContext('2d'); pc.clearRect(0, 0, w, h); pc.drawImage(layer.canvas, 0, 0); }   // smudge samples it anywhere
     else lazyCopy(this.preview, layer.canvas);
     if (!smudge) { this.buf = acquire(w, h); if (this.buf.stale?.w) { const s = this.buf.stale; this.buf.getContext('2d').clearRect(s.x, s.y, s.w, s.h); this.buf.stale = null; } }   // only what the last stroke left
@@ -65,7 +92,7 @@ export class PaintTool {
   makeEngine(target, b, smudge) {
     const { app } = this, { w, h } = app.doc;
     return new BrushEngine(b, {
-      target, color: app.color.fg, symmetry: app.symmetry(),
+      target, color: app.color.fg, symmetry: app.symmetry(), scale: 1 / app.view.zoom,
       profile: app.profile, alphaMul: b.buildup ? b.opacity : 1, smudge, wrap: app.opts.wrap ? { w, h } : null,
     });
   }
@@ -120,12 +147,16 @@ export class PaintTool {
       pc.clearRect(r.x, r.y, r.w, r.h);
       drawRect(pc, this.layer.canvas, r);
       let src = this.buf, t = null;
-      if (mask) {
+      const tone = this.brush.pattern && tonePattern(pc, this.brush.pattern, this.brush.patternSize ?? 8);
+      if (mask || tone) {
         t = acquire(doc.w, doc.h);
         const tc = t.getContext('2d');
         tc.clearRect(r.x, r.y, r.w, r.h);
         drawRect(tc, this.buf, r);
-        tc.globalCompositeOperation = 'destination-in'; drawRect(tc, mask, r); tc.globalCompositeOperation = 'source-over';
+        tc.globalCompositeOperation = 'destination-in';
+        if (mask) drawRect(tc, mask, r);
+        if (tone) { tc.fillStyle = tone; tc.fillRect(r.x, r.y, r.w, r.h); }   // screentone: the stroke keeps only the page-aligned dots / lines
+        tc.globalCompositeOperation = 'source-over';
         src = t;
       }
       pc.globalAlpha = this.opacity; pc.globalCompositeOperation = this.mode;
@@ -160,7 +191,7 @@ export class PaintTool {
     this.drawCursor(ctx, view);
   }
   drawCursor(ctx, view) {
-    const p = this.hoverPt, r = p && this.brush.size / 2 * view.zoom;
+    const p = this.ringAt(), r = p && this.brush.size / 2 * view.zoom;
     if (!p || r < 2) return;
     const s = view.toScreen(p.x, p.y);
     ctx.lineWidth = 1;
@@ -179,8 +210,8 @@ export class PixelTool extends PaintTool {
   erasing(e) { return this.app.opts.pixelErase || e?.button === 2; }
   makeEngine(target) {
     const { app } = this;
-    const o = app.opts, base = { target, color: app.color.fg, size: o.pixelSize, symmetry: app.symmetry() };
-    return this.id === 'pxshape' ? new PixelShapeEngine({ ...base, kind: o.pixelShape, filled: o.pixelFill }) : new PixelEngine({ ...base, perfect: o.pixelPerfect });
+    const o = app.opts, base = { target, color: app.color.fg, size: o.pixelSize, symmetry: app.symmetry(), dither: o.pixelDither };
+    return this.id === 'pxshape' ? new PixelShapeEngine({ ...base, kind: o.shape, filled: o.pixelFill }) : new PixelEngine({ ...base, perfect: o.pixelPerfect });
   }
   // The cursor is the square of pixels the pencil will fill.
   cellRect(view) {

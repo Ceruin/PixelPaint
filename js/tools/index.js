@@ -7,12 +7,22 @@ import { TextTool } from './text.js';
 import { AssistTool } from './assist.js';
 
 export const TOOL_META = [
-  ['brush', 'Brush', 'B'], ['pencil', 'Pixel Pencil', 'P'], ['pxshape', 'Pixel Line & Shapes', 'Shift+P'], ['eraser', 'Eraser', 'E'], ['smudge', 'Smudge', 'S'], ['fill', 'Fill', 'G'],
+  ['brush', 'Brush', 'B'], ['pencil', 'Pencil', 'P'], ['pxshape', 'Pixel Shapes', 'Shift+P'], ['eraser', 'Eraser', 'E'], ['smudge', 'Smudge', 'S'], ['fill', 'Fill', 'G'],
   ['picker', 'Eyedropper', 'I'], ['marquee', 'Rectangle Select', 'M'], ['ellipse', 'Ellipse Select', 'O'],
   ['lasso', 'Lasso', 'L'], ['wand', 'Magic Wand', 'W'], ['transform', 'Transform / Warp', 'V'],
   ['shape', 'Shapes & Bubbles', 'U'], ['text', 'Text', 'T'], ['assist', 'Drawing Assistants', 'A'],
   ['hand', 'Hand', 'H'], ['zoom', 'Zoom', 'Z'],
 ];
+
+// The toolbar shows one button per group (the group's last-used tool); the rest are a press away.
+// Shapes follow the canvas: hard-pixel shapes on a pixel canvas, smooth ones on a painting.
+export const TOOL_GROUPS = [
+  ['paint', 'Brush / Pencil', ['brush', 'pencil']], ['eraser', 'Eraser', ['eraser']], ['smudge', 'Smudge', ['smudge']],
+  ['fill', 'Fill / Eyedropper', ['fill', 'picker']], ['select', 'Select', ['marquee', 'ellipse', 'lasso', 'wand']],
+  ['transform', 'Transform', ['transform']], ['shape', 'Shapes', ['shape', 'pxshape']], ['text', 'Text', ['text']],
+  ['assist', 'Guides', ['assist']], ['view', 'Hand / Zoom', ['hand', 'zoom']],
+];
+export const groupOf = id => TOOL_GROUPS.find(g => g[2].includes(id));
 
 export function createTools(app) {
   return {

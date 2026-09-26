@@ -1,7 +1,7 @@
 import { h, icon, slider, select, segmented, toggle } from './dom.js';
 import { bus } from '../core/bus.js';
 import { actions } from '../core/actions.js';
-import { TOOL_META } from '../tools/index.js';
+import { TOOL_META, groupOf } from '../tools/index.js';
 import { SYMMETRY } from '../engine/symmetry.js';
 import { SMOOTHING } from '../engine/brush.js';
 import { SHAPES } from '../tools/shape.js';
@@ -45,6 +45,9 @@ export function optionsBar(app, el, openBrushes) {
   const render = () => {
     const t = app.tool.id, o = app.opts, b = app.brush;
     const parts = [h('span.opt-tool', {}, icon(t), TOOL_META.find(m => m[0] === t)[1])];
+    // tools that share a toolbar button switch here (Select: rectangle / ellipse / lasso / wand, …)
+    const grp = groupOf(t);
+    if (grp && grp[2].length > 1 && grp[0] !== 'shape') parts.push(segmented(grp[2].map(id => [id, TOOL_META.find(m => m[0] === id)[1], id]), t, v => app.setTool(v), true));
     if (PAINT.includes(t)) parts.push(
       h('button.brush-name', { type: 'button', 'data-tip': 'Brush library', onclick: openBrushes }, preview(b), b.name, icon('chevron')),
       mini({ label: 'Size', value: sizeToPos(b.size), step: 0.1, fmt: () => `${app.brush.size}px`, onInput: v => setBrush('size')(posToSize(v)) }),
@@ -57,11 +60,12 @@ export function optionsBar(app, el, openBrushes) {
       app.doc?.assistants.length > 0 && toggle('Snap to assistants', o.snapAssist, v => app.setOpt('snapAssist', v)),
       toggle('Wrap-around', o.wrap, v => app.setOpt('wrap', v)));
     if (t === 'pxshape') parts.push(
-      segmented([['line', 'Line', 'pen'], ['rect', 'Rectangle', 'marquee'], ['ellipse', 'Ellipse', 'ellipse']], o.pixelShape, v => app.setOpt('pixelShape', v), true),
+      segmented(SHAPES.filter(([id]) => ['rect', 'ellipse', 'line'].includes(id)), ['rect', 'ellipse', 'line'].includes(o.shape) ? o.shape : 'rect', v => { app.setOpt('shape', v); render(); }, true),
       toggle('Filled', o.pixelFill, v => app.setOpt('pixelFill', v)));
     if (t === 'pencil' || t === 'pxshape') parts.push(
       mini({ label: 'Pixel size', min: 1, max: 16, value: o.pixelSize, fmt: v => `${v}px`, onInput: v => { setOpt('pixelSize')(v); app.view.redrawOverlays(app.tool); } }),
       t === 'pencil' && toggle('Pixel-perfect lines', o.pixelPerfect, v => app.setOpt('pixelPerfect', v)),
+      toggle('Dither', o.pixelDither, v => app.setOpt('pixelDither', v)),
       toggle('Erase (or right-click)', o.pixelErase, v => app.setOpt('pixelErase', v)),
       h('label.inline', { 'data-tip': 'Symmetry' }, icon('symmetry'), select(SYMMETRY, o.symmetry, v => { app.setOpt('symmetry', v); render(); })),
       toggle('Pixel grid', o.pixelGrid, v => app.setOpt('pixelGrid', v)),

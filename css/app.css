@@ -198,6 +198,16 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .dock .panel[data-panel=layers]:not(.collapsed) { flex: 2 1 300px; min-height: 260px; }
 .panel.floating { position: absolute; box-shadow: var(--shadow); resize: both; min-width: 64px; min-height: 60px; }
 .panel.floating.collapsed { resize: none; }
+.panel-head .pin, .panel-head .undock { opacity: .6; }
+.panel:not(.floating) .panel-head .pin, .panel.flyout .panel-head :is(.pin, .undock) { display: none; }
+.panel.pinned .panel-head .pin { opacity: 1; color: var(--accent); }
+.panel-resize { display: none; }
+.panel.floating:not(.collapsed) .panel-resize { display: block; position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, var(--muted) 50%, var(--muted) 58%, transparent 58%, transparent 70%, var(--muted) 70%, var(--muted) 78%, transparent 78%); opacity: .6; }
+.panels-locked .panel.floating { resize: none; }
+.panels-locked .panel-resize, .panels-locked .dock-resizer { display: none !important; }
+.panels-locked .panel-head { cursor: default; }
+body[data-layout=zen] .float-layer > .panel.pinned { display: flex; }   /* pinned floating panels stay up in Focus */
 .panel-head {
   display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 4px 0 9px; flex: none;
   cursor: grab; touch-action: none; border-bottom: 1px solid var(--line);
@@ -226,6 +236,13 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .tool:hover { border-color: var(--muted); }
 .tool.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .tool .ic { width: 18px; height: 18px; }
+.tool.grouped { position: relative; }
+.tool.grouped::after { content: ''; position: absolute; right: 3px; bottom: 3px; border: 3px solid transparent; border-right-color: currentColor; border-bottom-color: currentColor; opacity: .55; }   /* more tools inside */
+.tool-menu { position: fixed; z-index: 120; display: flex; flex-direction: column; gap: 2px; padding: 4px; min-width: 180px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
+.tool-menu-item { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border: 0; border-radius: var(--r); background: none; color: var(--text); text-align: left; }
+.tool-menu-item:hover, .tool-menu-item.on { background: var(--accent); color: var(--accent-ink); }
+.tool-menu-item kbd { font: inherit; font-size: 11px; opacity: .7; }
+@media (pointer: coarse) { .tool-menu-item { height: 44px; } }
 .tool-sep { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 2px 0; }
 .chips { position: relative; width: 60px; height: 50px; margin: 6px auto 0; grid-column: 1 / -1; }
 .chip { width: 32px; height: 32px; border-radius: var(--r); border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); padding: 0; }
@@ -248,7 +265,7 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .sv-wrap, .hue-wrap { position: relative; touch-action: none; }
 .sv { display: block; width: 100%; height: 110px; border-radius: var(--r); cursor: crosshair; touch-action: none; }
 .hue { display: block; width: 100%; height: 12px; border-radius: 2px; cursor: pointer; touch-action: none; }
-.knob { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); pointer-events: none; }
+.knob { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .35), 0 1px 3px rgba(0, 0, 0, .3); pointer-events: none; }
 .hue-wrap .knob { top: 6px; background: transparent; border-radius: 2px; width: 6px; height: 16px; margin: -8px 0 0 -3px; }
 .picker-row { display: flex; align-items: center; gap: 8px; }
 .picker-row .hex { flex: 1; font-variant-numeric: tabular-nums; }
@@ -456,7 +473,7 @@ body[data-layout=zen] .zen { display: flex; align-items: center; position: absol
 body[data-layout=zen] .zen > * { pointer-events: auto; }
 /* mode rules name #app's own parts: the Pixel editor reuses class names (.statusbar, .timeline, .stage)
    and must not be restyled by a mode switch */
-body[data-layout=zen] #app > :is(.optionsbar, .statusbar), body[data-layout=zen] .float-layer > .panel:not(.flyout) { display: none; }
+body[data-layout=zen] #app > :is(.optionsbar, .statusbar), body[data-layout=zen] .float-layer > .panel:not(.flyout):not(.pinned) { display: none; }
 /* Zen lifts the docks out of the flow and hides them rather than display:none-ing their panels:
    they keep their styles and layout, so leaving Zen doesn't rebuild hundreds of nodes. Flyouts
    opened from the Zen strip live in the docks and stay visible. */
@@ -469,6 +486,10 @@ body[data-layout=zen] .dock .panel.flyout { visibility: visible; }
 .zen-strip.more-down { box-shadow: inset 0 -18px 14px -14px rgba(0, 0, 0, .35); }
 .zen-strip.more-up { box-shadow: inset 0 18px 14px -14px rgba(0, 0, 0, .35); }
 .zen-strip.more-up.more-down { box-shadow: inset 0 18px 14px -14px rgba(0, 0, 0, .35), inset 0 -18px 14px -14px rgba(0, 0, 0, .35); }
+.zen-exit { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 44px; padding: 5px 0 4px; border: 0; border-radius: var(--r); background: var(--accent); color: var(--accent-ink); font-size: 10.5px; font-weight: 700; letter-spacing: .3px; cursor: pointer; }
+.zen-exit .ic { width: 16px; height: 16px; }
+.zen-exit:hover { filter: brightness(1.1); }
+@media (pointer: coarse) { .zen-exit { width: 46px; padding: 7px 0 5px; } }
 .zen-sec { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .zen-strip .mascot-slot { margin-top: 0; position: sticky; bottom: -6px; padding-bottom: 6px; background: inherit; }   /* never scrolls out of a short strip */
 .zen-strip .mascot { width: 48px; height: 62px; }
@@ -551,14 +572,17 @@ body[data-theme=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 .quick-sizes button.on { border-color: var(--accent); }
 .quick-sizes i { display: block; max-width: 22px; max-height: 22px; border-radius: 50%; background: var(--text); }
 .pads { display: flex; flex-direction: column; gap: 8px; }
-.wheel { display: block; width: 100%; max-width: 240px; aspect-ratio: 1; margin: 0 auto; touch-action: none; cursor: crosshair; }
+.wheel { display: block; width: 100%; max-width: 220px; aspect-ratio: 1; margin: 2px auto; touch-action: none; cursor: crosshair; }
 .picker > .seg { align-self: flex-start; }
 
 /* ---------- navigator, reference, filter layers, text ---------- */
 .navigator { display: flex; flex-direction: column; gap: 4px; }
 .nav-thumb { width: 100%; height: auto; background: var(--stage); border-radius: var(--r); cursor: grab; touch-action: none; }
-.reference { display: flex; flex-direction: column; height: 100%; }
-.ref-img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: crosshair; }
+.reference { display: flex; flex-direction: column; gap: 6px; height: 100%; min-height: 0; outline: none; }
+.ref-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.ref-view { flex: 1; min-height: 80px; position: relative; overflow: hidden; display: grid; place-items: center; border-radius: var(--r); background: var(--bg); touch-action: none; cursor: crosshair; }
+.ref-img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; user-select: none; pointer-events: none; }
+.ref-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .thumb-wrap.fx { background: var(--panel3); color: var(--accent); }
 .text-editor {
   position: absolute; z-index: 20; min-width: 60px; min-height: 1.3em; padding: 0; margin: 0; resize: none; overflow: hidden;

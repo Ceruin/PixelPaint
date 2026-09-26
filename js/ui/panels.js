@@ -20,6 +20,7 @@ export class Panels {
     this.fly = null;
     this.save = debounce(() => local.set('pp.layout', this.layout()), 300);
     this.initResizer(ws.querySelector('#dockRight .dock-resizer'));
+    this.setLocked(local.get('pp.panelsLocked', false));
     this.narrow = innerWidth < 900;
     new ResizeObserver(() => {
       this.map.forEach(p => !p.s.dock && this.clampFloat(p));
@@ -34,19 +35,40 @@ export class Panels {
     const el = h(`section.panel${grow ? '.grow' : ''}`, { dataset: { panel: id } },
       h('header.panel-head', {},
         icon(ic), h('span.panel-title', {}, title),
+        // floating: pin keeps it up in Focus too; float/dock moves it out of or back into a side dock
+        h('button.ibtn.sm.pin', { type: 'button', 'data-tip': 'Pin: stay visible in Focus', onclick: () => this.patch(id, { pinned: !this.map.get(id).s.pinned }) }, icon('lock')),
+        h('button.ibtn.sm.undock', { type: 'button', 'data-tip': 'Float / dock this panel', onclick: () => this.toggleDock(id) }, icon('window')),
         h('button.ibtn.sm.fold', { type: 'button', 'data-tip': 'Collapse', onclick: () => this.patch(id, { collapsed: !this.map.get(id).s.collapsed }) }, icon('chevron')),
         h('button.ibtn.sm', { type: 'button', 'data-tip': 'Close', onclick: () => (this.fly?.p.id === id ? this.closeFlyout() : this.patch(id, { hidden: true })) }, icon('x'))),
-      h('div.panel-body', {}, body));
+      h('div.panel-body', {}, body), h('div.panel-resize', { 'data-tip': 'Resize' }));
     const p = { id, title, icon: ic, el, s: { ...def } };
     this.defaults[id] = def;
     this.map.set(id, p);
-    el.querySelector('.panel-head').addEventListener('pointerdown', e => !e.target.closest('button') && !el.classList.contains('flyout') && this.drag(p, e));
+    el.querySelector('.panel-head').addEventListener('pointerdown', e => !e.target.closest('button') && !el.classList.contains('flyout') && !this.locked && this.drag(p, e));
+    // a corner handle resizes a floating panel (CSS resize has no touch support)
+    el.querySelector('.panel-resize').addEventListener('pointerdown', e => {
+      if (p.s.dock || this.locked) return;
+      e.preventDefault(); e.stopPropagation();
+      const x0 = e.clientX, y0 = e.clientY, w0 = el.offsetWidth, h0 = el.offsetHeight;
+      const mv = ev => { p.s.w = Math.max(140, w0 + ev.clientX - x0); p.s.h = Math.max(100, h0 + ev.clientY - y0); this.place(p); };
+      const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); this.save(); };
+      addEventListener('pointermove', mv); addEventListener('pointerup', up);
+    });
     new ResizeObserver(() => {
       if (p.s.dock || p.s.collapsed || !el.offsetWidth || el.classList.contains('flyout')) return;
       p.s.w = el.offsetWidth; p.s.h = el.offsetHeight; this.save();
     }).observe(el);
     return el;
   }
+
+  // Undock to a floating panel where it is, or dock it back to its last side.
+  toggleDock(id) {
+    const p = this.map.get(id), r = p.el.getBoundingClientRect(), wr = this.ws.getBoundingClientRect();
+    if (p.s.dock) this.patch(id, { lastDock: p.s.dock, dock: null, x: Math.max(8, r.left - wr.left - 24), y: Math.max(8, r.top - wr.top), w: r.width, h: Math.max(200, Math.min(r.height, 420)), collapsed: false });
+    else { this.patch(id, { dock: p.s.lastDock ?? this.defaults[id]?.dock ?? 'right', pinned: false }); this.normalize(); this.placeAll(); }
+  }
+  // Locked: panels can't be dragged, docked or resized (buttons still work).
+  setLocked(on) { this.locked = on; local.set('pp.panelsLocked', on); this.ws.classList.toggle('panels-locked', on); }
 
   patch(id, s) { Object.assign(this.map.get(id).s, s); this.placeAll(); this.save(); }
   toggle(id) { this.patch(id, { hidden: !this.map.get(id).s.hidden }); }
@@ -124,6 +146,7 @@ export class Panels {
       el.hidden = !!s.hidden;
       el.classList.toggle('collapsed', !!s.collapsed);
       el.classList.toggle('floating', !s.dock);
+      el.classList.toggle('pinned', !s.dock && !!s.pinned);
       if (s.dock) {
         Object.assign(el.style, { left: '', top: '', right: '', width: '', height: '' });
         this.docks[s.dock].append(el);

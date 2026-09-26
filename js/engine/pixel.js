@@ -4,8 +4,8 @@ import { Rect } from '../core/util.js';
 // "pixel-perfect" removes the L-shaped corner pixels a freehand line leaves (as in Aseprite).
 // Same interface as BrushEngine, so PaintTool handles preview, selection, alpha lock and undo.
 export class PixelEngine {
-  constructor({ target, color, size = 1, perfect = true, symmetry }) {
-    Object.assign(this, { ctx: target, size: Math.max(1, Math.round(size)), perfect, sym: symmetry, dirty: null, path: [] });
+  constructor({ target, color, size = 1, perfect = true, symmetry, dither = false }) {
+    Object.assign(this, { ctx: target, size: Math.max(1, Math.round(size)), perfect, sym: symmetry, dither, dirty: null, path: [] });
     target.fillStyle = color;
   }
   cell(p) { const o = (this.size - 1) / 2; return [Math.floor(p.x - o), Math.floor(p.y - o)]; }
@@ -42,7 +42,8 @@ export class PixelEngine {
     const s = this.size;
     for (const f of this.sym) {
       const [cx, cy] = f(x + s / 2, y + s / 2, 0), X = Math.round(cx - s / 2), Y = Math.round(cy - s / 2);
-      clear ? this.ctx.clearRect(X, Y, s, s) : this.ctx.fillRect(X, Y, s, s);
+      if (this.dither && !clear) { for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) if (!((X + i + Y + j) & 1)) this.ctx.fillRect(X + i, Y + j, 1, 1); }   // checkerboard, fixed to the canvas grid
+      else clear ? this.ctx.clearRect(X, Y, s, s) : this.ctx.fillRect(X, Y, s, s);
       this.dirtyLast = { x: X, y: Y, w: s, h: s };
       this.dirty = Rect.union(this.dirty, this.dirtyLast);
       if (this.drawn && !clear) this.drawn.push(this.dirtyLast);
@@ -54,7 +55,7 @@ export class PixelEngine {
 // Pixel line / rectangle / ellipse from the press point to the pointer, redrawn as it moves (the
 // last outline is cleared from the stroke buffer first). Filled or outline, at the pencil's size.
 export class PixelShapeEngine extends PixelEngine {
-  constructor(o) { super(o); Object.assign(this, { kind: o.kind ?? 'line', filled: !!o.filled, perfect: false, drawn: [] }); }
+  constructor(o) { super(o); Object.assign(this, { kind: ['line', 'rect', 'ellipse'].includes(o.kind) ? o.kind : 'rect', filled: !!o.filled, perfect: false, drawn: [] }); }
   begin(p) { this.a = this.cell(p); this.draw(this.a); }
   move(p) { this.draw(this.cell(p)); }
   end(p) { if (p) this.move(p); }

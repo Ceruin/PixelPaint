@@ -21,7 +21,7 @@ export function loadCustomTips() {
   });
 }
 
-const CAT_ICONS = { Sketch: 'pencil', Ink: 'pen', Paint: 'brush', Texture: 'texture', Eraser: 'eraser', Blend: 'smudge', 'My Brushes': 'star' };
+const CAT_ICONS = { Sketch: 'pencil', Ink: 'pen', Manga: 'bubble', Paint: 'brush', Texture: 'texture', Eraser: 'eraser', Blend: 'smudge', 'My Brushes': 'star' };
 const QUICK_SIZES = [2, 4, 8, 16, 32, 64, 128, 256];
 export const favs = () => local.get('pp.favs', ['Pencil HB', 'Ink Pen', 'Brush Pen', 'Round', 'Soft Round', 'Airbrush', 'Marker', 'Chalk']);
 

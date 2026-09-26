@@ -12,6 +12,7 @@ import { bus } from './core/bus.js';
 import { acquire, release } from './engine/compositor.js';
 import { TOOL_META } from './tools/index.js';
 import { MODES, THEMES } from './ui/modes.js';
+import { LAYOUTS, PAGES, layoutRects, addPanels } from './tools/comic.js';
 import { hexToRgb } from './core/color.js';
 import { tipFromImage, registerTip } from './engine/tips.js';
 import { showWelcome } from './ui/welcome.js';
@@ -19,7 +20,7 @@ import { checkForUpdates, reloadFresh } from './ui/updates.js';
 import { showGuide } from './ui/guide.js';
 import { VERSION } from './version.js';
 
-const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
+const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ...PAGES, ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
 const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
@@ -70,9 +71,11 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       { id: 'w', label: 'Width (px)', value: 1920, min: 1, max: 8192 },
       { id: 'h', label: 'Height (px)', value: 1080, min: 1, max: 8192 },
       { id: 'bg', label: 'Background', type: 'select', options: [['white', 'White'], ['transparent', 'Transparent'], ['color', 'Background color']], value: 'white' },
+      { id: 'panels', label: 'Comic panels', type: 'select', options: LAYOUTS, value: 'none' },
     ], 'Create');
     if (!v) return;
     const d = new Doc(dim(v.w), dim(v.h), { bg: { white: '#ffffff', transparent: null, color: app.color.bg }[v.bg] });
+    if (v.panels !== 'none') { d.addLayer('Art', false); addPanels(d, layoutRects(d, v.panels)); }
     app.setDoc(d);
     if (d.pixelArt) app.setTool('pencil');   // a pixel canvas starts with the Pixel Pencil
   };
@@ -267,6 +270,10 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'file.save', label: 'Save to Browser', key: 'Ctrl+S', run: () => project.saveLocal(false) },
     { id: 'file.exportProject', label: 'Download Project (.ora)', key: 'Ctrl+Shift+S', run: project.exportProject },
     { id: 'file.exportPng', label: 'Export PNG', key: 'Ctrl+Shift+E', run: () => project.exportImage('image/png') },
+    { id: 'image.panels', label: 'Comic Panel Layout…', icon: 'crop', run: async () => {
+      const v = await form('Comic Panel Layout', [{ id: 'k', label: 'Layout', type: 'select', options: LAYOUTS.slice(1), value: 'grid4' }], 'Add Panels');
+      if (v) addPanels(doc(), layoutRects(doc(), v.k));
+    } },
     { id: 'file.exportJpg', label: 'Export JPG', run: () => project.exportImage('image/jpeg') },
     // pixel art: crisp enlargements and sprite sheets
     { id: 'file.exportScaled', label: 'Export PNG at Size…', icon: 'pixel', run: async () => {
@@ -389,6 +396,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'layout.export', label: 'Export Layout…', run: exportLayout },
     { id: 'layout.import', label: 'Import Layout…', run: importLayout },
     { id: 'layout.reset', label: 'Reset Layout', run: () => panels.reset() },
+    { id: 'layout.lock', label: 'Lock Panels', icon: 'lock', checked: () => !!panels.locked, run: () => panels.setLocked(!panels.locked) },
   ]);
 
   // Icons shown next to menu items (tools, modes and panels set their own).
@@ -408,14 +416,14 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     menus: [
       ['File', 'folder', ['file.new', 'file.open', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
-      ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW']],
+      ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
       ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
-      ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
-      ['Help', 'info', ['help.guide', 'edit.shortcuts', 'app.welcome', '-', 'help.update', 'help.reload', '-', 'help.about']],
+      ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.lock', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
+      ['Help', 'info', ['help.guide', 'edit.shortcuts', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],
   };
 }

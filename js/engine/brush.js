@@ -12,14 +12,17 @@ export const DEFAULT_BRUSH = {
 };
 
 const HALF_PI = Math.PI / 2;
+// sRGB ⇄ linear light, for clean colour mixing
+const LIN = Float32Array.from({ length: 256 }, (_, v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+const toSRGB = l => { const c = l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055; return Math.max(0, Math.min(255, Math.round(c * 255))); };
 const grain = (x, y) => { const s = Math.sin((x | 0) * 12.9898 + (y | 0) * 78.233) * 43758.5453; return s - Math.floor(s); };
 const mix = (a, b, t) => ({ ...b, x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, p: a.p + (b.p - a.p) * t });
 
 // Dab-based stroke engine. Input points {x, y, p, alt, az} in doc space; output dabs on `target`.
 // Pure rendering: no knowledge of layers, UI or history.
 export class BrushEngine {
-  constructor(brush, { target, color, symmetry, profile = {}, alphaMul = 1, smudge = false, wrap = null }) {
-    Object.assign(this, { b: brush, ctx: target, sym: symmetry, profile, alphaMul, smudge, wrap, dirty: null });
+  constructor(brush, { target, color, symmetry, profile = {}, alphaMul = 1, smudge = false, wrap = null, scale = 1 }) {
+    Object.assign(this, { b: brush, ctx: target, sym: symmetry, profile, alphaMul, smudge, wrap, scale, dirty: null });
     this.res = clamp(2 ** Math.ceil(Math.log2(Math.max(1, brush.size * 2))), 16, 512);
     this.mask = tipMask(brush.tip, brush.hardness, this.res);
     this.tip = smudge ? null : tint(this.mask, color);
@@ -40,26 +43,31 @@ export class BrushEngine {
   get smoothing() { return Math.min(0.94, this.b.smoothing + (this.profile.smoothing ?? 0)); }
   get mode() { return this.smoothing ? this.b.smoothMode ?? 'basic' : 'none'; }
 
+  // Smoothing, each mode clearly its own (strength 0–94%):
+  //  basic      — averages the last 2–40 input points (steady, follows closely)
+  //  stabilizer — a rope up to ~70 screen px: the line only moves once you pull it taut (dead-straight)
+  //  dynamic    — the pen tip has weight and drag: swoopy, brush-like curves
   move(p) {
     const s = this.s, amt = this.smoothing;
     switch (this.mode) {
       case 'none': Object.assign(s, p); break;
       case 'stabilizer': {
-        const r = amt * 40, dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
+        const r = amt * 75 * (this.scale ?? 1), dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
         if (d <= r) return;
         const k = 1 - r / d;
         s.x += dx * k; s.y += dy * k; s.p += (p.p - s.p) * k;
         break;
       }
       case 'dynamic': {
-        const v = this.v ??= { x: 0, y: 0 }, mass = 1 + amt * 10, drag = 0.5 + amt * 0.35;
+        const v = this.v ??= { x: 0, y: 0 }, mass = 1 + amt * 18, drag = 0.55 + amt * 0.38;
         v.x = (v.x + (p.x - s.x) / mass) * drag; v.y = (v.y + (p.y - s.y) / mass) * drag;
         s.x += v.x; s.y += v.y; s.p += (p.p - s.p) * 0.5;
         break;
       }
-      default: {
-        const k = 1 - amt;
-        s.x += (p.x - s.x) * k; s.y += (p.y - s.y) * k; s.p += (p.p - s.p) * k;
+      default: {   // moving average: rate-independent, so pens that send many points still get smoothed
+        const n = Math.max(2, Math.round(2 + amt * 40)), q = this.win ??= [];
+        q.push({ x: p.x, y: p.y, p: p.p }); if (q.length > n) q.splice(0, q.length - n);
+        s.x = q.reduce((a, o) => a + o.x, 0) / q.length; s.y = q.reduce((a, o) => a + o.y, 0) / q.length; s.p = q.reduce((a, o) => a + o.p, 0) / q.length;
       }
     }
     s.alt = p.alt; s.az = p.az;
@@ -127,19 +135,55 @@ export class BrushEngine {
   }
 
   // Smudge: pick up pixels at the previous dab and lay them down at this one through the tip.
+  // Pulls the paint under the previous dab into this one, mixed in linear light with premultiplied
+  // alpha: blends between colours stay clean (no muddy dark band between red and green, as plain
+  // sRGB mixing gives).
   smear(i, x, y, size) {
-    const n = Math.max(2, Math.ceil(size)), p = this.prev[i] ?? { x, y };
-    if (!this.buf || this.buf.width !== n) { this.buf = makeCanvas(n, n); this.bctx = this.buf.getContext('2d'); }
-    const bc = this.bctx;
-    bc.globalCompositeOperation = 'copy';
-    bc.drawImage(this.ctx.canvas, p.x - n / 2, p.y - n / 2, n, n, 0, 0, n, n);
-    bc.globalCompositeOperation = 'destination-in';
-    bc.drawImage(this.mask, 0, 0, n, n);
-    this.ctx.drawImage(this.buf, x - n / 2, y - n / 2);
+    const n = Math.max(2, Math.ceil(size)), p = this.prev[i] ?? { x, y }, c = this.ctx, W = c.canvas.width, H = c.canvas.height;
     this.prev[i] = { x, y };
+    const sx = Math.round(p.x - n / 2), sy = Math.round(p.y - n / 2), dx = Math.round(x - n / 2), dy = Math.round(y - n / 2);
+    if (dx >= W || dy >= H || dx + n <= 0 || dy + n <= 0) return;
+    if (this.maskN !== n) {   // the tip's coverage at this size, read once
+      const m = makeCanvas(n, n), mc = m.getContext('2d', { willReadFrequently: true }); mc.drawImage(this.mask, 0, 0, n, n);
+      const md = mc.getImageData(0, 0, n, n).data; this.maskA = new Float32Array(n * n); for (let k = 0; k < n * n; k++) this.maskA[k] = md[k * 4 + 3] / 255;
+      this.maskN = n;
+    }
+    const src = c.getImageData(sx, sy, n, n).data, dst = c.getImageData(dx, dy, n, n), d = dst.data, k0 = Math.min(1, c.globalAlpha), mA = this.maskA;
+    for (let k = 0, j = 0; k < n * n; k++, j += 4) {
+      const m = mA[k] * k0;
+      if (m <= 0.002) continue;
+      const sa = src[j + 3] / 255, da = d[j + 3] / 255, oa = da + (sa - da) * m;
+      if (oa <= 0.001) { d[j + 3] = 0; continue; }
+      for (let ch = 0; ch < 3; ch++) {
+        const sl = LIN[src[j + ch]] * sa, dl = LIN[d[j + ch]] * da;
+        d[j + ch] = toSRGB((dl + (sl - dl) * m) / oa);
+      }
+      d[j + 3] = Math.round(oa * 255);
+    }
+    c.putImageData(dst, dx, dy);
   }
 
   takeDirty() { const d = this.dirty; this.dirty = null; return d; }
+}
+
+// Screentone patterns (dots, lines, cross-hatch) on a grid fixed to the page, so tone stays aligned
+// across strokes like a real screentone sheet.
+const tones = new Map();
+export function tonePattern(ctx, kind, s) {
+  const key = `${kind}|${s}`;
+  if (!tones.has(key)) {
+    const c = document.createElement('canvas'); c.width = c.height = s;
+    const x = c.getContext('2d'); x.fillStyle = '#000';
+    if (kind === 'dots') { x.beginPath(); x.arc(s / 2, s / 2, s * 0.3, 0, Math.PI * 2); x.fill(); }
+    else {
+      x.lineWidth = Math.max(1, s * 0.22); x.strokeStyle = '#000'; x.beginPath();
+      for (const o of [-s, 0, s]) { x.moveTo(o, s); x.lineTo(o + s, 0); }
+      if (kind === 'cross') for (const o of [-s, 0, s]) { x.moveTo(o, 0); x.lineTo(o + s, s); }
+      x.stroke();
+    }
+    tones.set(key, c);
+  }
+  return ctx.createPattern(tones.get(key), 'repeat');
 }
 
 // Offline stroke render for the brush library thumbnails.
@@ -156,6 +200,7 @@ export function strokePreview(brush, canvas, color) {
     const t = i / N, pt = { x: w * 0.08 + t * w * 0.84, y: h / 2 + Math.sin(t * TAU) * h * 0.2, p: 0.15 + 0.85 * Math.sin(t * Math.PI), alt: HALF_PI };
     i ? e.line(pt) : e.begin(pt);
   }
+  if (b.pattern) { bctx.globalCompositeOperation = 'destination-in'; bctx.fillStyle = tonePattern(bctx, b.pattern, b.patternSize ?? 8); bctx.fillRect(0, 0, w, h); bctx.globalCompositeOperation = 'source-over'; }
   c.clearRect(0, 0, w, h);
   c.globalAlpha = b.buildup || smudge ? 1 : b.opacity;
   c.drawImage(buf, 0, 0);

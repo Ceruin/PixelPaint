@@ -2,6 +2,7 @@ import { h, iconBtn, slider } from './dom.js';
 import { bus } from '../core/bus.js';
 import { actions } from '../core/actions.js';
 import { makeCanvas } from '../core/util.js';
+import { idb } from '../core/storage.js';
 
 // Overview / Navigator: live thumbnail with the visible area; drag to pan, sliders for zoom & rotation.
 export function navigatorPanel(app) {
@@ -47,18 +48,62 @@ export function navigatorPanel(app) {
     iconBtn('undo', 'Reset rotation', () => actions.run('view.resetRot'))));
 }
 
-// Reference images (CSP / Krita): pin an image beside the canvas; click it to pick colours.
+// Reference images (CSP / Krita): an image beside the canvas — load, drop or paste it; zoom and pan
+// it (wheel / pinch-free: slider + drag), mirror it, check values in grey, fade it; tap to pick a
+// colour. The panel floats, resizes from its corner and can be pinned to stay up in Focus. The image
+// is remembered between visits.
 export function referencePanel(app) {
-  const img = h('img.ref-img', { alt: '' }), empty = h('p.muted', {}, 'Drop or load an image to paint from. Click it to pick a color.');
-  const load = f => { if (f?.type.startsWith('image/')) { img.src = URL.createObjectURL(f); empty.hidden = true; } };
-  const input = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: () => load(input.files[0]) });
-  img.addEventListener('click', e => {
-    const r = img.getBoundingClientRect(), c = makeCanvas(1, 1), cx = c.getContext('2d');
-    cx.drawImage(img, (e.clientX - r.left) * img.naturalWidth / r.width, (e.clientY - r.top) * img.naturalHeight / r.height, 1, 1, 0, 0, 1, 1);
-    const [R, G, B] = cx.getImageData(0, 0, 1, 1).data;
-    app.setColor(`#${[R, G, B].map(v => v.toString(16).padStart(2, '0')).join('')}`);
+  const img = h('img.ref-img', { alt: '', draggable: false }), empty = h('p.muted', {}, 'Load, drop or paste an image to paint from. Tap it to pick a colour; drag to pan.');
+  const view = h('div.ref-view', {}, img);
+  let zoom = 1, px = 0, py = 0, flip = false, grey = false;
+  const apply = () => {
+    img.style.transform = `translate(${px}px, ${py}px) scale(${zoom * (flip ? -1 : 1)}, ${zoom})`;
+    img.style.filter = grey ? 'grayscale(1)' : '';
+  };
+  const show = blob => {
+    if (!blob?.type?.startsWith('image/')) return;
+    img.src = URL.createObjectURL(blob); empty.hidden = true; view.hidden = false; zoom = 1; px = py = 0; apply(); zs.set?.(100);
+    idb.set('reference', blob).catch(() => {});
+  };
+  const input = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: () => show(input.files[0]) });
+  const paste = async () => {
+    try { for (const it of await navigator.clipboard.read()) { const t = it.types.find(x => x.startsWith('image/')); if (t) return show(await it.getType(t)); } app.toast('No image on the clipboard'); }
+    catch { app.toast('Paste with Ctrl+V into the panel, or allow clipboard access'); }
+  };
+  // tap = pick a colour; drag = pan
+  view.addEventListener('pointerdown', e => {
+    if (!img.src) return;
+    view.setPointerCapture(e.pointerId);
+    const x0 = e.clientX, y0 = e.clientY, p0 = [px, py]; let moved = false;
+    view.onpointermove = ev => { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 4) moved = true; if (moved) { px = p0[0] + ev.clientX - x0; py = p0[1] + ev.clientY - y0; apply(); } };
+    view.onpointerup = ev => {
+      view.onpointermove = view.onpointerup = null;
+      if (moved) return;
+      const r = img.getBoundingClientRect(), fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
+      if (fx < 0 || fy < 0 || fx > 1 || fy > 1) return;
+      const c = makeCanvas(1, 1), cx = c.getContext('2d');
+      cx.drawImage(img, (flip ? 1 - fx : fx) * img.naturalWidth, fy * img.naturalHeight, 1, 1, 0, 0, 1, 1);
+      const [R, G, B] = cx.getImageData(0, 0, 1, 1).data;
+      app.setColor(`#${[R, G, B].map(v => v.toString(16).padStart(2, '0')).join('')}`);
+    };
   });
-  const root = h('div.reference', { ondragover: e => e.preventDefault(), ondrop: e => { e.preventDefault(); e.stopPropagation(); load(e.dataTransfer.files[0]); } },
-    h('div.row', {}, h('button.btn.sm', { type: 'button', onclick: () => input.click() }, 'Load image…'), input), empty, img);
+  view.addEventListener('wheel', e => { if (!img.src) return; e.preventDefault(); zoom = Math.max(0.2, Math.min(8, zoom * Math.exp(-e.deltaY * 0.0015))); apply(); zs.set?.(Math.round(zoom * 100)); }, { passive: false });
+  const zs = slider({ label: 'Zoom', min: 20, max: 800, value: 100, fmt: v => `${Math.round(v)}%`, onInput: v => { zoom = v / 100; apply(); } });
+  const fade = slider({ label: 'Opacity', min: 10, max: 100, value: 100, fmt: v => `${Math.round(v)}%`, onInput: v => { view.style.opacity = v / 100; } });
+  const root = h('div.reference', {
+    tabIndex: 0,
+    ondragover: e => e.preventDefault(), ondrop: e => { e.preventDefault(); e.stopPropagation(); show(e.dataTransfer.files[0]); },
+    onpaste: e => { const f = [...e.clipboardData.files].find(x => x.type.startsWith('image/')); if (f) { e.preventDefault(); e.stopPropagation(); show(f); } },
+  },
+    h('div.row.ref-tools', {},
+      h('button.btn.sm', { type: 'button', onclick: () => input.click() }, 'Load…'), input,
+      iconBtn('paste', 'Paste an image', paste),
+      iconBtn('mirror', 'Mirror', () => { flip = !flip; apply(); }),
+      iconBtn('eye', 'Grey (check values)', () => { grey = !grey; apply(); }),
+      iconBtn('fit', 'Fit', () => { zoom = 1; px = py = 0; apply(); zs.set?.(100); }),
+      iconBtn('trash', 'Remove', () => { img.removeAttribute('src'); view.hidden = true; empty.hidden = false; idb.set('reference', null).catch(() => {}); })),
+    empty, view, h('div.ref-sliders', {}, zs.el, fade.el));
+  view.hidden = true;
+  idb.get('reference').then(b => b && show(b)).catch(() => {});
   return root;
 }
