@@ -86,8 +86,13 @@ export function layersPanel(app) {
     return el;
   };
 
+  // Rebuilding the rows keeps the list where it was, then only nudges it to show the active layer.
   const render = () => {
+    const top = list.scrollTop;
     list.replaceChildren(...rows().map(row), marker);
+    list.scrollTop = top;
+    const act = [...list.children].find(r => r.node === doc().active);
+    if (act) { const a = act.getBoundingClientRect(), l = list.getBoundingClientRect(); if (a.top < l.top) list.scrollTop -= l.top - a.top; else if (a.bottom > l.bottom) list.scrollTop += a.bottom - l.bottom; }
     updateThumbs();
     syncProps();
   };

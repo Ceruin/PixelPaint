@@ -1,13 +1,16 @@
 import { makeCanvas } from '../core/util.js';
 
-// Scanline flood fill → Uint8 mask. Tolerance is 0..100 (% per channel).
+// Scanline flood fill → Uint8 mask. Tolerance is 0..100 (% per channel). Colours are compared as
+// they look on white paper (so soft, half-transparent paint of the same colour doesn't wall the
+// fill off), with a smaller say for transparency itself. Tolerance 0 matches exact pixels (pixel art).
 export function floodMask({ data, width: w, height: h }, sx, sy, tolerance, contiguous = true) {
   const out = new Uint8Array(w * h), t = tolerance * 2.55, k0 = (sy * w + sx) * 4;
-  const [r0, g0, b0, a0] = [data[k0], data[k0 + 1], data[k0 + 2], data[k0 + 3]];
-  const match = i => {
-    const k = i * 4;
-    return Math.abs(data[k] - r0) <= t && Math.abs(data[k + 1] - g0) <= t && Math.abs(data[k + 2] - b0) <= t && Math.abs(data[k + 3] - a0) <= t;
-  };
+  const seen = (k, c) => data[k + c] * data[k + 3] / 255 + 255 - data[k + 3];   // channel c over white
+  const [r0, g0, b0, a0] = [seen(k0, 0), seen(k0, 1), seen(k0, 2), data[k0 + 3]];
+  const exact = data[k0] | (data[k0 + 1] << 8) | (data[k0 + 2] << 16), ea = data[k0 + 3];
+  const match = !t
+    ? i => { const k = i * 4; return data[k + 3] === ea && (ea === 0 || (data[k] | (data[k + 1] << 8) | (data[k + 2] << 16)) === exact); }
+    : i => { const k = i * 4; return Math.abs(seen(k, 0) - r0) <= t && Math.abs(seen(k, 1) - g0) <= t && Math.abs(seen(k, 2) - b0) <= t && Math.abs(data[k + 3] - a0) * 0.35 <= t; };
   if (!contiguous) {
     for (let i = 0; i < out.length; i++) if (match(i)) out[i] = 1;
     return out;
@@ -28,18 +31,22 @@ export function floodMask({ data, width: w, height: h }, sx, sy, tolerance, cont
   return out;
 }
 
-// Grows the mask by one pixel so fills tuck under anti-aliased line art — but only into soft edge
-// pixels (closer to the filled colour than to the line). A hard 1px line is never painted over.
-export function dilate(m, w, h, img, seed) {
-  const o = m.slice(), d = img?.data, k0 = seed * 4, lim = 0.5 * 255;
+// Grows the mask by two pixels so fills tuck under anti-aliased line art — but only into soft edge
+// pixels (closer to the filled colour than to the line). A hard line is never painted over.
+export function dilate(m, w, h, img, seed, rings = 2) {
+  const d = img?.data, k0 = seed * 4, lim = 0.5 * 255;
   const soft = i => {
     if (!d) return true;
     const k = i * 4;
     return Math.max(Math.abs(d[k] - d[k0]), Math.abs(d[k + 1] - d[k0 + 1]), Math.abs(d[k + 2] - d[k0 + 2]), Math.abs(d[k + 3] - d[k0 + 3])) <= lim;
   };
-  for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++)
-    if (!m[i] && ((x > 0 && m[i - 1]) || (x < w - 1 && m[i + 1]) || (y > 0 && m[i - w]) || (y < h - 1 && m[i + w])) && soft(i)) o[i] = 1;
-  return o;
+  for (let n = 0; n < rings; n++) {
+    const o = m.slice();
+    for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++)
+      if (!m[i] && ((x > 0 && m[i - 1]) || (x < w - 1 && m[i + 1]) || (y > 0 && m[i - w]) || (y < h - 1 && m[i + w])) && soft(i)) o[i] = 1;
+    m = o;
+  }
+  return m;
 }
 
 // Returns a canvas painted with `rgba` where the mask is set; `.bounds` holds the mask's bbox.

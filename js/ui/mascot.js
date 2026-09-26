@@ -210,7 +210,9 @@ export class Mascot {
     this.stats = new PyxlStats();
     this.canvas = h('canvas.pyxl-canvas');
     this.bubble = h('div.m-bubble');
-    this.el = h('div.mascot', { 'data-tip': 'Pyxl — click to care for her' }, this.canvas);
+    this.el = h('div.mascot', {}, this.canvas);
+    const tip = () => { this.el.dataset.tip = `${this.stats.name} — click to care for her, drag to carry her`; };
+    tip(); bus.on('pyxl:stats', tip);   // follows her name when you rename her
     document.body.append(this.bubble);   // floats above every panel and the canvas; follows her
     this.bubble.addEventListener('click', () => { clearTimeout(this.sayTimer); this.bubble.textContent = ''; });   // tap a bubble to dismiss it
     this.silent = local.get('pp.pyxlSilent', false);

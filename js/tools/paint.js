@@ -1,3 +1,4 @@
+import { CROSS } from '../ui/cursors.js';
 import { bus } from '../core/bus.js';
 import { acquire, release } from '../engine/compositor.js';
 import { BrushEngine, tonePattern } from '../engine/brush.js';
@@ -32,7 +33,7 @@ const LABEL = { brush: 'Brush', eraser: 'Eraser', smudge: 'Smudge', pencil: 'Pen
 // layer (the preview) inside the dirty rect only; the layer itself is written once, on pen-up.
 export class PaintTool {
   constructor(app, id) {
-    Object.assign(this, { app, id, cursor: 'crosshair', hoverPt: null, engine: null });
+    Object.assign(this, { app, id, cursor: CROSS, hoverPt: null, engine: null });
     // while the size changes, the brush's outline shows on the canvas (at the pen, else the middle)
     let last = null;
     bus.on('brush', () => {

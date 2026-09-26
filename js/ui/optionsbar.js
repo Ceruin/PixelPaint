@@ -54,7 +54,7 @@ export function optionsBar(app, el, openBrushes) {
       mini({ label: 'Opacity', value: b.opacity * 100, fmt: v => `${Math.round(v)}%`, onInput: v => setBrush('opacity')(v / 100) }),
       mini({ label: 'Flow', value: b.flow * 100, fmt: v => `${Math.round(v)}%`, onInput: v => setBrush('flow')(v / 100) }),
       h('label.inline', { 'data-tip': 'Smoothing method' }, icon('pen'), select(SMOOTHING, b.smoothMode ?? 'basic', v => { app.brush.smoothMode = v; app.brushChanged(); })),
-      mini({ label: 'Smoothing', max: 94, value: b.smoothing * 100, fmt: v => `${Math.round(v)}%`, onInput: v => setBrush('smoothing')(v / 100) }),
+      mini({ label: 'Smoothing', max: 100, value: b.smoothing * 100, fmt: v => `${Math.round(v)}%`, onInput: v => setBrush('smoothing')(v / 100) }),
       h('label.inline', { 'data-tip': 'Symmetry' }, icon('symmetry'), select(SYMMETRY, o.symmetry, v => { app.setOpt('symmetry', v); render(); })),
       o.symmetry === 'radial' && mini({ label: 'Axes', min: 2, max: 16, value: o.radial, onInput: setOpt('radial') }),
       app.doc?.assistants.length > 0 && toggle('Snap to assistants', o.snapAssist, v => app.setOpt('snapAssist', v)),

@@ -13,7 +13,12 @@ export function showWelcome(force = false) {
     const dpr = devicePixelRatio || 1, wk = devPx(2), big = devPx(Math.min(8, Math.max(3, Math.floor(Math.min(innerHeight * 0.5, 460) / 64))));
     const sized = (c, w, hh, k) => Object.assign(c, { width: w * k, height: hh * k, style: `width:${w * k / dpr}px;height:${hh * k / dpr}px` });
     const art = sized(h('canvas.wl-art', { 'aria-label': 'Pyxl the painter' }), 76, 64, big), trail = h('canvas.wl-trail'), walker = sized(h('canvas.wl-walker'), 96, 64, wk), bar = h('i');
-    atlasReady.then(() => drawPose(art.getContext('2d'), 'happy', 32, 58, big));
+    atlasReady.then(() => {   // drawn at 1×, tidied, then enlarged by whole pixels
+      const one = Object.assign(document.createElement('canvas'), { width: 76, height: 64 }), x = art.getContext('2d');
+      drawPose(one.getContext('2d'), 'happy', 32, 58, 1);
+      tidy(one);
+      x.imageSmoothingEnabled = false; x.drawImage(one, 0, 0, 76 * big, 64 * big);
+    });
     art.style.setProperty('--px', `${big / dpr}px`);
     const root = h('div.welcome', {},
       h('div.wl-card', {},
@@ -52,4 +57,21 @@ export function showWelcome(force = false) {
     addEventListener('keydown', close, { once: true });
     raf = requestAnimationFrame(tick);
   });
+}
+
+// Tidies small pixel art in place: drops stray lone pixels and single-pixel speckles (a pixel whose
+// four neighbours all share one other colour takes that colour), so a big splash reads clean.
+function tidy(c) {
+  const x = c.getContext('2d'), img = x.getImageData(0, 0, c.width, c.height), p = new Uint32Array(img.data.buffer), w = c.width, hh = c.height, o = p.slice();
+  const at = (i, j) => (i < 0 || j < 0 || i >= w || j >= hh ? 0 : p[j * w + i]);
+  for (let j = 0; j < hh; j++) for (let i = 0; i < w; i++) {
+    const v = p[j * w + i];
+    if (!(v >>> 24)) continue;
+    let n8 = 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) if ((di || dj) && at(i + di, j + dj) >>> 24) n8++;
+    if (n8 <= 1) { o[j * w + i] = 0; continue; }
+    const q = [at(i - 1, j), at(i + 1, j), at(i, j - 1), at(i, j + 1)];
+    if (q[0] >>> 24 && q.every(c2 => c2 === q[0]) && q[0] !== v) o[j * w + i] = q[0];
+  }
+  p.set(o); x.putImageData(img, 0, 0);
 }

@@ -40,19 +40,22 @@ export class BrushEngine {
     this.next = this.step(p.p);
   }
 
-  get smoothing() { return Math.min(0.94, this.b.smoothing + (this.profile.smoothing ?? 0)); }
+  get smoothing() { return Math.min(1, this.b.smoothing + (this.profile.smoothing ?? 0)); }
   get mode() { return this.smoothing ? this.b.smoothMode ?? 'basic' : 'none'; }
 
-  // Smoothing, each mode clearly its own (strength 0–94%):
-  //  basic      — averages the last 2–40 input points (steady, follows closely)
-  //  stabilizer — a rope up to ~70 screen px: the line only moves once you pull it taut (dead-straight)
+  // Smoothing, each mode clearly its own (strength 0–100%):
+  //  basic      — the line trails behind the pen (a distance-weighted average of the path, up to
+  //               ~50 screen px behind), so wobbles melt away whatever rate the pen reports at
+  //  stabilizer — a rope up to ~120 screen px: the line only moves once you pull it taut (dead-straight)
   //  dynamic    — the pen tip has weight and drag: swoopy, brush-like curves
-  move(p) {
+  // `step` (basic only) feeds a point as if the pen had moved that far — the stroke's end uses it to
+  // let the trailing line glide in to where you lifted the pen.
+  move(p, step) {
     const s = this.s, amt = this.smoothing;
     switch (this.mode) {
       case 'none': Object.assign(s, p); break;
       case 'stabilizer': {
-        const r = amt * 75 * (this.scale ?? 1), dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
+        const r = amt * 120 * (this.scale ?? 1), dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy);
         if (d <= r) return;
         const k = 1 - r / d;
         s.x += dx * k; s.y += dy * k; s.p += (p.p - s.p) * k;
@@ -64,10 +67,15 @@ export class BrushEngine {
         s.x += v.x; s.y += v.y; s.p += (p.p - s.p) * 0.5;
         break;
       }
-      default: {   // moving average: rate-independent, so pens that send many points still get smoothed
-        const n = Math.max(2, Math.round(2 + amt * 40)), q = this.win ??= [];
-        q.push({ x: p.x, y: p.y, p: p.p }); if (q.length > n) q.splice(0, q.length - n);
-        s.x = q.reduce((a, o) => a + o.x, 0) / q.length; s.y = q.reduce((a, o) => a + o.y, 0) / q.length; s.p = q.reduce((a, o) => a + o.p, 0) / q.length;
+      default: {   // Gaussian weights by distance along the path, not by point count
+        const sig = Math.max(0.3, amt * amt * 50 + amt * 4) * (this.scale ?? 1), q = this.win ??= [], last = q.at(-1);
+        const D = last ? last.D + (step ?? Math.hypot(p.x - last.x, p.y - last.y)) : 0;
+        q.push({ x: p.x, y: p.y, p: p.p, D });
+        while (q.length > 2 && D - q[0].D > 3 * sig) q.shift();
+        let W = 0, x = 0, y = 0, pr = 0;
+        for (const o of q) { const w = Math.exp(-((D - o.D) ** 2) / (2 * sig * sig)); W += w; x += o.x * w; y += o.y * w; pr += o.p * w; }
+        s.x = x / W; s.y = y / W; s.p = pr / W;
+        this.sig = sig;
       }
     }
     s.alt = p.alt; s.az = p.az;
@@ -77,7 +85,8 @@ export class BrushEngine {
   end(p) {
     if (!p) return;
     if (this.mode === 'stabilizer' || this.mode === 'none') this.line({ ...this.s, ...p });
-    else for (let i = 0; i < 12; i++) this.move(p);
+    else if (this.mode === 'dynamic') for (let i = 0; i < 16; i++) this.move(p);
+    else for (let i = 0; i < 24; i++) this.move(p, (this.sig ?? 1) / 6);   // the trailing line glides in
   }
 
   line(to) {

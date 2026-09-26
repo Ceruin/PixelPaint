@@ -30,6 +30,7 @@ export class CanvasInput {
     el.addEventListener('wheel', e => this.wheel(e), { passive: false });
     el.addEventListener('contextmenu', e => e.preventDefault());
     bus.on('tool', () => this.updateCursor());
+    queueMicrotask(() => this.app.tool && this.updateCursor());   // the starting tool's cursor
   }
 
   updateCursor() { this.el.style.cursor = this.app.keys.space ? 'grab' : this.app.tool.cursor; }

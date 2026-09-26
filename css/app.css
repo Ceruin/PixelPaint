@@ -1,5 +1,6 @@
 /* PixelPaint — shared look with the Pixel editor (Pixel mode, css/pixel.css): same palette, font and wordmark. */
 :root {
+  --cross: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2221%22%20height%3D%2221%22%3E%3Cg%20stroke-linecap%3D%22square%22%3E%3Cpath%20d%3D%22M10.5%202v5M10.5%2014v5M2%2010.5h5M14%2010.5h5%22%20stroke%3D%22%231b1d23%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M10.5%202v5M10.5%2014v5M2%2010.5h5M14%2010.5h5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221%22%2F%3E%3C%2Fg%3E%3Crect%20x%3D%229.5%22%20y%3D%229.5%22%20width%3D%222%22%20height%3D%222%22%20fill%3D%22%23fff%22%20stroke%3D%22%231b1d23%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E") 10 10, crosshair;   /* our own fine crosshair (the OS one varies) — same as js/ui/cursors.js */
   --bg: #1b1d23; --stage: #16181d; --panel: #23262e; --panel2: #2b2f39; --panel3: #353a47; --line: #3a3f4b;
   --text: #e6e8ee; --muted: #9aa1b1; --accent: #5b8cff; --accent2: #3a6bff; --accent-ink: #fff; --danger: #e0556a;
   --r: 4px; --shadow: 0 8px 24px rgba(0, 0, 0, .35); --dock-w: 280px;
@@ -263,7 +264,7 @@ body[data-layout=zen] .float-layer > .panel.pinned { display: flex; }   /* pinne
 /* ---------- color picker ---------- */
 .picker { display: flex; flex-direction: column; gap: 8px; }
 .sv-wrap, .hue-wrap { position: relative; touch-action: none; }
-.sv { display: block; width: 100%; height: 110px; border-radius: var(--r); cursor: crosshair; touch-action: none; }
+.sv { display: block; width: 100%; height: 110px; border-radius: var(--r); cursor: var(--cross); touch-action: none; }
 .hue { display: block; width: 100%; height: 12px; border-radius: 2px; cursor: pointer; touch-action: none; }
 .knob { position: absolute; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .35), 0 1px 3px rgba(0, 0, 0, .3); pointer-events: none; }
 .hue-wrap .knob { top: 6px; background: transparent; border-radius: 2px; width: 6px; height: 16px; margin: -8px 0 0 -3px; }
@@ -524,7 +525,7 @@ body[data-theme=paper] .pc-medal, body[data-theme=paper] .pc-grade { filter: gra
 .race-layer { position: fixed; z-index: 820; display: grid; place-items: center; background: color-mix(in srgb, var(--stage) 70%, transparent); }
 body[data-game] .pyxl-card { visibility: hidden; }
 .game-arena { position: fixed; z-index: 800; overflow: hidden; background: color-mix(in srgb, var(--stage) 35%, transparent); outline: 2px solid var(--accent); outline-offset: -2px; touch-action: none; }
-.ga-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+.ga-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: var(--cross); }
 .ga-bar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 3px 4px 3px 12px; max-width: calc(100% - 16px); border-radius: var(--r); background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 12px; white-space: nowrap; }
 .ga-status { color: var(--muted); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
 .ga-colour { position: absolute; inset: 48px 16px 16px; display: grid; place-items: center; pointer-events: none; }
@@ -630,7 +631,7 @@ body[data-layout=notes] #menubar [data-action^="edit."] { display: none; }
 .card-text { flex: 1; padding: 6px 11px 11px; outline: none; overflow: auto; font: 15px/1.45 var(--font); user-select: text; -webkit-user-select: text; white-space: pre-wrap; cursor: text; }
 .card.text .card-text { font-size: 22px; }
 .card-sketch { flex: 1; min-height: 0; overflow: hidden; background: #fff; border-radius: 0 0 3px 3px; }
-.card-canvas { display: block; background: #fff; touch-action: none; cursor: crosshair; }
+.card-canvas { display: block; background: #fff; touch-action: none; cursor: var(--cross); }
 /* resize handles on every edge and corner of notes and groups */
 .rz { position: absolute; z-index: 2; touch-action: none; }
 .rz-n, .rz-s { left: 10px; right: 10px; height: 8px; cursor: ns-resize; } .rz-n { top: -4px; } .rz-s { bottom: -4px; }
@@ -650,7 +651,7 @@ body[data-theme=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 /* ---------- pop-up palette (right-click / pen barrel button) ---------- */
 .popup-palette { position: fixed; width: 300px; height: 300px; z-index: 150; }
 .pp-disc { position: absolute; inset: 22px; border-radius: 50%; background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); box-shadow: var(--shadow); }
-.pp-hue { position: absolute; left: 60px; top: 60px; width: 180px; height: 180px; border-radius: 50%; cursor: crosshair; }
+.pp-hue { position: absolute; left: 60px; top: 60px; width: 180px; height: 180px; border-radius: 50%; cursor: var(--cross); }
 .pp-center { position: absolute; left: 126px; top: 126px; width: 48px; height: 48px; border-radius: 50%; border: 0; padding: 0; }
 .pp-dot { position: absolute; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--panel); padding: 0; }
 .pp-brush { position: absolute; width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); padding: 0; overflow: hidden; display: grid; place-items: center; }
@@ -671,7 +672,7 @@ body[data-theme=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 .quick-sizes button.on { border-color: var(--accent); }
 .quick-sizes i { display: block; max-width: 22px; max-height: 22px; border-radius: 50%; background: var(--text); }
 .pads { display: flex; flex-direction: column; gap: 8px; }
-.wheel { display: block; width: 100%; max-width: 220px; aspect-ratio: 1; margin: 2px auto; touch-action: none; cursor: crosshair; }
+.wheel { display: block; width: 100%; max-width: 220px; aspect-ratio: 1; margin: 2px auto; touch-action: none; cursor: var(--cross); }
 .picker > .seg { align-self: flex-start; }
 
 /* ---------- navigator, reference, filter layers, text ---------- */
@@ -679,7 +680,7 @@ body[data-theme=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 .nav-thumb { width: 100%; height: auto; background: var(--stage); border-radius: var(--r); cursor: grab; touch-action: none; }
 .reference { display: flex; flex-direction: column; gap: 6px; height: 100%; min-height: 0; outline: none; }
 .ref-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
-.ref-view { flex: 1; min-height: 80px; position: relative; overflow: hidden; display: grid; place-items: center; border-radius: var(--r); background: var(--bg); touch-action: none; cursor: crosshair; }
+.ref-view { flex: 1; min-height: 80px; position: relative; overflow: hidden; display: grid; place-items: center; border-radius: var(--r); background: var(--bg); touch-action: none; cursor: var(--cross); }
 .ref-img { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; user-select: none; pointer-events: none; }
 .ref-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .thumb-wrap.fx { background: var(--panel3); color: var(--accent); }
@@ -695,7 +696,7 @@ body[data-theme=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 }
 .welcome.out { opacity: 0; pointer-events: none; }
 .wl-card { display: flex; align-items: center; gap: 40px; padding: 24px; max-width: 94vw; animation: wl-in .7s ease-out both; }
-.wl-art { flex: none; image-rendering: pixelated; filter: drop-shadow(0 18px 30px rgba(0, 0, 0, .45)); animation: wl-float 1.2s step-end infinite alternate; }
+.wl-art { flex: none; image-rendering: pixelated; animation: wl-float 1.2s step-end infinite alternate; }
 .wl-text { display: flex; flex-direction: column; gap: 12px; color: var(--text); }
 .wl-text .brand { font-size: 44px; }
 .wl-text p { margin: 0; color: var(--muted); font-size: 15px; }

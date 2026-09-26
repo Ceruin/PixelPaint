@@ -1,9 +1,10 @@
+import { CROSS } from '../ui/cursors.js';
 import { bus } from '../core/bus.js';
 import { TAU } from '../core/util.js';
 
 // Places rulers (drag) and vanishing points (click); drag a handle to move it, Alt-click to delete.
 export class AssistTool {
-  constructor(app) { Object.assign(this, { app, id: 'assist', cursor: 'crosshair', drag: null }); }
+  constructor(app) { Object.assign(this, { app, id: 'assist', cursor: CROSS, drag: null }); }
   get list() { return this.app.doc.assistants; }
   changed() { bus.emit('assist'); this.app.view.redraw(); }
 

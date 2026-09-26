@@ -144,7 +144,7 @@ export function brushSettings(app) {
       slider({ label: 'Size', value: sizeToPos(b.size), step: 0.1, fmt: () => `${app.brush.size}px`, onInput: v => set('size', posToSize(v)) }).el,
       pct('Opacity', 'opacity'), pct('Flow', 'flow'), pct('Hardness', 'hardness'), pct('Spacing', 'spacing', 200),
       h('label.field', {}, h('span', {}, 'Smoothing'), select(SMOOTHING, b.smoothMode ?? 'basic', v => set('smoothMode', v))),
-      pct('Smoothing amount', 'smoothing', 94), pct('Min size (pressure)', 'minSize'), pct('Roundness', 'roundness'),
+      pct('Smoothing amount', 'smoothing'), pct('Min size (pressure)', 'minSize'), pct('Roundness', 'roundness'),
       slider({ label: 'Angle', min: -180, max: 180, value: b.angle, fmt: v => `${v}°`, onInput: v => set('angle', v) }).el,
       pct('Scatter', 'scatter', 300), pct('Size jitter', 'sizeJitter'), pct('Angle jitter', 'angleJitter'),
       h('div.bs-grid', {},

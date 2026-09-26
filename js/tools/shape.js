@@ -1,3 +1,4 @@
+import { CROSS } from '../ui/cursors.js';
 import { Rect, makeCanvas, TAU } from '../core/util.js';
 import { addPanels, panelBorder } from './comic.js';
 
@@ -41,7 +42,7 @@ function shapePath(kind, a, b) {
 }
 
 export class ShapeTool {
-  constructor(app) { Object.assign(this, { app, id: 'shape', cursor: 'crosshair' }); }
+  constructor(app) { Object.assign(this, { app, id: 'shape', cursor: CROSS }); }
 
   down(p, e) {
     const layer = this.app.doc.activeLayer;
