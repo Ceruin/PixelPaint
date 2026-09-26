@@ -6,6 +6,7 @@ import { debounce, clamp, makeCanvas } from '../core/util.js';
 import { BrushEngine, DEFAULT_BRUSH } from '../engine/brush.js';
 
 const COLORS = ['#fff3a8', '#ffd1dc', '#c8f0d8', '#cfe6ff', '#e6dcff', '#ffffff'];
+const MIN_W = 180, MIN_H = 110;   // room for the card bar's buttons and a couple of lines
 const GROUP_COLORS = ['#5b8cff', '#17c06b', '#ff8a3d', '#a445ff', '#ff5fa2', '#8c93a5'];
 const PEN = { ...DEFAULT_BRUSH, name: 'Note pen', size: 3.5, minSize: 0.35, hardness: 0.95, spacing: 0.05, smoothing: 0.35 };
 const DPX = 2, HEAD = 30, KIND_ICON = { note: 'note', text: 'text', sketch: 'sketch' };
@@ -116,11 +117,13 @@ export function initNotes(app, sendToCanvas) {
       icon(KIND_ICON[it.kind]),
       titleField(it, label(it)),
       h('span.card-space'),
-      it.kind === 'note' && !it.collapsed && h('span.dots', {}, COLORS.map(c => h('button.dot', { type: 'button', style: { background: c }, onclick: () => { it.color = c; placeCard(it); save(); } }))),
+      it.kind === 'note' && !it.collapsed && h('button.dot.note-swatch', { type: 'button', 'data-tip': 'Note colour', style: { background: it.color }, onclick: () => colors.hidden = !colors.hidden }),
       iconBtn('expand', 'Open on its own', () => focusNote(it)),
       it.kind === 'sketch' && iconBtn('upload', 'Send to canvas as a layer', () => sendToCanvas(canvas)),
       iconBtn('trash', 'Delete', () => remove(it)));
-    el.append(head);
+    // one swatch in the bar; the colours drop down under it, so a narrow note never overflows
+    const colors = h('div.note-colors', { hidden: true }, COLORS.map(c => h('button.dot', { type: 'button', style: { background: c }, onclick: () => { it.color = c; colors.hidden = true; head.querySelector('.note-swatch').style.background = c; placeCard(it); save(); } })));
+    el.append(head, colors);
     if (it.kind === 'sketch') {
       canvas = sketchCanvas(it);
       el.append(h('div.card-sketch', {}, canvas));
@@ -131,7 +134,9 @@ export function initNotes(app, sendToCanvas) {
       onpointerdown: e => e.stopPropagation(),
     }));
     dragger(head, (dx, dy) => { it.x += dx; it.y += dy; placeCard(it); }, () => assignGroup(it));
-    if (!it.collapsed) resizable(el, it, { minW: 120, minH: HEAD + 30, onChange: () => { placeCard(it); canvas?.fit(); } });
+    const minH = it.kind === 'text' ? HEAD + 30 : MIN_H;
+    it.w = Math.max(it.w, MIN_W); it.h = Math.max(it.h, minH);
+    if (!it.collapsed) resizable(el, it, { minW: MIN_W, minH, onChange: () => { placeCard(it); canvas?.fit(); } });
     els.set(it.id, el);
     inner.append(el);
     placeCard(it);
@@ -352,8 +357,13 @@ export function initNotes(app, sendToCanvas) {
     refreshOutline();
   };
   const outlineBtn = iconBtn('layers', 'Show / hide the outline', () => setOutline(!showOutline));
-  const focusBtn = iconBtn('expand', 'Focus: full-screen board (Tab)', () => actions.run('view.focus'), { 'data-action': 'view.focus' });
-  bus.on('mode', () => focusBtn.classList.toggle('on', !!app.focus));
+  const focusBtn = h('button.btn.sm.notes-focus', { type: 'button', onclick: () => actions.run('view.focus') });
+  const syncFocus = () => {
+    focusBtn.replaceChildren(icon(app.focus ? 'x' : 'expand'), h('span', {}, app.focus ? 'Exit full screen' : 'Full screen'));
+    focusBtn.classList.toggle('primary', !!app.focus); focusBtn.dataset.tip = app.focus ? 'Back to the menus (Tab or Esc)' : 'Full-screen board (Tab)';
+  };
+  bus.on('mode', syncFocus); syncFocus();
+  addEventListener('keydown', e => { if (e.key === 'Escape' && app.focus && app.mode === 'notes' && !root.querySelector('.note-focus') && !document.querySelector('.modal-back')) actions.run('view.focus'); });
   setOutline(showOutline);
   const btn = (ic, text, fn, tip) => h('button.btn.sm', { type: 'button', 'data-tip': tip, onclick: fn }, icon(ic), h('span', {}, text));
 
