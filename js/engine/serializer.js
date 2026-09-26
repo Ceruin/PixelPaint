@@ -27,13 +27,14 @@ export async function packDoc(doc, cache = new WeakMap()) {
     o.active = n === doc.active;
     return o;
   };
-  const meta = { version: VERSION, w: doc.w, h: doc.h, name: doc.name, assistants: doc.assistants, frames: doc.frames, tags: doc.tags, frame: doc.frame, tree: await node(doc.root) };
+  const meta = { version: VERSION, w: doc.w, h: doc.h, name: doc.name, libId: doc.libId ?? null, assistants: doc.assistants, frames: doc.frames, tags: doc.tags, frame: doc.frame, tree: await node(doc.root) };
   return { meta, blobs };
 }
 
 export async function unpackDoc({ meta, blobs }) {
   const doc = new Doc(meta.w, meta.h, { empty: true });
   doc.name = meta.name;
+  doc.libId = meta.libId ?? null;
   doc.assistants = meta.assistants ?? [];
   if (meta.frames) Object.assign(doc, { frames: meta.frames, tags: meta.tags ?? [], frame: Math.min(meta.frame ?? 0, meta.frames.length - 1) });
   const build = async o => {
@@ -137,4 +138,23 @@ export async function decodeORA(blob) {
   doc.root.children = top ? await build(top) : [];
   doc.active ??= doc.layers.at(-1) ?? null;
   return doc;
+}
+
+// PixelPaint project (.pp): a zip holding the whole document (every layer, frame, tag and guide, as
+// packDoc keeps it) plus a merged preview.png, so it's easy to see what's inside.
+export async function encodePP(doc, preview) {
+  const { meta, blobs } = await packDoc(doc);
+  return zip([
+    { name: 'mimetype', data: 'application/x-pixelpaint' },
+    { name: 'project.json', data: JSON.stringify(meta) },
+    ...blobs.map((b, i) => ({ name: `layers/${i}.png`, data: b })),
+    ...(preview ? [{ name: 'preview.png', data: preview }] : []),
+  ], 'application/x-pixelpaint');
+}
+export async function decodePP(blob) {
+  const files = await unzip(blob), json = files.get('project.json');
+  if (!json) throw new Error('Not a PixelPaint project');
+  const meta = JSON.parse(await json.text()), blobs = [];
+  for (let i = 0; files.has(`layers/${i}.png`); i++) blobs.push(files.get(`layers/${i}.png`));
+  return unpackDoc({ meta, blobs });
 }

@@ -2,7 +2,7 @@ import { bus } from './core/bus.js';
 import { idb } from './core/storage.js';
 import { debounce, download, pickFile, toBlob, makeCanvas } from './core/util.js';
 import { Doc } from './engine/document.js';
-import { packDoc, unpackDoc, encodeORA, decodeORA } from './engine/serializer.js';
+import { packDoc, unpackDoc, encodeORA, decodeORA, encodePP, decodePP } from './engine/serializer.js';
 import { flatten } from './engine/compositor.js';
 import { haptics } from './input/haptics.js';
 
@@ -34,7 +34,11 @@ export function createProject(app) {
 
   async function openFile(f) {
     try {
-      if (/\.ora$/i.test(f.name)) {
+      if (/\.pp$/i.test(f.name)) {
+        const doc = await decodePP(f);
+        doc.name ||= f.name.replace(/\.pp$/i, '');
+        app.setDoc(doc);
+      } else if (/\.ora$/i.test(f.name)) {
         const doc = await decodeORA(f);
         doc.name = f.name.replace(/\.ora$/i, '');
         app.setDoc(doc);
@@ -97,9 +101,38 @@ export function createProject(app) {
     return d;
   }
 
+  // ---- the browser library: named projects kept in this browser (index + one entry per project) ----
+  const thumbOf = (w = 240) => { const c = flatten(app.doc), k = Math.min(1, w / c.width, w / c.height), t = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/png'); };
+  const library = {
+    list: async () => Object.values(await idb.get('library') ?? {}).sort((a, b) => b.date - a.date),
+    async save(name = app.doc.name) {
+      const index = await idb.get('library') ?? {}, id = app.doc.libId ?? `p${Date.now().toString(36)}`;
+      app.doc.libId = id; app.doc.name = name;
+      await idb.set(`lib:${id}`, await packDoc(app.doc, cache));
+      index[id] = { id, name, date: Date.now(), thumb: thumbOf(), w: app.doc.w, h: app.doc.h };
+      await idb.set('library', index);
+      saveLocal(false);
+      return id;
+    },
+    async open(id) {
+      const pack = await idb.get(`lib:${id}`);
+      if (!pack) return app.toast('That project is no longer here');
+      const doc = await unpackDoc(pack); doc.libId = id;
+      app.setDoc(doc);
+    },
+    async rename(id, name) { const index = await idb.get('library') ?? {}; if (index[id]) { index[id].name = name; await idb.set('library', index); } if (app.doc.libId === id) app.doc.name = name; },
+    async remove(id) { const index = await idb.get('library') ?? {}; delete index[id]; await idb.set('library', index); await idb.del(`lib:${id}`); if (app.doc.libId === id) app.doc.libId = null; },
+  };
+
+  // ---- files to share: the finished picture (one merged PNG) and the full project (.pp) ----
+  const merged = async () => toBlob(flatten(app.doc), 'image/png');
+  const projectFile = async () => new File([await encodePP(app.doc, await merged())], `${app.doc.name || 'painting'}.pp`, { type: 'application/x-pixelpaint' });
+  const imageFile = async () => new File([await merged()], `${app.doc.name || 'painting'}.png`, { type: 'image/png' });
+
   return {
-    saveLocal, restore, openFile, importLayer, exportImage, exportSheet, importSheet,
-    open: async () => { const f = await pickFile('.ora,image/*'); if (f) openFile(f); },
-    exportProject: async () => { download(await encodeORA(app.doc), `${app.doc.name}.ora`); bus.emit('saved', { auto: false }); },
+    saveLocal, restore, openFile, importLayer, exportImage, exportSheet, importSheet, library, imageFile, projectFile,
+    open: async () => { const f = await pickFile('.pp,.ora,image/*'); if (f) openFile(f); },
+    exportProject: async () => { download(await projectFile(), `${app.doc.name || 'painting'}.pp`); bus.emit('saved', { auto: false }); },
+    exportOra: async () => download(await encodeORA(app.doc), `${app.doc.name || 'painting'}.ora`),
   };
 }

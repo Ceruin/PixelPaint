@@ -1,4 +1,4 @@
-import { h, iconBtn, slider } from './ui/dom.js';
+import { h, icon, iconBtn, slider } from './ui/dom.js';
 import { modal, form } from './ui/dialogs.js';
 import { actions, comboOf } from './core/actions.js';
 import { local } from './core/storage.js';
@@ -63,6 +63,53 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     startTransform();
   };
   const startTransform = () => { const t = app.tools.transform; t.commit(); app.setTool('transform'); t.begin(); };
+
+  // ---- the browser library: every project saved here, with a thumbnail ----
+  async function openLibrary() {
+    const list = await project.library.list(), grid = h('div.lib-grid');
+    let pick = null;
+    const render = items => grid.replaceChildren(...(items.length ? items.map(it => h('div.lib-item', { className: it.id === doc().libId ? 'on' : '' },
+      h('button.lib-open', { type: 'button', 'data-tip': 'Open', onclick: () => { pick = it.id; grid.closest('.modal-back')?.querySelector('.modal-foot .primary')?.click(); } },
+        h('img', { src: it.thumb, alt: '' }), h('b', {}, it.name), h('small', {}, `${it.w} × ${it.h} · ${new Date(it.date).toLocaleString()}`)),
+      h('div.lib-acts', {},
+        iconBtn('text', 'Rename', async () => { const v = await form('Rename', [{ id: 'n', label: 'Name', type: 'text', value: it.name }], 'Rename'); if (v) { await project.library.rename(it.id, String(v.n).trim() || it.name); render(await project.library.list()); } }),
+        iconBtn('trash', 'Delete', async () => { if (await modal('Delete project?', h('p', {}, `“${it.name}” will be removed from this browser.`), [['Cancel', null], ['Delete', 'ok', 'danger']])) { await project.library.remove(it.id); render(await project.library.list()); } }))))
+      : [h('p.muted', {}, 'Nothing saved here yet — use File ▸ Save to Browser (Ctrl+S).')]));
+    render(list);
+    if (await modal('Open from Browser', grid, [['Cancel', null], ['Open', 'ok', true]], 'wide') && pick) project.library.open(pick);
+  }
+
+  // ---- share the finished picture (merged) or the whole project (all layers, .pp) ----
+  async function shareDialog() {
+    const title = doc().name && doc().name !== 'Untitled' ? doc().name : 'My painting';
+    const tell = t => app.toast(t);
+    const shareFile = async (get, what) => {
+      const f = await get();
+      if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f], title }); } catch { /* cancelled */ } }
+      else { download(f, f.name); tell(`${what} downloaded — attach it to your post`); }
+    };
+    const copyImage = async () => {
+      try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': (await project.imageFile()) })]); tell('Image copied — paste it into your post'); return true; }
+      catch { tell('Copying images isn’t allowed here — use Share or Download'); return false; }
+    };
+    const site = url => async () => { await copyImage(); open(url, '_blank', 'noopener'); };
+    const text = encodeURIComponent(`${title} — made in PixelPaint`);
+    const row = (ic, label, sub, fn) => h('button.share-row', { type: 'button', onclick: fn }, icon(ic), h('span', {}, h('b', {}, label), h('small', {}, sub)));
+    const body = h('div.share', {},
+      h('div.sub-label', {}, 'Finished picture'),
+      row('upload', 'Share image…', 'To any app on this device (one merged PNG)', () => shareFile(project.imageFile, 'Image')),
+      row('copy', 'Copy image', 'Paste it into a post, chat or doc', copyImage),
+      row('image', 'Download PNG', 'The full-size merged picture', async () => { const f = await project.imageFile(); download(f, f.name); }),
+      h('div.share-sites', {},
+        h('button.btn.sm', { type: 'button', onclick: site(`https://www.reddit.com/submit?title=${text}`) }, 'Reddit'),
+        h('button.btn.sm', { type: 'button', onclick: site(`https://twitter.com/intent/tweet?text=${text}`) }, 'X / Twitter'),
+        h('button.btn.sm', { type: 'button', onclick: site(`https://bsky.app/intent/compose?text=${text}`) }, 'Bluesky'),
+        h('small.muted', {}, 'Copies the image, then opens the site — paste it into your post.')),
+      h('div.sub-label', {}, 'Full painting file'),
+      row('layers', 'Share project (.pp)…', 'Every layer and frame — opens in PixelPaint', () => shareFile(project.projectFile, 'Project')),
+      row('download', 'Download OpenRaster (.ora)', 'Layers for Krita, GIMP and MyPaint', project.exportOra));
+    await modal('Share', body, [['Done', null, true]]);
+  }
 
   // ---- image dialogs ----
   const newDoc = async () => {
@@ -267,8 +314,20 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'file.new', label: 'New Canvas…', key: 'Ctrl+Alt+N', run: newDoc },
     { id: 'file.open', label: 'Open…', key: 'Ctrl+O', run: project.open },
     { id: 'file.import', label: 'Import Image as Layer…', key: 'Ctrl+Shift+O', run: async () => { const f = await pickFile('image/*'); if (f) project.importLayer(f, f.name); } },
-    { id: 'file.save', label: 'Save to Browser', key: 'Ctrl+S', run: () => project.saveLocal(false) },
-    { id: 'file.exportProject', label: 'Download Project (.ora)', key: 'Ctrl+Shift+S', run: project.exportProject },
+    { id: 'file.save', label: 'Save to Browser', key: 'Ctrl+S', run: async () => {
+      let name = doc().name;
+      if (!doc().libId) {   // first save: name it
+        const v = await form('Save to Browser', [{ id: 'n', label: 'Name', type: 'text', value: name && name !== 'Untitled' ? name : 'My painting' }], 'Save');
+        if (!v) return;
+        name = String(v.n).trim() || 'My painting';
+      }
+      await project.library.save(name);
+      app.toast(`Saved “${name}” in this browser — File ▸ Open from Browser`);
+    } },
+    { id: 'file.library', label: 'Open from Browser…', icon: 'folder', run: openLibrary },
+    { id: 'file.exportProject', label: 'Download Project (.pp)', key: 'Ctrl+Shift+S', run: project.exportProject },
+    { id: 'file.exportOra', label: 'Export OpenRaster (.ora, for Krita / GIMP)', run: project.exportOra },
+    { id: 'file.share', label: 'Share…', icon: 'upload', run: shareDialog },
     { id: 'file.exportPng', label: 'Export PNG', key: 'Ctrl+Shift+E', run: () => project.exportImage('image/png') },
     { id: 'image.panels', label: 'Comic Panel Layout…', icon: 'crop', run: async () => {
       const v = await form('Comic Panel Layout', [{ id: 'k', label: 'Layout', type: 'select', options: LAYOUTS.slice(1), value: 'grid4' }], 'Add Panels');
@@ -414,7 +473,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.open', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', '-', 'file.toPixel', 'mode.pixel']],
+      ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],

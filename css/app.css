@@ -348,6 +348,25 @@ body[data-layout=zen] .float-layer > .panel.pinned { display: flex; }   /* pinne
 .modal-back { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: rgba(8, 10, 14, .55); padding: 16px; }
 .modal { width: min(380px, 100%); max-height: 88vh; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); }
 .modal.wide { width: min(560px, 100%); }
+.lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 4px 0; }
+.lib-item { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--panel2, var(--bg)); }
+.lib-item.on { border-color: var(--accent); }
+.lib-open { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0 0 8px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.lib-open img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: repeating-conic-gradient(#0000001a 0 25%, #0000 0 50%) 0 0 / 12px 12px; border-bottom: 1px solid var(--line); }
+.lib-open b, .lib-open small { padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-open small { color: var(--muted); font-size: 11px; }
+.lib-acts { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.lib-item:hover .lib-acts, .lib-item:focus-within .lib-acts { opacity: 1; }
+@media (hover: none) { .lib-acts { opacity: 1; } }
+.lib-acts .ibtn { background: var(--panel); }
+.share { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+.share .sub-label { margin-top: 6px; }
+.share-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.share-row:hover { border-color: var(--accent); }
+.share-row > span { display: flex; flex-direction: column; }
+.share-row small { color: var(--muted); font-size: 11px; }
+.share-sites { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.share-sites small { flex-basis: 100%; }
 .modal h3 { margin: 0; padding: 12px 14px; font-size: 13px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
 .modal-body { padding: 8px 14px; overflow: auto; }
 .modal-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); }
