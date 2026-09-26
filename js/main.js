@@ -171,6 +171,10 @@ panels.apply(local.get('pp.layout'));
 bus.on('toast', toast);
 watchForUpdates(() => project.saveLocal(true));
 
+// Right-click belongs to the app (the colour pop-up, the editors' menus): the browser's own menu, with
+// its "Save image as…", only appears where text is being edited.
+addEventListener('contextmenu', e => { if (!e.target.closest?.('input, textarea, [contenteditable="true"]')) e.preventDefault(); });
+
 // Space = temporary hand tool.
 addEventListener('keydown', e => { if (e.code === 'Space' && app.mode !== 'pixel' && !isTyping(e) && !app.keys.space) { app.keys.space = true; app.input.updateCursor(); e.preventDefault(); } });
 addEventListener('keyup', e => { if (e.code === 'Space') { app.keys.space = false; app.input.updateCursor(); } });

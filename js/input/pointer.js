@@ -111,7 +111,9 @@ export class CanvasInput {
   updateGesture() {
     const g = this.gesture, s = this.state(), b = g.base;
     if (s.n !== b.n) return this.startGesture({ timeStamp: g.t0 });
-    g.moved = Math.max(g.moved, Math.hypot(s.x - b.x, s.y - b.y) + Math.abs(s.d - b.d));
+    // a pure twist moves neither the centre nor the spread: count the arc the fingers travel too
+    const twist = s.n > 1 ? Math.abs(((s.a - b.a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * s.d / 2 : 0;
+    g.moved = Math.max(g.moved, Math.hypot(s.x - b.x, s.y - b.y) + Math.abs(s.d - b.d) + twist);
     if (g.moved < 8) return;
     if (s.n < 2) return this.app.view.set(g.view.zoom, g.view.rot, s.x, s.y, g.anchor);
     let rot = g.view.rot + (s.a - b.a) / DEG;

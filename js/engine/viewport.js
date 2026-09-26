@@ -72,7 +72,17 @@ export class Viewport {
   zoomAt(f, sx, sy) { this.set(this.zoom * f, this.rot, sx, sy); }
   pan(dx, dy) { this.x += dx; this.y += dy; this.changed(); }
 
-  changed() { this.m = this.inv = null; bus.emit('view', this); this.redraw(); }
+  changed() { this.m = this.inv = null; this.bound(); bus.emit('view', this); this.redraw(); }
+  // The page can't be pushed out of sight: at least a strip of it (up to 160px) always stays on
+  // screen, so panning never gets you lost in empty space.
+  bound() {
+    if (!this.doc || !this.cw) return;
+    const pts = [[0, 0], [this.doc.w, 0], [0, this.doc.h], [this.doc.w, this.doc.h]].map(([x, y]) => this.matrix.transformPoint({ x, y }));
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y), l = Math.min(...xs), r = Math.max(...xs), t = Math.min(...ys), b = Math.max(...ys);
+    const mx = Math.min(160, (r - l) / 2, this.cw / 2), my = Math.min(160, (b - t) / 2, this.ch / 2);
+    const dx = r < mx ? mx - r : l > this.cw - mx ? this.cw - mx - l : 0, dy = b < my ? my - b : t > this.ch - my ? this.ch - my - t : 0;
+    if (dx || dy) { this.x += dx; this.y += dy; this.m = this.inv = null; }
+  }
   invalidate(r) {
     if (!this.doc) return;
     r = Rect.clip(r, this.doc.w, this.doc.h);

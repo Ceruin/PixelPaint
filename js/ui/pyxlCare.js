@@ -127,11 +127,13 @@ export function careBody(pyxl, onPlay) {
 // The popup card: drag it by its header anywhere; pin it to keep it open (it remembers where you
 // left it); or dock it as a regular panel (Draw workspace).
 let card = null;
-const close = () => { card?.stop(); card?.body.dispose(); card?.remove(); card = null; };
+// Always ends with no card, even if one was half set up (a stuck `card` meant she could never be opened again).
+const close = () => { const c = card; card = null; try { c?.stop?.(); c?.body?.dispose?.(); } finally { c?.remove(); } };
 export const closeCareCard = close;
 
 export function openCareCard(pyxl, dock) {
-  if (card) return;
+  if (card?.isConnected) return;
+  if (card) close();
   const saved = local.get('pp.pyxlCard') ?? {}, body = careBody(pyxl, () => !saved.pinned && close());
   const pin = h('button.ibtn.sm', { type: 'button', 'data-tip': 'Pin open', onclick: () => { saved.pinned = !saved.pinned; pin.classList.toggle('on', saved.pinned); local.set('pp.pyxlCard', saved); } }, icon('lock'));
   pin.classList.toggle('on', !!saved.pinned);

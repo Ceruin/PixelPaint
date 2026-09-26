@@ -10,6 +10,7 @@ import { pickLock, project } from '../engine/assistants.js';
 function lazyCopy(pv, src) {
   const T = 64, cols = Math.ceil(pv.width / T), rows = Math.ceil(pv.height / T), done = new Uint8Array(cols * rows), pc = pv.getContext('2d');
   pv.ensure = r => {
+    if (!r) return;
     for (let ty = Math.max(0, Math.floor(r.y / T)); ty < rows && ty * T < r.y + r.h; ty++) for (let tx = Math.max(0, Math.floor(r.x / T)); tx < cols && tx * T < r.x + r.w; tx++) {
       if (done[ty * cols + tx]) continue;
       done[ty * cols + tx] = 1;
@@ -90,7 +91,7 @@ export class PaintTool {
     this.engine.end(this.lock ? project(this.lock, p) : p);
     this.flush();
     const r = this.total, pv = this.preview;
-    pv.ensure?.(r);   // the stroke's bounding box can span tiles no dab touched: fill them from the layer first
+    if (r) pv.ensure?.(r);   // the stroke's bounding box can span tiles no dab touched: fill them from the layer first
     if (r) this.app.doc.editPixels(LABEL[this.id], this.layer, r, ctx => { ctx.clearRect(r.x, r.y, r.w, r.h); drawRect(ctx, pv, r); });
     this.cleanup();
   }

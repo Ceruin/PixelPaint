@@ -27,7 +27,8 @@ export const favs = () => local.get('pp.favs', ['Pencil HB', 'Ink Pen', 'Brush P
 
 // Presets apply to the matching tool; any brush can be loaded into the eraser, like Procreate.
 export function applyPreset(app, p) {
-  const tool = p.cat === 'Eraser' ? 'eraser' : p.cat === 'Blend' ? 'smudge' : app.tool.id === 'eraser' ? 'eraser' : 'brush';
+  // an eraser preset erases, a blender smudges, anything else paints — even if the eraser was active
+  const tool = p.cat === 'Eraser' ? 'eraser' : p.cat === 'Blend' ? 'smudge' : 'brush';
   app.brushes[tool] = structuredClone(p);
   app.setTool(tool);
   app.brushChanged();
