@@ -146,17 +146,30 @@ export function initNotes(app, sendToCanvas) {
   // ================= editor =================
   const cv = h('canvas.nb-page'), ctx = cv.getContext('2d'), wrap = h('div.nb-paper', {}, cv);
   const pageLabel = h('span.nb-pageno');
-  let hist = [], redo = [], sel = null, scale = 1, cache = null;
+  let hist = [], redo = [], sel = null, scale = 1, cache = null, css = 1, zq = 1;
+  // the view: the page's offset from the middle (CSS px), zoom and rotation — pinch, twist and drag with two fingers
+  const vw = { x: 0, y: 0, z: 1, r: 0 };
+  const zoomLabel = h('button.nb-zoom', { type: 'button', 'data-tip': 'Fit the page', onclick: () => { Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 }); applyView(true); } }, '100%');
+  const applyView = (settle) => {
+    cv.style.transform = `translate(${vw.x}px, ${vw.y}px) rotate(${vw.r}rad) scale(${vw.z})`;
+    zoomLabel.textContent = `${Math.round(vw.z * 100)}%${vw.r ? ` · ${Math.round(vw.r * 180 / Math.PI)}°` : ''}`;
+    const q = Math.min(3, Math.max(1, Math.ceil(vw.z - 0.15)));   // re-render sharper when zoomed in (once the gesture ends)
+    if (settle && q !== zq) { zq = q; fit(); } else syncBar();
+  };
   const page = () => book.pages[pageIx];
   const fit = () => {
     const r = wrap.getBoundingClientRect(), dpr = devicePixelRatio || 1;
     if (!r.width) return;
-    const css = Math.min((r.width - 24) / PW, (r.height - 24) / PH);
-    scale = css * dpr;
+    css = Math.min((r.width - 24) / PW, (r.height - 24) / PH);
+    scale = css * dpr * zq;
     Object.assign(cv, { width: Math.round(PW * scale), height: Math.round(PH * scale) });
-    Object.assign(cv.style, { width: `${PW * css}px`, height: `${PH * css}px` });
-    redraw();
+    Object.assign(cv.style, { width: `${PW * css}px`, height: `${PH * css}px`, marginLeft: `${-PW * css / 2}px`, marginTop: `${-PH * css / 2}px` });
+    applyView(); redraw();
   };
+  // page units ↔ screen, through the view
+  const centre = () => { const r = wrap.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2, r]; };
+  const toPage = (cx, cy) => { const [mx, my] = centre(), dx = cx - mx - vw.x, dy = cy - my - vw.y, c = Math.cos(-vw.r), s2 = Math.sin(-vw.r); return [PW / 2 + (dx * c - dy * s2) / vw.z / css, PH / 2 + (dx * s2 + dy * c) / vw.z / css]; };
+  const toScreen = (x, y) => { const [mx, my] = centre(), qx = (x - PW / 2) * css * vw.z, qy = (y - PH / 2) * css * vw.z, c = Math.cos(vw.r), s2 = Math.sin(vw.r); return [mx + vw.x + qx * c - qy * s2, my + vw.y + qx * s2 + qy * c]; };
   new ResizeObserver(() => view === 'editor' && fit()).observe(wrap);
   // the finished strokes are cached on a canvas; the live stroke / lasso draw over it
   const redraw = () => {
@@ -183,10 +196,65 @@ export function initNotes(app, sendToCanvas) {
 
   // ---- pen input ----
   let tool = 'pen', live = null, lasso = null, drag = null, eraseHit = false;
-  const at = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * PW, (e.clientY - r.top) / r.height * PH, e.pointerType === 'pen' ? Math.max(0.05, e.pressure) : 0.5]; };
+  const at = e => [...toPage(e.clientX, e.clientY), e.pointerType === 'pen' ? Math.max(0.05, e.pressure) : 0.5];
   const hits = (st, x, y, rad) => { for (let i = 0; i < st.pts.length; i += 3) if ((st.pts[i] - x) ** 2 + (st.pts[i + 1] - y) ** 2 < rad * rad) return true; return false; };
+  // ---- fingers: pinch to zoom, twist to turn, drag to move (one finger pans once a pen has been used) ----
+  const touches = new Map();
+  let gest = null;
+  const twoOf = () => { const [a, b = a] = [...touches.values()]; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(b.x - a.x, b.y - a.y) || 1, a: Math.atan2(b.y - a.y, b.x - a.x) }; };
+  const startGesture = () => {
+    if (live) live = null; if (lasso) lasso = null; if (drag) { drag = null; sel.moving = false; }
+    const g = twoOf(), [mx, my] = centre();
+    // the page point under the fingers stays under them
+    const dx = g.x - mx - vw.x, dy = g.y - my - vw.y, c = Math.cos(-vw.r), s2 = Math.sin(-vw.r);
+    gest = { g, v: { ...vw }, q: [(dx * c - dy * s2) / vw.z, (dx * s2 + dy * c) / vw.z], n: touches.size };
+    paint();
+  };
+  const moveGesture = () => {
+    const g = twoOf(), [mx, my] = centre(), v = gest.v, two = touches.size > 1 && gest.n > 1;
+    vw.z = two ? Math.max(0.25, Math.min(8, v.z * g.d / gest.g.d)) : v.z;
+    let r = two ? v.r + (g.a - gest.g.a) : v.r;
+    r = Math.atan2(Math.sin(r), Math.cos(r)); if (Math.abs(r) < 0.07) r = 0;   // snaps straight near 0°
+    vw.r = r;
+    const [qx, qy] = gest.q, c = Math.cos(r), s2 = Math.sin(r);
+    vw.x = g.x - mx - (qx * c - qy * s2) * vw.z; vw.y = g.y - my - (qx * s2 + qy * c) * vw.z;
+    applyView();
+  };
+  // A resting hand never draws or moves anything: with a pen, touches near pen activity or with a
+  // palm-sized contact are ignored, and a single finger does nothing (two fingers move the view).
+  let penAt = 0;
+  const palm = e => e.pointerType === 'touch' && (Date.now() - penAt < 600 || e.width * e.height > 1600);
+  addEventListener('pointermove', e => { if (e.pointerType === 'pen') penAt = Date.now(); }, { passive: true, capture: true });
+  wrap.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'pen') penAt = Date.now();
+    if (e.pointerType !== 'touch') return;
+    if (palm(e)) { e.stopPropagation(); e.preventDefault(); return; }
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); wrap.setPointerCapture(e.pointerId);
+    if (touches.size > 1) { e.stopPropagation(); e.preventDefault(); startGesture(); }
+    else if (penSeen) { e.stopPropagation(); e.preventDefault(); }   // one finger with a pen around: a resting hand
+  }, true);
+  wrap.addEventListener('pointermove', e => {
+    if (!touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (gest) { e.stopPropagation(); moveGesture(); }
+  }, true);
+  const lift = e => {
+    if (!touches.delete(e.pointerId)) return;
+    if (!gest) return;
+    e.stopPropagation();
+    if (touches.size) startGesture(); else { gest = null; applyView(true); }
+  };
+  wrap.addEventListener('pointerup', lift, true); wrap.addEventListener('pointercancel', lift, true);
+  wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {   // zoom at the cursor (and trackpad pinch)
+      const [mx, my] = centre(), k = Math.exp(-e.deltaY * 0.01), z = Math.max(0.25, Math.min(8, vw.z * k)), f = z / vw.z;
+      vw.x = e.clientX - mx - (e.clientX - mx - vw.x) * f; vw.y = e.clientY - my - (e.clientY - my - vw.y) * f; vw.z = z;
+    } else { vw.x -= e.deltaX; vw.y -= e.deltaY; }
+    applyView(); clearTimeout(wrap.t); wrap.t = setTimeout(() => applyView(true), 200);
+  }, { passive: false });
   cv.addEventListener('pointerdown', e => {
-    if (e.button !== 0 && e.button !== 5 && e.pointerType !== 'touch' || (e.pointerType === 'touch' && penSeen)) return;
+    if (gest || e.button !== 0 && e.button !== 5 && e.pointerType !== 'touch' || (e.pointerType === 'touch' && penSeen)) return;
     e.preventDefault(); cv.setPointerCapture(e.pointerId);
     const [x, y, p] = at(e), eraser = tool === 'eraser' || e.button === 5;
     if (sel?.box && x > sel.box.x0 - 14 && x < sel.box.x1 + 14 && y > sel.box.y0 - 14 && y < sel.box.y1 + 14) { drag = [x, y]; sel.moving = true; sel.d = [0, 0]; redraw(); return; }
@@ -199,7 +267,7 @@ export function initNotes(app, sendToCanvas) {
   let penSeen = false;
   cv.addEventListener('pointermove', e => {
     if (e.pointerType === 'pen') penSeen = true;
-    if (!cv.hasPointerCapture(e.pointerId)) return;
+    if (gest || !cv.hasPointerCapture(e.pointerId)) return;
     const evs = e.getCoalescedEvents?.() ?? [e];
     for (const ev of evs.length ? evs : [e]) {
       const [x, y, p] = at(ev);
@@ -215,6 +283,7 @@ export function initNotes(app, sendToCanvas) {
     if (keep.length !== st.length) { page().strokes = keep; eraseHit = true; redraw(); }
   };
   const end = () => {
+    if (gest) return;
     if (drag) {
       const [dx, dy] = sel.d; drag = null; sel.moving = false;
       if (dx || dy) { snap(); sel.strokes.forEach(st => { for (let i = 0; i < st.pts.length; i += 3) { st.pts[i] += dx; st.pts[i + 1] += dy; } }); sel.box = unionBox(sel.strokes); commit(); } else redraw();
@@ -241,7 +310,7 @@ export function initNotes(app, sendToCanvas) {
   const paste = () => { if (!clip) return; snap(); const c = clone(clip); page().strokes.push(...c); sel = { strokes: c, box: unionBox(c) }; commit(); };
   const syncBar = () => {
     selBar.hidden = !sel?.box;
-    if (sel?.box) { const r = cv.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), k = r.width / PW; Object.assign(selBar.style, { left: `${r.left - wr.left + (sel.box.x0 + sel.box.x1) / 2 * k}px`, top: `${Math.max(8, r.top - wr.top + sel.box.y0 * k - 58)}px` }); }
+    if (sel?.box) { const wr = wrap.getBoundingClientRect(), b = sel.box, pts = [[b.x0, b.y0], [b.x1, b.y0], [b.x0, b.y1], [b.x1, b.y1]].map(([x, y]) => toScreen(x, y)); Object.assign(selBar.style, { left: `${pts.reduce((a, p) => a + p[0], 0) / 4 - wr.left}px`, top: `${Math.max(8, Math.min(...pts.map(p => p[1])) - wr.top - 58)}px` }); }
     undoB.disabled = !hist.length; redoB.disabled = !redo.length;
   };
 
@@ -290,7 +359,7 @@ export function initNotes(app, sendToCanvas) {
     iconBtn('x', 'Close notebook', () => showLibrary()));
   const nav = h('div.nb-nav', {},
     iconBtn('chevronLeft', 'Previous page', () => go(pageIx - 1)), pageLabel,
-    iconBtn('chevronRight', 'Next page (adds one at the end)', () => { if (pageIx === book.pages.length - 1) { book.pages.push({ strokes: [] }); touch(book); } go(pageIx + 1); }));
+    iconBtn('chevronRight', 'Next page (adds one at the end)', () => { if (pageIx === book.pages.length - 1) { book.pages.push({ strokes: [] }); touch(book); } go(pageIx + 1); }), zoomLabel);
   const editor = h('div.nb-editor', {}, bar, h('div.nb-stage', {}, wrap, selBar), nav);
   addEventListener('keydown', e => {
     if (view !== 'editor' || root.hidden || e.target.closest?.('input, textarea')) return;
@@ -304,7 +373,7 @@ export function initNotes(app, sendToCanvas) {
   }, true);
 
   function openBook(b) {
-    book = b; view = 'editor'; hist = []; redo = []; sel = null; tool = 'pen';
+    book = b; view = 'editor'; hist = []; redo = []; sel = null; tool = 'pen'; Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 }); zq = 1;
     bar.querySelector('.nb-title').textContent = b.name;
     root.replaceChildren(editor, slot);
     requestAnimationFrame(() => { fit(); go((b.last ?? 1) - 1); syncTools(); });

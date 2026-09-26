@@ -174,6 +174,21 @@ watchForUpdates(() => project.saveLocal(true));
 
 // Right-click belongs to the app (the colour pop-up, the editors' menus): the browser's own menu, with
 // its "Save image as…", only appears where text is being edited.
+// Palm rejection for the whole app: while drawing with a pen, a hand resting on the screen must not
+// press buttons or move panels — touches right after pen activity, and palm-sized contacts, are swallowed.
+{
+  let penAt = -1e9, penUsed = false;
+  const rejected = new Set();
+  const note = e => { if (e.pointerType === 'pen') { penAt = e.timeStamp; penUsed = true; } };
+  addEventListener('pointermove', note, { capture: true, passive: true });
+  addEventListener('pointerdown', e => {
+    note(e);
+    if (e.pointerType !== 'touch' || !penUsed || e.target.closest?.('#view, .nb-paper')) return;   // the canvases handle their own
+    if (e.timeStamp - penAt < 600 || e.width * e.height > 1600) { rejected.add(e.pointerId); e.stopPropagation(); e.preventDefault(); }
+  }, true);
+  const drop = e => { if (rejected.has(e.pointerId)) { e.stopPropagation(); e.preventDefault(); if (e.type === 'click' || e.type === 'pointercancel') rejected.delete(e.pointerId); } };
+  ['pointermove', 'pointerup', 'pointercancel', 'click'].forEach(t => addEventListener(t, drop, true));
+}
 addEventListener('contextmenu', e => { if (!e.target.closest?.('input, textarea, [contenteditable="true"]')) e.preventDefault(); });
 
 // Space = temporary hand tool.

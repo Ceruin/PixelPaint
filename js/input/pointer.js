@@ -47,7 +47,9 @@ export class CanvasInput {
     document.activeElement?.blur?.();
     e.preventDefault();
     this.el.setPointerCapture(e.pointerId);
-    if (e.pointerType === 'pen') this.penSeen = true;
+    if (e.pointerType === 'pen') { this.penSeen = true; this.penAt = e.timeStamp; }
+    // a resting hand is ignored: touches right after pen activity, and palm-sized contacts
+    if (e.pointerType === 'touch' && this.penSeen && (e.timeStamp - (this.penAt ?? -1e9) < 600 || e.width * e.height > 1600)) return;
     this.pointers.set(e.pointerId, { x: e.clientX - this.rect.left, y: e.clientY - this.rect.top });
     bus.emit('activity');
     const touch = e.pointerType === 'touch';
@@ -62,6 +64,7 @@ export class CanvasInput {
 
   move(e) {
     const { app } = this;
+    if (e.pointerType === 'pen') this.penAt = e.timeStamp;
     if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX - this.rect.left, y: e.clientY - this.rect.top });
     if (this.gesture) return this.updateGesture();
     if (this.pan?.id === e.pointerId) {
@@ -116,7 +119,7 @@ export class CanvasInput {
     const twist = s.n > 1 ? Math.abs(((s.a - b.a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) * s.d / 2 : 0;
     g.moved = Math.max(g.moved, Math.hypot(s.x - b.x, s.y - b.y) + Math.abs(s.d - b.d) + twist);
     if (g.moved < 8) return;
-    if (s.n < 2) return this.app.view.set(g.view.zoom, g.view.rot, s.x, s.y, g.anchor);
+    if (s.n < 2) return g.max > 1 || !this.penSeen ? this.app.view.set(g.view.zoom, g.view.rot, s.x, s.y, g.anchor) : undefined;   // with a pen, one finger alone is a resting hand
     let rot = g.view.rot + (s.a - b.a) / DEG;
     rot = ((rot + 540) % 360) - 180;
     if (Math.abs(rot) < 6) rot = 0;
