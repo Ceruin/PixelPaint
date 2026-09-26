@@ -40,8 +40,9 @@ export function startRace(pyxl, level = 0) {
   const card = h('div.race-card', {}, h('div.race-head', {}, icon('film'), h('strong', {}, `${title} Race`), h('span.spacer'), close), cv, h('div.race-foot', {}, cheer, h('small.muted', {}, 'Tap, click or press Space to cheer — it costs stamina!')));
   const layer = h('div.race-layer', {}, card);
   document.body.append(layer);
+  document.body.dataset.game = '';
   const fitScale = () => {   // on the canvas area, a whole number of device pixels per scene pixel
-    const b = stageBox(), dpr = devicePixelRatio || 1, n = Math.max(1, Math.floor(Math.min((b.width - 26) / W, (b.height - 110) / H) * dpr));
+    const b = stageBox(pyxl.app, { page: false }), dpr = devicePixelRatio || 1, n = Math.max(1, Math.floor(Math.min((b.width - 26) / W, (b.height - 110) / H) * dpr));
     Object.assign(layer.style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` });
     Object.assign(cv.style, { width: `${W * n / dpr}px`, height: `${H * n / dpr}px` });
   };
@@ -205,7 +206,7 @@ export function startRace(pyxl, level = 0) {
     over = true;
     cancelAnimationFrame(raf);
     removeEventListener('keydown', key, true); removeEventListener('resize', fitScale);
-    layer.remove();
+    layer.remove(); delete document.body.dataset.game;
     if (quit) return pyxl.raceOver(-1, level);
     const place = finished.indexOf(me) >= 0 ? finished.indexOf(me) : finished.length;
     pyxl.raceOver(place, level, place < 3 ? prize * (3 - place) : 2);

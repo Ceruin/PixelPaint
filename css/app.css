@@ -459,7 +459,17 @@ body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-top .btn { flex: 1; justify-content: center; gap: 5px; min-width: 0; }
 .pc-top .btn:disabled { opacity: .45; }
 .pc-top .btn.on { border-color: var(--accent); color: var(--accent); }
-.pc-toys { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.pc-toys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.pc-volume { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.pc-volume input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.pc-volume .ic { width: 16px; height: 16px; flex: none; }
+/* toys out on the page */
+.toy-sprite { position: fixed; left: 0; top: 0; z-index: 140; image-rendering: pixelated; pointer-events: none; transition: opacity .3s; }
+.toy-sprite.ball, .toy-sprite.bubble { pointer-events: auto; cursor: grab; touch-action: none; }
+.toy-sprite.bubble { cursor: pointer; opacity: .9; }
+.toy-sprite.pop { opacity: 0; transition: opacity .15s; }
+.toy-sprite.gone, .toy-doodle.gone { opacity: 0; }
+.toy-doodle { position: fixed; z-index: 139; image-rendering: pixelated; cursor: pointer; transition: opacity .8s; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .25)); }
 .pc-toy { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 5px 2px 4px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--text); cursor: pointer; }
 .pc-toy:hover { border-color: var(--accent); }
 .pc-toy.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--bg)); }
@@ -512,6 +522,7 @@ body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 body[data-theme=paper] .pc-medal, body[data-theme=paper] .pc-grade { filter: grayscale(1); }
 /* race mini-game */
 .race-layer { position: fixed; z-index: 820; display: grid; place-items: center; background: color-mix(in srgb, var(--stage) 70%, transparent); }
+body[data-game] .pyxl-card { visibility: hidden; }
 .game-arena { position: fixed; z-index: 800; overflow: hidden; background: color-mix(in srgb, var(--stage) 35%, transparent); outline: 2px solid var(--accent); outline-offset: -2px; touch-action: none; }
 .ga-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
 .ga-bar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 3px 4px 3px 12px; max-width: calc(100% - 16px); border-radius: var(--r); background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 12px; white-space: nowrap; }

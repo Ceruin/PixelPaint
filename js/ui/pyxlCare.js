@@ -14,7 +14,7 @@ import { GAMES } from './pyxlGames.js';
 // classroom's rotating lessons), Games (stars and races) and Shop (special fruit for rings).
 // Used by the popup card and the dockable "Pyxl" panel; it re-renders as her stats change.
 const TABS = [['care', 'Care', 'heart'], ['chart', 'Chart', 'pill'], ['school', 'School', 'bag'], ['games', 'Games', 'star'], ['shop', 'Shop', 'ring']];
-const TOYS = [['ball', 'Ball'], ['box', 'Box'], ['radio', 'Radio'], ['crayons', 'Crayons'], ['tv', 'TV']];
+const TOYS = [['ball', 'Ball'], ['bubbles', 'Bubbles'], ['crayons', 'Crayons'], ['box', 'Box'], ['radio', 'Radio'], ['tv', 'TV']];
 const clock = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const HAPPY_WORDS = [[60, 'Overjoyed'], [30, 'Happy'], [0, 'Content'], [-30, 'Down'], [-101, 'Miserable']];
 let tab = local.get('pp.pyxlTab', 'care');
@@ -44,6 +44,9 @@ export function careBody(pyxl, onPlay) {
           h('span', {}, iconCanvas('note', 2), ` ${radio.name}`),
           h('button.ibtn.sm', { type: 'button', 'data-tip': 'Next track', onclick: () => pyxl.setRadio(true, radio.index + 1) }, icon('last')),
           h('button.ibtn.sm', { type: 'button', 'data-tip': 'Switch the radio off', onclick: () => pyxl.setRadio(false) }, icon('pause'))),
+        h('label.pc-volume', { 'data-tip': 'Volume of the radio, toys and games' }, icon(radio.volume ? 'volume' : 'mute'),
+          h('input', { type: 'range', min: 0, max: 100, value: Math.round(radio.volume * 100), 'aria-label': 'Volume', oninput: e => { radio.setVolume(e.target.value / 100); e.target.previousSibling.replaceWith(icon(radio.volume ? 'volume' : 'mute')); } }),
+          h('small', {}, 'Sound')),
       ];
     },
     chart() {
@@ -136,7 +139,7 @@ export function careBody(pyxl, onPlay) {
   const top = h('div.pc-top');
   const renderTop = () => morph(top, h('div', {},
     h('button.btn.sm', { type: 'button', disabled: !pyxl.floating, 'data-tip': pyxl.floating ? 'Back to her spot' : 'She’s home — drag her to carry her anywhere', onclick: () => { pyxl.goHome(); pyxl.react('happy', { say: 'Home sweet home!' }); } }, iconCanvas('house', 2), h('span.lbl', {}, 'Send home')),
-    h('button.btn.sm', { type: 'button', className: pyxl.silent ? 'on' : '', 'data-tip': pyxl.silent ? 'Let her talk again' : 'No chatter or reactions (she won’t like it)', onclick: () => pyxl.setSilent(!pyxl.silent) }, iconCanvas('dots', 2), h('span.lbl', {}, pyxl.silent ? 'Quiet: on' : 'Quiet'))));
+    h('button.btn.sm', { type: 'button', className: pyxl.silent ? 'on' : '', 'data-tip': pyxl.silent ? 'Let her talk again' : 'No chatter or reactions (she won’t like it)', onclick: () => pyxl.setSilent(!pyxl.silent) }, icon('mute'), h('span.lbl', {}, pyxl.silent ? 'Quiet: on' : 'Quiet'))));
   const el = h('div.pc-body', {}, top, tabs, content);
   new IntersectionObserver(([e]) => { if (e.isIntersecting && stale) { stale = false; render(); } }).observe(el);
   render();

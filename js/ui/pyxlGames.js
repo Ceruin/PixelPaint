@@ -11,16 +11,29 @@ export const GAMES = [
   ['doodle', 'Draw This!', 'sparkle', 'She names a thing; you have 30 s.'],
 ];
 
-// The canvas area on screen (the whole window if there's none).
-export function stageBox() {
-  const el = [...document.querySelectorAll('#stage, .board')].find(e => e.offsetParent && e.getBoundingClientRect().width > 120);
-  const r = el?.getBoundingClientRect();
-  return r ? { left: r.left, top: r.top, width: r.width, height: r.height } : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+// Where games play: the drawing itself (the page in Draw or Sprite Studio), clipped to what's on
+// screen — or the whole canvas area when the page is too small or `page` is false. Notes: the board.
+export function stageBox(app, { page = true } = {}) {
+  const vis = el => (el?.offsetParent ? el.getBoundingClientRect() : null);
+  const clip = (a, b) => { const l = Math.max(a.left, b.left), t = Math.max(a.top, b.top), r = Math.min(a.right, b.right), bt = Math.min(a.bottom, b.bottom); return r > l && bt > t ? { left: l, top: t, right: r, bottom: bt } : null; };
+  let area = vis(document.getElementById('pxStage')), pg = null;
+  if (area?.width > 120) pg = vis(document.getElementById('pxView'));
+  else if ((area = vis(document.getElementById('stage')))?.width > 120) {
+    const v = app?.view, d = app?.doc, c = document.getElementById('view').getBoundingClientRect();
+    if (v && d) {
+      const pts = [[0, 0], [d.w, 0], [0, d.h], [d.w, d.h]].map(([x, y]) => v.toScreen(x, y)), xs = pts.map(q => q.x + c.left), ys = pts.map(q => q.y + c.top);
+      pg = { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+    }
+  } else area = vis(document.querySelector('#notes .board'));
+  if (!area?.width) return { left: 0, top: 0, width: innerWidth, height: innerHeight };
+  const box = page && pg && clip(pg, area), use = box && box.right - box.left >= 240 && box.bottom - box.top >= 200 ? box : area;
+  return { left: use.left, top: use.top, width: use.right - use.left, height: use.bottom - use.top };
 }
+let app = null;
 
 // The overlay a game plays in: a bar (title, status, close) and a full-size drawing canvas.
 function arena(title, onQuit) {
-  const b = stageBox(), dpr = devicePixelRatio || 1;
+  const b = stageBox(app), dpr = devicePixelRatio || 1;
   const status = h('span.ga-status'), cv = h('canvas.ga-canvas', { width: Math.round(b.width * dpr), height: Math.round(b.height * dpr) });
   const quit = h('button.ibtn.sm', { type: 'button', 'aria-label': 'Quit game', 'data-tip': 'Quit (Esc)', onclick: () => onQuit() }, icon('x'));
   const bar = h('div.ga-bar', {}, h('b', {}, title), status, quit);
@@ -28,8 +41,9 @@ function arena(title, onQuit) {
   const key = e => { if (e.key === 'Escape') { e.stopPropagation(); onQuit(); } };
   addEventListener('keydown', key, true);
   document.body.append(el);
+  document.body.dataset.game = '';   // her card steps aside while you play
   const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
-  return { el, cv, ctx, w: b.width, h: b.height, box: b, bar, status: t => { status.textContent = t; }, done: () => { removeEventListener('keydown', key, true); el.remove(); } };
+  return { el, cv, ctx, w: b.width, h: b.height, box: b, bar, status: t => { status.textContent = t; }, done: () => { removeEventListener('keydown', key, true); el.remove(); delete document.body.dataset.game; } };
 }
 
 // Where her brush is on screen (games draw from there).
@@ -207,4 +221,4 @@ function doodle(pyxl) {
   };
 }
 
-export function startGame(pyxl, id) { ({ stars, trace, colour, doodle })[id]?.(pyxl); }
+export function startGame(pyxl, id) { app = pyxl.app; ({ stars, trace, colour, doodle })[id]?.(pyxl); }

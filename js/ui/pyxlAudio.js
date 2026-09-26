@@ -2,6 +2,8 @@
 // bass, soft swung drums, a lazy pentatonic melody and vinyl crackle, all under a tape-warm filter.
 // Every track is a recipe (tempo, key, chords, groove), so nothing is downloaded. Plus a few toy sounds.
 
+import { local } from '../core/storage.js';
+
 const CHORDS = { maj7: [0, 4, 7, 11], m7: [0, 3, 7, 10], dom7: [0, 4, 7, 10], m9: [0, 3, 7, 10, 14], maj9: [0, 4, 7, 11, 14], sus: [0, 5, 7, 10] };
 // name, bpm, key (MIDI of the chord root), chords [semitones above the key, quality], kick / snare patterns (16 steps), swing
 const TRACKS = [
@@ -17,7 +19,7 @@ const PENTA = [0, 2, 4, 7, 9];
 const hz = m => 440 * 2 ** ((m - 69) / 12);
 
 let ctx, master, crackle, timer, noise, lfo;
-const state = { on: false, index: 0 };
+const state = { on: false, index: 0, volume: local.get('pp.pyxlVolume', 0.6) };
 
 function audio() {
   if (ctx) return ctx;
@@ -111,7 +113,7 @@ function start(i) {
   }, 60);
   crackle ??= vinyl();
   master.gain.cancelScheduledValues(ctx.currentTime);
-  master.gain.setTargetAtTime(0.9, ctx.currentTime, 0.4);
+  master.gain.setTargetAtTime(0.9 * state.volume, ctx.currentTime, 0.4);
 }
 
 export const radio = {
@@ -119,6 +121,12 @@ export const radio = {
   get on() { return state.on; },
   get index() { return state.index; },
   get name() { return TRACKS[state.index][0]; },
+  // One volume for the radio and every toy and game sound (0 mutes them all).
+  get volume() { return state.volume; },
+  setVolume(v) {
+    state.volume = Math.max(0, Math.min(1, v)); local.set('pp.pyxlVolume', state.volume);
+    if (state.on) master.gain.setTargetAtTime(0.9 * state.volume, ctx.currentTime, 0.05);
+  },
   play(i = state.index) { state.index = (i + TRACKS.length) % TRACKS.length; state.on = true; start(state.index); },
   next(d = 1) { this.play(state.index + d); },
   stop() {
@@ -131,9 +139,10 @@ export const radio = {
 
 // Little sound effects for her toys and games.
 export function sfx(name) {
+  if (!state.volume) return;
   audio(); ctx.resume?.();
   const t = ctx.currentTime + 0.01, out = ctx.createGain();
-  out.gain.value = 1; out.connect(ctx.destination);
+  out.gain.value = state.volume * 1.4; out.connect(ctx.destination);
   const beep = (f, at, len, type = 'square', v = 0.04) => {
     const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f, at);
     o.connect(g).connect(out); env(g, at, 0.005, v, len); o.start(at); o.stop(at + len + 0.05);
@@ -143,6 +152,7 @@ export function sfx(name) {
     hiss(t, 'bandpass', 3000, 0.12, 0.7, 0.3, out);
     [523, 494, 440, 392].forEach((f, i) => beep(f, t + 0.75 + i * 0.16, 0.14));
   } else if (name === 'pop') beep(880, t, 0.08, 'sine', 0.12).frequency.exponentialRampToValueAtTime(1760, t + 0.08);
+  else if (name === 'boing') { const o = beep(300, t, 0.16, 'sine', 0.07); o.frequency.exponentialRampToValueAtTime(620, t + 0.05); o.frequency.exponentialRampToValueAtTime(380, t + 0.16); }
   else if (name === 'bonk') beep(220, t, 0.12, 'triangle', 0.14).frequency.exponentialRampToValueAtTime(90, t + 0.12);
   else if (name === 'draw') beep(1200, t, 0.18, 'sine', 0.05).frequency.exponentialRampToValueAtTime(2400, t + 0.18);
   else if (name === 'win') [523, 659, 784, 1047].forEach((f, i) => beep(f, t + i * 0.1, 0.16, 'triangle', 0.08));

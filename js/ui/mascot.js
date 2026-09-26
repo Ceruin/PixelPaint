@@ -9,6 +9,8 @@ import { openCareCard } from './pyxlCare.js';
 import { startGame } from './pyxlGames.js';
 import { startRace, RACES, medalName } from './pyxlRace.js';
 import { radio, sfx } from './pyxlAudio.js';
+import { stepBody, flick } from './pyxlWorld.js';
+import { playToy, radioNotes } from './pyxlToys.js';
 
 // Pyxl — pixel sprites rebuilt from the character sheet at their native resolution (one art pixel
 // per sprite pixel, shared palette, 1px outline). Always drawn at an integer scale so she stays crisp.
@@ -141,6 +143,10 @@ const STATES = {
   // quiet mode: she won't say a word — just sits there, a little sad, sniffling now and then
   sulk: { poses: ['floor'], hold: true, breath: 3, tears: 'slow', emote: 'drop' },
   crayons: { poses: ['brush', 'paint'], fps: 3, dur: 2400, prop: 'crayons' },
+  // toys out on the page: throwing the ball, watching it fly, blowing bubbles
+  toss: { poses: ['raise', 'point'], fps: 4, dur: 700 },
+  watch: { poses: ['point'], hold: true, breath: 1.8, emote: 'bang' },
+  blow: { poses: ['front', 'happy', 'front', 'raise'], fps: 1.5, dur: 4200, sway: true },
   // life cycle (drawn procedurally, no sprite)
   egg: { poses: ['front'], hold: true, special: 'egg' },
   hatch: { poses: ['front'], dur: 1800, special: 'hatch' },
@@ -303,9 +309,8 @@ export class Mascot {
   // Let go: a quick flick throws her (she tumbles, bounces off the window's edges and lands in a
   // heap); a slow release sets her down gently where she is.
   drop(t = performance.now()) {
-    const tr = (this.trail ?? []).filter(p => t - p.t < 100), a = tr[0], b = tr.at(-1), dt = a && (b.t - a.t) / 1000;
+    const v = flick(this.trail ?? [], t);
     this.trail = [];
-    const v = dt > 0.012 ? [(b.x - a.x) / dt, (b.y - a.y) / dt] : [0, 0];
     if (Math.hypot(...v) > 1100 && document.body.dataset.theme !== 'paper') return this.fling(v);
     this.land(this.hangAngle(), this.phys?.hang?.om ?? 0, -16);
   }
@@ -317,25 +322,19 @@ export class Mascot {
     this.say(['Wheeeee!', 'Aaaah!', 'Whoooa!'][Math.floor(Math.random() * 3)]);
     this.stats.feel('fear', 10);
   }
-  // One physics step of her flight; true when she has come to rest on the window's floor.
+  // One physics step of her flight (off the window's edges, onto panels or the floor); true once she's at rest.
   flyStep(f, dt) {
-    const vv = window.visualViewport, sc = this.k / (devicePixelRatio || 1), r = 24 * sc, m = 2;
-    const L = (vv?.offsetLeft ?? 0) + m + r, T = (vv?.offsetTop ?? 0) + m + r, R = (vv?.offsetLeft ?? 0) + (vv?.width ?? innerWidth) - m - r, B = (vv?.offsetTop ?? 0) + (vv?.height ?? innerHeight) - m - r;
-    f.vy += 2200 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.th += f.om * dt;
-    const hit = speed => { if (speed > 350) { f.hits++; sfx('bonk'); this.showEmote('bang', 500); if (f.hits === 2) this.say('Ow!'); } };
-    if (f.x < L || f.x > R) { hit(Math.abs(f.vx)); f.x = f.x < L ? L : R; f.vx = -f.vx * 0.55; f.om = -f.om * 0.6 + f.vy / 600; }
-    if (f.y < T) { hit(Math.abs(f.vy)); f.y = T; f.vy = Math.abs(f.vy) * 0.5; }
-    if (f.y >= B) {
-      f.y = B;
-      if (f.vy > 260) { hit(f.vy); f.vy = -f.vy * 0.45; f.om = f.om * 0.5 + f.vx / 300; f.vx *= 0.8; }
-      else { f.vy = 0; f.vx *= Math.max(0, 1 - 7 * dt); f.om = f.vx / (r * 1.2); }   // rolling to a stop
-    }
-    return f.y >= B && f.vy === 0 && Math.abs(f.vx) < 50;
+    f.r = 24 * this.k / (devicePixelRatio || 1);
+    return stepBody(f, dt, (speed, side) => {
+      if (speed < 350) return;
+      f.hits++; sfx('bonk'); this.showEmote('bang', 500);
+      if (f.hits === 2) this.say(side === 'floor' ? 'Oof!' : 'Ow!');
+    }, { spin: true, bounce: 0.5 });
   }
   // After a flight: stand her up where she stopped, then wobble upright.
   touchdown(f) {
-    const sc = this.k / (devicePixelRatio || 1), B = (visualViewport?.offsetTop ?? 0) + (visualViewport?.height ?? innerHeight) - 4;
-    this.grab = { x: f.x, y: B - (FLOOR - PIV[1]) * sc };
+    const sc = this.k / (devicePixelRatio || 1);
+    this.grab = { x: f.x, y: f.ground - (FLOOR - PIV[1]) * sc };   // standing on the floor or the panel she landed on
     this.land(f.th, f.om * 0.3, -4);
     const s = this.stats;
     if (f.hits >= 2) setTimeout(() => {
@@ -1012,6 +1011,7 @@ export class Mascot {
       if (++this.taps >= 5) { this.taps = 0; this.hatchNow(); }
       return;
     }
+    if (this.state === 'box') { this.stats.change({ fun: 6 }); return this.react('cheer', { icon: 'heart', n: 3, say: 'Boo! You found me!', force: true }); }   // peek-a-boo
     if (this.awake()) this.pet();
     (this.openCare ?? (() => openCareCard(this)))();
   }
@@ -1063,13 +1063,15 @@ export class Mascot {
   toy(id) {
     if (!this.awake()) return this.say('Zzz…');
     if (id === 'radio') return this.setRadio(!radio.on);
+    if (playToy(this, id)) return this.stats.change({ energy: -2 });
     if (id === 'tv') { sfx('tv'); this.stats.change({ fun: 3 }); return this.react('tv', { say: 'Cartoons… I guess.', force: true }); }
     this.stats.change({ fun: 12, energy: -2 }, 1);
     this.stats.happy(0.5); this.stats.feel('joy', 20);
-    this.react(id, { say: { ball: 'Catch!', box: 'Where am I?', crayons: 'Let me draw!' }[id] });
+    this.react(id, { say: { ball: 'Catch!', box: 'Where am I? Tap to find me!', crayons: 'Let me draw!' }[id] });
   }
   // The radio plays lofi until you switch it off; she sits by it, nodding along.
   setRadio(on, track) {
+    radioNotes(this, on);
     if (on) { radio.play(track); this.stats.change({ fun: 10 }, 1); this.stats.feel('joy', 15); this.play('vibe', { say: `♪ ${radio.name}` }); }
     else { radio.stop(); if (this.state === 'vibe') this.base(); }
     bus.emit('pyxl:stats', this.stats);
