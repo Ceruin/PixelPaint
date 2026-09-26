@@ -561,7 +561,34 @@ body[data-game] .pyxl-card { visibility: hidden; }
 /* ---------- zen: canvas-first, one strip ---------- */
 .zen { display: none; }
 /* the strip always fits the stage (8px clear top and bottom) and scrolls when it's taller */
-body[data-layout=zen] .zen { display: flex; align-items: center; position: absolute; left: 8px; top: 8px; bottom: 8px; z-index: 50; pointer-events: none; }
+body[data-layout=zen] .zen { display: block; position: absolute; inset: 8px; z-index: 50; pointer-events: none; }
+body[data-layout=zen] .zen-strip { position: absolute; left: 0; top: 64px; bottom: 0; margin: auto 0; height: max-content; max-height: calc(100% - 64px); }
+.zen-top { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: row; width: max-content; height: auto; align-items: center; gap: 4px; padding: 5px 6px; max-width: 100%; overflow-x: auto; scrollbar-width: none; box-shadow: var(--shadow); }
+.zen-top > * { flex: none; }
+.zen-top .zen-exit { flex-direction: row; width: auto; gap: 5px; padding: 0 10px; height: 34px; }
+.zen-sep { width: 1px; height: 24px; background: var(--line); margin: 0 3px; }
+.zen-tools { width: auto !important; padding: 0 4px; gap: 0; display: inline-flex; align-items: center; }
+.zen-tools .ic + .ic { width: 12px; height: 12px; opacity: .6; }
+.zen-pop { position: fixed; z-index: 400; display: flex; flex-direction: column; gap: 8px; padding: 10px; max-width: calc(100vw - 16px); max-height: calc(100vh - 90px); overflow: auto; box-shadow: var(--shadow); }
+.zen-title { font-weight: 700; padding: 0 2px; }
+.zen-grid { display: grid; grid-template-columns: repeat(4, 76px); gap: 4px; }
+.zen-act { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 58px; padding: 6px 2px; border: 1px solid transparent; border-radius: var(--r); background: none; color: var(--text); font-size: 11px; line-height: 1.2; text-align: center; cursor: pointer; }
+.zen-act .ic { width: 22px; height: 22px; }
+.zen-act:hover { background: var(--panel2); }
+.zen-act.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.sel-bar { position: fixed; z-index: 120; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; flex-direction: row; width: max-content; height: auto; gap: 2px; padding: 4px; max-width: calc(100vw - 16px); overflow-x: auto; scrollbar-width: none; box-shadow: var(--shadow); }
+.sel-bar[hidden] { display: none; }
+.sel-bar .zen-act { min-height: 48px; min-width: 56px; font-size: 10.5px; }
+.sel-bar .zen-act .ic { width: 20px; height: 20px; }
+.zen-pop.panel { width: max-content; height: auto; }
+@media (max-width: 600px) {
+  .zen-top { gap: 1px; padding: 4px; }
+  .zen-top .zen-exit span:not(.ic), .zen-top [data-tip="Brush settings"], .zen-sep { display: none; }
+  .zen-top .zen-exit { padding: 0 9px; }
+  .zen-top .ibtn { width: 36px; height: 36px; }
+  .zen-grid { grid-template-columns: repeat(4, minmax(64px, 1fr)); }
+  .sel-bar { gap: 0; padding: 3px; } .sel-bar .zen-act { min-width: 42px; padding: 4px 0; font-size: 9.5px; }
+}
 body[data-layout=zen] .zen > * { pointer-events: auto; }
 /* mode rules name #app's own parts: the Pixel editor reuses class names (.statusbar, .timeline, .stage)
    and must not be restyled by a mode switch */

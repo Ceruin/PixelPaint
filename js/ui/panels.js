@@ -218,8 +218,12 @@ export class Panels {
 
   dockZone(ev, self) {
     for (const side of ['left', 'right']) {
-      const box = this.sides[side].getBoundingClientRect();
-      if (!(side === 'left' ? ev.clientX < box.right + 24 : ev.clientX > box.left - 24)) continue;
+      let box = this.sides[side].getBoundingClientRect();
+      if (box.width < 40) {   // an empty dock has no width: it catches drops along its edge of the workspace
+        const wr = this.ws.getBoundingClientRect(), w = 260;
+        box = { top: wr.top, bottom: wr.bottom, height: wr.height, width: w, left: side === 'left' ? wr.left : wr.right - w, right: side === 'left' ? wr.left + w : wr.right };
+        if (!(side === 'left' ? ev.clientX < wr.left + 48 : ev.clientX > wr.right - 48)) continue;
+      } else if (!(side === 'left' ? ev.clientX < box.right + 24 : ev.clientX > box.left - 24)) continue;
       const docked = [...this.map.values()].filter(p => p !== self && p.s.dock === side && !p.s.hidden).sort((a, b) => a.s.order - b.s.order);
       const hit = docked.find(p => ev.clientY < p.el.getBoundingClientRect().top + p.el.offsetHeight / 2), last = docked.at(-1)?.el.getBoundingClientRect();
       const y = hit ? hit.el.getBoundingClientRect().top - 3 : last ? last.bottom + 3 : box.top + 6;   // where the row will go
