@@ -2,7 +2,7 @@ import { h, icon, keepOnScreen, morph } from './dom.js';
 import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
 import { clamp } from '../core/util.js';
-import { NEEDS, SNACKS, SHOP, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
+import { NEEDS, SNACKS, SHOP, SHOP_INFO, dealOfTheDay, priceOf, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
 import { RACES, raceUnlocked, medalName } from './pyxlRace.js';
 import { iconCanvas } from './pixelIcons.js';
 import { radio } from './pyxlAudio.js';
@@ -105,15 +105,20 @@ export function careBody(pyxl, onPlay) {
         })),
       ];
     },
+    // Pick an item to see what it does; the deal of the day is 30% off.
     shop() {
+      const deal = dealOfTheDay(), sel = SHOP.find(i => i[0] === shopPick) ?? SHOP.find(i => i[0] === deal), price = priceOf(sel), fav = sel[0] === s.fav;
       return [
-        h('p.pc-mood', {}, iconCanvas('ring', 2), ` ${s.rings} rings — earn them by painting, saving, levelling up and winning races.`),
-        h('div.pc-shop', {}, SHOP.map(item => h('button.pc-item', { type: 'button', disabled: s.rings < item[2], onclick: () => pyxl.buy(item), 'data-tip': `${item[1]} — ${SHOP_TIPS[item[3]]}`, 'aria-label': item[1] },
-          iconCanvas(item[0], 3), h('small.pc-price', {}, iconCanvas('ring', 1), `${item[2]}`)))),
+        h('div.pc-wallet', {}, iconCanvas('ring', 2), h('b', {}, `${s.rings}`), h('small', {}, 'rings — earned by painting, saving, games and races')),
+        h('div.pc-shop', {}, SHOP.map(item => h('button.pc-item', { type: 'button', className: `${item[0] === sel[0] ? 'on' : ''} ${item[0] === deal ? 'deal' : ''}`, onclick: () => { shopPick = item[0]; render(); }, 'aria-label': item[1] },
+          iconCanvas(item[0], 3), h('small.pc-price', {}, iconCanvas('ring', 1), `${priceOf(item)}`)))),
+        h('div.pc-detail', {}, iconCanvas(sel[0], 4),
+          h('div', {}, h('b', {}, sel[1], sel[0] === deal ? h('span.pc-tag', {}, '−30% today') : '', fav ? h('span.pc-tag.fav', {}, 'her favourite') : ''), h('small', {}, SHOP_INFO[sel[3]])),
+          h('button.btn.sm.primary', { type: 'button', disabled: s.rings < price, onclick: () => pyxl.buy([sel[0], sel[1], price, sel[3]]) }, iconCanvas('ring', 1), h('span.lbl', {}, s.rings < price ? `Need ${price}` : `Buy · ${price}`))),
       ];
     },
   };
-  const SHOP_TIPS = { love: 'Love season: flowers bloom around her', bright: 'Nudges her toward Bright', moody: 'Nudges her toward Moody', skills: 'Trains every skill', energy: 'A pick-me-up' };
+  let shopPick = null;
 
   // Tabs are built once; a render only swaps the content of the open tab.
   tabs.append(...TABS.map(([id, label, ic]) => h('button.pc-tab', { type: 'button', role: 'tab', 'data-tip': label, dataset: { tab: id }, onclick: () => { tab = id; local.set('pp.pyxlTab', id); render(); } }, iconCanvas(ic, 2), h('span', {}, label))));

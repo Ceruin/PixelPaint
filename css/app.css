@@ -457,6 +457,18 @@ body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-focus-btns { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .pc-focus-btns .btn { justify-content: center; }
 .m-bubble:not(:empty) { pointer-events: auto; cursor: pointer; }
+.pc-wallet { display: flex; align-items: center; gap: 6px; }
+.pc-wallet b { font-size: 15px; }
+.pc-wallet small { color: var(--muted); }
+.pc-item.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--bg)); }
+.pc-item.deal { position: relative; }
+.pc-item.deal::after { content: '%'; position: absolute; top: 2px; right: 3px; font-size: 9px; font-weight: 700; color: #ff6fa0; }
+.pc-detail { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 10px; padding: 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+.pc-detail b { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.pc-detail small { display: block; color: var(--muted); margin-top: 2px; }
+.pc-detail .btn { grid-column: 1 / -1; justify-content: center; gap: 5px; }
+.pc-tag { padding: 0 5px; border-radius: 2px; font-size: 10px; font-weight: 600; background: #ff6fa0; color: #fff; }
+.pc-tag.fav { background: #d99a14; }
 .pc-price { display: flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
 .pc-namerow { display: flex; gap: 4px; }
 .pc-name { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--text); font: inherit; font-weight: 700; }

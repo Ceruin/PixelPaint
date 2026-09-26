@@ -105,7 +105,17 @@ const STATES = {
   cry: { poses: ['oops', 'front'], fps: 1.5, dur: 2800, tears: true },
   sit: { poses: ['floor'], hold: true, breath: 2.2 },
   drowsy: { poses: ['drowsy'], hold: true, breath: 2.6 },
-  sleep: { poses: ['sleep'], hold: true, breath: 3 },
+  sleep: { poses: ['sleep'], hold: true, breath: 3, zzz: true },
+  // in-betweens: nodding off, waking up, sitting down and getting up again
+  doze: { poses: ['front', 'drowsy', 'front', 'drowsy', 'drowsy', 'sleep'], fps: 1.8, dur: 3300, emote: 'dots' },
+  wake: { poses: ['sleep', 'drowsy', 'drowsy', 'raise', 'raise', 'frontBlink', 'front'], fps: 2.2, dur: 3200, emote: 'what' },
+  sitDown: { poses: ['idle1', 'floor'], fps: 2.5, dur: 800 },
+  standUp: { poses: ['floor', 'idle1'], fps: 2.5, dur: 800 },
+  // care: a happy wiggle when petted, a brave gulp of medicine, walking off to school and back
+  purr: { poses: ['happy', 'frontBlink', 'happy', 'front'], fps: 2.5, dur: 1800, sway: true, emote: 'heart' },
+  gulp: { poses: ['oops', 'front', 'oops', 'happy'], fps: 2, dur: 1800, shake: true, emote: 'swirl' },
+  depart: { poses: ['idle0', 'idle1', 'walk', 'idle1'], fps: 6, dur: 1800, walkOff: 1 },
+  arrive: { poses: ['idle0', 'idle1', 'walk', 'idle1'], fps: 6, dur: 1400, walkOff: -1 },
   sick: { poses: ['drowsy'], hold: true, breath: 2 },
   bloom: { poses: ['floor'], dur: 6000, breath: 2, prop: 'bloom', emote: 'heart' },
   // picked up and carried: arms up, legs kicking, swaying under your finger
@@ -507,7 +517,10 @@ export class Mascot {
 
   // Resting behaviour follows her most pressing need.
   base() {
-    const need = this.stats.need;
+    const need = this.stats.need, from = this.state;
+    if (need === 'asleep' && from && !['sleep', 'doze'].includes(from)) return this.play('doze');   // she nods off first
+    if (from === 'sleep' && need !== 'asleep') return this.play('wake');
+    if (from === 'sit' && !this.silent && (need !== 'bored' || Date.now() - this.lastActive < 20000)) return this.play('standUp');
     if (need === 'egg') return this.play('egg');
     if (need === 'school') return this.play('school');
     if (need === 'asleep') return this.play('sleep');
@@ -515,7 +528,7 @@ export class Mascot {
     if (need === 'tired') return this.play('drowsy');
     if (this.silent) return this.play('sulk');
     if (radio.on) return this.play('vibe');
-    if (need === 'bored' && Date.now() - this.lastActive > 20000) return this.play('sit');
+    if (need === 'bored' && Date.now() - this.lastActive > 20000) return this.play(from === 'sit' ? 'sit' : 'sitDown');
     this.play('idle');
   }
 
@@ -536,7 +549,8 @@ export class Mascot {
     if (!this.awake()) return;
     if (s.energy < 10) { this.nap(); this.say('So sleepy…'); }
     if (this.state === 'idle' && now > this.nextFidget) this.fidget(now);
-    if (this.state === 'idle' && s.need === 'bored' && now - this.lastActive > 20000) this.play('sit');
+    if (this.state === 'idle' && s.need === 'bored' && now - this.lastActive > 20000) this.play('sitDown');
+    if (this.state === 'sleep' && !s.asleep) this.play('wake');   // slept her fill
     if (st?.walk) this.stroll();
     if (now > this.blinkAt + 150) this.blinkAt = now + 2500 + Math.random() * 3500 * (Math.random() < 0.2 ? 0.1 : 1);
     this.symptoms(now);
@@ -553,6 +567,9 @@ export class Mascot {
       this.stats.train('colour', 4);
       return this.play('showDrawing', { extra: pic, say: `I drew ${pic === 'car' ? 'a car' : pic === 'house' ? 'a house' : `a ${pic}`}!` });
     }
+    const chain = { doze: 'sleep', sitDown: 'sit', depart: 'school' }[this.state];
+    if (chain) return this.play(chain);
+    if (this.state === 'wake') return this.react('happy', { icon: 'sparkle', say: 'Morning! ☀', force: true });
     if (this.state === 'tv') {   // too much TV: she comes away grumpy and square-eyed
       const s = this.stats;
       s.happy(-2); s.change({ energy: -6 }); s.feel('sorrow', 15); s.nudgeAlign(-2);
@@ -607,23 +624,33 @@ export class Mascot {
     if (this.state === 'egg' && now - (this.eggSince ??= now) > 120e3) this.hatchNow();
     if (s.school && now > s.school.until) {
       const r = s.finishSchool(), name = LESSONS.find(l => l[0] === r?.id)?.[1] ?? 'something';
-      if (r?.focus) {   // end of a focus session: a short break, then another round if you like
-        sfx('chime');
-        this.breakUntil = now + (s.pomos % 4 === 0 ? 15 : 5) * 60e3;
-        this.react('cheer', { icon: 'star', n: 5, say: `Break time! Great focus ♡ +5 rings`, force: true });
-        setTimeout(() => this.react(s.learned.exercise ? 'exercise' : 'stretch', { say: 'Stretch with me!' }), 2600);
-      } else {
-        this.react('cheer', { icon: 'star', n: 4, say: r?.fresh ? `I learned ${name}${r.level > 1 ? ` (level ${r.level})` : ''}!` : `Class was fun!`, force: true });
-        setTimeout(() => this.perform(r?.id), 2300);
-      }
+      this.play('arrive');   // she walks back in, then tells you about it
+      return setTimeout(() => this.backFromSchool(r, name), 1400);
     }
     if (this.breakUntil && now > this.breakUntil) {
       this.breakUntil = 0; sfx('chime');
       this.react('wave', { say: 'Break’s over — ready for another round?', force: true });
       bus.emit('pyxl:stats', s);
     }
-    if (s.school && this.state !== 'school') this.play('school');
+    if (s.school && !['school', 'depart'].includes(this.state)) this.play('school');
     if (this.state === 'school' && !s.school) this.base();
+    this.cocoonStep(now);
+  }
+  backFromSchool(r, name) {
+    const s = this.stats;
+    if (r?.focus) {   // end of a focus session: a short break, then another round if you like
+      sfx('chime');
+      this.breakUntil = Date.now() + (s.pomos % 4 === 0 ? 15 : 5) * 60e3;
+      this.react('cheer', { icon: 'star', n: 5, say: 'Break time! Great focus ♡ +5 rings', force: true });
+      setTimeout(() => this.react(s.learned.exercise ? 'exercise' : 'stretch', { say: 'Stretch with me!' }), 2600);
+    } else {
+      this.react('cheer', { icon: 'star', n: 4, say: r?.fresh ? `I learned ${name}${r.level > 1 ? ` (level ${r.level})` : ''}!` : 'Class was fun!', force: true });
+      setTimeout(() => this.perform(r?.id), 2300);
+    }
+  }
+  // Evolution and end-of-life cocoons.
+  cocoonStep(now) {
+    const s = this.stats;
     if (this.state === 'cocoon') {
       if (now < this.cocoonUntil) return;
       const kind = this.cocoonKind;
@@ -683,6 +710,9 @@ export class Mascot {
     if (st.hop) y -= Math.round(Math.abs(Math.sin(t * 9)) * 3);
     if (st.shake) x += Math.floor(t * 18) % 2 ? 1 : -1;
     if (st.sway) y -= Math.floor(t * 2.4) % 2;   // nods along to the radio
+    let fade = 1;
+    if (st.walkOff === 1) { x += Math.round(t * 22); flip = false; fade = Math.max(0, Math.min(1, (1.8 - t) / 0.6)); }   // off to school, out of sight
+    if (st.walkOff === -1) { x += Math.round(Math.max(0, 1.2 - t) * 26); flip = true; fade = Math.min(1, t / 0.4); }        // and back again
     if (st.walk && Math.floor(t * st.fps) % 2) y -= 1; // bob on each step
     if (this.hic > now) y -= 2;
     if (this.stats.sick === 'cold' && this.state === 'sick') x += Math.floor(t * 12) % 2;
@@ -690,7 +720,7 @@ export class Mascot {
     x = Math.max(l, Math.min(BOX_W - r, x)); // wide poses never clip out of her box
     const breath = st.breath && !still && (t % st.breath) / st.breath > 0.55 ? 1 : 0;
     const emote = this.emoteName(now), bob = still ? 0 : Math.round(Math.sin(t * 2.5));
-    const phase = st.special || st.prop || st.tears || st.notes ? Math.floor(t * 4) : 0;
+    const phase = st.special || st.prop || st.tears || st.notes || st.zzz || st.walkOff ? Math.floor(t * 8) : 0;
     // physics: hanging tilt / landing wobble, in 3° steps (each step is a cached pixel-art frame)
     const ph = this.phys, air = ph?.hang ? this.grab : ph?.fly, deg = ph ? Math.round((ph.hang ? this.hangAngle() : ph.fly ? ph.fly.th : ph.settle.th) * 60 / Math.PI) * 3 : 0;
     const kick = ph?.hang && Math.abs(ph.hang.om) < 4 ? (Math.floor(t * 5) % 3) - 1 : 0, drop = ph?.settle ? Math.round(ph.settle.y) : 0;
@@ -710,7 +740,12 @@ export class Mascot {
         const f = rotated(sheet(), SPRITES[pose], SPRITES[pose].slice(4), deg);
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(f.canvas, (x - f.ox) * k, (y - f.oy) * k, f.canvas.width * k, f.canvas.height * k);
-      } else drawPose(ctx, pose, x, y, k, flip, breath);
+      } else {
+        ctx.globalAlpha = still ? 1 : fade;
+        drawPose(ctx, pose, x, y, k, flip, breath);
+        ctx.globalAlpha = 1;
+        if (pose === 'sleep' && !still) this.drawZzz(ctx, x, y, flip, t, k);
+      }
       const [, , pw, ph2, pax, pby] = SPRITES[pose];
       this.spriteBox = [x - (flip ? pw - pax : pax), y - pby, x + (flip ? pax : pw - pax), y - pby + ph2];   // what keepInView keeps on screen
       this.drawProp(ctx, st, x, y - by, t, k);
@@ -719,6 +754,26 @@ export class Mascot {
       if (emote) { const [ew] = iconSize(emote); drawIcon(ctx, emote, x - Math.floor(ew / 2), y - by - 7 + bob, k, this.stats.chaos && emote === 'emDot' ? '#ffd23f' : null); }
     }
     this.drawParts(ctx, k, dt);
+  }
+  // Sleeping Z's: each one drifts up from her head, growing, then pops; three in a cycle.
+  // (The sheet's drawn Z's are wiped first, so only the animated ones show.)
+  drawZzz(ctx, x, y, flip, t, k) {
+    const [, , , , ax, by] = SPRITES.sleep, left = flip ? x + ax - 71 : x - ax + 52;
+    ctx.clearRect(left * k, (y - by + 1) * k, 19 * k, 21 * k);
+    const px = (a, b, c) => { ctx.fillStyle = c; ctx.fillRect(a * k, b * k, k, k); };
+    for (let i = 0; i < 3; i++) {
+      const p = (t / 2.7 + i / 3) % 1, hx = x + (flip ? -1 : 1) * (18 + Math.round(p * 12)), hy = y - by + 14 - Math.round(p * 22);
+      if (p > 0.86) {   // pop!
+        const r = Math.round((p - 0.86) * 40) + 2;
+        [[-r, 0], [r, 0], [0, -r], [0, r], [-r + 1, -r + 1], [r - 1, -r + 1], [-r + 1, r - 1], [r - 1, r - 1]].forEach(([dx, dy]) => px(hx + dx, hy + dy, '#8fb8ff'));
+        continue;
+      }
+      const n = 3 + Math.round(p * 4), cells = [];
+      for (let j = 0; j < n; j++) cells.push([j, 0], [j, n - 1], [n - 1 - j, j]);
+      const ox = hx - (n >> 1), oy = hy - (n >> 1);
+      for (const [cx, cy] of cells) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) px(ox + cx + dx, oy + cy + dy, '#1b2a55');
+      for (const [cx, cy] of cells) px(ox + cx, oy + cy, n > 5 ? '#5b8cff' : '#8fb8ff');
+    }
   }
   // She hangs on her own small overlay canvas centred on the pointer, so she can loop right round
   // it; it moves by a compositor-only transform each frame (snapped to whole device pixels).
@@ -975,7 +1030,7 @@ export class Mascot {
     s.change({ love: s.is('gentle') ? 12 : 8, fun: 2 }, 1);
     if (this.pets.length === 1) s.happy(1);
     s.feel('joy', 15); s.feel('sorrow', -20); s.feel('anger', -10);
-    this.react('happy', { icon: 'heart', n: 3 });
+    this.react(this.pets.length > 2 ? 'purr' : 'happy', { icon: 'heart', n: 3 });
   }
 
   feed([icon, name, delta]) {
@@ -998,6 +1053,9 @@ export class Mascot {
     setTimeout(() => {
       if (effect === 'love') this.react('bloom', { say: 'I feel all warm and floaty ♡' });
       else if (effect === 'skills') this.react('cheer', { icon: 'sparkle', n: 6, say: 'I feel so much smarter!' });
+      else if (effect === 'party') this.react('dance', { dur: 3000, say: 'Party time!' });
+      else if (effect === 'calm') this.react('purr', { say: 'Ahh… so calm.' });
+      else if (effect === 'luck') this.react('cheer', { icon: 'star', n: 6, say: 'I feel lucky!' });
       else this.react('eat', { icon: effect === 'bright' ? 'sparkle' : effect === 'moody' ? 'moon' : 'heart', n: 3, say: `${name}!` });
     }, 700);
   }
@@ -1031,20 +1089,20 @@ export class Mascot {
     this.setRadio(false);
     s.attend(currentLesson()[0], Date.now(), focusMin ? focusMin * 60e3 : undefined, !!focusMin);
     this.breakUntil = 0;
-    this.react('wave', { say: focusMin ? `Focus time! See you in ${focusMin} minutes.` : 'Off to kindergarten!', force: true });
-    setTimeout(() => this.play('school'), 1500);
+    this.play('depart', { say: focusMin ? `Focus time! See you in ${focusMin} minutes.` : 'Off to kindergarten!' });
   }
   leaveSchool() {
     if (!this.stats.school) return;
     this.stats.school = null; this.stats.save();
-    this.react('wave', { say: 'Back already?', force: true });
+    this.play('arrive', { say: 'Back already?' });
   }
 
   doctor() {
     const s = this.stats;
     if (!s.sick) return this.react('happy', { say: 'The doctor says I’m healthy!' });
     this.parts.push({ icon: 'pill', x: AX + 16, y: FLOOR - 40, vx: -0.4, vy: 0.2, life: 16 });
-    setTimeout(() => { s.cure(); this.react('cheer', { icon: 'sparkle', n: 4, say: 'All better! Thank you!', force: true }); }, 900);
+    setTimeout(() => this.react('gulp', { say: 'Bleh… medicine!', force: true }), 700);
+    setTimeout(() => { s.cure(); this.react('cheer', { icon: 'sparkle', n: 4, say: 'All better! Thank you!', force: true }); }, 2600);
   }
 
   playGame(id = 'stars') {
@@ -1085,6 +1143,6 @@ export class Mascot {
     else this.react(s.is('crybaby') ? 'cry' : 'oops', { say: line ?? (score ? `Only ${score}… again?` : 'Aww, none!'), force: true });
   }
 
-  nap() { this.setRadio(false); this.stats.sleep(true); this.say('Night night…'); this.play('sleep'); }
-  wake() { this.stats.sleep(false); this.react('happy', { icon: 'sparkle', say: 'I’m up!', force: true }); }
+  nap() { this.setRadio(false); this.stats.sleep(true); this.play('doze', { say: 'Night night…' }); }
+  wake() { this.stats.sleep(false); this.play('wake', { say: 'Mmh… I’m up!' }); }
 }

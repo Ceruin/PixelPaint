@@ -57,7 +57,17 @@ export const SNACKS = [
 export const SHOP = [
   ['heartFruit', 'Heart Fruit', 30, 'love'], ['brightFruit', 'Bright Fruit', 20, 'bright'], ['moodyFruit', 'Moody Fruit', 20, 'moody'],
   ['chaoFruit', 'Chao Fruit', 60, 'skills'], ['mushroom', 'Mushroom', 15, 'energy'],
+  ['cake', 'Party Cake', 25, 'party'], ['tea', 'Calm Tea', 12, 'calm'], ['star', 'Lucky Star', 35, 'luck'],
 ];
+// What each shop item does (shown before you buy).
+export const SHOP_INFO = {
+  love: 'Love season — flowers bloom around her and love fills up.', bright: 'Nudges her toward Bright.', moody: 'Nudges her toward Moody.',
+  skills: 'Trains every skill a little.', energy: 'A pick-me-up: energy and a snack.', party: 'Fun and fullness way up — she dances.',
+  calm: 'Soothes anger and sadness.', luck: 'Trains her luck (fewer trips, better races).',
+};
+// One item a day is 30% off.
+export const dealOfTheDay = (t = Date.now()) => SHOP[Math.floor(t / 864e5) % SHOP.length][0];
+export const priceOf = (item, t) => (item[0] === dealOfTheDay(t) ? Math.round(item[2] * 0.7) : item[2]);
 export const ILLNESSES = { cough: 'a cough', stomach: 'a stomach ache', cold: 'a cold', rash: 'a rash', hiccups: 'the hiccups', nose: 'a runny nose' };
 
 // Kindergarten classroom (lessons run in a fixed rotation, like the Chao Kindergarten).
@@ -203,6 +213,9 @@ export class PyxlStats {
     if (effect === 'moody') this.nudgeAlign(-12);
     if (effect === 'skills') SKILLS.forEach(([k]) => this.train(k, 60));
     if (effect === 'energy') { this.change({ energy: 30, food: 10 }); this.train('stamina', 20); }
+    if (effect === 'party') { this.change({ fun: 30, food: 20 }); this.feel('joy', 40); }
+    if (effect === 'calm') { this.feel('anger', -40); this.feel('sorrow', -40); this.happy(1); }
+    if (effect === 'luck') this.train('luck', 80);
     this.save();
   }
   spend(n) { if (this.rings < n) return false; this.rings -= n; this.save(); return true; }
