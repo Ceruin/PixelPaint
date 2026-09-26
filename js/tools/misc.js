@@ -1,4 +1,4 @@
-import { CROSS } from '../ui/cursors.js';
+import { toolCursor } from '../ui/cursors.js';
 import { floodMask, dilate, maskToCanvas } from '../engine/flood.js';
 import { makeCanvas } from '../core/util.js';
 import { hexToU32 } from '../core/color.js';
@@ -21,7 +21,7 @@ export function regionMask(app, p, rgba = 0xffffffff, grow = false, tolerance = 
 }
 
 export class FillTool {
-  constructor(app) { Object.assign(this, { app, id: 'fill', cursor: CROSS }); }
+  constructor(app) { Object.assign(this, { app, id: 'fill', cursor: toolCursor('fill') }); }
   down(p) {
     const { app } = this, { doc } = app, layer = doc.activeLayer;
     if (!layer || layer.locked) { app.toast('Select an unlocked layer'); return false; }
@@ -41,7 +41,7 @@ export class FillTool {
 }
 
 export class PickerTool {
-  constructor(app) { Object.assign(this, { app, id: 'picker', cursor: CROSS }); }
+  constructor(app) { Object.assign(this, { app, id: 'picker', cursor: toolCursor('picker') }); }
   down(p) { this.app.pickColor(p.x, p.y); return true; }
   move(pts) { const p = pts.at(-1); this.app.pickColor(p.x, p.y); }
   up() { haptics.pulse(5); }

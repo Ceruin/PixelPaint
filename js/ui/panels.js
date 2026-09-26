@@ -184,6 +184,8 @@ export class Panels {
     const { el, s } = p, r = el.getBoundingClientRect(), wr = this.ws.getBoundingClientRect();
     const off = { x: e.clientX - r.left, y: e.clientY - r.top };
     let moved = false, zone = null;
+    const marker = h('div.dock-marker', { hidden: true });   // a line showing where the panel will land
+    document.body.append(marker);
     const move = ev => {
       if (!moved) {
         if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 5) return;
@@ -196,10 +198,13 @@ export class Panels {
       this.clampFloat(p);
       zone = this.dockZone(ev, p);
       for (const side of ['left', 'right']) this.sides[side].classList.toggle('drop', zone?.side === side);
+      marker.hidden = !zone;
+      if (zone) Object.assign(marker.style, { left: `${zone.left}px`, top: `${Math.round(zone.y) - 2}px`, width: `${zone.width}px` });
     };
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       for (const side of ['left', 'right']) this.sides[side].classList.remove('drop');
+      marker.remove();
       el.style.zIndex = '';
       if (!moved) return;
       if (zone) { Object.assign(s, { dock: zone.side, order: zone.order }); this.folded[zone.side] = false; if (this.opened) this.opened[zone.side] = true; }
@@ -216,8 +221,9 @@ export class Panels {
       const box = this.sides[side].getBoundingClientRect();
       if (!(side === 'left' ? ev.clientX < box.right + 24 : ev.clientX > box.left - 24)) continue;
       const docked = [...this.map.values()].filter(p => p !== self && p.s.dock === side && !p.s.hidden).sort((a, b) => a.s.order - b.s.order);
-      const hit = docked.find(p => ev.clientY < p.el.getBoundingClientRect().top + p.el.offsetHeight / 2);
-      return { side, order: hit ? hit.s.order - 0.5 : (docked.at(-1)?.s.order ?? 0) + 1 };
+      const hit = docked.find(p => ev.clientY < p.el.getBoundingClientRect().top + p.el.offsetHeight / 2), last = docked.at(-1)?.el.getBoundingClientRect();
+      const y = hit ? hit.el.getBoundingClientRect().top - 3 : last ? last.bottom + 3 : box.top + 6;   // where the row will go
+      return { side, order: hit ? hit.s.order - 0.5 : (docked.at(-1)?.s.order ?? 0) + 1, y, left: box.left + 4, width: box.width - 8 };
     }
     return null;
   }

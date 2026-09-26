@@ -1,11 +1,11 @@
-import { CROSS } from '../ui/cursors.js';
+import { toolCursor } from '../ui/cursors.js';
 import { TAU, Rect } from '../core/util.js';
 import { regionMask } from './misc.js';
 
 const modeOf = (app, e) => (e.shiftKey ? 'add' : e.altKey ? 'sub' : app.opts.selMode);
 
 class DragSelect {
-  constructor(app, id) { Object.assign(this, { app, id, cursor: CROSS }); }
+  constructor(app, id) { Object.assign(this, { app, id, cursor: toolCursor(id) }); }
   down(p, e) { this.mode = modeOf(this.app, e); this.start(p); this.app.view.overlays.add(this); return true; }
   move(pts) { pts.forEach(p => this.add(p)); this.app.view.redraw(); }
   up() {
@@ -44,7 +44,7 @@ export class LassoTool extends DragSelect {
 }
 
 export class WandTool {
-  constructor(app) { Object.assign(this, { app, id: 'wand', cursor: CROSS }); }
+  constructor(app) { Object.assign(this, { app, id: 'wand', cursor: toolCursor('wand') }); }
   down(p, e) {
     const m = regionMask(this.app, p);
     if (m) this.app.doc.selection.apply('Magic Wand', modeOf(this.app, e), c => c.drawImage(m, 0, 0));
