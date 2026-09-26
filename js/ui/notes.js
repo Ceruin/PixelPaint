@@ -74,26 +74,35 @@ export function initNotes(app, sendToCanvas) {
     const by = { name: (a, b) => a.name.localeCompare(b.name), created: (a, b) => b.created - a.created, modified: (a, b) => b.modified - a.modified }[opts.sort];
     return l.sort(by);
   };
-  const libEl = h('div.nb-lib'), drawer = h('div.nb-drawer', { hidden: true });
+  const libEl = h('div.nb-lib'), drawer = h('div.nb-drawer'), shell = h('div.nb-shell', {}, drawer, libEl);
   const renderLibrary = () => {
     const items = listed(), title = opts.filter === 'trash' ? 'Trash' : opts.filter === 'favs' ? 'Favorites' : opts.tag ? `#${opts.tag}` : 'My files';
     const search = h('input.nb-search', { type: 'search', placeholder: 'Search notebooks', value: opts.q, hidden: !opts.searching, oninput: e => { opts.q = e.target.value; renderItems(); } });
     const list = h('div', { className: opts.grid ? 'nb-grid' : 'nb-list' });
-    const renderItems = () => list.replaceChildren(...(listed().length ? listed().map(item) : [h('p.nb-empty', {}, opts.filter === 'trash' ? 'Trash is empty.' : 'No notebooks yet — tap + to start one.')]));
+    const fresh = !lib.notebooks.some(b => !b.trashed) && opts.filter === 'all' && !opts.tag;
+    const renderItems = () => list.replaceChildren(...(listed().length ? listed().map(item) : fresh ? [] : [h('p.nb-empty', {}, opts.filter === 'trash' ? 'Trash is empty.' : 'Nothing here.')]));
     libEl.replaceChildren(
       h('header.nb-head', {},
-        iconBtn('menu', 'Menu', () => { drawer.hidden = !drawer.hidden; renderDrawer(); }),
+        iconBtn('menu', 'Menu', () => drawer.classList.toggle('open'), { className: 'ibtn nb-menu' }),
         h('h2', {}, title),
         h('select.nb-sort', { 'aria-label': 'Sort', onchange: e => { opts.sort = e.target.value; local.set('pp.nbSort', opts.sort); renderLibrary(); } }, SORTS.map(([v, l]) => h('option', { value: v, selected: v === opts.sort }, l)))),
       h('div.nb-sub', {}, h('span', {}, `${items.length} item${items.length === 1 ? '' : 's'}`), search),
-      list,
+      fresh ? startPanel() : list,
       h('div.nb-pill', {},
         iconBtn('zoom', 'Search', () => { opts.searching = !opts.searching; if (!opts.searching) opts.q = ''; renderLibrary(); if (opts.searching) libEl.querySelector('.nb-search').focus(); }),
         opts.filter !== 'trash' && iconBtn('plus', 'New notebook', newNotebook),
         iconBtn(opts.grid ? 'menu' : 'grid', opts.grid ? 'List view' : 'Thumbnails', () => { opts.grid = !opts.grid; local.set('pp.nbGrid', opts.grid); renderLibrary(); })));
     renderItems();
-    libEl.append(drawer);
+    renderDrawer();
   };
+  // first visit: pick a template and start writing, right here
+  const startPanel = () => h('div.nb-start', {},
+    h('h3', {}, 'Start a notebook'),
+    h('p', {}, 'Pick a page to write on. Notebooks are saved in this browser and kept here, ready to find again.'),
+    h('div.nb-templates', {}, TEMPLATES.map(([id, label]) => {
+      const c = h('canvas', { width: 96, height: 128 }); drawTemplate(c.getContext('2d'), id, 96 / PW);
+      return h('button.nb-tpl', { type: 'button', onclick: () => createBook(id, `${label} notes`) }, c, h('span', {}, label));
+    })));
   const ago = t => { const d = (Date.now() - t) / 1000; return d < 60 ? 'just now' : d < 3600 ? `${Math.floor(d / 60)} min ago` : d < 86400 ? `${Math.floor(d / 3600)} h ago` : new Date(t).toLocaleDateString(); };
   const item = b => h('div.nb-item', {},
     h('button.nb-open', { type: 'button', onclick: () => (b.trashed ? null : openBook(b)) },
@@ -107,14 +116,14 @@ export function initNotes(app, sendToCanvas) {
           iconBtn('trash', 'Move to trash', () => { b.trashed = true; touch(b, true); })]));
   const renderDrawer = () => {
     const tags = [...new Set(lib.notebooks.flatMap(b => b.tags ?? []))].sort();
-    const go = (filter, tag = null) => { Object.assign(opts, { filter, tag }); drawer.hidden = true; renderLibrary(); };
+    const go = (filter, tag = null) => { Object.assign(opts, { filter, tag }); drawer.classList.remove('open'); renderLibrary(); };
     const row = (ic, label, on, fn) => h('button.nb-drow', { type: 'button', className: on ? 'on' : '', onclick: fn }, icon(ic), h('span', {}, label));
-    drawer.replaceChildren(
+    drawer.replaceChildren(...[
       row('folder', 'My files', opts.filter === 'all' && !opts.tag, () => go('all')),
       row('star', 'Favorites', opts.filter === 'favs', () => go('favs')),
       tags.length ? h('div.nb-dlabel', {}, 'Tags') : null, ...tags.map(t => row('tag', t, opts.tag === t, () => go('all', t))),
       h('span.nb-dspace'),
-      row('trash', 'Trash', opts.filter === 'trash', () => go('trash')));
+      row('trash', 'Trash', opts.filter === 'trash', () => go('trash'))].filter(Boolean));
   };
   const touch = (b, rerender) => { b.modified = Date.now(); save(); if (rerender) renderLibrary(); };
 
@@ -127,7 +136,10 @@ export function initNotes(app, sendToCanvas) {
     const name = h('input.nb-name', { type: 'text', value: `Notebook ${lib.notebooks.length + 1}`, 'aria-label': 'Name' });
     const ok = await modal('New notebook', h('div.nb-new', {}, name, h('div.sub-label', {}, 'Template'), tiles), [['Cancel', null], ['Create', 'ok', true]], 'wide');
     if (!ok) return;
-    const now = Date.now(), b = { id: uid(), name: name.value.trim() || 'Notebook', template: pick, created: now, modified: now, pages: [{ strokes: [] }], tags: [], fav: false };
+    createBook(pick, name.value.trim() || 'Notebook');
+  }
+  function createBook(template, name) {
+    const now = Date.now(), b = { id: uid(), name, template, created: now, modified: now, pages: [{ strokes: [] }], tags: [], fav: false };
     lib.notebooks.push(b); save(); openBook(b);
   }
 
@@ -297,7 +309,7 @@ export function initNotes(app, sendToCanvas) {
     root.replaceChildren(editor, slot);
     requestAnimationFrame(() => { fit(); go((b.last ?? 1) - 1); syncTools(); });
   }
-  function showLibrary() { closePop(); view = 'library'; book = null; root.replaceChildren(libEl, slot); renderLibrary(); }
+  function showLibrary() { closePop(); view = 'library'; book = null; root.replaceChildren(shell, slot); renderLibrary(); }
 
   idb.get('notebooks').then(s => { if (s?.notebooks) lib = s; showLibrary(); }).catch(showLibrary);
   root.classList.add('nb');

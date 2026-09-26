@@ -43,7 +43,9 @@ export async function showGallery(project) {
         h('select.nb-sort', { 'aria-label': 'Sort', onchange: e => { opts.sort = e.target.value; local.set('pp.galSort', opts.sort); render(); } }, SORTS.map(([v, l]) => h('option', { value: v, selected: v === opts.sort }, l)))),
       ...(recent.length ? [h('div.nb-sub', {}, h('span', {}, 'Recent')), h('div.gal-recent', {}, recent.map(tile))] : []),
       h('div.nb-sub', {}, h('span', {}, `${items.length} drawing${items.length === 1 ? '' : 's'}`), search),
-      h('div', { className: opts.grid ? 'nb-grid' : 'nb-list' }, items.length ? items.map(tile) : h('p.nb-empty', {}, all.length ? 'Nothing matches.' : 'No saved drawings yet — File ▸ Save to Browser (Ctrl+S) keeps one here.')),
+      all.length ? h('div', { className: opts.grid ? 'nb-grid' : 'nb-list' }, items.length ? items.map(tile) : h('p.nb-empty', {}, 'Nothing matches.'))
+        : h('div.nb-start', {}, h('h3', {}, 'Your drawings live here'), h('p', {}, 'Save a drawing with File ▸ Save to Browser (Ctrl+S) and it shows up here, with your most recent ones on top.'),
+          h('div.nb-start-btns', {}, h('button.btn.primary', { type: 'button', onclick: () => act('file.new') }, icon('plus'), 'New canvas'), h('button.btn', { type: 'button', onclick: () => act('file.open') }, icon('folder'), 'Open a file'))),
       h('div.nb-pill', {},
         iconBtn('zoom', 'Search', () => { opts.searching = !opts.searching; if (!opts.searching) opts.q = ''; render().then(() => opts.searching && page.querySelector('.nb-search').focus()); }),
         iconBtn('plus', 'New canvas', () => act('file.new')),
