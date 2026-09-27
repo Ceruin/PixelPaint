@@ -726,7 +726,7 @@ export class Mascot {
     const ph = this.phys, air = ph?.hang ? this.grab : ph?.fly, deg = ph ? Math.round((ph.hang ? this.hangAngle() : ph.fly ? ph.fly.th : ph.settle.th) * 60 / Math.PI) * 3 : 0;
     const kick = ph?.hang && Math.abs(ph.hang.om) < 4 ? (Math.floor(t * 5) % 3) - 1 : 0, drop = ph?.settle ? Math.round(ph.settle.y) : 0;
     // Only repaint when the picture changes (idle: a couple of times a second, not 12).
-    const key = `${this.state}|${pose}|${x}|${y}|${flip}|${breath}|${k}|${outfitHex}|${this.canvas.width}|${emote}|${bob}|${phase}|${this.extra}|${deg}|${kick}|${drop}|${air ? `${air.x},${air.y}` : ''}`;
+    const key = `${this.state}|${pose}|${x}|${y}|${flip}|${breath}|${k}|${outfitHex}|${this.canvas.width}|${emote}|${bob}|${phase}|${this.extra}|${deg}|${kick}|${drop}|${air ? `${air.x},${air.y}` : ''}|${radio.on}`;
     const dt = Math.min(0.1, (performance.now() - (this.lastDraw ?? 0)) / 1000);
     this.lastDraw = performance.now();
     if (key === this.drawn && !this.parts.length) return;
@@ -754,6 +754,7 @@ export class Mascot {
       if (st.notes && Math.floor(t * 2) % 2 && !still) this.parts.length < 3 && this.parts.push({ icon: 'note', x: AX + (Math.random() - 0.5) * 30, y: FLOOR - 58, vx: (Math.random() - 0.5) * 0.4, vy: -0.4, life: 18 });
       if (emote) { const [ew] = iconSize(emote); drawIcon(ctx, emote, x - Math.floor(ew / 2), y - by - 7 + bob, k, this.stats.chaos && emote === 'emDot' ? '#ffd23f' : null); }
     }
+    if (radio.on && st.prop !== 'radio') this.drawProp(ctx, { prop: 'radio' }, x, y, t, k);   // the radio sits by her while it plays, whatever she's doing
     this.drawParts(ctx, k, dt);
   }
   // Sleeping Z's: each one drifts up from her head, growing, then pops; three in a cycle.
@@ -1063,8 +1064,8 @@ export class Mascot {
   }
 
   toy(id) {
+    if (id === 'radio') return this.setRadio(!radio.on);   // works any time: asleep, in class or during focus
     if (!this.awake()) return this.say('Zzz…');
-    if (id === 'radio') return this.setRadio(!radio.on);
     if (playToy(this, id)) return this.stats.change({ energy: -2 });
     if (id === 'tv') { sfx('tv'); this.stats.change({ fun: 3 }); return this.react('tv', { say: 'Cartoons… I guess.', force: true }); }
     this.stats.change({ fun: 12, energy: -2 }, 1);
@@ -1074,7 +1075,10 @@ export class Mascot {
   // The radio plays lofi until you switch it off; she sits by it, nodding along.
   setRadio(on, track) {
     radioNotes(this, on);
-    if (on) { radio.play(track); this.stats.change({ fun: 10 }, 1); this.stats.feel('joy', 15); this.play('vibe', { say: `♪ ${radio.name}` }); }
+    if (on) {
+      radio.play(track);
+      if (this.awake()) { this.stats.change({ fun: 10 }, 1); this.stats.feel('joy', 15); this.play('vibe', { say: `♪ ${radio.name}` }); }
+    }
     else { radio.stop(); if (this.state === 'vibe') this.base(); }
     bus.emit('pyxl:stats', this.stats);
   }
@@ -1090,7 +1094,6 @@ export class Mascot {
   school(focusMin) {
     const s = this.stats;
     if (!this.awake()) return this.say('Zzz…');
-    this.setRadio(false);
     s.attend(currentLesson()[0], Date.now(), focusMin ? focusMin * 60e3 : undefined, !!focusMin);
     this.breakUntil = 0;
     this.play('depart', { say: focusMin ? `Focus time! See you in ${focusMin} minutes.` : 'Off to kindergarten!' });
