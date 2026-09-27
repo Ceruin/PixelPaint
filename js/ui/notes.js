@@ -2,6 +2,7 @@ import { h, icon, iconBtn } from './dom.js';
 import { idb, local } from '../core/storage.js';
 import { modal, form } from './dialogs.js';
 import { debounce, download, toBlob } from '../core/util.js';
+import { modeTabs } from './modes.js';
 
 // Notes, after reMarkable's Paper Pro: a library of notebooks (list or thumbnails, sort, search,
 // favourites, tags, trash) and a calm paper page to write on with a few pens, an eraser, a lasso
@@ -362,7 +363,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
     penB, eraseB, selB, undoB, redoB,
     h('span.nb-title', {}),
     moreB,
-    iconBtn('brush', 'Back to Draw', toDraw),
+    modeTabs('notes'),
     iconBtn('x', 'Close notebook', () => showLibrary()));
   const nav = h('div.nb-nav', {},
     iconBtn('chevronLeft', 'Previous page', () => go(pageIx - 1)), pageLabel,

@@ -9,12 +9,15 @@ export const THEMES = [['dark', 'Dark', 'zen'], ['light', 'Light', 'sun'], ['pap
 // Old saved modes → workspace + toggle.
 export const LEGACY = { zen: { mode: 'paint', focus: true }, paper: { mode: 'paint', theme: 'paper' } };
 
+// The Draw | Notes tabs on their own (Notes shows them in its notebook bar too).
+export const modeTabs = current => h('div.mode-switch', { role: 'tablist' }, MODES.map(([id, label, ic]) =>
+  h('button.mode-btn', { type: 'button', role: 'tab', className: id === current ? 'on' : '', 'data-tip': `${label} workspace`, 'data-action': `mode.${id}`, onclick: () => actions.run(`mode.${id}`) },
+    icon(ic), h('span', {}, label))));
+
 export function modeSwitch(current, { focus, theme }) {
   const [, tLabel, tIcon] = THEMES.find(t => t[0] === theme) ?? THEMES[0];
   return h('div.mode-bar', {},
-    h('div.mode-switch', { role: 'tablist' }, MODES.map(([id, label, ic]) =>
-      h('button.mode-btn', { type: 'button', role: 'tab', className: id === current ? 'on' : '', 'data-tip': `${label} workspace`, 'data-action': `mode.${id}`, onclick: () => actions.run(`mode.${id}`) },
-        icon(ic), h('span', {}, label)))),
+    modeTabs(current),
     current === 'paint' && iconBtn('folder', 'My Art: your saved drawings (Ctrl+Shift+O)', () => actions.run('file.library'), { 'data-action': 'file.library' }),
     current !== 'pixel' && iconBtn('expand', 'Focus: full-screen canvas', () => actions.run('view.focus'), { className: `ibtn${focus ? ' on' : ''}`, 'data-action': 'view.focus' }),
     iconBtn(tIcon, `Theme: ${tLabel} (click for the next)`, () => actions.run('view.theme'), { 'data-action': 'view.theme' }));
