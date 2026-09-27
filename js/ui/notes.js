@@ -152,6 +152,11 @@ export function initNotes(app, sendToCanvas, toDraw) {
   const vw = { x: 0, y: 0, z: 1, r: 0 };
   const zoomLabel = h('button.nb-zoom', { type: 'button', 'data-tip': 'Fit the page', onclick: () => { Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 }); applyView(true); } }, '100%');
   const applyView = (settle) => {
+    // panning stops once only KEEP px of the page is left on screen, so it can't be lost off the edge
+    const r = wrap.getBoundingClientRect(), c = Math.abs(Math.cos(vw.r)), s = Math.abs(Math.sin(vw.r));
+    const hw = PW * css * vw.z / 2, hh = PH * css * vw.z / 2, KEEP = 80;
+    const mx = Math.max(0, c * hw + s * hh + r.width / 2 - KEEP), my = Math.max(0, s * hw + c * hh + r.height / 2 - KEEP);
+    vw.x = Math.max(-mx, Math.min(mx, vw.x)); vw.y = Math.max(-my, Math.min(my, vw.y));
     cv.style.transform = `translate(${vw.x}px, ${vw.y}px) rotate(${vw.r}rad) scale(${vw.z})`;
     zoomLabel.textContent = `${Math.round(vw.z * 100)}%${vw.r ? ` · ${Math.round(vw.r * 180 / Math.PI)}°` : ''}`;
     const q = Math.min(3, Math.max(1, Math.ceil(vw.z - 0.15)));   // re-render sharper when zoomed in (once the gesture ends)
