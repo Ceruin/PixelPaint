@@ -45,7 +45,8 @@ export function careBody(pyxl, onPlay) {
           h('button.ibtn.sm', { type: 'button', 'data-tip': 'Next track', onclick: () => pyxl.setRadio(true, radio.index + 1) }, icon('last')),
           h('button.ibtn.sm', { type: 'button', 'data-tip': 'Switch the radio off', onclick: () => pyxl.setRadio(false) }, icon('pause'))),
         h('label.pc-volume', { 'data-tip': 'Volume of the radio, toys and games' }, icon(radio.volume ? 'volume' : 'mute'),
-          h('input', { type: 'range', min: 0, max: 100, value: Math.round(radio.volume * 100), 'aria-label': 'Volume', oninput: e => { radio.setVolume(e.target.value / 100); e.target.previousSibling.replaceWith(icon(radio.volume ? 'volume' : 'mute')); } }),
+          h('input', { type: 'range', min: 0, max: 100, value: Math.round(radio.volume * 100), 'aria-label': 'Volume', style: { '--p': `${Math.round(radio.volume * 100)}%` },
+            oninput: e => { radio.setVolume(e.target.value / 100); e.target.style.setProperty('--p', `${e.target.value}%`); e.target.previousSibling.replaceWith(icon(radio.volume ? 'volume' : 'mute')); } }),
           h('small', {}, 'Sound')),
       ];
     },

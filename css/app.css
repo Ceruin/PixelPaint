@@ -461,7 +461,7 @@ body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-top { display: flex; gap: 4px; }
 .pc-top > div { display: contents; }
 .pc-top .btn { flex: 1; justify-content: center; gap: 5px; min-width: 0; }
-.pc-top .btn:disabled { opacity: .45; }
+.pc-top .btn:disabled, .pc-content .btn:disabled { opacity: .45; cursor: default; }
 .pc-top .btn.on { border-color: var(--accent); color: var(--accent); }
 .pc-toys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
 .pc-volume { display: flex; align-items: center; gap: 8px; color: var(--muted); }
