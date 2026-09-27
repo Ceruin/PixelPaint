@@ -39,7 +39,7 @@ const panels = new Panels($('#workspace'));
 const mascot = new Mascot(app);
 mascot.keepDrawing = (c, name) => { setMode('paint'); project.importLayer(c, name); };
 const zen = initZen(app, panels);
-const notes = initNotes(app, c => { setMode('paint'); project.importLayer(c, 'Sketch note'); });
+const notes = initNotes(app, c => { setMode('paint'); project.importLayer(c, 'Sketch note'); }, () => setMode('paint'));
 
 // Opens a panel where it lives; in Focus, or when its dock is folded, as a flyout by the clicked control.
 const openPanel = (id, e) => {

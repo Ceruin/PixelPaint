@@ -54,7 +54,7 @@ function renderPage(ctx, page, template, s = 1, skip) {
 const bbox = st => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (let i = 0; i < st.pts.length; i += 3) { x0 = Math.min(x0, st.pts[i]); x1 = Math.max(x1, st.pts[i]); y0 = Math.min(y0, st.pts[i + 1]); y1 = Math.max(y1, st.pts[i + 1]); } return { x0, y0, x1, y1 }; };
 const inPoly = (x, y, poly) => { let c = false; for (let i = 0, j = poly.length - 2; i < poly.length; j = i, i += 2) if ((poly[i + 1] > y) !== (poly[j + 1] > y) && x < (poly[j] - poly[i]) * (y - poly[i + 1]) / (poly[j + 1] - poly[i + 1]) + poly[i]) c = !c; return c; };
 
-export function initNotes(app, sendToCanvas) {
+export function initNotes(app, sendToCanvas, toDraw) {
   const root = document.getElementById('notes');
   const slot = h('div.board-slot');
   let lib = { notebooks: [] }, view = 'library', book = null, pageIx = 0;
@@ -119,6 +119,7 @@ export function initNotes(app, sendToCanvas) {
     const go = (filter, tag = null) => { Object.assign(opts, { filter, tag }); drawer.classList.remove('open'); renderLibrary(); };
     const row = (ic, label, on, fn) => h('button.nb-drow', { type: 'button', className: on ? 'on' : '', onclick: fn }, icon(ic), h('span', {}, label));
     drawer.replaceChildren(...[
+      row('brush', 'Draw', false, () => { drawer.classList.remove('open'); toDraw(); }),
       row('folder', 'My files', opts.filter === 'all' && !opts.tag, () => go('all')),
       row('star', 'Favorites', opts.filter === 'favs', () => go('favs')),
       tags.length ? h('div.nb-dlabel', {}, 'Tags') : null, ...tags.map(t => row('tag', t, opts.tag === t, () => go('all', t))),

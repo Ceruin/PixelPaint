@@ -43,8 +43,8 @@
 <script>
 // Coming back from an update: carry on the same loading bar from where it stopped.
 try { const u = sessionStorage.getItem('pp.updated'); if (u) { document.querySelector('#splash .sp-msg').textContent = 'Updating PixelPaint…'; document.querySelector('#splash .sp-bar i').style.setProperty('--from', Math.min(0.9, +u || 0.6)); } } catch (e) {}
-// Safety net: if starting ever stalls, let the user through instead of waiting forever.
-setTimeout(() => { const s = document.getElementById('splash'); if (s && !s.hidden && !s.classList.contains('out')) { s.querySelector('.sp-msg').textContent = 'Taking longer than usual… tap to continue'; s.onclick = () => s.classList.add('out'); } }, 12000);
+// Safety net: if starting ever stalls, offer a reload - never let the user into a half-loaded app.
+setTimeout(() => { const s = document.getElementById('splash'); if (s && !s.hidden && !s.classList.contains('out')) { s.querySelector('.sp-msg').textContent = 'Taking longer than usual… tap to reload'; s.onclick = () => location.reload(); } }, 12000);
 </script>
 <div id="app">
   <header class="menubar" id="menubar"></header>
