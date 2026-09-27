@@ -357,6 +357,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
     penB, eraseB, selB, undoB, redoB,
     h('span.nb-title', {}),
     moreB,
+    iconBtn('brush', 'Back to Draw', toDraw),
     iconBtn('x', 'Close notebook', () => showLibrary()));
   const nav = h('div.nb-nav', {},
     iconBtn('chevronLeft', 'Previous page', () => go(pageIx - 1)), pageLabel,
@@ -374,7 +375,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
   }, true);
 
   function openBook(b) {
-    book = b; view = 'editor'; hist = []; redo = []; sel = null; tool = 'pen'; Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 }); zq = 1;
+    book = b; view = 'editor'; pageIx = 0; hist = []; redo = []; sel = null; tool = 'pen'; Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 }); zq = 1;
     bar.querySelector('.nb-title').textContent = b.name;
     root.replaceChildren(editor, slot);
     requestAnimationFrame(() => { fit(); go((b.last ?? 1) - 1); syncTools(); });
