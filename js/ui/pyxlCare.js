@@ -83,12 +83,12 @@ export function careBody(pyxl, onPlay) {
     school() {
       const [id, name, kind] = currentLesson(), now = Date.now(), left = LESSON_SLOT - (now % LESSON_SLOT);
       const at = s.school, learned = LESSONS.filter(l => s.learned[l[0]]), brk = pyxl.breakUntil > now;
-      const focusBtn = min => h('button.btn.sm', { type: 'button', disabled: !!at || !pyxl.awake(), onclick: () => pyxl.school(min) }, `${min} min`);
+      const focusBtn = min => h('button.btn.sm', { type: 'button', disabled: !!at || !pyxl.awake(), onclick: () => pyxl.school(min) }, `${min}min`);
       return [
         h('p.pc-mood', {}, at?.focus ? `Focusing — ${clock(at.until - now)} left.` : at ? `In ${LESSONS.find(l => l[0] === at.id)?.[1]} class — back in ${clock(at.until - now)}.` : brk ? `Break — ${clock(pyxl.breakUntil - now)}. Stretch!` : `Next lesson in ${clock(left)}.`),
         at && h('button.btn.sm', { type: 'button', onclick: () => pyxl.leaveSchool() }, icon('x'), h('span.lbl', {}, at.focus ? 'Stop focusing' : 'Bring her home')),
         h('div.pc-label', {}, 'Focus together'),
-        h('div.pc-focus', {}, iconCanvas('moon', 3), h('small', {}, `She studies while you work, then you both take a break.${s.pomos ? ` ${s.pomos} done.` : ''}`), h('div.pc-focus-btns', {}, [15, 25, 50].map(focusBtn))),
+        h('div.pc-focus', {}, iconCanvas('moon', 3), h('small', {}, `She studies while you work, then you both take a break.${s.pomos ? ` ${s.pomos} done.` : ''}`), h('div.pc-focus-btns', {}, [15, 30, 60].map(focusBtn))),
         h('div.pc-label', {}, 'Kindergarten'),
         h('div.pc-lesson', {}, iconCanvas(kind === 'instrument' ? id : kind === 'dance' ? 'note' : kind === 'song' ? 'note' : kind === 'drawing' ? 'crayons' : 'star', 3),
           h('div', {}, h('b', {}, name), h('small', {}, `${kind[0].toUpperCase()}${kind.slice(1)}${s.learned[id] ? ` · learned${kind === 'song' || kind === 'drawing' ? ` (level ${s.learned[id]}/5)` : ''}` : ''}`)),

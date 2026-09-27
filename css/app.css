@@ -916,8 +916,8 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .nb-tpl.on { border-color: var(--accent); }
 /* the page */
 .nb-editor { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.nb-bar { display: flex; align-items: center; gap: 4px; padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--nb-line); }
-.nb-bar .ibtn { width: 40px; height: 40px; border-radius: 4px; }
+.nb-bar { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: var(--paper); border-bottom: 1px solid var(--nb-line); }   /* same height as Draw's top bar */
+.nb-bar .ibtn { width: 30px; height: 30px; border-radius: 4px; }
 .nb-bar .ibtn:disabled { opacity: .3; }
 .nb-tool[data-tip=Pens] { position: relative; }
 .nb-tool[data-tip=Pens]::after { content: ''; position: absolute; right: 5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1.5px var(--paper); }
