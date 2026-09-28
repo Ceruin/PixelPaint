@@ -77,9 +77,23 @@ export function slider({ label, min = 0, max = 100, step = 1, value, fmt = v => 
     out.textContent = fmt(+input.value);
     input.style.setProperty('--p', `${(input.value - min) / (max - min) * 100}%`);
   };
-  input.addEventListener('pointerdown', () => { v0 = +input.value; });
-  input.addEventListener('input', () => { paint(); onInput?.(+input.value); });
-  input.addEventListener('change', () => onCommit?.(+input.value, v0));
+  // A finger on a slider may be starting a scroll: the thumb stays put until the drag goes sideways,
+  // so scrolling a panel past a slider doesn't flick its value (and what it controls) for a moment.
+  let touch = null;
+  input.addEventListener('pointerdown', e => { v0 = +input.value; touch = e.pointerType === 'touch' ? { x: e.clientX, y: e.clientY, sliding: false } : null; });
+  input.addEventListener('pointermove', e => {
+    if (!touch || touch.sliding) return;
+    const dx = Math.abs(e.clientX - touch.x), dy = Math.abs(e.clientY - touch.y);
+    if (dx > 6 && dx > dy) touch.sliding = true;
+  });
+  const settle = () => { if (touch && !touch.sliding) { input.value = v0; paint(); } touch = null; };
+  input.addEventListener('pointerup', settle);
+  input.addEventListener('pointercancel', settle);
+  input.addEventListener('input', () => {
+    if (touch && !touch.sliding) { input.value = v0; return; }
+    paint(); onInput?.(+input.value);
+  });
+  input.addEventListener('change', () => +input.value !== v0 && onCommit?.(+input.value, v0));
   paint();
   const el = h('label.slider', {}, h('span.sl-label', {}, label), out, input);
   return { el, input, set(v) { input.value = v; paint(); } };
