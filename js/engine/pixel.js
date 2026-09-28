@@ -1,11 +1,15 @@
-import { Rect } from '../core/util.js';
+import { Rect, DEG } from '../core/util.js';
 
 // Pixel pencil: whole square pixels, no anti-aliasing. Lines between samples are Bresenham, and
 // "pixel-perfect" removes the L-shaped corner pixels a freehand line leaves (as in Aseprite).
 // Same interface as BrushEngine, so PaintTool handles preview, selection, alpha lock and undo.
+// On a turned view (`turn` degrees, `flip` mirrored) the square stays upright on screen.
 export class PixelEngine {
-  constructor({ target, color, size = 1, perfect = true, symmetry, dither = false }) {
+  constructor({ target, color, size = 1, perfect = true, symmetry, dither = false, turn = 0, flip = false }) {
     Object.assign(this, { ctx: target, size: Math.max(1, Math.round(size)), perfect, sym: symmetry, dither, dirty: null, path: [] });
+    this.rows = stampRows(this.size, turn % 90 ? turn * DEG : 0, flip);
+    const top = this.rows[0][0], left = Math.min(...this.rows.map(r => r[1])), right = Math.max(...this.rows.map(r => r[2]));
+    this.box = { x: left, y: top, w: right - left + 1, h: this.rows.length };
     target.fillStyle = color;
   }
   cell(p) { const o = (this.size - 1) / 2; return [Math.floor(p.x - o), Math.floor(p.y - o)]; }
@@ -29,8 +33,8 @@ export class PixelEngine {
   add(c) {
     const path = this.path, n = path.length;
     if (n && path[n - 1][0] === c[0] && path[n - 1][1] === c[1]) return;
-    // pixel-perfect: a, b, c where b is the elbow of an L — drop b
-    if (this.perfect && n >= 2) {
+    // pixel-perfect: a, b, c where b is the elbow of an L — drop b (1px only: a wider elbow overlaps a and c)
+    if (this.perfect && this.size === 1 && n >= 2) {
       const a = path[n - 2], b = path[n - 1];
       if ((a[0] === b[0] || a[1] === b[1]) && (b[0] === c[0] || b[1] === c[1]) && a[0] !== c[0] && a[1] !== c[1]) { this.plot(b, true); path.pop(); }
     }
@@ -39,17 +43,35 @@ export class PixelEngine {
     this.plot(c);
   }
   plot([x, y], clear = false) {
-    const s = this.size;
+    const s = this.size, b = this.box;
     for (const f of this.sym) {
       const [cx, cy] = f(x + s / 2, y + s / 2, 0), X = Math.round(cx - s / 2), Y = Math.round(cy - s / 2);
-      if (this.dither && !clear) { for (let j = 0; j < s; j++) for (let i = 0; i < s; i++) if (!((X + i + Y + j) & 1)) this.ctx.fillRect(X + i, Y + j, 1, 1); }   // checkerboard, fixed to the canvas grid
-      else clear ? this.ctx.clearRect(X, Y, s, s) : this.ctx.fillRect(X, Y, s, s);
-      this.dirtyLast = { x: X, y: Y, w: s, h: s };
+      for (const [j, i0, i1] of this.rows) {
+        if (clear) this.ctx.clearRect(X + i0, Y + j, i1 - i0 + 1, 1);
+        else if (this.dither) { for (let i = i0; i <= i1; i++) if (!((X + i + Y + j) & 1)) this.ctx.fillRect(X + i, Y + j, 1, 1); }   // checkerboard, fixed to the canvas grid
+        else this.ctx.fillRect(X + i0, Y + j, i1 - i0 + 1, 1);
+      }
+      this.dirtyLast = { x: X + b.x, y: Y + b.y, w: b.w, h: b.h };
       this.dirty = Rect.union(this.dirty, this.dirtyLast);
       if (this.drawn && !clear) this.drawn.push(this.dirtyLast);
     }
   }
   takeDirty() { const d = this.dirty; this.dirty = null; return d; }
+}
+
+// The pencil's square as row spans [row, first, last] (offsets from the stamp's corner): the canvas
+// pixels whose centres fall inside a size-wide square turned by `a` radians against the canvas.
+function stampRows(s, a, flip) {
+  const c = Math.cos(a), sn = Math.sin(a), h = s / 2, m = Math.ceil(s * 0.21) + 1, rows = [];
+  for (let j = -m; j < s + m; j++) {
+    let i0 = null, i1 = null;
+    for (let i = -m; i < s + m; i++) {
+      const dx = (i + 0.5 - h) * (flip ? -1 : 1), dy = j + 0.5 - h;
+      if (Math.abs(dx * c - dy * sn) <= h && Math.abs(dx * sn + dy * c) <= h) { i0 ??= i; i1 = i; }
+    }
+    if (i0 !== null) rows.push([j, i0, i1]);
+  }
+  return rows;
 }
 
 // Pixel line / rectangle / ellipse from the press point to the pointer, redrawn as it moves (the

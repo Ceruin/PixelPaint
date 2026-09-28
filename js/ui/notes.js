@@ -146,9 +146,12 @@ export function initNotes(app, sendToCanvas, toDraw) {
   }
 
   // ================= editor =================
-  const cv = h('canvas.nb-page'), ctx = cv.getContext('2d'), wrap = h('div.nb-paper', {}, cv);
+  // The canvas covers the stage at screen resolution and draws the page through the view, so a
+  // zoomed-in page costs no more to draw than a fitted one. The sheet under it only casts the
+  // page's shadow (moved by CSS).
+  const cv = h('canvas.nb-page'), ctx = cv.getContext('2d'), sheet = h('div.nb-sheet'), wrap = h('div.nb-paper', {}, sheet, cv);
   const pageLabel = h('span.nb-pageno');
-  let hist = [], redo = [], sel = null, scale = 1, cache = null, css = 1, zq = 1;
+  let hist = [], redo = [], sel = null, scale = 1, cache = null, cached = null, css = 1, dpr = 1, frame = 0;
   // the view: the page's offset from the middle (CSS px), zoom and rotation — pinch, twist and drag with two fingers
   const vw = { x: 0, y: 0, z: 1, r: 0 };
   const zoomLabel = h('button.nb-zoom', { type: 'button', 'data-tip': 'Fit the page', onclick: () => { Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 }); applyView(true); } }, '100%');
@@ -158,35 +161,50 @@ export function initNotes(app, sendToCanvas, toDraw) {
     const hw = PW * css * vw.z / 2, hh = PH * css * vw.z / 2, KEEP = 80;
     const mx = Math.max(0, c * hw + s * hh + r.width / 2 - KEEP), my = Math.max(0, s * hw + c * hh + r.height / 2 - KEEP);
     vw.x = Math.max(-mx, Math.min(mx, vw.x)); vw.y = Math.max(-my, Math.min(my, vw.y));
-    cv.style.transform = `translate(${vw.x}px, ${vw.y}px) rotate(${vw.r}rad) scale(${vw.z})`;
+    sheet.style.transform = `translate(${vw.x}px, ${vw.y}px) rotate(${vw.r}rad) scale(${vw.z})`;
+    scale = css * vw.z * dpr;
     zoomLabel.textContent = `${Math.round(vw.z * 100)}%${vw.r ? ` · ${Math.round(vw.r * 180 / Math.PI)}°` : ''}`;
-    const q = Math.min(3, Math.max(1, Math.ceil(vw.z - 0.15)));   // re-render sharper when zoomed in (once the gesture ends)
-    if (settle && q !== zq) { zq = q; fit(); } else syncBar();
+    syncBar();
+    // mid-gesture the last render just moves along; the page is drawn afresh once the gesture ends
+    if (settle) redraw(); else frame ||= requestAnimationFrame(() => { frame = 0; paint(); });
   };
   const page = () => book.pages[pageIx];
   const fit = () => {
-    const r = wrap.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+    const r = wrap.getBoundingClientRect();
     if (!r.width) return;
+    dpr = devicePixelRatio || 1;
     css = Math.min((r.width - 24) / PW, (r.height - 24) / PH);
-    scale = css * dpr * zq;
-    Object.assign(cv, { width: Math.round(PW * scale), height: Math.round(PH * scale) });
-    Object.assign(cv.style, { width: `${PW * css}px`, height: `${PH * css}px`, marginLeft: `${-PW * css / 2}px`, marginTop: `${-PH * css / 2}px` });
+    Object.assign(cv, { width: Math.round(r.width * dpr), height: Math.round(r.height * dpr) });
+    Object.assign(sheet.style, { width: `${PW * css}px`, height: `${PH * css}px`, marginLeft: `${-PW * css / 2}px`, marginTop: `${-PH * css / 2}px` });
     applyView(); redraw();
   };
   // page units ↔ screen, through the view
   const centre = () => { const r = wrap.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2, r]; };
   const toPage = (cx, cy) => { const [mx, my] = centre(), dx = cx - mx - vw.x, dy = cy - my - vw.y, c = Math.cos(-vw.r), s2 = Math.sin(-vw.r); return [PW / 2 + (dx * c - dy * s2) / vw.z / css, PH / 2 + (dx * s2 + dy * c) / vw.z / css]; };
   const toScreen = (x, y) => { const [mx, my] = centre(), qx = (x - PW / 2) * css * vw.z, qy = (y - PH / 2) * css * vw.z, c = Math.cos(vw.r), s2 = Math.sin(vw.r); return [mx + vw.x + qx * c - qy * s2, my + vw.y + qx * s2 + qy * c]; };
+  // page units already multiplied by `s` (drawTemplate / drawStroke scale themselves) → canvas pixels
+  const pageAt = (v, s) => new DOMMatrix().translate(cv.width / 2 + v.x * dpr, cv.height / 2 + v.y * dpr).rotate(v.r * 180 / Math.PI).translate(-PW / 2 * s, -PH / 2 * s);
+  const clipPage = (c, s) => { c.beginPath(); c.rect(0, 0, PW * s, PH * s); c.clip(); };
   new ResizeObserver(() => view === 'editor' && fit()).observe(wrap);
   // the finished strokes are cached on a canvas; the live stroke / lasso draw over it
   const redraw = () => {
     cache ??= document.createElement('canvas');
     Object.assign(cache, { width: cv.width, height: cv.height });
-    renderPage(cache.getContext('2d'), page(), book.template, scale, sel?.moving ? new Set(sel.strokes) : null);
+    const c = cache.getContext('2d');
+    c.setTransform(pageAt(vw, scale)); clipPage(c, scale);
+    renderPage(c, page(), book.template, scale, sel?.moving ? new Set(sel.strokes) : null);
+    cached = { ...vw, s: scale };
     paint();
   };
-  const paint = (live) => {
-    ctx.drawImage(cache, 0, 0);
+  const paint = () => {
+    const m = pageAt(vw, scale);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+    if (cached.x === vw.x && cached.y === vw.y && cached.z === vw.z && cached.r === vw.r) ctx.drawImage(cache, 0, 0);
+    else {   // the view moved since the last render: fresh paper and lines, the old render carried along
+      ctx.setTransform(m); drawTemplate(ctx, book.template, scale);
+      ctx.setTransform(m.scale(scale / cached.s).multiply(pageAt(cached, cached.s).inverse())); ctx.drawImage(cache, 0, 0);
+    }
+    ctx.save(); ctx.setTransform(m); clipPage(ctx, scale);
     if (live) drawStroke(ctx, live, scale);
     if (sel) {
       const d = sel.moving ? sel.d : [0, 0];
@@ -194,6 +212,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
       if (sel.box) { const b = sel.box; ctx.save(); ctx.setLineDash([8, 6]); ctx.strokeStyle = '#4a57b8'; ctx.lineWidth = 2; ctx.strokeRect((b.x0 + d[0] - 10) * scale, (b.y0 + d[1] - 10) * scale, (b.x1 - b.x0 + 20) * scale, (b.y1 - b.y0 + 20) * scale); ctx.restore(); }
     }
     if (lasso) { ctx.save(); ctx.setLineDash([6, 6]); ctx.strokeStyle = '#4a57b8'; ctx.lineWidth = 2; ctx.beginPath(); for (let i = 0; i < lasso.length; i += 2) ctx.lineTo(lasso[i] * scale, lasso[i + 1] * scale); ctx.stroke(); ctx.restore(); }
+    ctx.restore();
   };
   const commit = () => { redo = []; book.last = pageIx + 1; touch(book); redraw(); syncBar(); };
   const snap = () => { hist.push({ ix: pageIx, strokes: page().strokes.slice() }); if (hist.length > 100) hist.shift(); };
@@ -262,14 +281,15 @@ export function initNotes(app, sendToCanvas, toDraw) {
   }, { passive: false });
   cv.addEventListener('pointerdown', e => {
     if (gest || e.button !== 0 && e.button !== 5 && e.pointerType !== 'touch' || (e.pointerType === 'touch' && penSeen)) return;
-    e.preventDefault(); cv.setPointerCapture(e.pointerId);
     const [x, y, p] = at(e), eraser = tool === 'eraser' || e.button === 5;
+    if (x < 0 || y < 0 || x > PW || y > PH) return;   // the canvas spans the stage; only the page takes ink
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
     if (sel?.box && x > sel.box.x0 - 14 && x < sel.box.x1 + 14 && y > sel.box.y0 - 14 && y < sel.box.y1 + 14) { drag = [x, y]; sel.moving = true; sel.d = [0, 0]; redraw(); return; }
     if (sel) { sel = null; syncBar(); }
     if (tool === 'select') { lasso = [x, y]; paint(); return; }
     if (eraser) { snap(); eraseHit = false; eraseAt(x, y); return; }
     live = { pen: pen.pen, size: SIZES.find(s => s[0] === pen.size)[2], color: pen.color, pts: [x, y, p] };
-    paint(live);
+    paint();
   });
   let penSeen = false;
   cv.addEventListener('pointermove', e => {
@@ -283,7 +303,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
       else if (tool === 'eraser' || e.buttons & 32) eraseAt(x, y);
       else if (live) { const q = live.pts; if ((q.at(-3) - x) ** 2 + (q.at(-2) - y) ** 2 > 2) q.push(x, y, p); }
     }
-    paint(live);
+    paint();
   });
   const eraseAt = (x, y) => {
     const st = page().strokes, keep = st.filter(s => !hits(s, x, y, 16));
@@ -381,7 +401,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
   }, true);
 
   function openBook(b) {
-    book = b; view = 'editor'; pageIx = 0; hist = []; redo = []; sel = null; tool = 'pen'; Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 }); zq = 1;
+    book = b; view = 'editor'; pageIx = 0; hist = []; redo = []; sel = null; tool = 'pen'; Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 });
     bar.querySelector('.nb-title').textContent = b.name;
     root.replaceChildren(editor, slot);
     requestAnimationFrame(() => { fit(); go((b.last ?? 1) - 1); syncTools(); });

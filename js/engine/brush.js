@@ -19,10 +19,11 @@ const grain = (x, y) => { const s = Math.sin((x | 0) * 12.9898 + (y | 0) * 78.23
 const mix = (a, b, t) => ({ ...b, x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, p: a.p + (b.p - a.p) * t });
 
 // Dab-based stroke engine. Input points {x, y, p, alt, az} in doc space; output dabs on `target`.
-// Pure rendering: no knowledge of layers, UI or history.
+// Pure rendering: no knowledge of layers, UI or history. The tip's angle (and the pen's tilt) is
+// held against the screen, so on a view turned `turn` degrees (or mirrored) the tip doesn't turn.
 export class BrushEngine {
-  constructor(brush, { target, color, symmetry, profile = {}, alphaMul = 1, smudge = false, wrap = null, scale = 1 }) {
-    Object.assign(this, { b: brush, ctx: target, sym: symmetry, profile, alphaMul, smudge, wrap, scale, dirty: null });
+  constructor(brush, { target, color, symmetry, profile = {}, alphaMul = 1, smudge = false, wrap = null, scale = 1, turn = 0, flip = false }) {
+    Object.assign(this, { b: brush, ctx: target, sym: symmetry, profile, alphaMul, smudge, wrap, scale, turn: turn * DEG, flip, dirty: null });
     this.res = clamp(2 ** Math.ceil(Math.log2(Math.max(1, brush.size * 2))), 16, 512);
     this.mask = tipMask(brush.tip, brush.hardness, this.res);
     this.tip = smudge ? null : tint(this.mask, color);
@@ -103,14 +104,15 @@ export class BrushEngine {
     const b = this.b;
     let size = this.sizeAt(q.p), x = q.x, y = q.y, squash = b.roundness;
     let alpha = b.flow * (b.pressureOpacity ? q.p : 1) * this.alphaMul;
-    let ang = b.angle * DEG + (b.followDir ? this.dir : 0);
+    const onScreen = a => (this.flip ? this.turn - a : a - this.turn);
+    let ang = b.followDir ? b.angle * DEG + this.dir : onScreen(b.angle * DEG);
     if (b.sizeJitter) size *= 1 - Math.random() * b.sizeJitter;
     if (b.angleJitter) ang += (Math.random() - 0.5) * TAU * b.angleJitter;
     if (b.scatter) { const r = Math.random() * b.scatter * size, t = Math.random() * TAU; x += Math.cos(t) * r; y += Math.sin(t) * r; }
     if (this.profile.grain) alpha *= 1 - this.profile.grain * grain(x, y);
     if (b.tilt && q.alt != null && q.alt < HALF_PI - 0.1) {
       const t = 1 - q.alt / HALF_PI;
-      squash *= 1 - 0.6 * t; size *= 1 + t; ang = q.az;
+      squash *= 1 - 0.6 * t; size *= 1 + t; ang = onScreen(q.az);
     }
     this.sym.forEach((f, i) => {
       const [sx, sy, sa, m] = f(x, y, ang);

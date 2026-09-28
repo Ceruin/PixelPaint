@@ -44,7 +44,7 @@ export class Panels {
     const p = { id, title, icon: ic, el, s: { ...def } };
     this.defaults[id] = def;
     this.map.set(id, p);
-    el.querySelector('.panel-head').addEventListener('pointerdown', e => !e.target.closest('button') && !el.classList.contains('flyout') && !this.locked && this.drag(p, e));
+    el.querySelector('.panel-head').addEventListener('pointerdown', e => !e.target.closest('button') && !this.locked && this.drag(p, e));
     // a corner handle resizes a floating panel (CSS resize has no touch support)
     el.querySelector('.panel-resize').addEventListener('pointerdown', e => {
       if (p.s.dock || this.locked) return;
@@ -180,6 +180,8 @@ export class Panels {
   }
 
   // Header drag: tear off into a floating panel; drop near a dock column to dock it.
+  // A flyout tears off too (on phones panels only open as flyouts); in Focus it comes off
+  // pinned, since unpinned floating panels are hidden there.
   drag(p, e) {
     const { el, s } = p, r = el.getBoundingClientRect(), wr = this.ws.getBoundingClientRect();
     const off = { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -190,6 +192,7 @@ export class Panels {
       if (!moved) {
         if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 5) return;
         moved = true;
+        if (this.fly?.p === p) { this.closeFlyout(); s.pinned ||= document.body.dataset.layout === 'zen'; }
         Object.assign(s, { dock: null, x: r.left - wr.left, y: r.top - wr.top, w: r.width, h: Math.max(r.height, 160) });
         this.placeAll();
         el.style.zIndex = 20;
@@ -202,23 +205,28 @@ export class Panels {
       if (zone) Object.assign(marker.style, { left: `${zone.left}px`, top: `${Math.round(zone.y) - 2}px`, width: `${zone.width}px` });
     };
     const up = () => {
-      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
       for (const side of ['left', 'right']) this.sides[side].classList.remove('drop');
       marker.remove();
       el.style.zIndex = '';
       if (!moved) return;
-      if (zone) { Object.assign(s, { dock: zone.side, order: zone.order }); this.folded[zone.side] = false; if (this.opened) this.opened[zone.side] = true; }
+      if (zone) { Object.assign(s, { dock: zone.side, order: zone.order }); this.folded[zone.side] = false; if (this.narrow) (this.opened ??= {})[zone.side] = true; }
       this.normalize();
       this.placeAll();
       this.save();
     };
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
   }
 
   dockZone(ev, self) {
+    if (document.body.dataset.layout === 'zen') return null;   // Focus hides the docks
     for (const side of ['left', 'right']) {
       let box = this.sides[side].getBoundingClientRect();
+      // On a narrow screen an open dock covers most of it, so only its outer edge catches drops
+      // (otherwise every drop re-docks and a panel can never float).
+      if (this.narrow && box.width >= 40 && !(side === 'left' ? ev.clientX < box.left + 48 : ev.clientX > box.right - 48)) continue;
       if (box.width < 40) {   // an empty dock has no width: it catches drops along its edge of the workspace
         const wr = this.ws.getBoundingClientRect(), w = 260;
         box = { top: wr.top, bottom: wr.bottom, height: wr.height, width: w, left: side === 'left' ? wr.left : wr.right - w, right: side === 'left' ? wr.left + w : wr.right };

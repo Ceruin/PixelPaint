@@ -93,7 +93,7 @@ export class PaintTool {
   makeEngine(target, b, smudge) {
     const { app } = this, { w, h } = app.doc;
     return new BrushEngine(b, {
-      target, color: app.color.fg, symmetry: app.symmetry(), scale: 1 / app.view.zoom,
+      target, color: app.color.fg, symmetry: app.symmetry(), scale: 1 / app.view.zoom, turn: app.view.rot, flip: app.view.flip,
       profile: app.profile, alphaMul: b.buildup ? b.opacity : 1, smudge, wrap: app.opts.wrap ? { w, h } : null,
     });
   }
@@ -211,26 +211,23 @@ export class PixelTool extends PaintTool {
   erasing(e) { return this.app.opts.pixelErase || e?.button === 2; }
   makeEngine(target) {
     const { app } = this;
-    const o = app.opts, base = { target, color: app.color.fg, size: o.pixelSize, symmetry: app.symmetry(), dither: o.pixelDither };
+    const o = app.opts, base = { target, color: app.color.fg, size: o.pixelSize, symmetry: app.symmetry(), dither: o.pixelDither, turn: app.view.rot, flip: app.view.flip };
     return this.id === 'pxshape' ? new PixelShapeEngine({ ...base, kind: o.shape, filled: o.pixelFill }) : new PixelEngine({ ...base, perfect: o.pixelPerfect });
   }
-  // The cursor is the square of pixels the pencil will fill.
+  // The cursor is the square the pencil will fill, upright on screen like its stamp on a turned view.
   cellRect(view) {
     const p = this.hoverPt;
     if (!p) return null;
-    const n = this.app.opts.pixelSize, o = (n - 1) / 2, x = Math.floor(p.x - o), y = Math.floor(p.y - o);
-    const pts = [[x, y], [x + n, y], [x, y + n], [x + n, y + n]].map(([a, b]) => view.toScreen(a, b));
-    const xs = pts.map(q => q.x), ys = pts.map(q => q.y);
-    return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys), pts };
+    const n = this.app.opts.pixelSize, o = (n - 1) / 2, c = view.toScreen(Math.floor(p.x - o) + n / 2, Math.floor(p.y - o) + n / 2), s = n * view.zoom;
+    return { x: c.x - s / 2, y: c.y - s / 2, w: s, h: s };
   }
   bounds(view) { const r = this.cellRect(view); return r && { x: r.x - 2, y: r.y - 2, w: r.w + 4, h: r.h + 4 }; }
   drawCursor(ctx, view) {
     const r = this.cellRect(view);
     if (!r) return;
-    const [a, b, c, d] = r.pts;
     ctx.lineWidth = 1;
     for (const [col, off] of [['rgba(0,0,0,.6)', 0], ['rgba(255,255,255,.9)', 1]]) {
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(d.x, d.y); ctx.lineTo(c.x, c.y); ctx.closePath();
+      ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h);
       ctx.setLineDash(off ? [3, 3] : []); ctx.strokeStyle = col; ctx.stroke();
     }
     ctx.setLineDash([]);
