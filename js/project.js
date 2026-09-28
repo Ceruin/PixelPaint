@@ -113,8 +113,8 @@ export function createProject(app) {
       app.doc.libId = id; app.doc.name = name;
       await idb.set(`lib:${id}`, await packDoc(app.doc, cache));
       index[id] = { id, name, date: Date.now(), thumb: thumbOf(), w: app.doc.w, h: app.doc.h };
-      await idb.set('library', index);
-      if (!auto) saveLocal(false);
+      await idb.set('library', index);
+      if (!auto) saveLocal(false);
       return id;
     },
     async open(id) {
