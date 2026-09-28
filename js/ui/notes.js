@@ -28,8 +28,8 @@ function drawTemplate(ctx, kind, s = 1) {
   if (kind === 'dots') for (let y = 72; y < PH; y += 72) for (let x = 72; x < PW; x += 72) { ctx.beginPath(); ctx.arc(x * s, y * s, 2.6 * s, 0, 7); ctx.fill(); }
 }
 const PEN_STYLE = {
-  fineliner: { w: 3, press: 0, alpha: 1 }, ballpoint: { w: 3.2, press: 0.6, alpha: 0.92 }, pencil: { w: 3.6, press: 0.8, alpha: 0.55 },
-  marker: { w: 9, press: 0.3, alpha: 1 }, highlighter: { w: 30, press: 0, alpha: 0.35, flat: true }, calligraphy: { w: 7, press: 0.8, alpha: 1, nib: true },
+  fineliner: { w: 3, press: 0.45, alpha: 1 }, ballpoint: { w: 3.2, press: 0.6, alpha: 0.92 }, pencil: { w: 3.6, press: 0.8, alpha: 0.55 },
+  marker: { w: 9, press: 0.5, alpha: 1 }, highlighter: { w: 30, press: 0, alpha: 0.35, flat: true }, calligraphy: { w: 7, press: 0.8, alpha: 1, nib: true },
 };
 function drawStroke(ctx, st, s = 1) {
   const P = PEN_STYLE[st.pen] ?? PEN_STYLE.fineliner, p = st.pts, base = P.w * st.size * s;
