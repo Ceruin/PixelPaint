@@ -161,6 +161,8 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .stage { position: relative; flex: 1; min-width: 0; background: var(--stage); overflow: hidden; }
 .stage canvas { position: absolute; left: 0; top: 0; display: block; }   /* sized by the viewport (grow-only backing) */
 .dock { display: flex; flex-direction: column; gap: 6px; padding: 6px; background: var(--bg); min-height: 0; position: relative; z-index: 4; }
+/* a flyout lives inside its dock: lift the dock over the other dock and floating panels (and their scrollbars) while one is open */
+.dock:has(> .dock-panels > .panel.flyout) { z-index: 65; }
 .dock-left { border-right: 1px solid var(--line); }
 .dock-right { width: var(--dock-w); border-left: 1px solid var(--line); }
 .dock-right.empty:not(.folded) { display: none; }
