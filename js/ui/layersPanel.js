@@ -120,14 +120,18 @@ export function layersPanel(app) {
   };
 
   // Pointer-based drag reorder (works for mouse, pen and touch). Drop into a group's middle band.
+  // A finger or pen has to hold the row still for a moment first; a quick swipe scrolls the list.
   const startDrag = (n, e) => {
-    const d = doc(), now = e.timeStamp;
+    const d = doc(), now = e.timeStamp, row = e.currentTarget;
     if (lastTap.id === n.id && now - lastTap.t < 380) { lastTap = { id: 0, t: 0 }; return n.type === 'filter' ? editFilter(n) : rename(n); }
     lastTap = { id: n.id, t: now };
     if (d.active !== n) d.setActive(n);
-    let target = null;
+    let target = null, held = e.pointerType === 'mouse';
     const x0 = e.clientX, y0 = e.clientY;
+    const hold = held ? 0 : setTimeout(() => { held = true; row.classList.add('lift'); }, 350);
+    const noScroll = ev => held && ev.cancelable && ev.preventDefault();
     const move = ev => {
+      if (!held) { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) >= 6) stop(); return; }   // moved first: that's a scroll
       if (!target && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
       const el = [...list.querySelectorAll('.layer-row')].find(r => { const b = r.getBoundingClientRect(); return ev.clientY >= b.top && ev.clientY < b.bottom; });
       if (!el) return;
@@ -137,9 +141,12 @@ export function layersPanel(app) {
       if (target.into) { el.classList.add('into'); marker.style.display = 'none'; }
       else Object.assign(marker.style, { display: 'block', top: `${(target.above ? b.top : b.bottom) - list.getBoundingClientRect().top + list.scrollTop - 1}px` });
     };
+    const stop = () => {
+      clearTimeout(hold); row.classList.remove('lift'); marker.style.display = 'none';
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', stop); removeEventListener('touchmove', noScroll);
+    };
     const up = () => {
-      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
-      marker.style.display = 'none';
+      stop();
       if (!target || target.tn === n) return render();
       const { tn } = target;
       if (target.into) d.moveNode(n, tn, tn.children.length);
@@ -147,6 +154,8 @@ export function layersPanel(app) {
     };
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
+    addEventListener('pointercancel', stop);
+    addEventListener('touchmove', noScroll, { passive: false });
   };
 
   bus.on('layers', render);

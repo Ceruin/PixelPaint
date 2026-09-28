@@ -96,6 +96,7 @@ pixelBox.addEventListener('click', e => {
 });
 // App-wide items in the editor's Help menu (updates, guide, theme…).
 pixelBox.addEventListener('pp-action', e => actions.run(e.detail));
+pixelBox.addEventListener('pp-drew', () => bus.emit('drew', 'pixel'));
 
 // Workspaces: Draw ('paint'), Pixel, Notes. Focus hides the chrome (remembered per workspace; Draw
 // starts focused on touch screens). The chrome's CSS follows data-layout, which Pixel leaves as it
@@ -191,9 +192,37 @@ watchForUpdates(() => project.saveLocal(true));
 }
 addEventListener('contextmenu', e => { if (!e.target.closest?.('input, textarea, [contenteditable="true"]')) e.preventDefault(); });
 
+// Touch and pen: sliders take sideways drags and let up/down scroll their panel (CSS pan-y). A
+// finger that lands on one as a scroll begins has already moved it, so it's put back.
+addEventListener('pointerdown', e => {
+  const i = e.target;
+  if (e.pointerType === 'mouse' || !(i instanceof HTMLInputElement) || i.type !== 'range' || i.classList.contains('vslider')) return;
+  const v = i.value;
+  const done = () => { i.removeEventListener('pointercancel', undo); i.removeEventListener('pointerup', done); };
+  const undo = () => { done(); if (i.value !== v) { i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); } };
+  i.addEventListener('pointercancel', undo); i.addEventListener('pointerup', done);
+}, true);
+
+// Keeps the screen on while you work: some tablets dim mid-drawing because pen input doesn't
+// always count as activity to the system. Let go after two quiet minutes.
+{
+  let lock = null, asking = false, timer = 0;
+  const awake = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { lock?.release(); lock = null; }, 2 * 60000);
+    if (lock || asking || !navigator.wakeLock || document.hidden) return;
+    asking = true;
+    navigator.wakeLock.request('screen').then(l => { lock = l; l.addEventListener('release', () => { if (lock === l) lock = null; }); }).catch(() => {}).finally(() => { asking = false; });
+  };
+  addEventListener('pointerdown', awake, { capture: true, passive: true });
+  addEventListener('keydown', awake, { capture: true, passive: true });
+}
+
 // Space = temporary hand tool.
 addEventListener('keydown', e => { if (e.code === 'Space' && app.mode !== 'pixel' && !isTyping(e) && !app.keys.space) { app.keys.space = true; app.input.updateCursor(); e.preventDefault(); } });
 addEventListener('keyup', e => { if (e.code === 'Space') { app.keys.space = false; app.input.updateCursor(); } });
+// Space released while another window had focus never sends keyup: without this every press would pan.
+addEventListener('blur', () => { if (app.keys.space) { app.keys.space = false; app.input.updateCursor(); } });
 
 // Drop files: projects/images open; images dropped on an open canvas become layers.
 const stage = $('#stage');

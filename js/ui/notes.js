@@ -3,6 +3,7 @@ import { idb, local } from '../core/storage.js';
 import { modal, form } from './dialogs.js';
 import { debounce, download, toBlob } from '../core/util.js';
 import { modeTabs } from './modes.js';
+import { bus } from '../core/bus.js';
 
 // Notes, after reMarkable's Paper Pro: a library of notebooks (list or thumbnails, sort, search,
 // favourites, tags, trash) and a calm paper page to write on with a few pens, an eraser, a lasso
@@ -197,6 +198,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
     paint();
   };
   const paint = () => {
+    if (!cached) return;   // nothing rendered yet (the page had no size)
     const m = pageAt(vw, scale);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
     if (cached.x === vw.x && cached.y === vw.y && cached.z === vw.z && cached.r === vw.r) ctx.drawImage(cache, 0, 0);
@@ -321,7 +323,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
       lasso = null; sel = strokes.length ? { strokes, box: unionBox(strokes) } : null; paint(); syncBar(); return;
     }
     if (tool === 'eraser') { if (eraseHit) commit(); else hist.pop(); return; }
-    if (live) { snap(); page().strokes.push(live); live = null; commit(); }
+    if (live) { snap(); page().strokes.push(live); live = null; commit(); bus.emit('drew', 'notes'); }
   };
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
   const unionBox = sts => sts.map(bbox).reduce((a, b) => ({ x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) }));
@@ -378,13 +380,14 @@ export function initNotes(app, sendToCanvas, toDraw) {
     const v = await form('Template', [{ id: 't', label: 'Template', type: 'select', options: TEMPLATES, value: book.template }], 'Apply');
     if (v) { book.template = v.t; touch(book); redraw(); }
   }
+  // same order as Draw's and Focus's bars: tools, then the workspace tabs, undo / redo, and the menu last
   const bar = h('header.nb-bar', {},
-    iconBtn('chevronLeft', 'My files', () => showLibrary()),
-    penB, eraseB, selB, undoB, redoB,
+    iconBtn('chevronLeft', 'Close notebook: back to My files', () => showLibrary()),
+    penB, eraseB, selB,
     h('span.nb-title', {}),
-    moreB,
     modeTabs('notes'),
-    iconBtn('x', 'Close notebook', () => showLibrary()));
+    undoB, redoB,
+    moreB);
   const nav = h('div.nb-nav', {},
     iconBtn('chevronLeft', 'Previous page', () => go(pageIx - 1)), pageLabel,
     iconBtn('chevronRight', 'Next page (adds one at the end)', () => { if (pageIx === book.pages.length - 1) { book.pages.push({ strokes: [] }); touch(book); } go(pageIx + 1); }), zoomLabel);

@@ -26,6 +26,9 @@ export class CanvasInput {
     el.addEventListener('pointermove', e => this.move(e));
     el.addEventListener('pointerup', e => this.up(e));
     el.addEventListener('pointercancel', e => this.up(e));
+    // capture lost without a pointerup (a dialog opened, the window lost focus): end it anyway,
+    // or the stroke stays "active" and every later press is ignored
+    el.addEventListener('lostpointercapture', e => this.up(e));
     el.addEventListener('pointerleave', () => app.tool.hover?.(null));
     el.addEventListener('wheel', e => this.wheel(e), { passive: false });
     el.addEventListener('contextmenu', e => e.preventDefault());
@@ -54,6 +57,7 @@ export class CanvasInput {
     bus.emit('activity');
     const touch = e.pointerType === 'touch';
     if (touch && (this.penSeen || !app.settings.fingerDraw || this.pointers.size > 1)) return this.startGesture(e);
+    if (this.active === e.pointerId) this.up(e);   // its pointerup never arrived
     if (this.active != null) return;
     const pencil = app.tool.id === 'pencil' || app.tool.id === 'pxshape';   // the pixel tools erase with right-click
     if (e.button === 2 && !pencil) { bus.emit('popup', { x: e.clientX, y: e.clientY }); return; }

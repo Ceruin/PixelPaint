@@ -232,7 +232,7 @@ export class PyxlStats {
 
   // ---- kindergarten ----
   // `focus`: a study session with you (a pomodoro) — she learns the lesson and earns rings for it
-  attend(id, now = Date.now(), ms = LESSON_TIME, focus = false) { this.school = { id, until: now + ms, focus }; this.save(); }
+  attend(id, now = Date.now(), ms = LESSON_TIME, focus = false) { this.school = { id, from: now, until: now + ms, focus }; this.save(); }
   finishSchool() {
     const { id, focus } = this.school ?? {};
     this.school = null;

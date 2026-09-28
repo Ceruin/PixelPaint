@@ -2398,6 +2398,7 @@ async function deserializeStack(arr){
 }
 
 function pushUndo(){
+  PX.dispatchEvent(new CustomEvent("pp-drew"));   // Pyxl learns from drawing here too
   undoStack.push(snapshot());
   trimUndo();
   redoStack=[];

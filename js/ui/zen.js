@@ -6,7 +6,7 @@ import { TOOL_META } from '../tools/index.js';
 import { sizeToPos, posToSize } from './brushPanel.js';
 
 // Focus (full screen), after SketchBook: the canvas fills the window. A bar along the top holds
-// undo/redo and everything else a tap away (every tool, brushes, colour, layers and their actions,
+// the tools, undo/redo and a menu (in the same order as Draw's and Notes' bars) and everything else a tap away (every tool, brushes, colour, layers and their actions,
 // more); a slim strip on the left has size and opacity and your recent tools. While something is
 // selected (or being transformed) a bar of selection actions sits at the bottom.
 const LAYER_ACTS = [['layer.new', 'New', 'plus'], ['layer.dup', 'Duplicate', 'copy'], ['edit.copy', 'Copy', 'copy'], ['edit.cut', 'Cut', 'scissors'],
@@ -49,14 +49,16 @@ export function initZen(app, panels) {
 
   const top = h('div.zen-top.panel', {},
     h('button.zen-exit', { type: 'button', 'data-tip': 'Leave Focus and bring the menus back (Tab)', onclick: () => actions.run('view.focus') }, icon('x'), h('span', {}, 'Exit')),
-    iconBtn('undo', 'Undo', () => actions.run('edit.undo')), iconBtn('redo', 'Redo', () => actions.run('edit.redo')),
     h('span.zen-sep'),
     toolsBtn, fly('brushes', 'grid', 'Brushes'), fly('brushSettings', 'sliders', 'Brush settings'), chip, fly('layers', 'layers', 'Layers'),
     iconBtn('copy', 'Layer actions', e => pop(e.currentTarget, h('div.zen-title', {}, app.doc.activeLayer?.name ?? 'Layer'), h('div.zen-grid', {}, LAYER_ACTS.map(act)))),
+    h('span.zen-sep'),
+    iconBtn('undo', 'Undo', () => actions.run('edit.undo')), iconBtn('redo', 'Redo', () => actions.run('edit.redo')),
     iconBtn('menu', 'More', e => pop(e.currentTarget, h('div.zen-grid', {}, MORE_ACTS.map(act)))));
 
   // ---- left strip: recent tools, size and opacity ----
   let recent = local.get('pp.zenRecent', ['brush', 'eraser', 'smudge', 'lasso']);
+  const used = new Map();
   const recentBox = h('div.zen-sec');
   const renderRecent = () => recentBox.replaceChildren(...recent.filter(id => app.tools[id]).slice(0, 5).map(id =>
     h('button.ibtn.tool', { type: 'button', className: app.tool.id === id ? 'on' : '', 'data-tip': TOOL_META.find(t => t[0] === id)?.[1], onclick: () => app.setTool(id) }, icon(id === 'assist' ? 'ruler' : id))));
@@ -101,7 +103,14 @@ export function initZen(app, panels) {
   new ResizeObserver(edges).observe(strip);
   const sync = () => {
     const id = app.tool.id;
-    if (recent[0] !== id) { recent = [id, ...recent.filter(t => t !== id)].slice(0, 5); local.set('pp.zenRecent', recent); }
+    // a tool already in the strip keeps its place (buttons that jump around get mis-hit);
+    // a new one takes the slot of the one used longest ago
+    used.set(id, Date.now());
+    if (!recent.includes(id)) {
+      if (recent.length < 5) recent.push(id);
+      else recent[recent.lastIndexOf(recent.reduce((a, t) => ((used.get(t) ?? 0) <= (used.get(a) ?? 0) ? t : a)))] = id;
+      local.set('pp.zenRecent', recent);
+    }
     renderRecent();
     toolsBtn.replaceChildren(icon(id === 'assist' ? 'ruler' : id), icon('chevron'));
     chip.style.background = app.color.fg;

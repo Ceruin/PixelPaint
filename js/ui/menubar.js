@@ -29,7 +29,8 @@ export const wordmark = () => h('div.brand', { 'aria-label': 'PixelPaint' },
 
 export function menubar(el, menus, right) {
   const open = (m, btn) => { popMenu(btn, m.items); m.classList.add('open'); };
-  // Phones: one button lists the menus; picking one shows its items in the same spot.
+  // Phones: one button lists the menus; picking one shows its items in the same spot. Like every
+  // bar's menu button (Notes, Focus) it's the last one, after undo / redo.
   const burger = h('button.ibtn.menu-burger', { type: 'button', 'aria-label': 'Menu', onclick: () => {
     const drop = popMenu(burger, []);
     drop.append(...menus.map(([title, ic, items]) => h('button.menu-item', { type: 'button', onclick: () => popMenu(burger, items) }, icon(ic), h('span.mi-label', {}, title), h('span.kbd', {}, '›'))));
@@ -46,11 +47,12 @@ export function menubar(el, menus, right) {
       return m;
     }));
   el.append(
-    wordmark(), burger, nav,
+    wordmark(), nav,
     h('div.spacer'), right,
     h('div.group', {},
       iconBtn('undo', 'Undo', () => actions.run('edit.undo'), { 'data-action': 'edit.undo' }),
-      iconBtn('redo', 'Redo', () => actions.run('edit.redo'), { 'data-action': 'edit.redo' })));
+      iconBtn('redo', 'Redo', () => actions.run('edit.redo'), { 'data-action': 'edit.redo' })),
+    burger);
   // Menus never get cut off: labels drop to icons when space runs short, then fold into the burger.
   const fit = () => {
     const over = () => nav.scrollWidth > nav.clientWidth + 1;

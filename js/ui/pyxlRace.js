@@ -8,7 +8,8 @@ import { stageBox } from './pyxlGames.js';
 // Pyxl races (after the Chao Races): four racers over a course of Line (running), Colour
 // (swimming a paint river), Shape (flying over a gap) and Power (climbing a wall) sections —
 // each section runs on the matching skill. Stamina drains as they go; tap or press Space to
-// cheer (a burst of speed that costs stamina). Luck keeps them from tripping.
+// cheer (a burst of speed that costs stamina). Luck keeps them from tripping. The race runs
+// across the whole canvas area: the scene is 200 pixels tall and as wide as the screen allows.
 export const RACES = [
   ['beginner', 'Beginner', [0, 90], 15],
   ['jewel', 'Jewel', [260, 900], 40],
@@ -17,7 +18,7 @@ export const RACES = [
 const COURSE = [['line', 260], ['colour', 150], ['line', 120], ['shape', 110], ['line', 140], ['power', 110], ['line', 170]];
 const LENGTH = COURSE.reduce((a, [, l]) => a + l, 0);
 const RIVAL_COLOURS = ['#ff5a7a', '#ffb02e', '#8b5cff', '#2fb36b', '#3b7bff', '#ff7a3b'];
-const W = 320, H = 200, TRACK = 72, LANE_H = 32, LANES = [0, 1, 2, 3].map(i => TRACK + (i + 1) * LANE_H - 5);   // feet lines, back to front
+const H = 200, TRACK = 72, LANE_H = 32, LANES = [0, 1, 2, 3].map(i => TRACK + (i + 1) * LANE_H - 5);   // feet lines, back to front
 const segAt = d => { let a = 0; for (const [t, l] of COURSE) { if (d < a + l) return t; a += l; } return 'line'; };
 const MEDALS = ['Gold', 'Silver', 'Bronze'];
 
@@ -34,15 +35,16 @@ export function startRace(pyxl, level = 0) {
   });
   const racers = [rivals[0], me, rivals[1], rivals[2]].map((r, i) => Object.assign(r, { lane: i, d: 0, st: r.stamina, max: r.stamina, boost: 0, trip: 0, done: 0 }));
 
+  let W = 320;
   const cv = h('canvas.race-canvas', { width: W, height: H }), ctx = cv.getContext('2d');
   const cheer = h('button.btn.primary', { type: 'button' }, icon('sparkle'), 'Cheer!');
   const close = h('button.ibtn.sm', { type: 'button', 'aria-label': 'Close' }, icon('x'));
-  const card = h('div.race-card', {}, h('div.race-head', {}, icon('film'), h('strong', {}, `${title} Race`), h('span.spacer'), close), cv, h('div.race-foot', {}, cheer, h('small.muted', {}, 'Tap, click or press Space to cheer — it costs stamina!')));
-  const layer = h('div.race-layer', {}, card);
+  const layer = h('div.race-layer', {}, cv, h('div.race-head', {}, icon('film'), h('strong', {}, `${title} Race`), close), h('div.race-foot', {}, cheer, h('small', {}, 'Tap or press Space to cheer — it costs stamina!')));
   document.body.append(layer);
   document.body.dataset.game = '';
-  const fitScale = () => {   // on the canvas area, a whole number of device pixels per scene pixel
-    const b = stageBox(pyxl.app, { page: false }), dpr = devicePixelRatio || 1, n = Math.max(1, Math.floor(Math.min((b.width - 26) / W, (b.height - 110) / H) * dpr));
+  const fitScale = () => {   // fills the canvas area: a whole number of device pixels per scene pixel, at least 320 wide
+    const b = stageBox(pyxl.app, { page: false }), dpr = devicePixelRatio || 1, n = Math.max(1, Math.min(Math.floor(b.height * dpr / H), Math.floor(b.width * dpr / 320)));
+    W = Math.floor(b.width * dpr / n); cv.width = W;
     Object.assign(layer.style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` });
     Object.assign(cv.style, { width: `${W * n / dpr}px`, height: `${H * n / dpr}px` });
   };
@@ -106,7 +108,7 @@ export function startRace(pyxl, level = 0) {
   const standing = () => [...racers].sort((p, q) => (p.done && q.done ? p.done - q.done : p.done ? -1 : q.done ? 1 : q.d - p.d));
 
   const draw = (now, running) => {
-    const lead = Math.max(...racers.map(r => r.d)), cam = Math.max(0, Math.min(LENGTH - 250, Math.max(me.d, lead - 140) - 70)), T = now / 1000;
+    const lead = Math.max(...racers.map(r => r.d)), cam = Math.max(0, Math.min(LENGTH + 70 - W, Math.max(me.d, lead - (W - 180)) - 70)), T = now / 1000;
     ctx.imageSmoothingEnabled = false;
     // sky, clouds, hills (parallax)
     ['#8ccdff', '#9fd6ff', '#b2dfff', '#c6e8ff'].forEach((c, i) => rect(0, i * 14, W, 14, c));

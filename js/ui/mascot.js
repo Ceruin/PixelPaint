@@ -152,6 +152,9 @@ const STATES = {
   hatch: { poses: ['front'], dur: 1800, special: 'hatch' },
   cocoon: { poses: ['front'], hold: true, special: 'cocoon' },
   school: { poses: ['front'], hold: true, special: 'school' },
+  // a focus session (pomodoro): she stays and works along with you, slow careful strokes, an
+  // hourglass beside her running down the session
+  focus: { poses: ['brush', 'brush', 'paint', 'brush'], fps: 0.9, hold: true, breath: 2.4, prop: 'focus' },
 };
 const FIDGETS = ['glance', 'walk', 'peek', 'stretch', 'glance', 'walk', 'wave', 'paint', 'think'];
 const RANGE = [-10, 20]; // how far (native px) she strolls from her spot
@@ -523,7 +526,7 @@ export class Mascot {
     if (from === 'sleep' && need !== 'asleep') return this.play('wake');
     if (from === 'sit' && !this.silent && (need !== 'bored' || Date.now() - this.lastActive < 20000)) return this.play('standUp');
     if (need === 'egg') return this.play('egg');
-    if (need === 'school') return this.play('school');
+    if (need === 'school') return this.play(this.stats.school?.focus ? 'focus' : 'school');
     if (need === 'asleep') return this.play('sleep');
     if (need === 'sick') return this.play('sick');
     if (need === 'tired') return this.play('drowsy');
@@ -625,6 +628,7 @@ export class Mascot {
     if (this.state === 'egg' && now - (this.eggSince ??= now) > 120e3) this.hatchNow();
     if (s.school && now > s.school.until) {
       const r = s.finishSchool(), name = LESSONS.find(l => l[0] === r?.id)?.[1] ?? 'something';
+      if (r?.focus) return this.backFromSchool(r, name);   // she never left
       this.play('arrive');   // she walks back in, then tells you about it
       return setTimeout(() => this.backFromSchool(r, name), 1400);
     }
@@ -633,8 +637,9 @@ export class Mascot {
       this.react('wave', { say: 'Break’s over — ready for another round?', force: true });
       bus.emit('pyxl:stats', s);
     }
-    if (s.school && !['school', 'depart'].includes(this.state)) this.play('school');
-    if (this.state === 'school' && !s.school) this.base();
+    const away = s.school?.focus ? 'focus' : 'school';
+    if (s.school && ![away, 'depart'].includes(this.state)) this.play(away);
+    if (['school', 'focus'].includes(this.state) && !s.school) this.base();
     this.cocoonStep(now);
   }
   backFromSchool(r, name) {
@@ -829,7 +834,22 @@ export class Mascot {
       case 'radio': return art('radio', 1, FLOOR - 16);
       case 'tv': return art('tv', BOX_W - 17, FLOOR - 16);
       case 'crayons': return art('crayons', x + 8, FLOOR - 15);
+      case 'focus': return this.drawHourglass(ctx, 2, FLOOR - 13, k);
     }
+  }
+
+  // 9×13 hourglass: the sand runs from top to bottom over the focus session.
+  drawHourglass(ctx, x, y, k) {
+    const sc = this.stats.school, p = sc?.from ? Math.min(1, (Date.now() - sc.from) / (sc.until - sc.from)) : 0.5;
+    const px = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect((x + a) * k, (y + b) * k, w * k, h * k); };
+    px(0, 0, 9, 1, '#6b4a31'); px(0, 12, 9, 1, '#6b4a31');                            // wooden caps
+    for (let j = 1; j < 12; j++) {                                                     // glass, pinched in the middle
+      const half = Math.max(1, Math.round(Math.abs(j - 6) * 0.7)), l = 4 - half, top = j < 6;
+      px(l, j, 1, 1, '#221822'); px(8 - l, j, 1, 1, '#221822');
+      const full = top ? j >= 1 + Math.round(p * 5) : j > 11 - Math.round(p * 5);          // sand drains from the top half, heaps up below
+      if (full && j !== 6) px(l + 1, j, 7 - 2 * l, 1, '#f0c840');
+    }
+    if (p < 1 && Math.floor(Date.now() / 250) % 2) px(4, 6, 1, 3, '#f0c840');               // the falling thread
   }
 
   drawSpecial(ctx, kind, t, k, still) {
@@ -861,6 +881,8 @@ export class Mascot {
     const s = this.stats;
     const active = () => { this.lastActive = Date.now(); s.touch(); if (this.state === 'sit' && s.need !== 'bored') this.base(); };
     ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, active, { passive: true }));
+    // Notes and Sprite Studio strokes (Draw's come through history below): she learns from all your drawing
+    bus.on('drew', () => { s.train('line', 4); this.painted(); });
     bus.on('history', hist => {
       const undone = hist.undone.length, top = hist.done.at(-1), label = top?.label ?? '', now = Date.now();
       if (undone > this.lastUndone) {
@@ -1096,12 +1118,15 @@ export class Mascot {
     if (!this.awake()) return this.say('Zzz…');
     s.attend(currentLesson()[0], Date.now(), focusMin ? focusMin * 60e3 : undefined, !!focusMin);
     this.breakUntil = 0;
-    this.play('depart', { say: focusMin ? `Focus time! See you in ${focusMin} minutes.` : 'Off to kindergarten!' });
+    if (focusMin) this.play('focus', { say: `Focus time! I’ll work with you for ${focusMin} minutes.` });
+    else this.play('depart', { say: 'Off to kindergarten!' });
   }
   leaveSchool() {
     if (!this.stats.school) return;
+    const focus = this.stats.school.focus;
     this.stats.school = null; this.stats.save();
-    this.play('arrive', { say: 'Back already?' });
+    if (focus) this.react('think', { say: 'Stopping already? Okay!' });
+    else this.play('arrive', { say: 'Back already?' });
   }
 
   doctor() {

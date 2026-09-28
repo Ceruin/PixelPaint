@@ -60,7 +60,7 @@ export class FilterLayer extends Node {
 
 export class Doc {
   constructor(w, h, { bg = '#ffffff', empty = false } = {}) {
-    Object.assign(this, { w, h, name: 'Untitled', root: new Group('root'), active: null, count: 0, groups: 0, assistants: [] });
+    Object.assign(this, { w, h, bg, name: 'Untitled', root: new Group('root'), active: null, count: 0, groups: 0, assistants: [] });
     Object.assign(this, { frames: [{ duration: 100 }], frame: 0, tags: [] });
     this.history = new History();
     this.selection = new Selection(this);
@@ -141,12 +141,23 @@ export class Doc {
   }
   editPixels(label, layer, rect, fn) { this.history.push(this.pixelEdit(label, layer, rect, fn)); }
 
-  // Wipes every layer on this frame in one undoable step; a layer named "Background" goes back to
-  // plain white rather than transparent.
+  // A layer named "Background" is never left see-through: cleared, or on a new frame, it's the
+  // canvas's background colour (white for files saved before the colour was kept).
+  fillBackground(l, ctx) {
+    if (/^background$/i.test(l.name)) { ctx.fillStyle = this.bg ?? '#ffffff'; ctx.fillRect(0, 0, this.w, this.h); }
+  }
+  blankCel(l) {
+    if (!/^background$/i.test(l.name)) return BLANK;
+    const c = makeCanvas(this.w, this.h);
+    this.fillBackground(l, c.getContext('2d'));
+    return c;
+  }
+
+  // Wipes every layer on this frame in one undoable step.
   clearCanvas() {
     const cmds = this.layers.filter(l => l.view(this.frame)).map(l => this.pixelEdit('Clear Canvas', l, this.bounds, ctx => {
       ctx.clearRect(0, 0, this.w, this.h);
-      if (/^background$/i.test(l.name)) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.w, this.h); }
+      this.fillBackground(l, ctx);
     }));
     if (cmds.some(Boolean)) this.history.push(new Compound('Clear Canvas', cmds));
   }
@@ -195,7 +206,7 @@ export class Doc {
       this.frames.splice(i, 0, { duration: this.frames[this.frame].duration });
       for (const l of this.layers) {
         const src = l.cels[i - 1];
-        l.cels.splice(i, 0, dup ? (src ? copyOf(src) : undefined) : l === active ? BLANK : undefined);
+        l.cels.splice(i, 0, dup ? (src ? copyOf(src) : undefined) : l === active ? this.blankCel(l) : undefined);
       }
       for (const t of this.tags) { if (t.from >= i) { t.from++; t.to++; } else if (t.to >= i - 1) t.to++; }
       this.frame = i;
@@ -221,7 +232,7 @@ export class Doc {
   setDuration(ms, all = false) {
     this.editFrames('Frame Duration', () => this.frames.forEach((f, i) => { if (all || i === this.frame) f.duration = ms; }));
   }
-  clearCel(layer) { this.editFrames('Clear Cel', () => { layer.cels[this.frame] = BLANK; }); }
+  clearCel(layer) { this.editFrames('Clear Cel', () => { layer.cels[this.frame] = this.blankCel(layer); }); }
   holdCel(layer) { if (this.frame) this.editFrames('Hold Previous', () => { layer.cels[this.frame] = undefined; }); }
   addTag(from, to) {
     const colors = ['#5b8cff', '#ff3b47', '#17c06b', '#ffd23f', '#a445ff', '#ff8a3d'];

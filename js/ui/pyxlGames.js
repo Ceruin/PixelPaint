@@ -2,8 +2,8 @@ import { h, icon } from './dom.js';
 import { iconCanvas } from './pixelIcons.js';
 import { sfx } from './pyxlAudio.js';
 
-// Pyxl's mini-games. They play right on the canvas area (Draw's stage, or the Notes board): an
-// overlay covers it, so painting is locked until the game ends.
+// Pyxl's mini-games. They play right on the canvas area (Draw's stage, or the Notes page): an
+// overlay covers all of it, so painting is locked until the game ends.
 export const GAMES = [
   ['stars', 'Catch the Stars', 'star', 'She draws stars — tap them before they fade.'],
   ['trace', 'Trace It', 'pencilPx', 'She draws a shape; trace over it.'],
@@ -14,7 +14,7 @@ export const GAMES = [
 // Where games play: the drawing itself (the page in Draw or Sprite Studio), clipped to what's on
 // screen — or the whole canvas area when the page is too small or `page` is false. Notes: the board.
 export function stageBox(app, { page = true } = {}) {
-  const vis = el => (el?.offsetParent ? el.getBoundingClientRect() : null);
+  const vis = el => (el?.offsetParent && !el.closest('.parked') ? el.getBoundingClientRect() : null);   // a parked (see-through) Sprite Studio still has a box
   const clip = (a, b) => { const l = Math.max(a.left, b.left), t = Math.max(a.top, b.top), r = Math.min(a.right, b.right), bt = Math.min(a.bottom, b.bottom); return r > l && bt > t ? { left: l, top: t, right: r, bottom: bt } : null; };
   let area = vis(document.getElementById('pxStage')), pg = null;
   if (area?.width > 120) pg = vis(document.getElementById('pxView'));
@@ -24,7 +24,7 @@ export function stageBox(app, { page = true } = {}) {
       const pts = [[0, 0], [d.w, 0], [0, d.h], [d.w, d.h]].map(([x, y]) => v.toScreen(x, y)), xs = pts.map(q => q.x + c.left), ys = pts.map(q => q.y + c.top);
       pg = { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
     }
-  } else area = vis(document.querySelector('#notes .board'));
+  } else area = vis(document.querySelector('#notes .nb-paper'));
   if (!area?.width) return { left: 0, top: 0, width: innerWidth, height: innerHeight };
   const box = page && pg && clip(pg, area), use = box && box.right - box.left >= 240 && box.bottom - box.top >= 200 ? box : area;
   return { left: use.left, top: use.top, width: use.right - use.left, height: use.bottom - use.top };
@@ -33,7 +33,7 @@ let app = null;
 
 // The overlay a game plays in: a bar (title, status, close) and a full-size drawing canvas.
 function arena(title, onQuit) {
-  const b = stageBox(app), dpr = devicePixelRatio || 1;
+  const b = stageBox(app, { page: false }), dpr = devicePixelRatio || 1;
   const status = h('span.ga-status'), cv = h('canvas.ga-canvas', { width: Math.round(b.width * dpr), height: Math.round(b.height * dpr) });
   const quit = h('button.ibtn.sm', { type: 'button', 'aria-label': 'Quit game', 'data-tip': 'Quit (Esc)', onclick: () => onQuit() }, icon('x'));
   const bar = h('div.ga-bar', {}, h('b', {}, title), status, quit);
