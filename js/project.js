@@ -25,7 +25,8 @@ export function createProject(app) {
   // Autosave when you pause — never mid-stroke, and in idle time, so reading layers back never
   // lands on the start of your next stroke.
   const whenIdle = fn => (app.input?.active != null ? setTimeout(() => whenIdle(fn), 1000) : (window.requestIdleCallback ?? setTimeout)(fn, { timeout: 3000 }));
-  const autosave = debounce(() => whenIdle(() => saveLocal(true)), 2500);
+  // Like Notes, a painting you've worked on keeps itself in My Art (a blank canvas doesn't).
+  const autosave = debounce(() => whenIdle(async () => { await saveLocal(true); if (!isBlank()) library.save(app.doc.name, true); }), 2500);
   bus.on('history', autosave);
   bus.on('assist', autosave);
   addEventListener('visibilitychange', () => document.hidden && saveLocal(true));
@@ -102,16 +103,18 @@ export function createProject(app) {
   }
 
   // ---- the browser library: named projects kept in this browser (index + one entry per project) ----
+  // Blank = every pixel of the merged picture the same (an empty or plain-coloured canvas).
+  const isBlank = () => { const c = flatten(app.doc), d = new Uint32Array(c.getContext('2d').getImageData(0, 0, c.width, c.height).data.buffer); return d.every(v => v === d[0]); };
   const thumbOf = (w = 240) => { const c = flatten(app.doc), k = Math.min(1, w / c.width, w / c.height), t = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/png'); };
   const library = {
     list: async () => Object.values(await idb.get('library') ?? {}).sort((a, b) => b.date - a.date),
-    async save(name = app.doc.name) {
+    async save(name = app.doc.name, auto = false) {
       const index = await idb.get('library') ?? {}, id = app.doc.libId ?? `p${Date.now().toString(36)}`;
       app.doc.libId = id; app.doc.name = name;
       await idb.set(`lib:${id}`, await packDoc(app.doc, cache));
       index[id] = { id, name, date: Date.now(), thumb: thumbOf(), w: app.doc.w, h: app.doc.h };
-      await idb.set('library', index);
-      saveLocal(false);
+      await idb.set('library', index);
+      if (!auto) saveLocal(false);
       return id;
     },
     async open(id) {

@@ -164,7 +164,7 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .dock-left { border-right: 1px solid var(--line); }
 .dock-right { width: var(--dock-w); border-left: 1px solid var(--line); }
 .dock-right.empty:not(.folded) { display: none; }
-.dock-panels { display: flex; flex-direction: column; gap: 6px; min-height: 0; flex: 1; overflow-y: auto; scrollbar-width: thin; }
+.dock-panels { display: flex; flex-direction: column; gap: 6px; min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 .dock-left .dock-panels { flex: 0 1 auto; }
 .dock-left .panel[data-panel=tools]:not(.collapsed):not(.flyout) { flex-shrink: 1; min-height: 140px; }
 .dock.drop { outline: 2px dashed var(--accent); outline-offset: -3px; }
@@ -175,7 +175,9 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .dock-right .dock-rail { justify-content: flex-start; }
 .dock-left .dock-rail { justify-content: flex-end; }
 .rail-toggle { height: 22px !important; color: var(--muted); }
-.dock:not(.folded) .dock-rail { align-items: center; gap: 2px; flex-wrap: wrap; }
+/* an open dock keeps its panel icons on one row: they shrink rather than stack up over the panels */
+.dock:not(.folded) .dock-rail { align-items: center; gap: 1px; min-width: 0; }
+.dock:not(.folded) .rail-mini { flex: 0 1 24px; width: auto; min-width: 16px; }
 .dock-left:not(.folded) .rail-toggle { margin-left: auto; }
 .rail-mini.on { background: var(--panel2); border-color: var(--line); color: var(--accent); }
 .rail-mini:not(.on) { opacity: .5; }
@@ -223,7 +225,7 @@ body[data-layout=zen] .float-layer { z-index: 60; }   /* over Focus's bars, like
 .panel.collapsed .panel-body { display: none; }
 .panel.collapsed .panel-head { border-bottom: 0; }
 .panel.collapsed .fold .ic { transform: rotate(-90deg); }
-.panel-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px; scrollbar-width: thin; }
+.panel-body { flex: 1; min-height: 0; overflow: auto; overflow-x: hidden; padding: 8px 10px; scrollbar-width: thin; }
 .panel.flyout {
   display: flex !important; position: fixed; z-index: 70; width: min(300px, calc(100vw - 70px)); height: auto;
   max-height: min(600px, calc(100dvh - 90px)); box-shadow: var(--shadow); resize: none;
@@ -324,6 +326,8 @@ body[data-layout=zen] .float-layer { z-index: 60; }   /* over Focus's bars, like
 .rename { flex: 1; user-select: text; }
 .badges { display: inline-flex; gap: 3px; align-items: center; color: var(--muted); }
 .badges .ic { width: 13px; height: 13px; }
+.layer-grip { display: grid; place-items: center; align-self: stretch; width: 26px; margin-right: -4px; flex: none; color: var(--muted); cursor: grab; touch-action: none; }
+.layer-grip .ic { width: 16px; height: 16px; }
 .drop-line { display: none; position: absolute; left: 6px; right: 6px; height: 2px; background: var(--accent); pointer-events: none; }
 .layer-foot { display: flex; justify-content: space-around; padding: 4px; border-top: 1px solid var(--line); flex: none; }
 
@@ -587,7 +591,7 @@ body[data-layout=zen] .zen-strip { position: absolute; left: 0; top: 64px; botto
 .zen-pop.panel { width: max-content; height: auto; }
 @media (max-width: 600px) {
   .zen-top { gap: 1px; padding: 4px; }
-  .zen-top .zen-exit span:not(.ic), .zen-top [data-tip="Brush settings"], .zen-sep { display: none; }
+  .zen-top .zen-exit span:not(.ic), .zen-sep { display: none; }
   .zen-top .zen-exit { padding: 0 9px; }
   .zen-top .ibtn { width: 36px; height: 36px; }
   .zen-grid { grid-template-columns: repeat(4, minmax(64px, 1fr)); }
@@ -923,10 +927,11 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .nb-bar { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: var(--paper); border-bottom: 1px solid var(--nb-line); }   /* same height as Draw's top bar */
 .nb-bar .ibtn { width: 30px; height: 30px; border-radius: 4px; }
 .nb-bar .ibtn:disabled { opacity: .3; }
+.nb-bar > * { flex: none; }
 .nb-tool[data-tip=Pens] { position: relative; }
-.nb-tool[data-tip=Pens]::after { content: ''; position: absolute; right: 5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1.5px var(--paper); }
-.nb-tool[data-tip=Pens]::after { background: var(--ink, #1b1d23); }
-.nb-title { flex: 1; text-align: center; font: 600 13px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--nb-muted); }
+.nb-tool[data-tip=Pens]::after { content: ''; position: absolute; right: 5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--pen-ink, #1b1d23); box-shadow: 0 0 0 1.5px var(--paper); }
+/* a narrow bar gives up the notebook's name first, then the labels on the Draw | Notes switch */
+.nb-title { flex: 1 1 0; min-width: 0; text-align: center; font: 600 13px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--nb-muted); }
 .nb-stage { position: relative; flex: 1; min-height: 0; display: flex; }
 .nb-paper { flex: 1; position: relative; min-width: 0; overflow: hidden; touch-action: none; }
 .nb-page { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
@@ -961,3 +966,37 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .gal-recent .gal-thumb { width: 100%; aspect-ratio: 4 / 3; }
 .gal-recent .nb-item { position: relative; }
 .gal-recent .nb-acts { position: absolute; top: 4px; right: 4px; background: var(--paper); border-radius: 6px; box-shadow: var(--shadow); }
+
+/* ---------- narrow panels: a thin dock or a shrunk floating panel re-flows instead of clipping ---------- */
+section.panel[data-panel]:not([data-panel=tools]) { container: panel / inline-size; }
+@container panel (max-width: 250px) {
+  .panel-head { gap: 2px; padding-left: 6px; }
+  .panel-head > .ic, .panel-head .pin { display: none; }
+  .panel-body { padding: 6px; }
+  .picker > .seg { align-self: stretch; }
+  .seg button { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 4px; overflow: hidden; }
+  .picker-row { flex-wrap: wrap; gap: 6px; }
+  .picker-row .hex { flex: 1 1 64px; min-width: 0; }
+  .picker-row select { flex: 1 1 0; min-width: 0; }
+  .swatches { grid-template-columns: repeat(auto-fill, minmax(18px, 1fr)); }
+  .layer-props { grid-template-columns: minmax(0, 1fr) auto; padding: 6px 6px 4px; }
+  .layer-props select { min-width: 0; width: 100%; }
+  .layer-row { gap: 4px; }
+  .layer-foot { justify-content: space-between; }
+}
+@container panel (max-width: 190px) {
+  .seg button .ic { display: none; }
+  .layer-props { grid-template-columns: minmax(0, 1fr); }
+  .layer-props .flags { justify-content: space-between; }
+  .layer-sub, .badges { display: none; }
+  .thumb-wrap { width: 30px; height: 30px; }
+  .layer-foot { flex-wrap: wrap; }
+}
+@media (max-width: 560px) { .nb-title { font-size: 0; } }   /* a clipped letter or two reads as a glitch: keep the gap, drop the name */
+@media (max-width: 420px) { .nb-bar { gap: 2px; padding: 5px 6px; } .nb-bar .mode-btn { padding: 0 6px; } }
+
+/* eyedropper: new colour over old, held above the fingertip; pops when the pick lands */
+.pick-loupe { position: fixed; z-index: 500; width: 64px; height: 64px; margin: -104px 0 0 -32px; border-radius: 50%; pointer-events: none;
+  background: linear-gradient(var(--now, transparent) 50%, var(--was, transparent) 50%); border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), var(--shadow); }
+.pick-loupe.done { animation: pick-pop .4s ease-out forwards; }
+@keyframes pick-pop { 30% { transform: scale(1.18); background: var(--now); } to { transform: scale(1.18); background: var(--now); opacity: 0; } }

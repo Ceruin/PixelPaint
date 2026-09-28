@@ -80,9 +80,10 @@ export function layersPanel(app) {
         ? [h('button.ibtn.sm', { type: 'button', onclick: () => { n.collapsed = !n.collapsed; render(); } }, icon(n.collapsed ? 'chevronRight' : 'chevron')), h('span.folder', {}, icon('folder'))]
         : n.type === 'filter' ? h('span.thumb-wrap.fx', {}, icon('sparkle')) : h('span.thumb-wrap', {}, thumb(n)),
       h('span.layer-meta', {}, h('span.layer-name', {}, n.name), h('span.layer-sub', {}, `${Math.round(n.opacity * 100)}% · ${n.type === 'filter' ? 'Filter layer' : BLEND_SHORT[n.blend] ?? 'Pass Through'}`)),
-      h('span.badges', {}, n.clip && icon('clip'), n.alphaLock && icon('alpha'), n.locked && icon('lock')));
+      h('span.badges', {}, n.clip && icon('clip'), n.alphaLock && icon('alpha'), n.locked && icon('lock')),
+      h('span.layer-grip', { 'data-tip': 'Drag to move' }, icon('grip')));
     el.node = n;
-    el.addEventListener('pointerdown', e => !e.target.closest('button') && startDrag(n, e));
+    el.addEventListener('pointerdown', e => !e.target.closest('button') && startDrag(n, e, !!e.target.closest('.layer-grip')));
     return el;
   };
 
@@ -120,14 +121,16 @@ export function layersPanel(app) {
   };
 
   // Pointer-based drag reorder (works for mouse, pen and touch). Drop into a group's middle band.
-  // A finger or pen has to hold the row still for a moment first; a quick swipe scrolls the list.
-  const startDrag = (n, e) => {
+  // A finger or pen has to hold the row still for a moment first (a quick swipe scrolls the list),
+  // unless it grabs the row's grip, which drags straight away.
+  const startDrag = (n, e, grip) => {
     const d = doc(), now = e.timeStamp, row = e.currentTarget;
-    if (lastTap.id === n.id && now - lastTap.t < 380) { lastTap = { id: 0, t: 0 }; return n.type === 'filter' ? editFilter(n) : rename(n); }
+    if (!grip && lastTap.id === n.id && now - lastTap.t < 380) { lastTap = { id: 0, t: 0 }; return n.type === 'filter' ? editFilter(n) : rename(n); }
     lastTap = { id: n.id, t: now };
     if (d.active !== n) d.setActive(n);
-    let target = null, held = e.pointerType === 'mouse';
+    let target = null, held = grip || e.pointerType === 'mouse';
     const x0 = e.clientX, y0 = e.clientY;
+    if (grip) row.classList.add('lift');
     const hold = held ? 0 : setTimeout(() => { held = true; row.classList.add('lift'); }, 350);
     const noScroll = ev => held && ev.cancelable && ev.preventDefault();
     const move = ev => {

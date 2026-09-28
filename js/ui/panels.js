@@ -99,13 +99,15 @@ export class Panels {
     this.fly = { p, anchor };
     const r = anchor.getBoundingClientRect(), right = r.left > innerWidth / 2;
     p.el.classList.add('flyout');
-    Object.assign(p.el.style, {
-      top: `${Math.max(8, r.top)}px`, width: '', height: '',
-      left: right ? 'auto' : `${r.right + 8}px`, right: right ? `${innerWidth - r.left + 8}px` : 'auto',
-    });
+    // Focus's top bar sits over the docks: its popovers open below the bar, where the header can be grabbed
+    const below = !!anchor.closest('.zen-top');
+    Object.assign(p.el.style, below
+      ? { top: `${r.bottom + 8}px`, width: '', height: '', left: `${r.left}px`, right: 'auto' }
+      : { top: `${Math.max(8, r.top)}px`, width: '', height: '', left: right ? 'auto' : `${r.right + 8}px`, right: right ? `${innerWidth - r.left + 8}px` : 'auto' });
     // Keep the whole popover on screen: slide it up / sideways once its real size is known.
     const b = p.el.getBoundingClientRect();
-    if (b.bottom > innerHeight - 8) p.el.style.top = `${Math.max(8, innerHeight - 8 - b.height)}px`;
+    if (below) p.el.style.maxHeight = `${innerHeight - r.bottom - 16}px`;
+    else if (b.bottom > innerHeight - 8) p.el.style.top = `${Math.max(8, innerHeight - 8 - b.height)}px`;
     if (b.right > innerWidth - 8) Object.assign(p.el.style, { left: `${Math.max(8, innerWidth - 8 - b.width)}px`, right: 'auto' });
     if (b.left < 8) Object.assign(p.el.style, { left: '8px', right: 'auto' });
     this.fly.stop = keepOnScreen(p.el);
@@ -117,6 +119,7 @@ export class Panels {
     stop?.();
     this.fly = null;
     p.el.classList.remove('flyout');
+    p.el.style.maxHeight = '';
     anchor.classList.remove('on');
     this.place(p);
   }

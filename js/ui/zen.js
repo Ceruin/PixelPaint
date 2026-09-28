@@ -47,14 +47,35 @@ export function initZen(app, panels) {
   const chip = h('button.chip.zen-chip', { type: 'button', 'data-tip': 'Color', onclick: e => { closePop(); panels.flyout('color', e.currentTarget); } });
   const fly = (id, ic, tip) => iconBtn(ic, tip, e => { closePop(); panels.flyout(id, e.currentTarget); });
 
+  const layerActs = anchor => pop(anchor, h('div.zen-title', {}, app.doc.activeLayer?.name ?? 'Layer'), h('div.zen-grid', {}, LAYER_ACTS.map(act)));
+  // the buttons a narrow bar can give up, least needed first; the ones that don't fit move into More
+  const spill = [
+    [fly('brushSettings', 'sliders', 'Brush settings'), 'Brush settings', 'sliders', a => panels.flyout('brushSettings', a)],
+    [iconBtn('copy', 'Layer actions', e => layerActs(e.currentTarget)), 'Layer actions', 'copy', a => layerActs(a)],
+    [fly('brushes', 'grid', 'Brushes'), 'Brushes', 'grid', a => panels.flyout('brushes', a)],
+    [fly('layers', 'layers', 'Layers'), 'Layers', 'layers', a => panels.flyout('layers', a)],
+  ];
+  const [bsBtn, laBtn, brBtn, lyBtn] = spill.map(s => s[0]);
+  const moreBtn = iconBtn('menu', 'More', e => {
+    const a = e.currentTarget, extra = spill.filter(s => s[0].style.display === 'none');
+    // a spilled panel opens under More once the menu has closed (pop() would close it again)
+    const moved = extra.map(([, label, ic, open]) => h('button.zen-act', { type: 'button', onclick: () => { closePop(); open(a); } }, icon(ic), h('span', {}, label)));
+    pop(a, h('div.zen-grid', {}, moved, MORE_ACTS.map(act)));
+  });
   const top = h('div.zen-top.panel', {},
     h('button.zen-exit', { type: 'button', 'data-tip': 'Leave Focus and bring the menus back (Tab)', onclick: () => actions.run('view.focus') }, icon('x'), h('span', {}, 'Exit')),
     h('span.zen-sep'),
-    toolsBtn, fly('brushes', 'grid', 'Brushes'), fly('brushSettings', 'sliders', 'Brush settings'), chip, fly('layers', 'layers', 'Layers'),
-    iconBtn('copy', 'Layer actions', e => pop(e.currentTarget, h('div.zen-title', {}, app.doc.activeLayer?.name ?? 'Layer'), h('div.zen-grid', {}, LAYER_ACTS.map(act)))),
+    toolsBtn, brBtn, bsBtn, chip, lyBtn, laBtn,
     h('span.zen-sep'),
     iconBtn('undo', 'Undo', () => actions.run('edit.undo')), iconBtn('redo', 'Redo', () => actions.run('edit.redo')),
-    iconBtn('menu', 'More', e => pop(e.currentTarget, h('div.zen-grid', {}, MORE_ACTS.map(act)))));
+    moreBtn);
+  const fit = () => {
+    if (!top.offsetParent) return;
+    spill.forEach(s => { s[0].style.display = ''; });
+    for (const s of spill) { if (top.scrollWidth <= top.clientWidth) break; s[0].style.display = 'none'; }
+  };
+  addEventListener('resize', fit);
+  new ResizeObserver(fit).observe(root);
 
   // ---- left strip: recent tools, size and opacity ----
   let recent = local.get('pp.zenRecent', ['brush', 'eraser', 'smudge', 'lasso']);

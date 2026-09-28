@@ -30,6 +30,7 @@ import { careBody, openCareCard } from './ui/pyxlCare.js';
 import { watchForUpdates, hideSplash } from './ui/updates.js';
 import { initZen } from './ui/zen.js';
 import { initNotes } from './ui/notes.js';
+import { TOOL_META } from './tools/index.js';
 
 const welcome = showWelcome();
 loadCustomTips();
@@ -171,6 +172,9 @@ initTooltips();
 bindKeys(a => app.mode !== 'pixel' || /^mode\./.test(a.id));
 panels.apply(local.get('pp.layout'));
 bus.on('toast', toast);
+// touch: a finger covers the button it just tapped, so a tool change also names the new tool
+const coarsePointer = matchMedia('(pointer: coarse)');
+bus.on('tool', t => coarsePointer.matches && toast(TOOL_META.find(m => m[0] === t.id)?.[1] ?? t.id));
 watchForUpdates(() => project.saveLocal(true));
 
 // Right-click belongs to the app (the colour pop-up, the editors' menus): the browser's own menu, with

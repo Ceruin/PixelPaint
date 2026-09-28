@@ -29,6 +29,7 @@ export const ICONS = {
   copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>',
   merge: '<path d="M8 3v6l4 4 4-4V3M12 13v8M8 17l4 4 4-4"/>',
   menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  grip: '<path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" stroke-width="3.2"/>',
   expand: '<path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/>',
   symmetry: '<path d="M12 2v20" stroke-dasharray="2 2.5"/><path d="M9 6 4 12l5 6zM15 6l5 6-5 6z"/>',
   palette: '<circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1"/><circle cx="12" cy="7" r="1"/><circle cx="16" cy="10" r="1"/><path d="M12 21a2.5 2.5 0 0 1 0-5h2a3 3 0 0 0 3-3"/>',

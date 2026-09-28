@@ -66,8 +66,8 @@ export class App {
     if (this.tool.id === id || !this.tools[id]) return;
     this.tool.deactivate?.();
     this.tool = this.tools[id];
-    this.tool.activate?.();
-    haptics.pulse(5);
+    this.tool.activate?.();
+    haptics.pulse(12);
     bus.emit('tool', this.tool);
     this.view.redraw();
   }

@@ -364,7 +364,7 @@ export function initNotes(app, sendToCanvas, toDraw) {
   const eraseB = iconBtn('eraser', 'Eraser (erases whole strokes)', () => setTool('eraser'), { className: 'ibtn nb-tool' });
   const selB = iconBtn('lasso', 'Select (lasso strokes, then drag, copy or delete)', () => setTool('select'), { className: 'ibtn nb-tool' });
   const undoB = iconBtn('undo', 'Undo', undo), redoB = iconBtn('redo', 'Redo', redoIt);
-  const syncTools = () => { penB.classList.toggle('on', tool === 'pen'); eraseB.classList.toggle('on', tool === 'eraser'); selB.classList.toggle('on', tool === 'select'); penB.style.setProperty('--ink', pen.color); };
+  const syncTools = () => { penB.classList.toggle('on', tool === 'pen'); eraseB.classList.toggle('on', tool === 'eraser'); selB.classList.toggle('on', tool === 'select'); penB.style.setProperty('--pen-ink', pen.color); };
   const menuItem = (ic, label, fn) => h('button.nb-mitem', { type: 'button', onclick: () => { closePop(); fn(); } }, icon(ic), h('span', {}, label));
   const exportPage = async () => { const c = h('canvas', { width: PW, height: PH }); renderPage(c.getContext('2d'), page(), book.template); download(await toBlob(c, 'image/png'), `${book.name} p${pageIx + 1}.png`); };
   const moreB = iconBtn('menu', 'Page menu', e => pop(e.currentTarget,
