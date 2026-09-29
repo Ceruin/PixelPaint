@@ -16,7 +16,15 @@ import { playToy, radioNotes } from './pyxlToys.js';
 // per sprite pixel, shared palette, 1px outline). Always drawn at an integer scale so she stays crisp.
 const atlas = new Image();
 atlas.src = 'assets/pyxl-pixel.webp';
-export const atlasReady = atlas.decode().catch(() => {});
+// The sleep pose has two static Z's painted into it (top right); they're erased from a working copy
+// of the sheet so she can breathe out animated ones instead. Everything draws from `base`.
+const ZZZ_BAKED = [1011, 18, 20, 20];   // atlas x, y, w, h — clear of her body and feet
+let base = atlas;
+export const atlasReady = atlas.decode().then(() => {
+  const c = document.createElement('canvas'); Object.assign(c, { width: atlas.width, height: atlas.height });
+  const x = c.getContext('2d'); x.drawImage(atlas, 0, 0); x.clearRect(...ZZZ_BAKED);
+  base = c; tints.clear();
+}).catch(() => {});
 
 // Outfit: her teal smock (and the teal paint on her beret) is recoloured to the colour you're
 // painting with. Greys keep her last colourful outfit; the default is her original teal.
@@ -32,7 +40,7 @@ export function tinted(hex) {
   const out = document.createElement('canvas');
   Object.assign(out, { width: atlas.width, height: atlas.height });
   const c = out.getContext('2d');
-  c.drawImage(atlas, 0, 0);
+  c.drawImage(base, 0, 0);
   const img = c.getImageData(0, 0, atlas.width, atlas.height), d = img.data;
   for (let i = 0; i < d.length; i += 4) {
     if (!d[i + 3]) continue;
@@ -53,7 +61,7 @@ export function setOutfit(hex) {
   if (ts < 0.25 || tv < 0.3) return;
   outfitHex = hex;
 }
-const sheet = () => (outfitHex ? tinted(outfitHex) : atlas);
+const sheet = () => (outfitHex ? tinted(outfitHex) : base);
 // name: [x, y, w, h, anchorX (beret centre), feet line]. 'side' faces left natively, action poses face right.
 export const SPRITES = {
   front: [0, 6, 34, 53, 15, 51], frontBlink: [35, 6, 34, 53, 15, 51], side: [70, 7, 31, 52, 17, 50], back: [102, 8, 33, 51, 16, 50],
@@ -160,6 +168,7 @@ const FIDGETS = ['glance', 'walk', 'peek', 'stretch', 'glance', 'walk', 'wave', 
 const RANGE = [-10, 20]; // how far (native px) she strolls from her spot
 // Idle snooze: she yawns after 5 minutes without any sign of you and dozes off after 8 (5-10 asked).
 const IDLE_SLEEPY = 5 * 60e3, IDLE_SLEEP = 8 * 60e3;
+const ZZZ_HEAD = [26, 16];   // where the Z's start in the 'sleep' pose (where its old static Z's were), from her anchor: x across, y up
 const NEED_ICON = { hungry: 'onigiri', lonely: 'heart', bored: 'dots', tired: 'moon', sad: 'drop' };
 const DANCES = { gogo: 'gogo', shake: 'shake', spin: 'spin', step: 'step' };
 const DRAWINGS = ['sun', 'flower', 'cake', 'car', 'house'];
@@ -761,6 +770,15 @@ export class Mascot {
       this.drawProp(ctx, st, x, y - by, t, k);
       if (st.tears && (st.tears === 'slow' ? Math.floor(t * 3) % 14 < 3 : Math.floor(t * 3) % 2)) { drawIcon(ctx, 'drop', x - 8, y - by + 22, k); drawIcon(ctx, 'drop', x + 5, y - by + 22, k); }
       if (st.notes && Math.floor(t * 2) % 2 && !still) this.parts.length < 3 && this.parts.push({ icon: 'note', x: AX + (Math.random() - 0.5) * 30, y: FLOOR - 58, vx: (Math.random() - 0.5) * 0.4, vy: -0.4, life: 18 });
+      // asleep: Z's float up from her head, drifting away from her face and growing as they rise
+      if (st.zzz) {
+        const side = flip ? -1 : 1, hx = AX + side * ZZZ_HEAD[0], hy = FLOOR - ZZZ_HEAD[1];
+        if (still) { drawIcon(ctx, 'zS', hx + this.pos - 3, hy - 3, k); drawIcon(ctx, 'zL', hx + this.pos + side * 5 - 3, hy - 12, k); }   // e-ink: a still pair
+        else if (now > (this.zzzAt ?? 0)) {
+          this.zzzAt = now + 1400;
+          if (this.parts.filter(q => q.zzz).length < 3) this.parts.push({ icon: 'zS', zzz: true, grow: 28, x: hx, y: hy - 3, vx: side * 0.26, vy: -0.42, life: 42 });
+        }
+      }
       if (emote) { const [ew] = iconSize(emote); drawIcon(ctx, emote, x - Math.floor(ew / 2), y - by - 7 + bob, k, this.stats.chaos && emote === 'emDot' ? '#ffd23f' : null); }
     }
     if (radio.on && st.prop !== 'radio') this.drawProp(ctx, { prop: 'radio' }, x, y, t, k);   // the radio sits by her while it plays, whatever she's doing
@@ -805,6 +823,7 @@ export class Mascot {
     this.parts = this.parts.filter(p => (p.life -= f) > 0);
     for (const p of this.parts) {
       p.x += p.vx * f; p.y += p.vy * f;
+      if (p.grow && p.life < p.grow) { p.icon = 'zL'; p.grow = 0; }   // a sleep Z grows as it rises
       ctx.globalAlpha = Math.min(1, p.life / 8);
       const [pw] = iconSize(p.icon);
       drawIcon(ctx, p.icon, p.x + this.pos - pw / 2, p.y, k, p.color);

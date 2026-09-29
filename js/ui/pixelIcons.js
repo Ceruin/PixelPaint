@@ -52,6 +52,14 @@ export const ICONS = {
   pill: ['.rrww.', 'rrrwww', '.rrww.'], bag: ['.nnn.', 'n...n', 'bbbbb', 'bbybb', 'bbbbb'], bloom: ['.p.', 'pyp', '.p.'],
 };
 
+// Sleep Z's in the sprite's own style: blue with a light-blue top stroke and a 1px dark outline.
+const outlined = rows => { const H = rows.length + 2, W = rows[0].length + 2, g = Array.from({ length: H }, (_, j) => Array.from({ length: W }, (_, i) => rows[j - 1]?.[i - 1] ?? '.'));
+  const out = g.map(r => r.slice());
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) if (g[j][i] === '.' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => (g[j + b]?.[i + a] ?? '.') !== '.')) out[j][i] = 'k';
+  return out.map(r => r.join('')); };
+ICONS.zS = outlined(['cccc', '..b.', '.b..', 'bbbb']);
+ICONS.zL = outlined(['ccccc', '...b.', '..b..', '.b...', 'bbbbb']);
+
 export function drawIcon(ctx, name, x, y, k = 1, color) {
   const rows = ICONS[name];
   if (!rows) return;

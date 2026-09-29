@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+// viewport-fit=cover is for the iPhone / iPad notch. On Android it opts the page into drawing under the
+// system bars (edge-to-edge), and a tablet's taskbar doesn't report its height back as a safe-area
+// inset, so bottom controls sat under it. Elsewhere, let the browser keep the app above its bars.
+if (!/iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+  document.querySelector('meta[name=viewport]').content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
+</script>
 <title>PixelPaint</title>
 <meta name="description" content="PixelPaint — paint, sketch, take notes and make pixel art in your browser.">
 <meta name="theme-color" content="#1b1d23">
