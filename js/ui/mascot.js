@@ -158,6 +158,8 @@ const STATES = {
 };
 const FIDGETS = ['glance', 'walk', 'peek', 'stretch', 'glance', 'walk', 'wave', 'paint', 'think'];
 const RANGE = [-10, 20]; // how far (native px) she strolls from her spot
+// Idle snooze: she yawns after 5 minutes without any sign of you and dozes off after 8 (5-10 asked).
+const IDLE_SLEEPY = 5 * 60e3, IDLE_SLEEP = 8 * 60e3;
 const NEED_ICON = { hungry: 'onigiri', lonely: 'heart', bored: 'dots', tired: 'moon', sad: 'drop' };
 const DANCES = { gogo: 'gogo', shake: 'shake', spin: 'spin', step: 'step' };
 const DRAWINGS = ['sun', 'flower', 'cake', 'car', 'house'];
@@ -550,8 +552,10 @@ export class Mascot {
     const now = Date.now(), st = STATES[this.state], s = this.stats;
     if (now > this.until) this.afterState();
     this.lifeCycle(now);
+    if (this.idleNap && !s.asleep) { this.idleNap = false; local.set('pp.pyxlIdleNap', false); }   // slept her fill on her own
     if (!this.awake()) return;
     if (s.energy < 10) { this.nap(); this.say('So sleepy…'); }
+    this.idleCheck(now);
     if (this.state === 'idle' && now > this.nextFidget) this.fidget(now);
     if (this.state === 'idle' && s.need === 'bored' && now - this.lastActive > 20000) this.play('sitDown');
     if (this.state === 'sleep' && !s.asleep) this.play('wake');   // slept her fill
@@ -881,6 +885,13 @@ export class Mascot {
     const s = this.stats;
     const active = () => { this.lastActive = Date.now(); s.touch(); if (this.state === 'sit' && s.need !== 'bored') this.base(); };
     ['pointerdown', 'keydown'].forEach(ev => addEventListener(ev, active, { passive: true }));
+    // Idle snooze: any sign of you (even just moving the mouse) resets the clock and wakes her from a
+    // nap she took because you were away. Capture phase, so a click right on her wakes her gently
+    // before her own grab / poke handlers (which would treat it as being woken rudely).
+    this.seenAt = Date.now();
+    this.idleNap = s.asleep && local.get('pp.pyxlIdleNap', false);   // napping when the app was closed
+    const seen = () => { this.seenAt = Date.now(); this.sleepyShown = false; if (this.idleNap) this.idleWake(); };
+    ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'].forEach(ev => addEventListener(ev, seen, { passive: true, capture: true }));
     // Notes and Sprite Studio strokes (Draw's come through history below): she learns from all your drawing
     bus.on('drew', () => { s.train('line', 4); this.painted(); });
     bus.on('history', hist => {
@@ -1176,5 +1187,22 @@ export class Mascot {
   }
 
   nap() { this.setRadio(false); this.stats.sleep(true); this.play('doze', { say: 'Night night…' }); }
+  // Left alone for a while she gets sleepy, then dozes off until you're back (not while busy with you).
+  idleCheck(now) {
+    if (this.phys || ['held', 'dance'].includes(this.state) || this.state?.startsWith?.('game')) return;
+    const idle = now - (this.seenAt ?? now);
+    if (idle > IDLE_SLEEP) {
+      this.idleNap = true; local.set('pp.pyxlIdleNap', true);
+      this.stats.sleep(true); this.play('doze', { say: 'Zzz…' });
+    } else if (idle > IDLE_SLEEPY && !this.sleepyShown && ['idle', 'sit', 'drowsy'].includes(this.state)) {
+      this.sleepyShown = true; this.play('yawn', { say: 'Getting sleepy…' });
+    }
+  }
+  idleWake() {
+    this.idleNap = false; local.set('pp.pyxlIdleNap', false);
+    if (!this.stats.asleep) return;
+    this.stats.sleep(false);
+    this.play('wake', { say: ['Oh! You’re back.', 'Mmh… I dozed off.', 'Hi again!'][Math.floor(Math.random() * 3)] });
+  }
   wake() { this.stats.sleep(false); this.play('wake', { say: 'Mmh… I’m up!' }); }
 }
