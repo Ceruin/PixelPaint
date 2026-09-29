@@ -24,6 +24,7 @@ import { MODES, THEMES, LEGACY, modeSwitch, modeToggles } from './ui/modes.js';
 import { optionsBar } from './ui/optionsbar.js';
 import { statusbar } from './ui/statusbar.js';
 import { initTooltips } from './ui/tooltip.js';
+import { initSelects } from './ui/selects.js';
 import { toast } from './ui/dialogs.js';
 import { Mascot } from './ui/mascot.js';
 import { careBody, openCareCard } from './ui/pyxlCare.js';
@@ -176,6 +177,7 @@ $('#optionsbar').addEventListener('wheel', e => {
 }, { passive: false });
 statusbar(app, $('#statusbar'), $('#view'));
 initTooltips();
+initSelects();
 bindKeys(a => app.mode !== 'pixel' || /^mode\./.test(a.id));
 panels.apply(local.get('pp.layout'));
 bus.on('toast', toast);

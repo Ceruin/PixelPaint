@@ -71,6 +71,20 @@ select, .field input:not([type=checkbox]), .hex, .rename {
   height: 28px; padding: 0 7px; border-radius: var(--r); border: 1px solid var(--line); background: var(--bg); min-width: 0; max-width: 100%;
 }
 select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+/* themed drop-down list (js/ui/selects.js) - replaces the browser's own open list */
+select.dd-open { outline: 1px solid var(--accent); outline-offset: -1px; }
+.dd-pop { position: fixed; z-index: 2147483000; overflow-y: auto; overscroll-behavior: contain; padding: 4px; box-sizing: border-box;
+  max-width: min(420px, calc(100vw - 16px)); background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: var(--r, 4px); box-shadow: var(--shadow, 0 8px 24px rgba(0,0,0,.4)); font: inherit; font-size: 13px; animation: dd-in .08s ease-out; }
+@keyframes dd-in { from { opacity: 0; transform: translateY(-3px); } }
+.dd-item { padding: 6px 10px; border-radius: calc(var(--r, 4px) - 1px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; user-select: none; }
+.dd-item.indent { padding-left: 20px; }
+.dd-item.selected { color: var(--accent); }
+.dd-item.selected::after { content: '✓'; float: right; margin-left: 14px; }
+.dd-item.active { background: var(--accent); color: var(--accent-ink); }
+.dd-item.disabled { opacity: .45; cursor: default; }
+.dd-group { padding: 7px 10px 3px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); user-select: none; }
+.dd-pop::-webkit-scrollbar { width: 8px; } .dd-pop::-webkit-scrollbar-thumb { background: var(--panel3, var(--line)); border-radius: 4px; }
 
 /* ---------- top bar (identical in every mode, and in the Pixel editor) ---------- */
 #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; box-sizing: border-box; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
