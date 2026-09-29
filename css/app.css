@@ -633,6 +633,9 @@ body[data-layout=zen] .dock .panel.flyout { visibility: visible; }
 body[data-layout=notes] #optionsbar, body[data-layout=notes] .workspace, body[data-layout=notes] #menubar .menus, body[data-layout=notes] #app > .statusbar { display: none; }   /* Notes has its own simple bars */
 /* Focus (full screen): the canvas or board gets the whole window; Tab or the strip's button brings the chrome back */
 body[data-focus] #app > #menubar, body[data-layout=notes][data-focus] #app > .statusbar { display: none; }
+/* An open notebook has its own full bar (tabs, focus, theme), so the app's top bar steps aside - no doubled header */
+body[data-layout=notes][data-notebook] #app > #menubar { display: none; }
+.nb-toggles { display: contents; }
 /* Notes has no undo history: the bar's undo / redo belong to Draw */
 body[data-layout=notes] #menubar [data-action^="edit."] { display: none; }
 .board { position: relative; flex: 1; overflow: hidden; touch-action: none; cursor: grab; background-color: var(--stage); background-image: radial-gradient(circle, var(--line) 1px, transparent 1.2px); }

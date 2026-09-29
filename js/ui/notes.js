@@ -380,12 +380,15 @@ export function initNotes(app, sendToCanvas, toDraw) {
     const v = await form('Template', [{ id: 't', label: 'Template', type: 'select', options: TEMPLATES, value: book.template }], 'Apply');
     if (v) { book.template = v.t; touch(book); redraw(); }
   }
+  // Focus + theme live here while a notebook is open (the app's top bar steps aside); main.js fills it.
+  const toggles = h('span.nb-toggles', {});
   // same order as Draw's and Focus's bars: tools, then the workspace tabs, undo / redo, and the menu last
   const bar = h('header.nb-bar', {},
     iconBtn('chevronLeft', 'Close notebook: back to My files', () => showLibrary()),
     penB, eraseB, selB,
     h('span.nb-title', {}),
     modeTabs('notes'),
+    toggles,
     undoB, redoB,
     moreB);
   const nav = h('div.nb-nav', {},
@@ -406,12 +409,12 @@ export function initNotes(app, sendToCanvas, toDraw) {
   function openBook(b) {
     book = b; view = 'editor'; pageIx = 0; hist = []; redo = []; sel = null; tool = 'pen'; Object.assign(vw, { x: 0, y: 0, z: 1, r: 0 });
     bar.querySelector('.nb-title').textContent = b.name;
-    root.replaceChildren(editor, slot);
+    root.replaceChildren(editor, slot); document.body.toggleAttribute('data-notebook', true);
     requestAnimationFrame(() => { fit(); go((b.last ?? 1) - 1); syncTools(); });
   }
-  function showLibrary() { closePop(); view = 'library'; book = null; root.replaceChildren(shell, slot); renderLibrary(); }
+  function showLibrary() { closePop(); view = 'library'; book = null; document.body.toggleAttribute('data-notebook', false); root.replaceChildren(shell, slot); renderLibrary(); }
 
   idb.get('notebooks').then(s => { if (s?.notebooks) lib = s; showLibrary(); }).catch(showLibrary);
   root.classList.add('nb');
-  return { slot, show: on => { root.hidden = !on; if (on && view === 'editor') requestAnimationFrame(fit); } };
+  return { slot, toggles, show: on => { root.hidden = !on; if (on && view === 'editor') requestAnimationFrame(fit); } };
 }

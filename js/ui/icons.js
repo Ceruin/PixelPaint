@@ -73,6 +73,7 @@ export const ICONS = {
   bubble: '<path d="M21 11.5c0 4.1-4 7.5-9 7.5-1.3 0-2.6-.2-3.7-.6L3 20l1.5-4C3.6 14.7 3 13.2 3 11.5 3 7.4 7 4 12 4s9 3.4 9 7.5z"/>',
   ruler: '<path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/>',
   navigator: '<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="8" y="8" width="8" height="6" rx="1"/>',
+  moon: '<path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   wrap: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>',
   filterLayer: '<circle cx="9" cy="9" r="6"/><circle cx="15" cy="15" r="6"/>',

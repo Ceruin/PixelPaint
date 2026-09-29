@@ -20,7 +20,7 @@ import { initPopupPalette } from './ui/popupPalette.js';
 import { initTimeline } from './ui/timeline.js';
 import { showWelcome } from './ui/welcome.js';
 import { menubar } from './ui/menubar.js';
-import { MODES, THEMES, LEGACY, modeSwitch } from './ui/modes.js';
+import { MODES, THEMES, LEGACY, modeSwitch, modeToggles } from './ui/modes.js';
 import { optionsBar } from './ui/optionsbar.js';
 import { statusbar } from './ui/statusbar.js';
 import { initTooltips } from './ui/tooltip.js';
@@ -124,6 +124,7 @@ function applyFocus() {
   }
   mascot.mount(mode === 'notes' ? notes.slot : mode === 'pixel' ? pixelSlot : app.focus ? zen.slot : $('#mascotSlot'));
   modeBox.replaceChildren(modeSwitch(mode, { focus: app.focus, theme: app.settings.theme }));
+  notes.toggles.replaceChildren(...modeToggles(mode, { focus: app.focus, theme: app.settings.theme }));
   bus.emit('mode', mode);
   if (mode !== 'pixel') requestAnimationFrame(() => app.view.resize());
 }
@@ -142,6 +143,7 @@ function setTheme(theme) {
   app.profile = theme === 'paper' ? { smoothing: 0.3, grain: 0.35 } : {};
   app.view.flat = theme === 'paper'; app.view.redraw();
   if (modeBox.isConnected) modeBox.replaceChildren(modeSwitch(app.mode, { focus: app.focus, theme }));
+  notes.toggles.replaceChildren(...modeToggles(app.mode, { focus: app.focus, theme }));
   bus.emit('theme', theme);
 }
 
