@@ -955,7 +955,6 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .nb-choice:hover { background: var(--panel2); }
 .nb-choice.on { background: var(--nb-accent); color: var(--accent-ink); }
 .nb-choice canvas { width: 64px; height: 28px; border-radius: 2px; }
-.nb-thick { display: block; width: 40px; background: currentColor; border-radius: 4px; transform: rotate(-20deg); }
 .nb-ink { display: block; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--ink); }
 .nb-mitem { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
 .nb-mitem:hover { background: var(--panel2); }

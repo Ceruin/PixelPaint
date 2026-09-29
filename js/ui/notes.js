@@ -355,10 +355,27 @@ export function initNotes(app, sendToCanvas, toDraw) {
   addEventListener('pointerdown', e => { if (popEl && !popEl.contains(e.target) && !popEl.anchor.contains(e.target)) closePop(); }, true);
   const setTool = t => { tool = t; sel = null; closePop(); paint(); syncTools(); syncBar(); };
   const choice = (list, cur, fn, render) => h('div.nb-choices', {}, list.map(it => h('button.nb-choice', { type: 'button', className: it[0] === cur ? 'on' : '', onclick: () => { fn(it[0]); local.set('pp.nbPen', pen); penPop(); syncTools(); } }, render(it))));
-  const penDot = (id) => { const c = h('canvas', { width: 64, height: 28 }), x = c.getContext('2d'); x.fillStyle = '#fbfaf6'; x.fillRect(0, 0, 64, 28); drawStroke(x, { pen: id, size: 1.2, color: pen.color, pts: [8, 20, .3, 20, 10, .6, 34, 18, .9, 48, 8, .6, 56, 14, .4] }, 1); return c; };
+  // Picker previews: one smooth wave per swatch, each pen at a width that fits the 64x28 swatch
+  // (drawn at 2x so it stays sharp). Thickness previews draw the current pen at each size.
+  const PREVIEW_W = { fineliner: 2.6, ballpoint: 2.6, pencil: 3, marker: 6, highlighter: 11, calligraphy: 5.5 };
+  const MEDIUM = SIZES.find(z => z[0] === 'medium')[2];
+  const darkInk = c => { const n = parseInt(c.slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 < 150; };
+  const swatch = (id, mult) => {
+    const c = h('canvas', { width: 128, height: 56 }), x = c.getContext('2d'); x.scale(2, 2);
+    x.fillStyle = '#fbfaf6'; x.fillRect(0, 0, 64, 28);
+    const P = PEN_STYLE[id] ?? PEN_STYLE.fineliner, width = PREVIEW_W[id] * mult / MEDIUM;
+    const hl = id === 'highlighter', color = hl && darkInk(pen.color) ? '#e8c547' : pen.color;
+    if (hl) { x.fillStyle = '#8c8f97'; x.fillRect(12, 13, 40, 2); }   // a line of "text" to highlight
+    const amp = hl ? 1.2 : Math.max(1.5, Math.min(6, (28 - width) / 2 - 3)), pts = [];
+    for (let px = 9; px <= 55; px += 1.5) { const t = (px - 9) / 46; pts.push(px, 14 + amp * Math.sin(t * Math.PI * 2.2 - 0.6), 0.35 + 0.6 * Math.sin(t * Math.PI)); }
+    drawStroke(x, { pen: id, size: width / P.w, color, pts }, 1);
+    return c;
+  };
+  const penDot = id => swatch(id, MEDIUM);
+  const thickDot = mult => swatch(pen.pen, mult);
   const penPop = () => { const a = penB; if (popEl?.anchor === a) closePop(); pop(a,
     h('div.nb-plabel', {}, 'Pen'), choice(PENS, pen.pen, v => { pen.pen = v; if (v === 'highlighter' && ['#1b1d23', '#8c8f97'].includes(pen.color)) pen.color = '#e8c547'; }, ([id, l]) => [penDot(id), h('span', {}, l)]),
-    h('div.nb-plabel', {}, 'Thickness'), choice(SIZES, pen.size, v => { pen.size = v; }, ([, l, w]) => [h('i.nb-thick', { style: { height: `${w * 2.5}px` } }), h('span', {}, l)]),
+    h('div.nb-plabel', {}, 'Thickness'), choice(SIZES, pen.size, v => { pen.size = v; }, ([, l, w]) => [thickDot(w), h('span', {}, l)]),
     h('div.nb-plabel', {}, 'Color'), choice(INKS, pen.color, v => { pen.color = v; }, ([c, l]) => [h('i.nb-ink', { style: { background: c } }), h('span', {}, l)])); };
   const penB = h('button.ibtn.nb-tool', { type: 'button', 'data-tip': 'Pens', onclick: () => { if (tool !== 'pen') setTool('pen'); else penPop(); } }, icon('pen'));
   const eraseB = iconBtn('eraser', 'Eraser (erases whole strokes)', () => setTool('eraser'), { className: 'ibtn nb-tool' });
