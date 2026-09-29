@@ -36,7 +36,7 @@ function drawStroke(ctx, st, s = 1) {
   if (!p.length) return;
   ctx.save();
   ctx.globalAlpha = P.alpha; ctx.strokeStyle = ctx.fillStyle = st.color; ctx.lineCap = P.flat ? 'butt' : 'round'; ctx.lineJoin = 'round';
-  if (st.pen === 'highlighter') ctx.globalCompositeOperation = 'multiply';
+  if (st.pen === 'highlighter') { ctx.globalCompositeOperation = 'multiply'; chiselSweep(ctx, p, s, base); ctx.restore(); return; }
   if (p.length <= 3) { ctx.beginPath(); ctx.arc(p[0] * s, p[1] * s, base / 2, 0, 7); ctx.fill(); ctx.restore(); return; }
   if (!P.press && !P.nib) {   // even width: one smooth path
     ctx.lineWidth = base; ctx.beginPath(); ctx.moveTo(p[0] * s, p[1] * s);
@@ -44,6 +44,39 @@ function drawStroke(ctx, st, s = 1) {
     ctx.lineTo(p.at(-3) * s, p.at(-2) * s); ctx.stroke();
   } else ribbon(ctx, p, s, base, P);   // width follows pressure (and the nib's angle)
   ctx.restore();
+}
+// Highlighter: the shape a chisel tip sweeps out. The tip is a flat bar held at a fixed slight tilt,
+// so a sideways swipe is full height with angled ends and a stroke up or down comes out thinner,
+// like the real pen. Hand wobble is smoothed out, and every piece is gathered into ONE path (all
+// hulls wound the same way) and filled once, so overlapping parts never darken each other.
+function chiselSweep(ctx, p, s, base) {
+  let c = smoothPts(p);
+  if (c.length > 9) {   // extra positional smoothing over ~a third of the tip's height: swipes read as steady
+    let len = 0; for (let i = 3; i < c.length; i += 3) len += Math.hypot(c[i] - c[i - 3], c[i + 1] - c[i - 2]);
+    const step = len / (c.length / 3 - 1) || 1, K = Math.min(40, Math.max(2, Math.round(base / s * 0.33 / step)));
+    const o = c.slice();
+    for (let i = 3; i < c.length - 3; i += 3) { let x = 0, y = 0, n = 0;
+      const k0 = Math.min(K, i / 3, (c.length - 3 - i) / 3);   // shrink the window near the ends so they stay put
+      for (let k = -k0; k <= k0; k++) { const j = i + k * 3; x += c[j]; y += c[j + 1]; n++; }
+      o[i] = x / n; o[i + 1] = y / n; }
+    c = o;
+  }
+  const tilt = 12 * Math.PI / 180, half = base / 2, thick = base * 0.14;
+  const vx = Math.sin(tilt) * half, vy = -Math.cos(tilt) * half;       // along the tip (near vertical)
+  const ux = Math.cos(tilt) * thick / 2, uy = Math.sin(tilt) * thick / 2; // across the tip
+  const corners = (x, y) => [[x - vx - ux, y - vy - uy], [x - vx + ux, y - vy + uy], [x + vx + ux, y + vy + uy], [x + vx - ux, y + vy - uy]];
+  const hull = pts => {   // monotone chain; always the same winding, so the union fills cleanly
+    pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+    for (const q of pts) { while (lo.length > 1 && cr(lo.at(-2), lo.at(-1), q) <= 0) lo.pop(); lo.push(q); }
+    for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; while (up.length > 1 && cr(up.at(-2), up.at(-1), q) <= 0) up.pop(); up.push(q); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  };
+  ctx.beginPath();
+  const add = poly => { ctx.moveTo(poly[0][0], poly[0][1]); for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]); ctx.closePath(); };
+  if (c.length < 6) add(hull(corners(c[0] * s, c[1] * s)));
+  for (let i = 3; i < c.length; i += 3) add(hull([...corners(c[i - 3] * s, c[i - 2] * s), ...corners(c[i] * s, c[i + 1] * s)]));
+  ctx.fill('nonzero');
 }
 // Pressure strokes: the sampled points are smoothed (Chaikin corner-cutting) and drawn as short
 // round-capped segments whose width eases from point to point — round joins keep sharp turns clean.
