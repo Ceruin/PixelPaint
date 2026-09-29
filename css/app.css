@@ -202,6 +202,8 @@ input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2
 .float-layer > * { pointer-events: auto; }
 
 .panel { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; flex: none; }
+.panel.flash { animation: panel-flash .7s ease; }
+@keyframes panel-flash { 30% { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); } }
 .dock .panel.grow:not(.collapsed) { flex: 1 1 200px; min-height: 200px; }
 .dock .panel[data-panel=layers]:not(.collapsed) { flex: 2 1 300px; min-height: 260px; }
 .panel.floating { position: absolute; box-shadow: var(--shadow); min-width: 64px; min-height: 60px; }

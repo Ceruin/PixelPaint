@@ -43,10 +43,15 @@ const zen = initZen(app, panels);
 const notes = initNotes(app, c => { setMode('paint'); project.importLayer(c, 'Sketch note'); }, () => setMode('paint'));
 
 // Opens a panel where it lives; in Focus, or when its dock is folded, as a flyout by the clicked control.
+// isFolded, not folded[]: narrow screens fold the docks on their own, and a panel "opened" inside a
+// folded rail never shows - the brush / eraser picker used to do nothing there.
 const openPanel = (id, e) => {
-  const s = panels.map.get(id).s;
-  if (e?.currentTarget && (app.focus || (s.dock && panels.folded[s.dock]))) return panels.flyout(id, e.currentTarget);
+  const p = panels.map.get(id), s = p.s;
+  if (e?.currentTarget && (app.focus || (s.dock && panels.isFolded(s.dock)))) return panels.flyout(id, e.currentTarget);
+  const wasShown = !s.hidden && !s.collapsed;
   panels.patch(id, { hidden: false, collapsed: false });
+  // already open: point at it, so the click visibly does something
+  if (wasShown) { p.el.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); p.el.classList.remove('flash'); void p.el.offsetWidth; p.el.classList.add('flash'); }
 };
 
 panels.add('tools', 'Tools', 'brush', toolbar(app, e => openPanel('color', e)), { dock: 'left', order: 0 });

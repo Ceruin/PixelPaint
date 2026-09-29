@@ -42,11 +42,59 @@ function drawStroke(ctx, st, s = 1) {
     ctx.lineWidth = base; ctx.beginPath(); ctx.moveTo(p[0] * s, p[1] * s);
     for (let i = 3; i < p.length - 3; i += 3) ctx.quadraticCurveTo(p[i] * s, p[i + 1] * s, (p[i] + p[i + 3]) / 2 * s, (p[i + 1] + p[i + 4]) / 2 * s);
     ctx.lineTo(p.at(-3) * s, p.at(-2) * s); ctx.stroke();
-  } else for (let i = 3; i < p.length; i += 3) {   // width follows pressure (and the nib's angle)
-    const dx = p[i] - p[i - 3], dy = p[i + 1] - p[i - 2], nib = P.nib ? 0.35 + 0.65 * Math.abs(Math.sin(Math.atan2(dy, dx) - Math.PI / 4)) : 1;
-    ctx.lineWidth = base * nib * (1 - P.press + P.press * (p[i + 2] + p[i - 1])) ;
-    ctx.beginPath(); ctx.moveTo(p[i - 3] * s, p[i - 2] * s); ctx.lineTo(p[i] * s, p[i + 1] * s); ctx.stroke();
+  } else ribbon(ctx, p, s, base, P);   // width follows pressure (and the nib's angle)
+  ctx.restore();
+}
+// Pressure strokes: the sampled points are smoothed (Chaikin corner-cutting) and drawn as short
+// round-capped segments whose width eases from point to point — round joins keep sharp turns clean.
+// See-through pens (pencil, ballpoint) would darken wherever segments overlap (beads), so they're
+// drawn opaque on a scratch layer and laid onto the page once at the pen's opacity.
+function smoothPts(p) {
+  let c = [];
+  for (let i = 0; i < p.length; i += 3) { const n = c.length; if (!n || (p[i] - c[n - 3]) ** 2 + (p[i + 1] - c[n - 2]) ** 2 > 0.25) c.push(p[i], p[i + 1], p[i + 2]); }
+  for (let pass = 0; pass < 2 && c.length > 6; pass++) {
+    const o = [c[0], c[1], c[2]];
+    for (let i = 0; i < c.length - 3; i += 3) for (const t of [0.25, 0.75]) o.push(c[i] + (c[i + 3] - c[i]) * t, c[i + 1] + (c[i + 4] - c[i + 1]) * t, c[i + 2] + (c[i + 5] - c[i + 2]) * t);
+    o.push(c.at(-3), c.at(-2), c.at(-1)); c = o;
   }
+  return c;
+}
+function pressureSegments(x, c, s, base, P) {
+  const w = [];
+  for (let i = 0; i < c.length; i += 3) {
+    const j = Math.min(i + 3, c.length - 3), k = Math.max(i - 3, 0), dx = c[j] - c[k], dy = c[j + 1] - c[k + 1];
+    const nib = P.nib ? 0.3 + 0.7 * Math.abs(Math.sin(Math.atan2(dy, dx) - Math.PI / 4)) : 1;
+    w.push(Math.max(0.7, base * nib * (1 - P.press + P.press * 2 * c[i + 2])));
+  }
+  for (let i = 1; i < w.length - 1; i++) w[i] = (w[i - 1] + 2 * w[i] + w[i + 1]) / 4;   // no sudden jumps
+  if (c.length < 6) { x.beginPath(); x.arc(c[0] * s, c[1] * s, w[0] / 2, 0, 7); x.fill(); return; }
+  for (let i = 3, n = 1; i < c.length; i += 3, n++) {
+    x.lineWidth = (w[n - 1] + w[n]) / 2;
+    x.beginPath(); x.moveTo(c[i - 3] * s, c[i - 2] * s); x.lineTo(c[i] * s, c[i + 1] * s); x.stroke();
+  }
+}
+let scratch = null;
+function ribbon(ctx, p, s, base, P) {
+  const c = smoothPts(p);
+  if (P.alpha >= 1) return pressureSegments(ctx, c, s, base, P);
+  // device-space box around the stroke, so the scratch layer only touches (and copies) that much
+  const T = ctx.getTransform(), W = ctx.canvas.width, H = ctx.canvas.height, pad = base + 2;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (let i = 0; i < c.length; i += 3) { x0 = Math.min(x0, c[i]); x1 = Math.max(x1, c[i]); y0 = Math.min(y0, c[i + 1]); y1 = Math.max(y1, c[i + 1]); }
+  let rx0 = 1e9, ry0 = 1e9, rx1 = -1e9, ry1 = -1e9;
+  for (const [px, py] of [[x0 * s - pad, y0 * s - pad], [x1 * s + pad, y0 * s - pad], [x0 * s - pad, y1 * s + pad], [x1 * s + pad, y1 * s + pad]]) {
+    const q = T.transformPoint(new DOMPoint(px, py)); rx0 = Math.min(rx0, q.x); rx1 = Math.max(rx1, q.x); ry0 = Math.min(ry0, q.y); ry1 = Math.max(ry1, q.y);
+  }
+  rx0 = Math.max(0, Math.floor(rx0)); ry0 = Math.max(0, Math.floor(ry0)); rx1 = Math.min(W, Math.ceil(rx1)); ry1 = Math.min(H, Math.ceil(ry1));
+  if (rx1 <= rx0 || ry1 <= ry0) return;   // off screen
+  scratch ??= document.createElement('canvas');
+  if (scratch.width < W || scratch.height < H) Object.assign(scratch, { width: Math.max(W, scratch.width), height: Math.max(H, scratch.height) });
+  const x = scratch.getContext('2d');
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(rx0, ry0, rx1 - rx0, ry1 - ry0);
+  x.setTransform(T); x.globalAlpha = 1; x.strokeStyle = x.fillStyle = ctx.strokeStyle; x.lineCap = x.lineJoin = 'round';
+  pressureSegments(x, c, s, base, P);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);   // the clip (device space) still applies
+  ctx.drawImage(scratch, rx0, ry0, rx1 - rx0, ry1 - ry0, rx0, ry0, rx1 - rx0, ry1 - ry0);
   ctx.restore();
 }
 function renderPage(ctx, page, template, s = 1, skip) {
