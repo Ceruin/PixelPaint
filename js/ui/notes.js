@@ -168,13 +168,15 @@ export function initNotes(app, sendToCanvas, toDraw) {
       h('header.nb-head', {},
         iconBtn('menu', 'Menu', () => drawer.classList.toggle('open'), { className: 'ibtn nb-menu' }),
         h('h2', {}, title),
-        h('select.nb-sort', { 'aria-label': 'Sort', onchange: e => { opts.sort = e.target.value; local.set('pp.nbSort', opts.sort); renderLibrary(); } }, SORTS.map(([v, l]) => h('option', { value: v, selected: v === opts.sort }, l)))),
+        h('select.nb-sort', { 'aria-label': 'Sort', onchange: e => { opts.sort = e.target.value; local.set('pp.nbSort', opts.sort); renderLibrary(); } }, SORTS.map(([v, l]) => h('option', { value: v, selected: v === opts.sort }, l))),
+        // in the header, not a floating pill at the bottom: a tablet's taskbar can sit over the page's
+        // bottom edge without reporting it, which hid the pill in landscape
+        h('div.nb-acts-top', {},
+          iconBtn('zoom', 'Search', () => { opts.searching = !opts.searching; if (!opts.searching) opts.q = ''; renderLibrary(); if (opts.searching) libEl.querySelector('.nb-search').focus(); }, { className: `ibtn${opts.searching ? ' on' : ''}` }),
+          iconBtn(opts.grid ? 'menu' : 'grid', opts.grid ? 'List view' : 'Thumbnails', () => { opts.grid = !opts.grid; local.set('pp.nbGrid', opts.grid); renderLibrary(); }),
+          opts.filter !== 'trash' && iconBtn('plus', 'New notebook', newNotebook, { className: 'ibtn nb-add' }))),
       h('div.nb-sub', {}, h('span', {}, `${items.length} item${items.length === 1 ? '' : 's'}`), search),
-      fresh ? startPanel() : list,
-      h('div.nb-pill', {},
-        iconBtn('zoom', 'Search', () => { opts.searching = !opts.searching; if (!opts.searching) opts.q = ''; renderLibrary(); if (opts.searching) libEl.querySelector('.nb-search').focus(); }),
-        opts.filter !== 'trash' && iconBtn('plus', 'New notebook', newNotebook),
-        iconBtn(opts.grid ? 'menu' : 'grid', opts.grid ? 'List view' : 'Thumbnails', () => { opts.grid = !opts.grid; local.set('pp.nbGrid', opts.grid); renderLibrary(); })));
+      fresh ? startPanel() : list);
     renderItems();
     renderDrawer();
   };

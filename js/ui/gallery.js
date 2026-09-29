@@ -40,17 +40,18 @@ export async function showGallery(project) {
         iconBtn('x', 'Close (Esc)', close),
         h('h2', {}, opts.favs ? 'Favorites' : 'My art'),
         h('button.nb-sort', { type: 'button', className: opts.favs ? 'on' : '', onclick: () => { opts.favs = !opts.favs; render(); } }, icon('star'), ' Favorites'),
-        h('select.nb-sort', { 'aria-label': 'Sort', onchange: e => { opts.sort = e.target.value; local.set('pp.galSort', opts.sort); render(); } }, SORTS.map(([v, l]) => h('option', { value: v, selected: v === opts.sort }, l)))),
+        h('select.nb-sort', { 'aria-label': 'Sort', onchange: e => { opts.sort = e.target.value; local.set('pp.galSort', opts.sort); render(); } }, SORTS.map(([v, l]) => h('option', { value: v, selected: v === opts.sort }, l))),
+        // in the header like Notes' (a bottom pill could sit under a tablet taskbar)
+        h('div.nb-acts-top', {},
+          iconBtn('zoom', 'Search', () => { opts.searching = !opts.searching; if (!opts.searching) opts.q = ''; render().then(() => opts.searching && page.querySelector('.nb-search').focus()); }, { className: `ibtn${opts.searching ? ' on' : ''}` }),
+          iconBtn(opts.grid ? 'menu' : 'grid', opts.grid ? 'List view' : 'Thumbnails', () => { opts.grid = !opts.grid; local.set('pp.galGrid', opts.grid); render(); }),
+          iconBtn('folder', 'Open a file…', () => act('file.open')),
+          iconBtn('plus', 'New canvas', () => act('file.new'), { className: 'ibtn nb-add' }))),
       ...(recent.length ? [h('div.nb-sub', {}, h('span', {}, 'Recent')), h('div.gal-recent', {}, recent.map(tile))] : []),
       h('div.nb-sub', {}, h('span', {}, `${items.length} drawing${items.length === 1 ? '' : 's'}`), search),
       all.length ? h('div', { className: opts.grid ? 'nb-grid' : 'nb-list' }, items.length ? items.map(tile) : h('p.nb-empty', {}, 'Nothing matches.'))
         : h('div.nb-start', {}, h('h3', {}, 'Your drawings live here'), h('p', {}, 'Save a drawing with File ▸ Save to Browser (Ctrl+S) and it shows up here, with your most recent ones on top.'),
-          h('div.nb-start-btns', {}, h('button.btn.primary', { type: 'button', onclick: () => act('file.new') }, icon('plus'), 'New canvas'), h('button.btn', { type: 'button', onclick: () => act('file.open') }, icon('folder'), 'Open a file'))),
-      h('div.nb-pill', {},
-        iconBtn('zoom', 'Search', () => { opts.searching = !opts.searching; if (!opts.searching) opts.q = ''; render().then(() => opts.searching && page.querySelector('.nb-search').focus()); }),
-        iconBtn('plus', 'New canvas', () => act('file.new')),
-        iconBtn('folder', 'Open a file…', () => act('file.open')),
-        iconBtn(opts.grid ? 'menu' : 'grid', opts.grid ? 'List view' : 'Thumbnails', () => { opts.grid = !opts.grid; local.set('pp.galGrid', opts.grid); render(); })));
+          h('div.nb-start-btns', {}, h('button.btn.primary', { type: 'button', onclick: () => act('file.new') }, icon('plus'), 'New canvas'), h('button.btn', { type: 'button', onclick: () => act('file.open') }, icon('folder'), 'Open a file'))));
   }
   await render();
 }

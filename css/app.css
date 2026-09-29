@@ -902,7 +902,7 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .nb-start-btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .nb-start-btns .btn { height: 40px; padding: 0 18px; gap: 8px; }
 .nb-head { display: flex; align-items: center; gap: 10px; padding: 6px 0 10px; }
-.nb-head h2 { flex: 1; margin: 0; font: 700 22px/1.2 var(--font); letter-spacing: .3px; }
+.nb-head h2 { flex: 1; min-width: 0; margin: 0; font: 700 22px/1.2 var(--font); letter-spacing: .3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nb-sort { border: 0; background: none; color-scheme: inherit; color: var(--nb-muted); font: inherit; font-size: 12.5px; cursor: pointer; }
 .nb-sub { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--nb-line); color: var(--nb-muted); font-size: 12px; }
 .nb-search { flex: 1; max-width: 320px; height: 32px; padding: 0 10px; border: 1px solid var(--nb-line); border-radius: 16px; background: var(--bg); color: var(--ink); font: inherit; }
@@ -925,8 +925,17 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 .nb-item:hover .nb-acts, .nb-item:focus-within .nb-acts { opacity: 1; }
 @media (hover: none) { .nb-acts { opacity: 1; } }
 .nb-empty { color: var(--nb-muted); padding: 30px 0; text-align: center; }
-.nb-pill { position: sticky; bottom: max(18px, env(safe-area-inset-bottom)); align-self: center; margin-top: auto; display: flex; gap: 4px; padding: 5px 10px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--paper); z-index: 5; }
-.nb-pill .ibtn { width: 40px; height: 40px; }
+.nb-acts-top { display: flex; align-items: center; gap: 4px; flex: none; }
+/* narrow: menu, title and actions on one row; the sort menu wraps below instead of squeezing the title out */
+@media (max-width: 560px) {
+  .nb-head { flex-wrap: wrap; row-gap: 4px; }
+  .nb-head h2 { flex: 1 1 110px; }
+  .nb-head .nb-acts-top { order: 2; }
+  .nb-head .nb-sort { order: 3; margin-left: auto; }
+}
+.nb-acts-top .ibtn { width: 36px; height: 36px; }
+.nb .nb-acts-top .nb-add { background: var(--nb-accent); color: var(--accent-ink); }
+.nb .nb-acts-top .nb-add:hover { filter: brightness(1.1); background: var(--nb-accent); }
 .nb-drawer { position: absolute; left: 0; top: 0; bottom: 0; z-index: 6; width: min(260px, 80%); display: none; flex-direction: column; gap: 2px; padding: 12px 8px; background: var(--panel); border-right: 1px solid var(--nb-line); box-shadow: var(--shadow); }
 .nb-drawer.open { display: flex; }
 @media (min-width: 900px) {   /* wide screens: the drawer is a sidebar that stays */
