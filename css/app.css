@@ -618,6 +618,7 @@ body[data-game] .tooltip { z-index: 880; }
 .race-st b { display: block; height: 100%; background: #ff9f2b; }
 .sg-star { position: absolute; z-index: 1; border: 0; background: none; padding: 6px; cursor: var(--hand); animation: sg-in .25s ease-out, sg-bob .6s ease-in-out infinite alternate; }
 .sg-star.pop { animation: sg-pop .18s ease-in forwards; }
+.sg-star.lucky { filter: drop-shadow(0 0 5px #ffd23f) drop-shadow(0 0 2px #fff); }   /* a lucky double */
 @keyframes sg-in { from { transform: scale(0); } }
 @keyframes sg-bob { to { translate: 0 -6px; } }
 @keyframes sg-pop { to { transform: scale(1.6); opacity: 0; } }

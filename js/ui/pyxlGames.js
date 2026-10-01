@@ -86,6 +86,9 @@ function drawFx(a) {
   c.globalAlpha = 1;
 }
 
+// Her Luck (0..1): lucky Pyxls give you a helping hand in the games.
+const luckOf = pyxl => Math.min(1, (pyxl.stats.skills.luck?.pts ?? 0) / 2000);
+
 // ---- Catch the Stars: she draws each star; catch it before it fades ----
 function stars(pyxl) {
   const N = 8;
@@ -103,11 +106,13 @@ function stars(pyxl) {
     aimAt(pyxl, a.box.left + x, a.box.top + y); sfx('draw');
     await sparkLine(a, brushAt(pyxl), { x, y }, 260);
     if (over) return;
-    const star = h('button.sg-star', { type: 'button', style: { left: `${x - 20}px`, top: `${y - 20}px` } }, iconCanvas('star', 4));
-    const gone = setTimeout(() => { star.remove(); spawn(); }, 1300);
+    // Luck: her stars linger longer, and now and then one's a lucky double
+    const lucky = Math.random() < 0.25 * luckOf(pyxl);
+    const star = h('button.sg-star', { type: 'button', className: lucky ? 'lucky' : '', style: { left: `${x - 20}px`, top: `${y - 20}px` } }, iconCanvas('star', 4));
+    const gone = setTimeout(() => { star.remove(); spawn(); }, 1300 + 900 * luckOf(pyxl));
     star.addEventListener('pointerdown', e => {
       e.stopPropagation(); clearTimeout(gone);
-      a.status(`${++caught} / ${N}`); sfx('pop');
+      caught = Math.min(N, caught + (lucky ? 2 : 1)); a.status(`${caught} / ${N}${lucky ? ' — lucky star!' : ''}`); sfx('pop');
       star.classList.add('pop'); pyxl.burst('sparkle', 2);
       setTimeout(() => { star.remove(); spawn(); }, 180);
     });
@@ -130,7 +135,7 @@ function trace(pyxl) {
   const names = Object.keys(SHAPES), name = names[Math.floor(Math.random() * names.length)];
   const a = arena('Trace It', () => end(true)), R = Math.min(a.w, a.h) * 0.32, cx = a.w / 2, cy = a.h / 2 + 12;
   const pts = Array.from({ length: 120 }, (_, i) => { const [x, y] = SHAPES[name](i / 119); return [cx + x * R, cy + y * R]; });
-  const ink = [], tol = Math.max(12, R * 0.08);
+  const ink = [], tol = Math.max(12, R * 0.08) * (1 + 0.35 * luckOf(pyxl));   // Luck: a little more forgiving
   let shown = 0, over = false, drawing = false, left = 12;
   a.fx = [];
   const paint = () => {
@@ -188,7 +193,9 @@ function colour(pyxl) {
     setTimeout(() => {
       if (over) return;
       a.status(`Round ${round} / ${ROUNDS} — which was it?`);
-      const opts = [target, ...Array.from({ length: 5 }, (_, i) => hsl(hh + (i % 2 ? 1 : -1) * spread * (0.4 + Math.random() * 0.6), s + (Math.random() - 0.5) * spread * 0.6, l + (i % 3 - 1) * spread * 0.3))].sort(() => Math.random() - 0.5);
+      let opts = [target, ...Array.from({ length: 5 }, (_, i) => hsl(hh + (i % 2 ? 1 : -1) * spread * (0.4 + Math.random() * 0.6), s + (Math.random() - 0.5) * spread * 0.6, l + (i % 3 - 1) * spread * 0.3))].sort(() => Math.random() - 0.5);
+      // Luck: sometimes she rules two of them out for you
+      if (Math.random() < 0.15 + 0.5 * luckOf(pyxl)) { let cut = 2; opts = opts.filter(c => c === target || cut-- <= 0); a.status(`Round ${round} / ${ROUNDS} — psst, she ruled two out!`); pyxl.showEmote?.('emDot', 900); }
       stage.replaceChildren(h('div.ga-swatches', {}, opts.map(c => h('button.ga-swatch', { type: 'button', style: { background: c }, dataset: { t: c === target ? '1' : '' }, onclick: e => {
         const ok = c === target;
         if (ok) { score++; sfx('pop'); pyxl.burst('sparkle', 2); } else sfx('bonk');

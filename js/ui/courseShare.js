@@ -31,7 +31,7 @@ const pipe = async (bytes, stream) => new Uint8Array(await new Response(new Blob
 
 // The course as a share link, or null if it's too big for one (share the file instead).
 export async function courseLink(course) {
-  const c = normalizeCourse(course), packed = [c.v, c.name, c.w, c.h, c.segs.flat(), c.water.flat(), c.hazards.flat(), c.takes.flat(), c.start, c.finish];
+  const c = normalizeCourse(course), packed = [c.v, c.name, c.w, c.h, c.segs.flat(), c.water.flat(), c.hazards.flat(), c.takes.flat(), c.start, c.finish, c.pits.flat()];
   const data = b64url(await pipe(new TextEncoder().encode(JSON.stringify(packed)), new CompressionStream('deflate-raw')));
   const url = `${location.origin}${location.pathname}#course=${data}`;
   return url.length > LINK_MAX ? null : url;
@@ -43,7 +43,7 @@ export async function readCourseLink(hash = location.hash) {
   try {
     const p = JSON.parse(new TextDecoder().decode(await pipe(unb64url(m[1]), new DecompressionStream('deflate-raw'))));
     if (!Array.isArray(p)) return null;
-    const [v, name, w, h, segs, water, hazards, takes, start, finish] = p;
-    return normalizeCourse({ v, name, w, h, segs: groups(segs, 4), water: groups(water, 4), hazards: groups(hazards, 4), takes: groups(takes, 2), start, finish });
+    const [v, name, w, h, segs, water, hazards, takes, start, finish, pits] = p;
+    return normalizeCourse({ v, name, w, h, segs: groups(segs, 4), water: groups(water, 4), hazards: groups(hazards, 4), takes: groups(takes, 2), start, finish, pits: groups(pits, 4) });
   } catch { return null; }
 }

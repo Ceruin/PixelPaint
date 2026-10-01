@@ -78,7 +78,7 @@ export const SHOP = [
 export const SHOP_INFO = {
   love: 'Love season — flowers bloom around her and love fills up.', bright: 'Nudges her toward Bright.', moody: 'Nudges her toward Moody.',
   skills: 'Trains every skill a little.', energy: 'A pick-me-up: energy and a snack.', party: 'Fun and fullness way up — she dances.',
-  calm: 'Soothes anger and sadness.', luck: 'Trains her luck (fewer trips, better races).',
+  calm: 'Soothes anger and sadness.', luck: 'Trains her luck: fewer trips, lighter lava burns, and more help in games.',
 };
 // A Pyxl egg: a new friend of her own (not a fruit — never the deal, never a favourite).
 export const EGG = ['egg', 'Pyxl egg', 150, 'egg'];

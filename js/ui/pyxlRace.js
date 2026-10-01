@@ -175,6 +175,8 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
       const nm = list[frameNo % list.length];
       drawPose(ctx, nm, r.x, r.y + (nm === 'floor' ? 4 : 0), 1, r.dir < 0, 0, r.src ?? tinted(r.colour));
       if (r.me && !test) { ctx.fillStyle = '#ffd23f'; const ty = Math.round(r.y - 60); ctx.fillRect(Math.round(r.x) - 2, ty, 5, 1); ctx.fillRect(Math.round(r.x) - 1, ty + 1, 3, 1); ctx.fillRect(Math.round(r.x), ty + 2, 1, 1); }   // a little "you" marker
+      if (r.burn > 0 && Math.floor(now / 80) % 2) { ctx.fillStyle = '#ffb02e'; ctx.fillRect(Math.round(r.x) - 4, Math.round(r.y) - 6, 2, 3); ctx.fillStyle = '#ff6a2b'; ctx.fillRect(Math.round(r.x) + 3, Math.round(r.y) - 8, 2, 4); }   // singed!
+      if (phase === 'race' && !r.done && r.hp < r.hpMax) { const bw = 14, fill = Math.round(bw * clamp(r.hp / r.hpMax, 0, 1)); ctx.fillStyle = 'rgba(34,24,34,.7)'; ctx.fillRect(Math.round(r.x) - 7, Math.round(r.y) + 6, bw, 2); ctx.fillStyle = '#e0485a'; ctx.fillRect(Math.round(r.x) - 7, Math.round(r.y) + 6, fill, 2); }   // health, once she's been burnt
       if (phase === 'race' && !r.done) { const bw = 14, fill = Math.round(bw * clamp(r.st / r.max, 0, 1)); ctx.fillStyle = 'rgba(34,24,34,.7)'; ctx.fillRect(Math.round(r.x) - 7, Math.round(r.y) + 3, bw, 2); ctx.fillStyle = r.st < r.max * 0.25 ? '#e0485a' : '#2fb36b'; ctx.fillRect(Math.round(r.x) - 7, Math.round(r.y) + 3, fill, 2); }
     }
     const big = (str, y) => pixelText(ctx, str, W / 2, y, '#ffd23f', { size: 16, align: 'center', outline: '#221822' });

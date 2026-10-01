@@ -1,6 +1,7 @@
 // Race courses as plain, portable data — Pyxl's generated ones, ones you draw in the course
 // builder, and shared ones all look the same:
-//   { v: 1, name, w, h, segs: [[ax, ay, bx, by]], water: [[x0, y0, x1, y1]], hazards: [[x0, y0, x1, y1]],
+//   { v: 1, name, w, h, segs: [[ax, ay, bx, by]], water: [[x0, y0, x1, y1]], hazards: [[x0, y0, x1, y1]] (lava: it
+//     burns while you're in it), pits: [[x0, y0, x1, y1]] (fall in and you're back at your last spot),
 //     takes: [[x, y]], start: [x, y], finish: [x, y] }
 // in "scene" pixels of the arena it was made for (w × h). A track is a course prepared for the arena
 // it's raced in: fitted (stretched a little if the canvas shape differs), with a distance field
@@ -25,7 +26,7 @@ function buildStrip(c, rnd, pick, row, { start, finish, entry }) {
   const X = s => (dir > 0 ? x0 + s : x1 - s);
   const seg = (sa, ha, sb, hb) => c.segs.push([X(sa), base + ha, X(sb), base + hb].map(Math.round));
   const take = (s, hh) => c.takes.push([Math.round(X(s)), Math.round(base + hh)]);
-  const pit = (sa, sb, h0) => c.hazards.push([Math.min(X(sa), X(sb)) - 12, base + h0 + 30, Math.max(X(sa), X(sb)) + 12, base + h0 + 62].map(Math.round));   // under the ground there, whatever its height   // falling in a gap = back to your last spot
+  const pit = (sa, sb, h0) => c.pits.push([Math.min(X(sa), X(sb)) - 12, base + h0 + 30, Math.max(X(sa), X(sb)) + 12, base + h0 + 62].map(Math.round));   // under the ground there, whatever its height   // falling in a gap = back to your last spot
   let s = 0, hh = 0;
   const end = finish ? len - 40 : len - 26;   // a row that isn't last stays open at its far end: you drop to the next
   if (start || entry) { seg(0, 0, 44, 0); s = 44; }
@@ -61,7 +62,7 @@ export function generateCourse(W, H, levelId = 'beginner', seed = 1 + Math.floor
   const rnd = seeded(seed), pool = POOLS[levelId] ?? POOLS.beginner;
   let deck = [], i = 0;
   const pick = () => { if (i >= deck.length) { deck = pool.slice().sort(() => rnd() - 0.5); i = 0; } return deck[i++]; };
-  const vertical = H > W * 1.15, c = { v: COURSE_VERSION, name: 'Pyxl’s course', w: W, h: H, segs: [], water: [], hazards: [], takes: [], start: null, finish: null };
+  const vertical = H > W * 1.15, c = { v: COURSE_VERSION, name: 'Pyxl’s course', w: W, h: H, segs: [], water: [], hazards: [], pits: [], takes: [], start: null, finish: null };
   const n = vertical ? Math.max(2, Math.min(6, Math.floor(H / 190))) : 1, sh = H / n;
   for (let r = 0; r < n; r++) {
     const row = { base: Math.round(r * sh + sh * (vertical ? 0.74 : 0.66)), dir: r % 2 ? -1 : 1, x0: 6, x1: W - 6 };
@@ -72,7 +73,7 @@ export function generateCourse(W, H, levelId = 'beginner', seed = 1 + Math.floor
 }
 // A course from anywhere (a file, a link, storage) made safe to use: numbers only, sane sizes and
 // counts, everything rounded. Returns null if it isn't a course at all.
-export const LIMITS = { segs: 3000, water: 60, hazards: 60, takes: 120 };
+export const LIMITS = { segs: 3000, water: 60, hazards: 60, pits: 60, takes: 120 };
 export function normalizeCourse(c) {
   if (!c || typeof c !== 'object' || !Array.isArray(c.segs)) return null;
   const w = Math.round(clamp(+c.w || 0, 120, 4000)), h = Math.round(clamp(+c.h || 0, 120, 4000));
@@ -85,7 +86,7 @@ export function normalizeCourse(c) {
   return {
     v: COURSE_VERSION, name: String(c.name ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 40) || 'Untitled course', w, h,
     segs: list(c.segs, quad, LIMITS.segs).filter(([ax, ay, bx, by]) => ax !== bx || ay !== by),
-    water: list(c.water, box, LIMITS.water), hazards: list(c.hazards, box, LIMITS.hazards), takes: list(c.takes, pt, LIMITS.takes),
+    water: list(c.water, box, LIMITS.water), hazards: list(c.hazards, box, LIMITS.hazards), pits: list(c.pits, box, LIMITS.pits), takes: list(c.takes, pt, LIMITS.takes),
     start: pt(c.start), finish: pt(c.finish),
   };
 }
@@ -104,7 +105,7 @@ export function prepareTrack(course, W, H, { stretch = true } = {}) {
   const t = {
     course, W, H, k, kx, ky,
     segs: c.segs.map(([ax, ay, bx, by]) => ({ a: P(ax, ay), b: P(bx, by) })),
-    water: (c.water ?? []).map(rect), hazards: (c.hazards ?? []).map(rect),
+    water: (c.water ?? []).map(rect), hazards: (c.hazards ?? []).map(rect), pits: (c.pits ?? []).map(rect),
     takes: (c.takes ?? []).map(([x, y], id) => { const [a, b] = P(x, y); return { x: a, y: b, id }; }),
     start: c.start ? P(...c.start) : [W * 0.1, H * 0.5], finish: c.finish ? P(...c.finish) : null,
   };
@@ -127,8 +128,9 @@ export function buildField(t) {
   // spikes block too: the way on never runs through them (so a gap with a pit under it isn't a shortcut)
   const cellsOf = list => { for (const z of list) for (let y = Math.max(0, Math.floor(z.y0 / CELL)); y <= Math.min(rows - 1, Math.floor(z.y1 / CELL)); y++) for (let x = Math.max(0, Math.floor(z.x0 / CELL)); x <= Math.min(cols - 1, Math.floor(z.x1 / CELL)); x++) wall[y * cols + x] = 1; };
   const solid = wall.slice();   // the lines alone (for "is there ground under / a ceiling over this spot")
-  cellsOf(t.hazards);
-  const wet = new Uint8Array(n);
+  cellsOf(t.pits);
+  const wet = new Uint8Array(n), hot = new Uint8Array(n);   // water slows; lava hurts (the way on goes round it if it can)
+  for (const z of t.hazards) for (let y = Math.max(0, Math.floor(z.y0 / CELL)); y <= Math.min(rows - 1, Math.floor(z.y1 / CELL)); y++) for (let x = Math.max(0, Math.floor(z.x0 / CELL)); x <= Math.min(cols - 1, Math.floor(z.x1 / CELL)); x++) hot[y * cols + x] = 1;
   for (const z of t.water) for (let y = Math.max(0, Math.floor(z.y0 / CELL)); y <= Math.min(rows - 1, Math.floor(z.y1 / CELL)); y++) for (let x = Math.max(0, Math.floor(z.x0 / CELL)); x <= Math.min(cols - 1, Math.floor(z.x1 / CELL)); x++) wet[y * cols + x] = 1;
   // Dijkstra out from the finish. Racers can't fly: going up costs far more than falling or running,
   // so "the way on" follows the ground and drops, not a straight line through the air.
@@ -150,7 +152,7 @@ export function buildField(t) {
     if (wall[to]) return;
     let cost = kind === 'up' ? 4 : 1;
     if (kind === 'side' && !ground(to)) { if (ceiling(to)) return; cost = 3; }
-    const d = d0 + cost * (wet[to] ? 1.6 : 1);
+    const d = d0 + cost * (wet[to] ? 1.6 : 1) * (hot[to] ? 5 : 1);
     if (d < dist[to]) { dist[to] = d; next[to] = from; push(d, to); }
   };
   while (heap.length) {
@@ -240,7 +242,7 @@ export function placeAtFraction(t, q) {
 
 // ---------------------------------------------------------------- physics
 export function makeRacer(o) {
-  return Object.assign({ st: o.max, x: 0, y: 0, vx: 0, vy: 0, px: 0, boost: 0, trip: 0, tumble: 0, dead: 0, took: -1, hop: 0, prog: 0, best: 0, done: 0, pose: 'wait', dir: 1, safe: null, safeAt: 0, lag: 0 }, o);
+  return Object.assign({ st: o.max, x: 0, y: 0, vx: 0, vy: 0, px: 0, boost: 0, trip: 0, tumble: 0, dead: 0, took: -1, hop: 0, hp: 100, hpMax: 100, burn: -1, prog: 0, best: 0, done: 0, pose: 'wait', dir: 1, safe: null, safeAt: 0, lag: 0 }, o);
 }
 // Closest points between segments p1–q1 and p2–q2 (Ericson, Real-Time Collision Detection 5.1.9).
 function closest(p1x, p1y, q1x, q1y, p2x, p2y, q2x, q2y) {
@@ -300,7 +302,7 @@ export function stepRacer(r, t, dt, racing) {
     } else if (r.grounded) {
       const { a, b } = r.grounded; let tx = b[0] - a[0], ty = b[1] - a[1]; const L = Math.hypot(tx, ty) || 1; tx /= L; ty /= L;
       if (tx * dir < 0) { tx = -tx; ty = -ty; }
-      const target = (58 + 66 * sk01(r.sk.line)) * boost * tired, vt = r.vx * tx + r.vy * ty;
+      const target = (58 + 66 * sk01(r.sk.line)) * boost * tired * (r.burn > 0 ? 0.6 : 1), vt = r.vx * tx + r.vy * ty;   // wading through lava is slow
       if (vt < target) { const dv = Math.min(460 * dt, target - vt); r.vx += tx * dv; r.vy += ty * dv; }
       r.st -= 1.6 * dt; r.pose = 'run';
       if (Math.random() < dt * 0.02 * (1 - sk01(r.sk.luck) / 1.7)) r.trip = 0.7;   // Luck: fewer stumbles
@@ -327,7 +329,15 @@ export function stepRacer(r, t, dt, racing) {
   if (!was && r.grounded && vy0 > 380 && racing && Math.random() < 0.3 * (1 - sk01(r.sk.luck) / 1.7)) r.trip = 0.8;   // hard landing
   r.boost -= dt; r.trip -= dt; r.tumble -= dt; r.hop -= dt; if (!r.grounded && !water) r.st = Math.min(r.max, r.st + 2 * dt);
   if (!racing) return;
-  if (inside(t.hazards, r.x, r.y) || r.y > t.H + 30 || r.y < -200) { r.dead = 0.6; return; }   // a pit / off the arena
+  if (inside(t.pits, r.x, r.y) || r.y > t.H + 30 || r.y < -200) { r.dead = 0.6; return; }   // down a pit / off the arena
+  // lava burns while she's in it (Luck: it singes less), with a yelp and a hop as she steps in;
+  // only when she's out of health is she sent back to her last safe spot
+  if (inside(t.hazards, r.x, r.y)) {
+    if (r.burn <= -1) { r.vy = Math.min(r.vy, -160); r.grounded = null; r.trip = 0.25; }   // a yelp and a hop stepping in (not every step: she has to wade through)
+    r.burn = 0.3;
+    r.hp -= 38 * (1 - 0.4 * Math.min(1, sk01(r.sk.luck))) * dt;
+    if (r.hp <= 0) { r.dead = 0.6; return; }
+  } else { r.burn = Math.max(-1, r.burn - dt); r.hp = Math.min(r.hpMax, r.hp + 6 * dt); }
   const p = progressOf(t, r.x, r.y);
   if (p != null) { r.prog = p; if (p > r.best) r.best = p; }
   // stuck (wedged, or running into something it can't climb): jump, then try the other way, then
@@ -342,7 +352,7 @@ export function stepRacer(r, t, dt, racing) {
     }
   }
   r.safeAt -= dt;
-  if (r.grounded && !water && r.safeAt <= 0 && p != null && p >= r.best - 30) {   // a safe spot to come back to: well in from the ledge's ends
+  if (r.grounded && !water && r.burn <= 0 && r.safeAt <= 0 && p != null && p >= r.best - 30) {   // (never in lava)   // a safe spot to come back to: well in from the ledge's ends
     const { a, b } = r.grounded, L = Math.hypot(b[0] - a[0], b[1] - a[1]);
     if (L >= 16) { const u = clamp(((r.x - a[0]) * (b[0] - a[0]) + (r.y - a[1]) * (b[1] - a[1])) / (L * L), 10 / L, 1 - 10 / L); r.safe = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; }
     r.safeAt = 0.3;
@@ -350,7 +360,7 @@ export function stepRacer(r, t, dt, racing) {
 }
 function respawn(r, t) {
   const [x, y] = r.safe ?? t.start;
-  Object.assign(r, { x, y: y - 6, vx: 0, vy: 0, dead: 0, tumble: 0.3, took: -1, stuckT: 0, tries: 0 });
+  Object.assign(r, { x, y: y - 6, vx: 0, vy: 0, dead: 0, tumble: 0.3, took: -1, stuckT: 0, tries: 0, hp: r.hpMax, burn: -1 });
 }
 export const atFinish = (t, r) => !!t.finish && (Math.hypot(r.x - t.finish[0], r.y - t.finish[1]) < 16 || distTo(t, r.x, r.y) <= 2);
 
@@ -376,10 +386,13 @@ export function drawTrack(ctx, t, { now = performance.now(), reveal = Infinity, 
     ctx.fillStyle = 'rgba(225,242,255,.95)';
     for (let x = Math.round(w.x0); x < w.x1; x += 4) ctx.fillRect(x, Math.round(w.y0) + ((x / 4 + wave) % 4 < 2 ? 0 : 1), 2, 1);
   }
-  for (const z of t.hazards) {   // spikes along the top of a hazard zone
-    ctx.fillStyle = 'rgba(224,72,90,.28)'; ctx.fillRect(Math.round(z.x0), Math.round(z.y0), Math.round(z.x1 - z.x0), Math.round(z.y1 - z.y0));
-    ctx.fillStyle = '#e0485a';
-    for (let x = Math.round(z.x0); x < z.x1 - 3; x += 6) { ctx.fillRect(x + 2, Math.round(z.y0), 2, 1); ctx.fillRect(x + 1, Math.round(z.y0) + 1, 4, 1); ctx.fillRect(x, Math.round(z.y0) + 2, 6, 1); }
+  const bub = Math.floor(now / 120);
+  for (const z of t.hazards) {   // lava: glowing, with bubbles popping along its top
+    const x0 = Math.round(z.x0), y0 = Math.round(z.y0), w = Math.round(z.x1 - z.x0), hh = Math.round(z.y1 - z.y0);
+    ctx.fillStyle = 'rgba(255,106,43,.82)'; ctx.fillRect(x0, y0, w, hh);
+    ctx.fillStyle = 'rgba(200,40,30,.55)'; ctx.fillRect(x0, y0 + Math.ceil(hh / 2), w, Math.floor(hh / 2));
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x0, y0, w, 1);
+    for (let x = x0 + 2; x < x0 + w - 2; x += 7) { const ph = (x * 7 + bub) % 9; if (ph < 3) ctx.fillRect(x, y0 - ph, 2, 2); }
   }
   let tip = null;
   const lines = t.segs.filter(sg => !sg.edge);

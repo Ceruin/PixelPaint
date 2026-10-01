@@ -17,12 +17,12 @@ const TOOLS = [
   ['eraser', 'Eraser (E)', 'eraser', 'e'],
   ['water', 'Water: drag a pool (W)', 'water', 'w'],
   ['pad', 'Jump pad: tap on the ground (J)', 'spring', 'j'],
-  ['hazard', 'Spikes: drag a zone — touching it sends a racer back (H)', 'spikes', 'h'],
+  ['hazard', 'Lava: drag a pool — it burns while they’re in it (H)', 'lava', 'h'],
   ['start', 'Start flag (S)', 'flag', 's'],
   ['finish', 'Finish flag (F)', 'finish', 'f'],
 ];
 const ERASE_R = 9, PEN_STEP = 6;
-const blank = (W, H) => ({ v: COURSE_VERSION, name: 'My course', w: W, h: H, segs: [], water: [], hazards: [], takes: [], start: null, finish: null });
+const blank = (W, H) => ({ v: COURSE_VERSION, name: 'My course', w: W, h: H, segs: [], water: [], hazards: [], pits: [], takes: [], start: null, finish: null });
 const segDist = (px, py, [ax, ay, bx, by]) => { const ex = bx - ax, ey = by - ay, l2 = ex * ex + ey * ey || 1, u = Math.max(0, Math.min(1, ((px - ax) * ex + (py - ay) * ey) / l2)); return Math.hypot(px - ax - ex * u, py - ay - ey * u); };
 // Ramer–Douglas–Peucker: a hand-drawn stroke as few straight lines as keep its shape
 function simplify(pts, tol = 1.6) {
@@ -37,7 +37,7 @@ export function courseThumb(c, w = 96, hh = 56) {
   const cv = h('canvas.cb-thumb', { width: w, height: hh }), x = cv.getContext('2d'), k = Math.min(w / c.w, hh / c.h), ox = (w - c.w * k) / 2, oy = (hh - c.h * k) / 2;
   const P = (px, py) => [ox + px * k, oy + py * k];
   x.fillStyle = 'rgba(70,140,255,.5)'; for (const [a, b, d, e] of c.water) { const [p, q] = P(a, b), [r, s] = P(d, e); x.fillRect(p, q, r - p, s - q); }
-  x.fillStyle = 'rgba(224,72,90,.6)'; for (const [a, b, d, e] of c.hazards) { const [p, q] = P(a, b), [r, s] = P(d, e); x.fillRect(p, q, r - p, s - q); }
+  x.fillStyle = 'rgba(255,106,43,.75)'; for (const [a, b, d, e] of c.hazards) { const [p, q] = P(a, b), [r, s] = P(d, e); x.fillRect(p, q, r - p, s - q); }
   x.strokeStyle = '#221822'; x.lineWidth = 1.2; x.lineCap = 'round'; x.beginPath();
   for (const [a, b, d, e] of c.segs) { x.moveTo(...P(a, b)); x.lineTo(...P(d, e)); }
   x.stroke();
@@ -114,11 +114,11 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
 
   // ---------------------------------------------------------------- editing
   const eraseAt = ([x, y]) => {
-    const r = ERASE_R / fitK().k * 1.6, n0 = c.segs.length + c.water.length + c.hazards.length + c.takes.length, inBox = ([a, b, d, e]) => x >= a - 2 && x <= d + 2 && y >= b - 2 && y <= e + 2;
+    const r = ERASE_R / fitK().k * 1.6, n0 = c.segs.length + c.water.length + c.hazards.length + c.pits.length + c.takes.length, inBox = ([a, b, d, e]) => x >= a - 2 && x <= d + 2 && y >= b - 2 && y <= e + 2;
     c.segs = c.segs.filter(s => segDist(x, y, s) > r);
-    c.water = c.water.filter(z => !inBox(z)); c.hazards = c.hazards.filter(z => !inBox(z));
+    c.water = c.water.filter(z => !inBox(z)); c.hazards = c.hazards.filter(z => !inBox(z)); c.pits = c.pits.filter(z => !inBox(z));
     c.takes = c.takes.filter(([tx, ty]) => Math.hypot(tx - x, ty - y) > r + 3);
-    if (c.segs.length + c.water.length + c.hazards.length + c.takes.length !== n0) touch();
+    if (c.segs.length + c.water.length + c.hazards.length + c.pits.length + c.takes.length !== n0) touch();
   };
   const snapAngle = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), L = Math.hypot(dx, dy); return [Math.round(a[0] + Math.cos(ang) * L), Math.round(a[1] + Math.sin(ang) * L)]; };
   cv.addEventListener('pointerdown', e => {
@@ -167,7 +167,7 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
 
   const clearAll = async () => {
     if (!c.segs.length && !c.water.length && !c.hazards.length && !c.takes.length && !c.start && !c.finish) return;
-    commit(); Object.assign(c, { segs: [], water: [], hazards: [], takes: [], start: null, finish: null }); touch();
+    commit(); Object.assign(c, { segs: [], water: [], hazards: [], pits: [], takes: [], start: null, finish: null }); touch();
     toast('Cleared — Undo brings it back');
   };
   const pyxlDraws = () => {
@@ -259,6 +259,8 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
     }
     const reveal = revealAt ? T.inkLen * Math.min(1, (now - revealAt) / 1400) : Infinity;
     const tip = drawTrack(ctx, T, { now, reveal, flags: false });
+    ctx.fillStyle = 'rgba(34,24,34,.35)';   // pits (under Pyxl's gaps): a faint dashed outline, so you can see and erase them
+    for (const z of T.pits) { for (let x = Math.round(z.x0); x < z.x1; x += 4) { ctx.fillRect(x, Math.round(z.y0), 2, 1); ctx.fillRect(x, Math.round(z.y1), 2, 1); } for (let y = Math.round(z.y0); y < z.y1; y += 4) { ctx.fillRect(Math.round(z.x0), y, 1, 2); ctx.fillRect(Math.round(z.x1), y, 1, 2); } }
     if (revealAt && reveal >= T.inkLen) revealAt = 0;
     if (tip) drawPose(ctx, 'brush', tip[0] - 14, tip[1] + 2, 1);
     if (!revealAt) {
@@ -272,7 +274,7 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
       ctx.strokeStyle = '#3b7bff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(...S(...pts[0])); for (const p of pts.slice(1)) ctx.lineTo(...S(...p)); ctx.stroke();
     } else if (drag && (tool === 'water' || tool === 'hazard')) {
       const [a, b] = S(...drag.a), [d, e] = S(...drag.b);
-      ctx.fillStyle = tool === 'water' ? 'rgba(70,140,255,.35)' : 'rgba(224,72,90,.3)'; ctx.fillRect(Math.min(a, d), Math.min(b, e), Math.abs(d - a), Math.abs(e - b));
+      ctx.fillStyle = tool === 'water' ? 'rgba(70,140,255,.35)' : 'rgba(255,106,43,.4)'; ctx.fillRect(Math.min(a, d), Math.min(b, e), Math.abs(d - a), Math.abs(e - b));
     }
     if (hover && tool === 'eraser') { const [x, y] = S(...hover); ctx.strokeStyle = 'rgba(34,24,34,.7)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, ERASE_R * 1.6, 0, Math.PI * 2); ctx.stroke(); }
     else if (hover && !drag && (tool === 'pad' || tool === 'start' || tool === 'finish')) {   // where it'll land

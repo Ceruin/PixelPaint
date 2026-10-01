@@ -89,9 +89,9 @@ export function careBody(pyxl, onPlay) {
           row('Stage', s.ageLabel, s.stage === 'child' || s.stage === 'adult' ? ` · life ${s.lives}` : ''),
           row('Type', s.chaos ? `Chaos ${s.name}` : s.type ? TYPES[s.type] : 'Still growing'),
           row('Alignment', s.alignment)),
-        h('div.pc-skills', {}, SKILLS.map(([k, label, ic, color]) => {
+        h('div.pc-skills', {}, [...SKILLS, ['luck', 'Luck', 'star', '#ffd23f']].map(([k, label, ic, color]) => {
           const sk = s.skills[k];
-          return h('div.pc-skill', { 'data-tip': `${sk.pts} points` }, iconCanvas(ic, 2), h('span', {}, label), h('b.pc-grade', { className: `g${sk.grade}` }, GRADES[sk.grade]),
+          return h('div.pc-skill', { 'data-tip': k === 'luck' ? `${sk.pts} points — fewer trips, lighter lava burns, and a helping hand in games` : `${sk.pts} points` }, iconCanvas(ic, 2), h('span', {}, label), h('b.pc-grade', { className: `g${sk.grade}` }, GRADES[sk.grade]),
             h('span.pc-lv', {}, `Lv ${sk.level}`), h('span.pc-prog', {}, Array.from({ length: 10 }, (_, i) => h(`i${i < sk.prog / 10 ? '.on' : ''}`, { style: { '--c': color } }))));
         })),
         h('div.pc-page.yellow', {},
