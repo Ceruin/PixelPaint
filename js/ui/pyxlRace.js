@@ -1,4 +1,5 @@
 import { h, icon } from './dom.js';
+import { bus } from '../core/bus.js';
 import { drawPose, tinted } from './mascot.js';
 import { pixelText } from './pixelFont.js';
 import { LUCKY_NAMES } from './pyxlStats.js';
@@ -125,11 +126,12 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
   layer.addEventListener('pointerdown', e => { if (!e.target.closest('button')) boostMe(); });
   const key = e => {
     if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); boostMe(); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); end(true); }
+    else if (e.key === 'Escape') { if (document.querySelector('.menu-drop, .tool-menu, .dd-pop, .modal-back')) return; e.preventDefault(); e.stopPropagation(); end(true); }   // (a menu open over it closes first)
     else if (test && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); e.stopPropagation(); restart(); }
   };
   addEventListener('keydown', key, true);
   close.onclick = () => end(true);
+  const offMode = bus.on('mode', () => end(true));   // switching workspace mid-race calls it off (the course was laid on this canvas)
 
   const standing = () => racers.slice().sort((a, b) => (a.done && b.done ? a.done - b.done : a.done ? -1 : b.done ? 1 : b.best - a.best));
   let boardAt = 0;
@@ -196,7 +198,7 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
     if (over) return;
     over = true;
     cancelAnimationFrame(raf);
-    removeEventListener('keydown', key, true); area.stop();
+    removeEventListener('keydown', key, true); area.stop(); offMode();
     layer.remove(); delete document.body.dataset.game;   // nothing was added to the drawing: it's just as it was
     hideRacers(false);
     if (test) return onDone?.({ finished: !!me.done, time: me.time });

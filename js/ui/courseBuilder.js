@@ -288,7 +288,7 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
 
   // ---------------------------------------------------------------- keys / closing
   const key = e => {
-    if (layer.hidden || document.querySelector('.modal-back')) return;
+    if (layer.hidden || document.querySelector('.modal-back, .menu-drop, .tool-menu, .dd-pop')) return;   // a menu or dialog open over it has the keys
     e.stopPropagation();   // the app's own shortcuts sit this out
     if (e.target === nameIn) { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); nameIn.blur(); } return; }
     const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();

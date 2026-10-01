@@ -552,9 +552,9 @@ body[data-theme=paper] .pyxl-canvas { filter: grayscale(1) contrast(1.15); }
 .pc-learned span.on { color: var(--text); border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
 body[data-theme=paper] .pc-medal, body[data-theme=paper] .pc-grade { filter: grayscale(1); }
 /* race mini-game */
-.race-layer { position: fixed; z-index: 820; overflow: hidden; background: linear-gradient(#8ccdff 50%, #e8d1a4 50%); }   /* the race fills the canvas area */
+.race-layer { position: fixed; z-index: 90; overflow: hidden; background: linear-gradient(#8ccdff 50%, #e8d1a4 50%); }   /* the race fills the canvas area: over the canvas and its floating panels, under menus, popups and dialogs (only drawing is locked) */
 body[data-game] .pyxl-card { visibility: hidden; }
-.game-arena { position: fixed; z-index: 800; overflow: hidden; background: color-mix(in srgb, var(--stage) 35%, transparent); outline: 2px solid var(--accent); outline-offset: -2px; touch-action: none; }
+.game-arena { position: fixed; z-index: 89; overflow: hidden; background: color-mix(in srgb, var(--stage) 35%, transparent); outline: 2px solid var(--accent); outline-offset: -2px; touch-action: none; }
 .ga-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: var(--hand); }
 .ga-bar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 3px 4px 3px 12px; max-width: calc(100% - 16px); border-radius: var(--r); background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); font-size: 12px; white-space: nowrap; }
 .ga-status { color: var(--muted); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
