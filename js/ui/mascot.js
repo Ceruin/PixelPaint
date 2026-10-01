@@ -1174,22 +1174,25 @@ export class Mascot {
     startGame(this, id);
   }
 
-  race(level) {
+  // level: 0..2 for Pyxl's races; opts.course for one you drew (opts.mode 'test' = a solo test ride)
+  race(level, opts) {
+    if (opts?.mode === 'test') return startRace(this, -1, opts);
     if (!this.awake()) return this.say('Zzz…');
     if (this.stats.energy < 25) return this.react('refuse', { say: 'Too tired to race…' });
     this.react('cheer', { say: 'Let’s race!' });
-    startRace(this, level);
+    return startRace(this, level, opts);
   }
 
   raceOver(place, level, rings = 0) {
     const s = this.stats;
     if (place < 0) return this.say('Maybe next time!');
-    const id = RACES[level][0];
+    const id = RACES[level]?.[0];   // a course you drew (level -1) gives rings but no medal
     s.races++; if (place === 0) s.wins++;
-    if (place < 3) s.medals[id] = Math.min(s.medals[id] ?? 9, place);
+    if (place < 3 && id) s.medals[id] = Math.min(s.medals[id] ?? 9, place);
     s.earn(rings); s.change({ fun: 15, energy: -15 }, 5 - Math.min(4, place));
     s.train('luck', 10); s.train('smarts', 6); s.happy(place === 0 ? 3 : 1);
-    const medal = medalName(place);
+    const medal = id ? medalName(place) : null;
+    if (!id && place < 3) return this.react(place ? 'happy' : 'cheer', { icon: 'star', n: 3 - place, say: `${['1st', '2nd', '3rd'][place]} on your course! +${rings} rings`, force: true });
     if (place === 0) this.react('cheer', { icon: 'medal', n: 4, say: `I won! Gold medal! +${rings} rings`, force: true });
     else if (medal) this.react('happy', { icon: 'medal', n: 2, say: `${medal} medal! +${rings} rings`, force: true });
     else this.react(s.is('crybaby') ? 'cry' : 'oops', { say: 'Aww… I’ll train harder!', force: true });
