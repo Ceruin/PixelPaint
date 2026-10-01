@@ -572,6 +572,13 @@ body[data-game] .pyxl-card { visibility: hidden; }
 .pc-race:hover:not(:disabled) { border-color: var(--accent); }
 .pc-race:disabled { opacity: .5; cursor: default; }
 .pc-race .pxicon { filter: grayscale(1) opacity(.5); } .pc-race.m0 .pxicon { filter: none; } .pc-race.m1 .pxicon { filter: grayscale(1) brightness(1.3); } .pc-race.m2 .pxicon { filter: sepia(1) saturate(2) hue-rotate(-20deg) brightness(.9); }
+.race-layer.course { background: none; cursor: var(--hand); }   /* the course is drawn over your drawing: it shows through */
+.race-layer.course .race-canvas { top: 0; left: 0; transform: none; }
+.race-board { position: absolute; top: 8px; left: 8px; margin: 0; padding: 6px 10px; list-style: none; border-radius: var(--r); background: var(--panel); box-shadow: var(--shadow); font-size: 12px; line-height: 1.6; pointer-events: none; }
+.race-board li { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.race-board li.me { color: var(--text); font-weight: 700; }
+.race-board li i { width: 8px; height: 8px; border-radius: 2px; }
+.race-layer.course .race-foot { top: auto; bottom: 10px; }
 .race-head, .race-foot { position: absolute; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 16px); padding: 3px 4px 3px 12px; border-radius: var(--r); background: var(--panel); box-shadow: var(--shadow); white-space: nowrap; }
 .race-head { top: 8px; right: 8px; }
 .race-foot { top: 52px; left: 50%; transform: translateX(-50%); padding: 4px 12px 4px 4px; }   /* up in the sky, clear of the lanes */
