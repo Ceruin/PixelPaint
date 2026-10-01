@@ -11,10 +11,12 @@ import { bus } from '../core/bus.js';
 // - a life cycle measured in active app time: egg → child → cocoon → adult → cocoon → rebirth
 //   (happy: she keeps 10% of her skills) — or, fully cared for, the immortal Chaos Pyxl;
 // - kindergarten lessons, rings to spend in the shop, race medals.
+// Your first Pyxl lives at KEY; Pyxls hatched from shop eggs at `${KEY}.${id}` (and their backups likewise).
 const KEY = 'pp.pyxl', BACKUP = 'pyxl-backup';
+export const statsKey = id => (id ? `${KEY}.${id}` : KEY), backupKey = id => (id ? `${BACKUP}.${id}` : BACKUP);
 // Everything that makes her who she is (saved, backed up, and written to a .pyxl file).
 const SAVE_KEYS = ['name', 'food', 'fun', 'love', 'energy', 'asleep', 'xp', 'level', 'born', 't', 'lives', 'rings', 'medals', 'wins', 'races', 'chaos',
-  'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom', 'pomos'];
+  'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom', 'pomos', 'colour'];
 // A .pyxl file: her saved state with a format tag, so a stray JSON file can't replace her.
 export const PYXL_FORMAT = 'pixelpaint-pyxl';
 export const pyxlFile = stats => JSON.stringify({ format: PYXL_FORMAT, version: 1, saved: Date.now(), pyxl: stats.snapshot() }, null, 1);
@@ -78,6 +80,11 @@ export const SHOP_INFO = {
   skills: 'Trains every skill a little.', energy: 'A pick-me-up: energy and a snack.', party: 'Fun and fullness way up — she dances.',
   calm: 'Soothes anger and sadness.', luck: 'Trains her luck (fewer trips, better races).',
 };
+// A Pyxl egg: a new friend of her own (not a fruit — never the deal, never a favourite).
+export const EGG = ['egg', 'Pyxl egg', 150, 'egg'];
+SHOP_INFO.egg = 'A new Pyxl friend! She hatches from the egg and lives alongside your other Pyxls, with her own needs, skills and colour.';
+// Smock colours for Pyxls from eggs (your first Pyxl wears the colour you paint with).
+export const FRIEND_COLOURS = ['#ff5a7a', '#ffb02e', '#8b5cff', '#2fb36b', '#3b7bff', '#ff7a3b', '#e05ad6', '#20b8c8'];
 // One item a day is 30% off.
 export const dealOfTheDay = (t = Date.now()) => SHOP[Math.floor(t / 864e5) % SHOP.length][0];
 export const priceOf = (item, t) => (item[0] === dealOfTheDay(t) ? Math.round(item[2] * 0.7) : item[2]);
@@ -118,26 +125,34 @@ function newLife(prev) {
 }
 
 export class PyxlStats {
-  constructor() {
-    const now = Date.now(), saved = local.get(KEY, null) ?? local.get('pp.pip', null);
+  // id: null for your first Pyxl; a Pyxl from an egg has her own id (and storage)
+  constructor(id = null) {
+    this.id = id; this.key = statsKey(id); this.backup = backupKey(id);
+    const now = Date.now(), saved = local.get(this.key, null) ?? (id ? null : local.get('pp.pip', null));
     // localStorage lost but the IndexedDB copy survived (e.g. a partial clear): bring her back. Once
     // per session, so a browser that won't keep localStorage can't loop on reloads.
     // (Not the copy this fresh start may already have written of its own new Pyxl: that one shares her birth time.)
-    if (!saved) idb.get(BACKUP).then(b => { if (b?.born && b.skills && b.born !== this.born && !sessionStorage.getItem('pp.pyxlRestored')) { sessionStorage.setItem('pp.pyxlRestored', '1'); adoptSave(b); } }).catch(() => {});
+    if (!saved && !id) idb.get(BACKUP).then(b => { if (b?.born && b.skills && b.born !== this.born && !sessionStorage.getItem('pp.pyxlRestored')) { sessionStorage.setItem('pp.pyxlRestored', '1'); adoptSave(b); } }).catch(() => {});
     Object.assign(this, {
       name: 'Pyxl', food: 80, fun: 80, love: 70, energy: 90, asleep: false, xp: 0, level: 1, born: now, t: now,
       lives: 1, rings: 20, medals: {}, wins: 0, races: 0, chaos: false,
     }, newLife(), saved ?? {});
     // Saves from before the life cycle: she's already a grown-up friend.
     if (saved && !saved.skills) Object.assign(this, newLife(), { stage: 'adult', type: 'normal', active: YEAR * CHILD_YEARS });
-    if (!saved) this.stage = 'child';   // a new friend arrives already hatched; eggs come with rebirth
+    if (!saved) this.stage = id ? 'egg' : 'child';   // your first friend arrives already hatched; eggs come from the shop and with rebirth
     this.emo = { joy: 0, anger: 0, fear: 0, sorrow: 0, ...this.emo };
     const away = now - this.t;
     this.update(Math.min(away, 24 * HOUR), { offline: true });
     this.welcomeBack = away > 2 * HOUR;
-    setInterval(() => this.update(Date.now() - this.t, { active: this.isActive() }), 20e3);
+    this.timer = setInterval(() => this.update(Date.now() - this.t, { active: this.isActive() }), 20e3);
     addEventListener('pagehide', () => this.flush());
     document.addEventListener('visibilitychange', () => document.hidden && this.flush());
+  }
+  // Saying goodbye to a Pyxl from an egg: stop her clock and remove both copies of her.
+  dispose() {
+    this.gone = true; clearInterval(this.timer); clearTimeout(this.saveTimer);
+    try { localStorage.removeItem(this.key); } catch { /* private mode */ }
+    idb.del(this.backup).catch(() => {});
   }
 
   // "Active" = the app is visible and you did something in the last two minutes; only that ages her.
@@ -190,7 +205,7 @@ export class PyxlStats {
     if (!n) return;
     this.xp += n;
     const need = this.level * 40;
-    if (this.xp >= need) { this.xp -= need; this.level++; this.rings += 10; bus.emit('pyxl:level', this.level); }
+    if (this.xp >= need) { this.xp -= need; this.level++; this.rings += 10; bus.emit('pyxl:level', { lv: this.level, stats: this }); }
   }
 
   // Skill training: progress fills a 10-step bar; each full bar is a level worth GAIN[grade] points.
@@ -202,7 +217,7 @@ export class PyxlStats {
     while (s.prog >= 100 && s.level < 99) {
       s.prog -= 100; s.level++;
       s.pts = Math.min(k in { luck: 1, smarts: 1 } ? 4000 : 3266, s.pts + GAIN[s.grade] + Math.floor(Math.random() * 4));
-      if (!(k in { luck: 1, smarts: 1 })) bus.emit('pyxl:skill', { k, level: s.level });
+      if (!(k in { luck: 1, smarts: 1 })) bus.emit('pyxl:skill', { k, level: s.level, stats: this });
     }
     if (k in this.recent) { for (const r in this.recent) this.recent[r] *= 0.98; this.recent[k] += amount; }
     if (!(k in { luck: 1, smarts: 1 })) HIDDEN.forEach(hk => this.train(hk, amount * 0.2));
@@ -242,7 +257,7 @@ export class PyxlStats {
   fallIll(kind) {
     this.sick = kind ?? pick(Object.keys(ILLNESSES));
     this.feel('sorrow', 20);
-    bus.emit('pyxl:sick', this.sick);
+    bus.emit('pyxl:sick', { kind: this.sick, stats: this });
     this.save();
   }
   cure() { this.sick = null; this.happy(2); this.feel('joy', 20); this.save(); }
@@ -338,11 +353,11 @@ export class PyxlStats {
   }
   flush() {
     clearTimeout(this.saveTimer); this.saveTimer = 0;
-    if (!this.dirty) return;
+    if (!this.dirty || this.gone) return;
     this.dirty = false;
     const data = this.snapshot();
-    local.set(KEY, data);
-    idb.set(BACKUP, data).catch(() => {});   // a second copy, restored if localStorage is ever lost
+    local.set(this.key, data);
+    idb.set(this.backup, data).catch(() => {});   // a second copy, restored if localStorage is ever lost
     bus.emit('pyxl:stats', this);
   }
   snapshot() { return Object.fromEntries(SAVE_KEYS.map(k => [k, this[k]])); }

@@ -27,6 +27,7 @@ import { initTooltips } from './ui/tooltip.js';
 import { initSelects } from './ui/selects.js';
 import { toast } from './ui/dialogs.js';
 import { Mascot } from './ui/mascot.js';
+import { initRoster } from './ui/pyxlRoster.js';
 import { openBuilder } from './ui/courseBuilder.js';
 import { readCourseLink, readCourseFile } from './ui/courseShare.js';
 import { careBody, openCareCard } from './ui/pyxlCare.js';
@@ -41,6 +42,7 @@ const app = new App($('#view'));
 const project = createProject(app);
 const panels = new Panels($('#workspace'));
 const mascot = new Mascot(app);
+initRoster(app, mascot);   // and her friends from shop eggs
 mascot.keepDrawing = (c, name) => { setMode('paint'); project.importLayer(c, name); };
 const zen = initZen(app, panels);
 const notes = initNotes(app, c => { setMode('paint'); project.importLayer(c, 'Sketch note'); }, () => setMode('paint'));

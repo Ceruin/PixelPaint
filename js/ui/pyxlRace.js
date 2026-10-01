@@ -2,16 +2,16 @@ import { h, icon } from './dom.js';
 import { drawPose, tinted } from './mascot.js';
 import { pixelText } from './pixelFont.js';
 import { LUCKY_NAMES } from './pyxlStats.js';
-import { stageBox } from './pyxlGames.js';
+import { stageBox, pageRect } from './pyxlGames.js';
 import { generateCourse, prepareTrack, buildField, makeRacer, stepRacer, atFinish, placeAtFraction, drawTrack } from './raceCourse.js';
 
 // Pyxl races, Line Rider style: Pyxl draws a course of lines right over your drawing (it shows
 // through as the backdrop; nothing is added to your document), then four racers ride it with real
 // physics — running the slopes, jumping gaps, swimming the water, climbing walls. Each move runs on
 // its skill: Line = running, Colour = swimming, Shape = jumping and gliding, Power = climbing, Luck =
-// not tripping. A wide canvas area races left to right; a tall one zig-zags top to bottom. Turn the
-// device mid-race and the course re-lays for the new shape while gravity keeps pointing down — so
-// everyone drops onto it. Tap / Space cheers (a burst of speed that costs stamina).
+// not tripping. The course is laid on your canvas page: a wide canvas races left to right, a tall
+// one zig-zags top to bottom. Once laid it keeps its size; resizing the window just scales it with
+// the page. Tap / Space cheers (a burst of speed that costs stamina).
 // Courses you build (or are sent) race the same way: `startRace(pyxl, -1, { course })`, or
 // `mode: 'test'` for a solo test ride from the course builder.
 export const RACES = [
@@ -31,29 +31,35 @@ const POSE = { run: ['walk', 'idle1'], air: ['raise'], climb: ['raise', 'point']
 const ordinal = i => `${i}${['th', 'st', 'nd', 'rd'][i % 10 < 4 && Math.floor(i / 10) !== 1 ? i % 10 : 0]}`;
 const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}.${Math.floor(s * 10 % 10)}`;
 
-// Fit an overlay canvas to the canvas area: a whole number of device pixels per scene pixel, ~620
-// scene px on the short side. Calls onSize(W, H) when the scene size changes. Shared with the builder.
+// The arena is your canvas page: the scene is sized for it once (a whole number of device pixels
+// per scene pixel, ~620 scene px on its short side) and then stays that size — resizing the window
+// or turning the device only scales it along with the page. The layer itself covers the canvas
+// area (it clips the scene and holds the HUD). onSize(W, H) is called once. Shared with the builder.
 export function arena(app, layer, cv, onSize) {
   let W = 0, H = 0;
   const a = { scale: 1 };
   const fit = () => {
-    const b = stageBox(app, { page: false }), dpr = devicePixelRatio || 1;
-    const dw = Math.round(b.width * dpr), dh = Math.round(b.height * dpr);
-    const n = Math.max(1, Math.round(Math.min(dw, dh) / 620));
-    const nw = Math.floor(dw / n), nh = Math.floor(dh / n);
+    const b = stageBox(app, { page: false }), p = pageRect(app) ?? b, dpr = devicePixelRatio || 1;
     Object.assign(layer.style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` });
-    Object.assign(cv, { width: nw, height: nh }); Object.assign(cv.style, { width: `${nw * n / dpr}px`, height: `${nh * n / dpr}px` });
-    a.scale = n / dpr;   // CSS px per scene px
-    if (nw === W && nh === H) return;
-    W = nw; H = nh; onSize(W, H);
+    if (!W) {
+      const dw = Math.round(p.width * dpr), dh = Math.round(p.height * dpr), n = Math.max(1, Math.round(Math.min(dw, dh) / 620));
+      W = Math.max(120, Math.floor(dw / n)); H = Math.max(120, Math.floor(dh / n));
+      Object.assign(cv, { width: W, height: H });
+      onSize(W, H);
+    }
+    // fixed scene, scaled to the page wherever it is now (same aspect as when it was made)
+    const k = Math.min(p.width / W, p.height / H);
+    a.scale = k;
+    Object.assign(cv.style, { left: `${p.left - b.left + (p.width - W * k) / 2}px`, top: `${p.top - b.top + (p.height - H * k) / 2}px`, width: `${W * k}px`, height: `${H * k}px` });
   };
   addEventListener('resize', fit);
-  // the docks re-flow a moment after a rotate / resize: follow the canvas area itself as it settles
+  // the docks re-flow a moment after a rotate / resize, and the page moves when you zoom or pan
   const stageEl = document.getElementById('pxStage')?.offsetParent ? document.getElementById('pxStage') : document.getElementById('stage');
   const ro = stageEl ? new ResizeObserver(() => fit()) : null; ro?.observe(stageEl);
+  let raf = 0; const follow = () => { fit(); raf = requestAnimationFrame(follow); };
   a.fit = fit;
-  a.stop = () => { removeEventListener('resize', fit); ro?.disconnect(); };
-  fit();
+  a.stop = () => { removeEventListener('resize', fit); ro?.disconnect(); cancelAnimationFrame(raf); };
+  fit(); raf = requestAnimationFrame(follow);
   return a;
 }
 
@@ -61,14 +67,17 @@ export function arena(app, layer, cv, onSize) {
 export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDone } = {}) {
   const test = mode === 'test', custom = !!course;
   const s = pyxl.stats, [levelId, title, [lo, hi], prize] = custom ? CUSTOM : RACES[level];
-  const skill = k => s.skills[k]?.pts ?? 0;
-  const me = makeRacer({ name: s.name, me: true, sk: { line: skill('line'), colour: skill('colour'), shape: skill('shape'), power: skill('power'), luck: skill('luck') }, max: 80 + skill('stamina') / 10 });
-  const names = LUCKY_NAMES.filter(n => n !== s.name).sort(() => Math.random() - 0.5);
-  const rivals = test ? [] : [0, 1, 2].map(i => {
+  const skillsOf = st => { const p = k => st.skills[k]?.pts ?? 0; return { sk: { line: p('line'), colour: p('colour'), shape: p('shape'), power: p('power'), luck: p('luck') }, max: 80 + p('stamina') / 10 }; };
+  const me = makeRacer({ name: s.name, me: true, src: pyxl.sheet(), ...skillsOf(s) });
+  // your other Pyxls race too (if they're up to it); rivals fill the rest of the four lanes
+  const mates = test ? [] : (pyxl.roster?.all ?? []).filter(m => m !== pyxl && m.awake() && m.stats.energy >= 25).slice(0, 3)
+    .map(m => makeRacer({ name: m.stats.name, mate: m, colour: m.colour, src: m.sheet(), ...skillsOf(m.stats) }));
+  const names = LUCKY_NAMES.filter(n => n !== s.name && !mates.some(m => m.name === n)).sort(() => Math.random() - 0.5);
+  const free = RIVAL_COLOURS.filter(c => !mates.some(m => m.colour === c)), rivals = test ? [] : Array.from({ length: 3 - mates.length }, (_, i) => {
     const r = () => lo + Math.random() * (hi - lo);
-    return makeRacer({ name: names[i], colour: RIVAL_COLOURS[(Math.max(0, level) * 2 + i) % RIVAL_COLOURS.length], sk: { line: r(), colour: r(), shape: r(), power: r(), luck: r() }, max: 80 + r() / 10 });
+    return makeRacer({ name: names[i], colour: free[(Math.max(0, level) * 2 + i) % free.length], sk: { line: r(), colour: r(), shape: r(), power: r(), luck: r() }, max: 80 + r() / 10 });
   });
-  const racers = test ? [me] : [rivals[0], me, rivals[1], rivals[2]];
+  const others = [...mates, ...rivals], racers = test ? [me] : [others[0], me, ...others.slice(1)];
   racers.forEach((r, i) => { r.lag = i * 0.12; });
 
   const cv = h('canvas.race-canvas'), ctx = cv.getContext('2d');
@@ -120,7 +129,7 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
 
   const standing = () => racers.slice().sort((a, b) => (a.done && b.done ? a.done - b.done : a.done ? -1 : b.done ? 1 : b.best - a.best));
   let boardAt = 0;
-  const syncBoard = () => board.replaceChildren(...standing().map((r, i) => h('li', { className: r.me ? 'me' : '' }, h('i', { style: { background: r.me ? 'var(--accent)' : r.colour } }), `${ordinal(i + 1)} ${r.name}`)));
+  const syncBoard = () => board.replaceChildren(...standing().map((r, i) => h('li', { className: r.me ? 'me' : r.mate ? 'mate' : '' }, h('i', { style: { background: r.me ? 'var(--accent)' : r.colour } }), `${ordinal(i + 1)} ${r.name}`)));
 
   const frame = now => {
     raf = requestAnimationFrame(frame);
@@ -158,7 +167,7 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
       if (r.dead > 0 && Math.floor(now / 90) % 2) continue;   // blinking while respawning
       const pose = r.trip > 0 ? 'trip' : r.tumble > 0 ? 'air' : r.done ? 'done' : phase === 'count' ? 'wait' : r.pose, list = POSE[pose] ?? POSE.wait;
       const nm = list[frameNo % list.length];
-      drawPose(ctx, nm, r.x, r.y + (nm === 'floor' ? 4 : 0), 1, r.dir < 0, 0, r.me ? undefined : tinted(r.colour));
+      drawPose(ctx, nm, r.x, r.y + (nm === 'floor' ? 4 : 0), 1, r.dir < 0, 0, r.src ?? tinted(r.colour));
       if (r.me && !test) { ctx.fillStyle = '#ffd23f'; const ty = Math.round(r.y - 60); ctx.fillRect(Math.round(r.x) - 2, ty, 5, 1); ctx.fillRect(Math.round(r.x) - 1, ty + 1, 3, 1); ctx.fillRect(Math.round(r.x), ty + 2, 1, 1); }   // a little "you" marker
       if (phase === 'race' && !r.done) { const bw = 14, fill = Math.round(bw * clamp(r.st / r.max, 0, 1)); ctx.fillStyle = 'rgba(34,24,34,.7)'; ctx.fillRect(Math.round(r.x) - 7, Math.round(r.y) + 3, bw, 2); ctx.fillStyle = r.st < r.max * 0.25 ? '#e0485a' : '#2fb36b'; ctx.fillRect(Math.round(r.x) - 7, Math.round(r.y) + 3, fill, 2); }
     }
@@ -186,9 +195,10 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
     removeEventListener('keydown', key, true); area.stop();
     layer.remove(); delete document.body.dataset.game;   // nothing was added to the drawing: it's just as it was
     if (test) return onDone?.({ finished: !!me.done, time: me.time });
-    const place = quit ? -1 : me.done ? me.done - 1 : finished.length;
-    if (custom) pyxl.raceOver(place, -1, place < 0 ? 0 : place < 3 ? prize * (3 - place) : 1);
-    else pyxl.raceOver(place, level, place < 3 ? prize * (3 - place) : 2);
+    const placeOf = r => (quit ? -1 : r.done ? r.done - 1 : finished.length), ringsFor = p => (p < 0 ? 0 : p < 3 ? prize * (3 - p) : custom ? 1 : 2);
+    const place = placeOf(me);
+    pyxl.raceOver(place, custom ? -1 : level, ringsFor(place));
+    if (!quit) mates.forEach((r, i) => setTimeout(() => !r.mate.gone && r.mate.raceOver(placeOf(r), custom ? -1 : level, ringsFor(placeOf(r))), 900 * (i + 1)));   // each of your Pyxls gets her own result
     onDone?.({ place });
   };
   syncBoard();

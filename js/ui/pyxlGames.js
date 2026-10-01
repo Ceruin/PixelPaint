@@ -13,6 +13,17 @@ export const GAMES = [
 
 // Where games play: the drawing itself (the page in Draw or Sprite Studio), clipped to what's on
 // screen — or the whole canvas area when the page is too small or `page` is false. Notes: the board.
+// The drawing's page on screen (not clipped to the stage), or null where there's no page (Notes).
+export function pageRect(app) {
+  const px = document.getElementById('pxView');
+  if (px?.offsetParent && !px.closest('.parked') && document.getElementById('pxStage')?.getBoundingClientRect().width > 120) return px.getBoundingClientRect();
+  const v = app?.view, d = app?.doc, st = document.getElementById('stage');
+  if (!v || !d || !st?.offsetParent) return null;
+  const c = document.getElementById('view').getBoundingClientRect(), pts = [[0, 0], [d.w, 0], [0, d.h], [d.w, d.h]].map(([x, y]) => v.toScreen(x, y)), xs = pts.map(q => q.x + c.left), ys = pts.map(q => q.y + c.top);
+  const left = Math.min(...xs), top = Math.min(...ys);
+  return { left, top, width: Math.max(...xs) - left, height: Math.max(...ys) - top };
+}
+
 export function stageBox(app, { page = true } = {}) {
   const vis = el => (el?.offsetParent && !el.closest('.parked') ? el.getBoundingClientRect() : null);   // a parked (see-through) Sprite Studio still has a box
   const clip = (a, b) => { const l = Math.max(a.left, b.left), t = Math.max(a.top, b.top), r = Math.min(a.right, b.right), bt = Math.min(a.bottom, b.bottom); return r > l && bt > t ? { left: l, top: t, right: r, bottom: bt } : null; };

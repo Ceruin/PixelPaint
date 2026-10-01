@@ -62,6 +62,8 @@ const outlined = rows => { const H = rows.length + 2, W = rows[0].length + 2, g 
   return out.map(r => r.join('')); };
 ICONS.zS = outlined(['cccc', '..b.', '.b..', 'bbbb']);
 ICONS.zL = outlined(['ccccc', '...b.', '..b..', '.b...', 'bbbbb']);
+// A Pyxl egg for the shop: speckled, like the one she hatches from.
+ICONS.egg = outlined(['..ww..', '.wwwl.', 'wgwwwl', 'wwwgwl', 'wwwwwl', 'wgwwll', '.wwll.']);
 
 export function drawIcon(ctx, name, x, y, k = 1, color) {
   const rows = ICONS[name];

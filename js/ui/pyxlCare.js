@@ -3,7 +3,7 @@ import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
 import { clamp, download } from '../core/util.js';
 import { modal, toast } from './dialogs.js';
-import { pyxlFile, readPyxlFile, adoptSave, NEEDS, SNACKS, SHOP, SHOP_INFO, dealOfTheDay, priceOf, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
+import { pyxlFile, readPyxlFile, adoptSave, EGG, NEEDS, SNACKS, SHOP, SHOP_INFO, dealOfTheDay, priceOf, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
 import { RACES, raceUnlocked, medalName } from './pyxlRace.js';
 import { openBuilder } from './courseBuilder.js';
 import { iconCanvas } from './pixelIcons.js';
@@ -31,6 +31,18 @@ function loadPyxl(s) {
     if (ok) adoptSave(data);
   };
   inp.click();
+}
+
+// A Pyxl from an egg can leave (after a confirm; offers her backup file first).
+async function goodbye(pyxl) {
+  const s = pyxl.stats;
+  const v = await modal(`Say goodbye to ${s.name}?`, h('p', {}, `${s.name} will leave for good, with her skills and rings. Save her to a file first if you might want her back.`),
+    [['Cancel', null], ['Save a file first', 'file'], ['Goodbye', 'bye', 'danger']]);
+  if (v === 'file') download(new Blob([pyxlFile(s)], { type: 'application/json' }), `${s.name.replace(/[^\w -]+/g, '') || 'Pyxl'}.pyxl`);
+  if (v !== 'bye') return;
+  close();
+  pyxl.say('Bye bye! ♡', 1200);
+  setTimeout(() => { pyxl.roster?.remove(pyxl); toast(`${s.name} waved goodbye`); }, 1200);
 }
 
 export function careBody(pyxl, onPlay) {
@@ -97,7 +109,7 @@ export function careBody(pyxl, onPlay) {
           h('small', {}, `${s.name} is saved in this browser. Keep a backup file in case its data is cleared.`),
           h('div.pc-backup-btns', {},
             btn('disk', 'Save to a file', () => download(new Blob([pyxlFile(s)], { type: 'application/json' }), `${s.name.replace(/[^\w -]+/g, '') || 'Pyxl'}.pyxl`)),
-            btn('folder', 'Load from a file', () => loadPyxl(s)))),
+            pyxl.id ? btn('bang', 'Say goodbye', () => goodbye(pyxl)) : btn('folder', 'Load from a file', () => loadPyxl(s)))),
       ];
     },
     school() {
@@ -135,14 +147,15 @@ export function careBody(pyxl, onPlay) {
     },
     // Pick an item to see what it does; the deal of the day is 30% off.
     shop() {
-      const deal = dealOfTheDay(), sel = SHOP.find(i => i[0] === shopPick) ?? SHOP.find(i => i[0] === deal), price = priceOf(sel), fav = sel[0] === s.fav;
+      const items = [...SHOP, EGG], deal = dealOfTheDay(), sel = items.find(i => i[0] === shopPick) ?? SHOP.find(i => i[0] === deal), price = priceOf(sel), fav = sel[0] === s.fav;
+      const full = sel === EGG && !pyxl.roster?.hasRoom();
       return [
         h('div.pc-wallet', {}, iconCanvas('ring', 2), h('b', {}, `${s.rings}`), h('small', {}, 'rings — earned by painting, saving, games and races')),
-        h('div.pc-shop', {}, SHOP.map(item => h('button.pc-item', { type: 'button', className: `${item[0] === sel[0] ? 'on' : ''} ${item[0] === deal ? 'deal' : ''}`, onclick: () => { shopPick = item[0]; render(); }, 'aria-label': item[1] },
+        h('div.pc-shop', {}, items.map(item => h('button.pc-item', { type: 'button', className: `${item[0] === sel[0] ? 'on' : ''} ${item[0] === deal ? 'deal' : ''}`, onclick: () => { shopPick = item[0]; render(); }, 'aria-label': item[1] },
           iconCanvas(item[0], 3), h('small.pc-price', {}, iconCanvas('ring', 1), `${priceOf(item)}`)))),
         h('div.pc-detail', {}, iconCanvas(sel[0], 4),
           h('div', {}, h('b', {}, sel[1], sel[0] === deal ? h('span.pc-tag', {}, '−30% today') : '', fav ? h('span.pc-tag.fav', {}, 'her favourite') : ''), h('small', {}, SHOP_INFO[sel[3]])),
-          h('button.btn.sm.primary', { type: 'button', disabled: s.rings < price, onclick: () => pyxl.buy([sel[0], sel[1], price, sel[3]]) }, iconCanvas('ring', 1), h('span.lbl', {}, s.rings < price ? `Need ${price}` : `Buy · ${price}`))),
+          h('button.btn.sm.primary', { type: 'button', disabled: s.rings < price || full, 'data-tip': full ? `You have ${pyxl.roster.all.length} Pyxls — that’s all the room there is` : null, onclick: () => pyxl.buy([sel[0], sel[1], price, sel[3]]) }, iconCanvas('ring', 1), h('span.lbl', {}, full ? 'No room' : s.rings < price ? `Need ${price}` : `Buy · ${price}`))),
       ];
     },
   };
@@ -163,7 +176,7 @@ export function careBody(pyxl, onPlay) {
   // always at hand: send her home (when she's away from her spot) and quiet mode
   const top = h('div.pc-top');
   const renderTop = () => morph(top, h('div', {},
-    h('button.btn.sm', { type: 'button', disabled: !pyxl.floating, 'data-tip': pyxl.floating ? 'Back to her spot' : 'She’s home — drag her to carry her anywhere', onclick: () => { pyxl.goHome(); pyxl.react('happy', { say: 'Home sweet home!' }); } }, iconCanvas('house', 2), h('span.lbl', {}, 'Send home')),
+    h('button.btn.sm', { type: 'button', disabled: !pyxl.floating || pyxl.besideMain, 'data-tip': pyxl.floating && !pyxl.besideMain ? 'Back to her spot' : 'She’s home — drag her to carry her anywhere', onclick: () => { pyxl.goHome(); pyxl.react('happy', { say: 'Home sweet home!' }); } }, iconCanvas('house', 2), h('span.lbl', {}, 'Send home')),
     h('button.btn.sm', { type: 'button', className: pyxl.silent ? 'on' : '', 'data-tip': pyxl.silent ? 'Let her talk again' : 'No chatter or reactions (she won’t like it)', onclick: () => pyxl.setSilent(!pyxl.silent) }, icon('mute'), h('span.lbl', {}, pyxl.silent ? 'Quiet: on' : 'Quiet'))));
   const el = h('div.pc-body', {}, top, tabs, content);
   new IntersectionObserver(([e]) => { if (e.isIntersecting && stale) { stale = false; render(); } }).observe(el);
@@ -181,8 +194,8 @@ const close = () => { const c = card; card = null; try { c?.stop?.(); c?.body?.d
 export const closeCareCard = close;
 
 export function openCareCard(pyxl, dock) {
-  if (card?.isConnected) return;
-  if (card) close();
+  if (card?.isConnected && card.pyxl === pyxl) return;
+  if (card) close();   // (or another Pyxl's card: hers replaces it)
   const saved = local.get('pp.pyxlCard') ?? {}, body = careBody(pyxl, () => !saved.pinned && close());
   const pin = h('button.ibtn.sm', { type: 'button', 'data-tip': 'Pin open', onclick: () => { saved.pinned = !saved.pinned; pin.classList.toggle('on', saved.pinned); local.set('pp.pyxlCard', saved); } }, icon('lock'));
   pin.classList.toggle('on', !!saved.pinned);
@@ -190,7 +203,7 @@ export function openCareCard(pyxl, dock) {
     dock && h('button.ibtn.sm', { type: 'button', 'data-tip': 'Dock as a panel', onclick: () => { close(); dock(); } }, icon('window')),
     h('button.ibtn.sm', { type: 'button', 'aria-label': 'Close', onclick: close }, icon('x')));
   card = h('div.pyxl-card', {}, head, body);
-  card.body = body;
+  card.body = body; card.pyxl = pyxl;
   document.body.append(card);
   const c = card.getBoundingClientRect(), place = (x, y) => Object.assign(card.style, { left: `${clamp(x, 8, innerWidth - c.width - 8)}px`, top: `${clamp(y, 8, innerHeight - c.height - 8)}px` });
   if (saved.pinned && saved.x != null) place(saved.x, saved.y);
