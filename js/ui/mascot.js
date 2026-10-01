@@ -218,6 +218,27 @@ function drawOval(ctx, cx, bottom, rx, ry, [fill, shade, light], k, { top = 0.85
   }
 }
 
+// Her egg as a little sprite (so it can hang, spin and fly like she does): her colour's spots,
+// and cracks that spread as she gets ready to hatch — or as it gets knocked about.
+const EGG_RECT = [0, 0, 23, 28, 11, 27], EGG_GRIP = [11, 2], EGG_TIME = 120e3, EGG_PET_GAP = 4000;
+const CRACKS = [[[13, 6], [14, 8], [13, 9], [15, 11]], [[5, 12], [7, 13], [6, 15], [8, 16]], [[8, 8], [10, 10], [9, 11], [11, 12]], [[14, 15], [16, 17], [15, 19], [17, 21]], [[9, 18], [7, 20], [9, 22], [8, 24]]];
+const eggSprites = new Map();
+function eggSprite(colour, cracks) {
+  const key = `${colour}|${cracks}`;
+  if (eggSprites.has(key)) return eggSprites.get(key);
+  const c = document.createElement('canvas'); Object.assign(c, { width: EGG_RECT[2], height: EGG_RECT[3] });
+  const x = c.getContext('2d');
+  drawOval(x, 11, 27, 10, 13, ['#f6efe4', '#d9cdb8', '#ffffff'], 1, { spots: Object.assign([[-3, -4], [3, 2], [-2, 6], [4, -8]], { color: colour }) });
+  x.fillStyle = '#221822';
+  for (const line of CRACKS.slice(0, cracks)) for (let i = 1; i < line.length; i++) {   // one-pixel zigzag cracks
+    const [ax, ay] = line[i - 1], [bx, by] = line[i], n = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+    for (let j = 0; j <= n; j++) x.fillRect(Math.round(ax + (bx - ax) * j / n), Math.round(ay + (by - ay) * j / n), 1, 1);
+  }
+  if (eggSprites.size > 40) eggSprites.delete(eggSprites.keys().next().value);
+  eggSprites.set(key, c);
+  return c;
+}
+
 export class Mascot {
   // id: null for your first Pyxl; Pyxls from shop eggs get their own (see pyxlRoster.js)
   constructor(app, { id = null } = {}) {
@@ -265,6 +286,20 @@ export class Mascot {
   // Her sprite sheet: your first Pyxl wears the colour you paint with; each friend her own colour.
   sheet() { return this.id ? tinted(this.stats.colour ?? '#ff5a7a') : outfitHex ? tinted(outfitHex) : base; }
   get colour() { return this.id ? this.stats.colour : outfitHex ?? '#2fb3a4'; }
+  // What hangs from your pointer and flies when thrown: Pyxl by her brush, or her egg by its top.
+  isEgg() { return this.stats.stage === 'egg' || this.state === 'egg' || this.state === 'hatch'; }
+  body() { return this.isEgg() ? { src: eggSprite(this.colour, this.state === 'hatch' ? 5 : this.eggCracks()), rect: EGG_RECT, grip: EGG_GRIP } : { src: this.sheet(), rect: SPRITES.raise, grip: GRIP }; }
+  // How ready to hatch (0..1): time in the egg and the pets you've given it; cracks show it (and knocks add more)
+  eggProgress() { return Math.min(1, Math.max((Date.now() - (this.eggSince ?? Date.now())) / EGG_TIME, (this.taps ?? 0) / 5)); }
+  eggCracks() { const p = this.eggProgress(); return Math.min(5, (p > 0.9 ? 3 : p > 0.65 ? 2 : p > 0.35 ? 1 : 0) + (this.stats.eggDmg ?? 0)); }
+  // A hard knock (a throw into a wall or the floor): it cracks, and two or three of those break it
+  eggKnock() {
+    const s = this.stats, now = Date.now();
+    if (now - (this.knockAt ?? 0) < 300) return;   // one knock per bump, not per bounce frame
+    this.knockAt = now; s.eggDmg = (s.eggDmg ?? 0) + 1; s.save(); this.drawn = null;
+    this.parts.push({ icon: 'bang', x: AX + 4, y: FLOOR - 40, vx: 0, vy: -0.3, life: 14 });
+    if (s.eggDmg >= 3 || (s.eggDmg === 2 && Math.random() < 0.4)) this.eggBreaks = true;
+  }
   // A friend goes away for good: everything she runs stops and both copies of her are deleted.
   dispose() {
     this.gone = true; clearInterval(this.ticker);
@@ -297,8 +332,8 @@ export class Mascot {
     addEventListener('resize', reclamp); visualViewport?.addEventListener('resize', reclamp);
     this.el.addEventListener('pointerdown', e => {
       if (e.button !== 0 || this.phys) return;
-      // her school bag or egg just slides where you put it; Pyxl herself hangs from your pointer
-      const slide = !this.awake() && !this.stats.asleep, r0 = this.el.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
+      // her school bag just slides where you put it; Pyxl (or her egg) hangs from your pointer
+      const slide = this.stats.need === 'school' || ['school', 'focus', 'depart', 'arrive', 'cocoon'].includes(this.state), r0 = this.el.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
       let lifting = false;
       // window listeners: moving her into the floating box would drop an element pointer capture
       const move = ev => {
@@ -328,8 +363,9 @@ export class Mascot {
     this.hangAt();
     this.el.classList.add('hanging'); document.body.append(this.hangCv);
     this.runPhysics();
-    if (s.asleep) { s.sleep(false); s.feel('anger', 15); }
     this.heldAt = Date.now();
+    if (this.isEgg()) return;   // an egg just hangs there (no words, no feelings yet)
+    if (s.asleep) { s.sleep(false); s.feel('anger', 15); }
     this.play('held', { say: ['Wheee!', 'Whoa!', 'Up we go!'][Math.floor(Math.random() * 3)] });
     s.change({ fun: 3 }); s.feel('joy', 10);
   }
@@ -344,20 +380,24 @@ export class Mascot {
     const v = flick(this.trail ?? [], t);
     this.trail = [];
     if (Math.hypot(...v) > 1100 && document.body.dataset.theme !== 'paper') return this.fling(v);
+    if (this.isEgg()) this.grab.y -= (FLOOR - PIV[1] - (EGG_RECT[3] - EGG_GRIP[1])) * this.k / (devicePixelRatio || 1);   // set down where it hangs (it's shorter than her)
     this.land(this.hangAngle(), this.phys?.hang?.om ?? 0, -16);
   }
   fling([vx, vy]) {
-    const A = this.hangAngle(), [cx, cy] = centreOfMass(this.sheet(), SPRITES.raise), sc = this.k / (devicePixelRatio || 1), dx = cx - GRIP[0], dy = cy - GRIP[1];
+    const b = this.body(), A = this.hangAngle(), [cx, cy] = centreOfMass(b.src, b.rect), sc = this.k / (devicePixelRatio || 1), dx = cx - b.grip[0], dy = cy - b.grip[1];
     const cap = v => Math.max(-3500, Math.min(3500, v));
     // she flies about her centre of mass, starting where it hangs now
     this.phys = { fly: { x: this.grab.x + (dx * Math.cos(A) - dy * Math.sin(A)) * sc, y: this.grab.y + (dx * Math.sin(A) + dy * Math.cos(A)) * sc, vx: cap(vx), vy: cap(vy), th: A, om: (this.phys?.hang?.om ?? 0) + vx / 220, hits: 0 } };
+    if (this.isEgg()) return;
     this.say(['Wheeeee!', 'Aaaah!', 'Whoooa!'][Math.floor(Math.random() * 3)]);
     this.stats.feel('fear', 10);
   }
   // One physics step of her flight (off the window's edges, onto panels or the floor); true once she's at rest.
   flyStep(f, dt) {
-    f.r = 24 * this.k / (devicePixelRatio || 1);
+    const egg = this.isEgg();
+    f.r = (egg ? 13 : 24) * this.k / (devicePixelRatio || 1);
     return stepBody(f, dt, (speed, side) => {
+      if (egg) { if (speed > 350) sfx('bonk'); if (speed > 650 && !f.knocked) { f.knocked = true; this.eggKnock(); } return; }   // eggs crack (once per throw, however much it bounces)
       if (speed < 350) return;
       f.hits++; sfx('bonk'); this.showEmote('bang', 500);
       if (f.hits === 2) this.say(side === 'floor' ? 'Oof!' : 'Ow!');
@@ -369,6 +409,7 @@ export class Mascot {
     this.grab = { x: f.x, y: f.ground - (FLOOR - PIV[1]) * sc };   // standing on the floor or the panel she landed on
     this.land(f.th, f.om * 0.3, -4);
     const s = this.stats;
+    if (this.isEgg()) return;
     if (f.hits >= 2) setTimeout(() => {
       if (s.personality === 'energetic' || s.emo.joy > 60) this.react('cheer', { icon: 'star', n: 3, say: 'Again! Again!', force: true });
       else { this.react('trip', { say: 'So dizzy… @_@', force: true }); s.feel('anger', 8); }
@@ -384,6 +425,11 @@ export class Mascot {
     const nearHome = this.nearHome();
     if (nearHome) this.goHome();
     else { this.besideMain = false; local.set(this.keys.pos, this.floatPos); }
+    if (this.isEgg()) {   // the egg settles; knocked about too much, it breaks open early
+      if (this.eggBreaks) { this.eggBreaks = false; this.rough = true; sfx('pop'); this.play('hatch'); this.say('Oh no — the egg broke!', 2200); }
+      else this.play('egg');
+      return;
+    }
     const long = Date.now() - this.heldAt > 6000;
     this.play('land', { say: nearHome ? 'Home sweet home!' : long ? 'Phew, finally!' : Math.random() < 0.5 ? 'I like it here!' : '' });
     if (long) this.stats.feel('anger', 10);
@@ -435,8 +481,8 @@ export class Mascot {
         const g = this.grab, pv = ph.last ?? g, v = [(g.x - pv.x) / dt, (g.y - pv.y) / dt];
         const a = v.map((vi, i) => (vi - ph.v[i]) / dt);
         ph.a = ph.a.map((ai, i) => ai * 0.6 + a[i] * 0.4); ph.v = v; ph.last = { ...g };
-        const [cx, cy] = centreOfMass(this.sheet(), SPRITES.raise);
-        ph.hang.step(dt, ph.a[0], ph.a[1], Math.hypot(cx - GRIP[0], cy - GRIP[1]) * this.k / (devicePixelRatio || 1));
+        const b = this.body(), [cx, cy] = centreOfMass(b.src, b.rect);
+        ph.hang.step(dt, ph.a[0], ph.a[1], Math.hypot(cx - b.grip[0], cy - b.grip[1]) * this.k / (devicePixelRatio || 1));
       } else if (ph.fly) { if (this.flyStep(ph.fly, dt)) this.touchdown(ph.fly); }
       else if (!ph.settle.step(dt)) { this.phys = null; this.keepInView(); this.physRaf = 0; return; }
       this.render();   // same frame as the step (the frame loop then finds nothing new)
@@ -447,8 +493,8 @@ export class Mascot {
   }
   // Her on-screen tilt while hanging: the natural hang of the pose (centre of mass under the grip) plus the swing.
   hangAngle() {
-    const [cx, cy] = centreOfMass(this.sheet(), SPRITES.raise);
-    return Math.atan2(cx - GRIP[0], cy - GRIP[1]) + (this.phys?.hang?.th ?? 0);
+    const b = this.body(), [cx, cy] = centreOfMass(b.src, b.rect);
+    return Math.atan2(cx - b.grip[0], cy - b.grip[1]) + (this.phys?.hang?.th ?? 0);
   }
   // Dropped (or restored) on or next to her spot in this mode counts as home.
   nearHome() {
@@ -618,7 +664,12 @@ export class Mascot {
       s.happy(-2); s.change({ energy: -6 }); s.feel('sorrow', 15); s.nudgeAlign(-2);
       return this.play('refuse', { say: ['My eyes feel all fuzzy…', 'That was boring. Can we draw instead?', 'Too much TV… I feel grumpy.'][Math.floor(Math.random() * 3)] });
     }
-    if (this.state === 'hatch') { this.stats.hatch(); return this.react('happy', { icon: 'heart', n: 4, say: `Hi! I’m ${this.name}!`, force: true }); }
+    if (this.state === 'hatch') {
+      const rough = this.rough; this.rough = false; this.taps = 0;
+      const out = this.stats.hatch({ rough });
+      if (rough) return this.react(this.stats.is('crybaby') ? 'cry' : 'oops', { icon: 'drop', n: 2, say: `Ow… I’m ${this.name}. I hatched too soon${out.sick ? ' and I don’t feel well' : ''}…`, force: true });
+      return this.react('happy', { icon: 'heart', n: 4, say: `Hi! I’m ${this.name}!${out.sick ? ' …achoo.' : ''}`, force: true });
+    }
     this.base();
   }
 
@@ -664,7 +715,7 @@ export class Mascot {
     if (now < (this.nextLife ?? 0)) return;
     this.nextLife = now + 1000;
     if (s.stage === 'egg' && this.state !== 'egg' && this.state !== 'hatch') { this.play('egg'); this.eggSince = now; }
-    if (this.state === 'egg' && now - (this.eggSince ??= now) > 120e3) this.hatchNow();
+    if (this.state === 'egg' && !this.phys && now - (this.eggSince ??= now) > EGG_TIME) this.hatchNow();   // (not while you're holding it)
     if (s.school && now > s.school.until) {
       const r = s.finishSchool(), name = LESSONS.find(l => l[0] === r?.id)?.[1] ?? 'something';
       if (r?.focus) return this.backFromSchool(r, name);   // she never left
@@ -715,7 +766,7 @@ export class Mascot {
     }
   }
 
-  hatchNow() { if (this.state === 'egg') this.play('hatch'); }
+  hatchNow() { if (this.state === 'egg' && !this.phys) this.play('hatch'); }
 
   // Performs a kindergarten skill she knows.
   perform(id) {
@@ -776,10 +827,14 @@ export class Mascot {
     if (key === this.drawn && !this.parts.length) return;
     this.drawn = this.parts.length ? null : key;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (air) {   // held or flying (Pyxl or her egg): drawn on the overlay that follows the pointer
+      ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      const b = this.body(), egg = this.isEgg();
+      return this.drawHanging(deg, egg ? 0 : kick, egg ? null : emote, ph.fly ? centreOfMass(b.src, b.rect) : b.grip, air);
+    }
     if (st.special) this.drawSpecial(ctx, st.special, t, k, still);
     else {
       if (st.prop === 'bloom') for (let i = 0; i < 7; i++) drawIcon(ctx, 'bloom', AX + this.pos + Math.cos(i / 7 * 6.28) * 22 - 1, FLOOR - 3 + Math.sin(i / 7 * 6.28) * 3, k);
-      if (air) return this.drawHanging(deg, kick, emote, ph.fly ? centreOfMass(this.sheet(), SPRITES.raise) : GRIP, air);
       y += drop;
       if (deg && !flip) {   // wobbling upright on her feet
         const f = rotated(this.sheet(), SPRITES[pose], SPRITES[pose].slice(4), deg);
@@ -833,7 +888,7 @@ export class Mascot {
   // She hangs on her own small overlay canvas centred on the pointer, so she can loop right round
   // it; it moves by a compositor-only transform each frame (snapped to whole device pixels).
   drawHanging(deg, kick, emote, pivot = GRIP, at = this.grab) {
-    const c = this.hangCv, k = this.k, dpr = devicePixelRatio || 1, f = rotated(this.sheet(), SPRITES.raise, pivot, deg, kick), S = f.r * 2 + 1;
+    const c = this.hangCv, k = this.k, dpr = devicePixelRatio || 1, b = this.body(), f = rotated(b.src, b.rect, pivot, deg, kick), S = f.r * 2 + 1;
     if (c.width !== S * k) { c.width = c.height = S * k; c.style.width = c.style.height = `${S * k / dpr}px`; }
     const x = c.getContext('2d');
     x.clearRect(0, 0, c.width, c.height); x.imageSmoothingEnabled = false;
@@ -904,15 +959,28 @@ export class Mascot {
   drawSpecial(ctx, kind, t, k, still) {
     const cx = AX + this.pos + 4;
     if (kind === 'egg' || kind === 'hatch') {
-      const wob = kind === 'hatch' || this.wobbleUntil > Date.now() ? (Math.floor(t * 10) % 2 ? 1 : -1) : 0;
-      const spots = Object.assign([[-3, -4], [3, 2], [-2, 6], [4, -8]], { color: this.colour });
-      if (kind === 'hatch' && t > 1) {                                  // crack open
-        drawOval(ctx, cx, FLOOR, 10, 13, ['#f6efe4', '#d9cdb8', '#ffffff'], k, { spots });
-        ctx.clearRect((cx - 11) * k, (FLOOR - 27) * k, 23 * k, (13 - Math.floor((t - 1) * 8)) * k);
+      // close to hatching she rocks every few seconds; tapped, she wobbles; hatching, she shakes
+      const near = kind === 'egg' && !still && this.eggProgress() > 0.7 && Math.floor(t * 1.5) % 4 === 0;
+      const wob = kind === 'hatch' && t < 1 || near || this.wobbleUntil > Date.now() ? (Math.floor(t * 10) % 2 ? 1 : -1) : 0;
+      const img = eggSprite(this.colour, kind === 'hatch' ? 5 : this.eggCracks()), ex = cx - 11 + wob, ey = FLOOR - 27;
+      ctx.imageSmoothingEnabled = false;
+      if (kind === 'egg' || t < 1) {
+        ctx.drawImage(img, ex * k, ey * k, 23 * k, 28 * k);
+        if (kind === 'hatch' && t > 0.45) {   // a crack runs right round her middle
+          ctx.fillStyle = '#221822';
+          const n = Math.round(Math.min(1, (t - 0.45) / 0.5) * 19);
+          for (let i = 0; i < n; i++) ctx.fillRect((ex + 2 + i) * k, (ey + 14 + (i % 2 ? 1 : -1)) * k, k, k);
+        }
         return;
       }
-      drawOval(ctx, cx + wob, FLOOR, 10, 13, ['#f6efe4', '#d9cdb8', '#ffffff'], k, { spots });
-      if (kind === 'hatch' && t > 0.6) { ctx.fillStyle = '#221822'; for (let i = -8; i <= 8; i++) ctx.fillRect((cx + wob + i) * k, (FLOOR - 13 + (i % 2 ? 1 : -1)) * k, k, k); }
+      // the top of the shell pops off and tumbles away; the bottom half stays
+      const u = t - 1, lift = Math.round(u * 26), side = Math.round(u * 9);
+      ctx.drawImage(img, 0, 14, 23, 14, ex * k, (ey + 14) * k, 23 * k, 14 * k);
+      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - u * 1.1);
+      ctx.drawImage(img, 0, 0, 23, 14, (ex + side) * k, (ey - lift) * k, 23 * k, 14 * k);
+      ctx.restore();
+      ctx.fillStyle = '#f6efe4';   // shell bits
+      for (let i = 0; i < 4; i++) ctx.fillRect((ex + 4 + i * 5 - Math.round(u * (i - 1.5) * 10)) * k, (ey + 12 - Math.round(u * 14) + Math.round(u * u * 30)) * k, k, k);
       return;
     }
     if (kind === 'cocoon') {
@@ -1087,9 +1155,12 @@ export class Mascot {
   // ---- care ----
   // `openCare` can be swapped by the host (e.g. to show her docked panel instead of the popup).
   onClick() {
-    if (this.state === 'egg') {                                          // help her hatch
-      this.wobbleUntil = Date.now() + 500; this.drawn = null;
-      if (++this.taps >= 5) { this.taps = 0; this.hatchNow(); }
+    if (this.state === 'egg') {                                          // warm her egg to help her hatch
+      const now = Date.now();
+      this.wobbleUntil = now + 500; this.drawn = null;
+      if (now - (this.eggPetAt ?? 0) < EGG_PET_GAP) return void this.parts.push({ icon: 'dots', x: AX + 4, y: FLOOR - 36, vx: 0, vy: -0.25, life: 14 });   // too soon: it needs a moment
+      this.eggPetAt = now; this.burst('heart', 1);
+      if (++this.taps >= 5) this.hatchNow();
       return;
     }
     if (this.state === 'box') { this.stats.change({ fun: 6 }); return this.react('cheer', { icon: 'heart', n: 3, say: 'Boo! You found me!', force: true }); }   // peek-a-boo

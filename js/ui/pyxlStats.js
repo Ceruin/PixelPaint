@@ -16,7 +16,7 @@ const KEY = 'pp.pyxl', BACKUP = 'pyxl-backup';
 export const statsKey = id => (id ? `${KEY}.${id}` : KEY), backupKey = id => (id ? `${BACKUP}.${id}` : BACKUP);
 // Everything that makes her who she is (saved, backed up, and written to a .pyxl file).
 const SAVE_KEYS = ['name', 'food', 'fun', 'love', 'energy', 'asleep', 'xp', 'level', 'born', 't', 'lives', 'rings', 'medals', 'wins', 'races', 'chaos',
-  'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom', 'pomos', 'colour'];
+  'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom', 'pomos', 'colour', 'eggDmg'];
 // A .pyxl file: her saved state with a format tag, so a stray JSON file can't replace her.
 export const PYXL_FORMAT = 'pixelpaint-pyxl';
 export const pyxlFile = stats => JSON.stringify({ format: PYXL_FORMAT, version: 1, saved: Date.now(), pyxl: stats.snapshot() }, null, 1);
@@ -292,7 +292,19 @@ export class PyxlStats {
     if (this.stage === 'adult' && this.years >= CHILD_YEARS + ADULT_YEARS) return 'end';
     return null;
   }
-  hatch() { this.stage = 'child'; this.feel('joy', 40); this.save(); bus.emit('pyxl:stage', 'child'); }
+  // Hatching. A cracked egg (knocked about) or one that broke open early (`rough`) leaves its mark:
+  // likelier a trying personality, often a sickness, a shaky start, and for a broken one, lower grades.
+  hatch({ rough = false } = {}) {
+    const dmg = this.eggDmg ?? 0, out = { sick: false };
+    if (rough || dmg) {
+      if (Math.random() < (rough ? 0.75 : 0.2 * dmg)) this.personality = pick(['naughty', 'crybaby', 'careless', 'lonely', 'bored']);
+      if (Math.random() < (rough ? 0.8 : 0.2 * dmg)) { this.sick = pick(Object.keys(ILLNESSES)); out.sick = true; }
+      this.happy(rough ? -25 : -5 * dmg); this.feel('fear', rough ? 50 : 15 * dmg);
+      if (rough) for (const k of ['line', 'colour', 'shape', 'power', 'stamina']) if (this.skills[k]) this.skills[k].grade = Math.max(0, this.skills[k].grade - 1);
+    } else this.feel('joy', 40);
+    this.eggDmg = 0; this.stage = 'child'; this.save(); bus.emit('pyxl:stage', 'child');
+    return out;
+  }
   evolve() {
     const r = this.recent, top = Object.entries(r).sort((a, b) => b[1] - a[1])[0], mean = Object.values(r).reduce((a, b) => a + b, 0) / 4;
     this.type = top[1] > mean * 1.4 ? top[0] : 'normal';
@@ -338,7 +350,7 @@ export class PyxlStats {
   get mood() {
     const n = this.name;
     return {
-      egg: `${n}’s egg is warm… tap it to help her hatch!`, school: this.school?.focus ? `${n} is studying while you focus.` : `${n} is at kindergarten.`,
+      egg: (this.eggDmg ? `${n}’s egg is cracked — handle it gently! ` : `${n}’s egg is warm… `) + 'Tap it now and then to help her hatch (a throw can crack it).', school: this.school?.focus ? `${n} is studying while you focus.` : `${n} is at kindergarten.`,
       asleep: `${n} is fast asleep. Zzz…`, sick: `${n} has ${ILLNESSES[this.sick]}. The doctor can help.`,
       tired: `${n} can barely keep her eyes open.`, hungry: `${n}’s tummy is rumbling…`, sad: `${n} is feeling blue…`,
       lonely: `${n} wants some attention!`, bored: `${n} is bored. Paint something, or play with her!`,
