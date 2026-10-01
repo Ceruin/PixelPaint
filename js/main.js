@@ -178,6 +178,10 @@ $('#optionsbar').addEventListener('wheel', e => {
 statusbar(app, $('#statusbar'), $('#view'));
 initTooltips();
 initSelects();
+// Ask the browser to keep this app's storage (Pyxl, drawings, notebooks) instead of clearing it when
+// space runs low or the site goes unused for a while. Asked on the first tap / click, since some
+// browsers show a prompt for it; most grant it quietly.
+addEventListener('pointerdown', () => navigator.storage?.persisted?.().then(p => p || navigator.storage.persist()).catch(() => {}), { once: true, capture: true });
 bindKeys(a => app.mode !== 'pixel' || /^mode\./.test(a.id));
 panels.apply(local.get('pp.layout'));
 bus.on('toast', toast);

@@ -71,6 +71,9 @@ select, .field input:not([type=checkbox]), .hex, .rename {
   height: 28px; padding: 0 7px; border-radius: var(--r); border: 1px solid var(--line); background: var(--bg); min-width: 0; max-width: 100%;
 }
 select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+.pc-backup { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; color: var(--muted); }
+.pc-backup small { line-height: 1.4; }
+.pc-backup-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 /* themed drop-down list (js/ui/selects.js) - replaces the browser's own open list */
 select.dd-open { outline: 1px solid var(--accent); outline-offset: -1px; }
 .dd-pop { position: fixed; z-index: 2147483000; overflow-y: auto; overscroll-behavior: contain; padding: 4px; box-sizing: border-box;

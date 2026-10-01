@@ -1,8 +1,9 @@
 import { h, icon, keepOnScreen, morph } from './dom.js';
 import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
-import { clamp } from '../core/util.js';
-import { NEEDS, SNACKS, SHOP, SHOP_INFO, dealOfTheDay, priceOf, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
+import { clamp, download } from '../core/util.js';
+import { modal, toast } from './dialogs.js';
+import { pyxlFile, readPyxlFile, adoptSave, NEEDS, SNACKS, SHOP, SHOP_INFO, dealOfTheDay, priceOf, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
 import { RACES, raceUnlocked, medalName } from './pyxlRace.js';
 import { iconCanvas } from './pixelIcons.js';
 import { radio } from './pyxlAudio.js';
@@ -18,6 +19,18 @@ const TOYS = [['ball', 'Ball'], ['bubbles', 'Bubbles'], ['crayons', 'Crayons'], 
 const clock = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const HAPPY_WORDS = [[60, 'Overjoyed'], [30, 'Happy'], [0, 'Content'], [-30, 'Down'], [-101, 'Miserable']];
 let tab = local.get('pp.pyxlTab', 'care');
+
+// Load a .pyxl backup in place of the current Pyxl (after a confirm: she'd be replaced).
+function loadPyxl(s) {
+  const inp = h('input', { type: 'file', accept: '.pyxl,application/json' });
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    let data; try { data = readPyxlFile(await f.text()); } catch { return toast('That file isn’t a Pyxl backup.'); }
+    const ok = await modal(`Load ${data.name || 'Pyxl'}?`, h('p', {}, `${s.name} will be replaced by ${data.name || 'Pyxl'} from the file. Save ${s.name} to a file first if you want to keep them.`), [['Cancel', null], ['Load', 'ok', true]]);
+    if (ok) adoptSave(data);
+  };
+  inp.click();
+}
 
 export function careBody(pyxl, onPlay) {
   const s = pyxl.stats, content = h('div.pc-content'), tabs = h('div.pc-tabs', { role: 'tablist' });
@@ -78,6 +91,12 @@ export function careBody(pyxl, onPlay) {
           row('Rings', iconCanvas('ring', 2), ` ${s.rings}`),
           row('Races', `${s.wins} won / ${s.races}`),
           row('Medals', ...RACES.map(([id, label]) => s.medals[id] != null ? h('span.pc-medal', { className: `m${s.medals[id]}`, 'data-tip': `${label}: ${medalName(s.medals[id])}` }, iconCanvas('medal', 2)) : ''))),
+        // She lives in this browser's storage; a file is the backup (and how she moves to another device).
+        h('div.pc-backup', {},
+          h('small', {}, `${s.name} is saved in this browser. Keep a backup file in case its data is cleared.`),
+          h('div.pc-backup-btns', {},
+            btn('disk', 'Save to a file', () => download(new Blob([pyxlFile(s)], { type: 'application/json' }), `${s.name.replace(/[^\w -]+/g, '') || 'Pyxl'}.pyxl`)),
+            btn('folder', 'Load from a file', () => loadPyxl(s)))),
       ];
     },
     school() {

@@ -52,6 +52,9 @@ export const ICONS = {
   pill: ['.rrww.', 'rrrwww', '.rrww.'], bag: ['.nnn.', 'n...n', 'bbbbb', 'bbybb', 'bbbbb'], bloom: ['.p.', 'pyp', '.p.'],
 };
 
+// Backup buttons: a floppy (save) and a folder (load).
+ICONS.disk = ['bbbbbb.', 'bwwkwbb', 'bwwkwbb', 'bbbbbbb', 'blllllb', 'blllllb', 'bbbbbbb'];
+ICONS.folder = ['YYY....', 'Yyyyyyy', 'yyyyyyy', 'yyyyyyy', 'yyyyyyy', 'YYYYYYY'];
 // Sleep Z's in the sprite's own style: blue with a light-blue top stroke and a 1px dark outline.
 const outlined = rows => { const H = rows.length + 2, W = rows[0].length + 2, g = Array.from({ length: H }, (_, j) => Array.from({ length: W }, (_, i) => rows[j - 1]?.[i - 1] ?? '.'));
   const out = g.map(r => r.slice());

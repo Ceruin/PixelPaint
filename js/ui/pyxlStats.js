@@ -1,4 +1,4 @@
-import { local } from '../core/storage.js';
+import { local, idb } from '../core/storage.js';
 import { bus } from '../core/bus.js';
 
 // Pyxl's care model, after the Chao Garden (chao-island.com/info-center):
@@ -11,7 +11,20 @@ import { bus } from '../core/bus.js';
 // - a life cycle measured in active app time: egg → child → cocoon → adult → cocoon → rebirth
 //   (happy: she keeps 10% of her skills) — or, fully cared for, the immortal Chaos Pyxl;
 // - kindergarten lessons, rings to spend in the shop, race medals.
-const KEY = 'pp.pyxl';
+const KEY = 'pp.pyxl', BACKUP = 'pyxl-backup';
+// Everything that makes her who she is (saved, backed up, and written to a .pyxl file).
+const SAVE_KEYS = ['name', 'food', 'fun', 'love', 'energy', 'asleep', 'xp', 'level', 'born', 't', 'lives', 'rings', 'medals', 'wins', 'races', 'chaos',
+  'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom', 'pomos'];
+// A .pyxl file: her saved state with a format tag, so a stray JSON file can't replace her.
+export const PYXL_FORMAT = 'pixelpaint-pyxl';
+export const pyxlFile = stats => JSON.stringify({ format: PYXL_FORMAT, version: 1, saved: Date.now(), pyxl: stats.snapshot() }, null, 1);
+export function readPyxlFile(text) {
+  const o = JSON.parse(text);
+  if (o?.format !== PYXL_FORMAT || !o.pyxl || typeof o.pyxl.born !== 'number' || !o.pyxl.skills) throw new Error('Not a Pyxl file');
+  return o.pyxl;
+}
+// Replace her with a loaded / restored save: both copies, then a fresh start so everything picks it up.
+export function adoptSave(data) { local.set(KEY, data); return idb.set(BACKUP, data).catch(() => {}).then(() => location.reload()); }
 const HOUR = 3600e3, MIN = 60e3;
 export const YEAR = 2 * HOUR;               // one Pyxl-year of active use
 const CHILD_YEARS = 1, ADULT_YEARS = 4;
@@ -107,6 +120,10 @@ function newLife(prev) {
 export class PyxlStats {
   constructor() {
     const now = Date.now(), saved = local.get(KEY, null) ?? local.get('pp.pip', null);
+    // localStorage lost but the IndexedDB copy survived (e.g. a partial clear): bring her back. Once
+    // per session, so a browser that won't keep localStorage can't loop on reloads.
+    // (Not the copy this fresh start may already have written of its own new Pyxl: that one shares her birth time.)
+    if (!saved) idb.get(BACKUP).then(b => { if (b?.born && b.skills && b.born !== this.born && !sessionStorage.getItem('pp.pyxlRestored')) { sessionStorage.setItem('pp.pyxlRestored', '1'); adoptSave(b); } }).catch(() => {});
     Object.assign(this, {
       name: 'Pyxl', food: 80, fun: 80, love: 70, energy: 90, asleep: false, xp: 0, level: 1, born: now, t: now,
       lives: 1, rings: 20, medals: {}, wins: 0, races: 0, chaos: false,
@@ -323,9 +340,10 @@ export class PyxlStats {
     clearTimeout(this.saveTimer); this.saveTimer = 0;
     if (!this.dirty) return;
     this.dirty = false;
-    const keys = ['name', 'food', 'fun', 'love', 'energy', 'asleep', 'xp', 'level', 'born', 't', 'lives', 'rings', 'medals', 'wins', 'races', 'chaos',
-      'stage', 'active', 'skills', 'recent', 'type', 'personality', 'fav', 'happiness', 'align', 'emo', 'learned', 'sick', 'school', 'eatenRecently', 'bloom', 'pomos'];
-    local.set(KEY, Object.fromEntries(keys.map(k => [k, this[k]])));
+    const data = this.snapshot();
+    local.set(KEY, data);
+    idb.set(BACKUP, data).catch(() => {});   // a second copy, restored if localStorage is ever lost
     bus.emit('pyxl:stats', this);
   }
+  snapshot() { return Object.fromEntries(SAVE_KEYS.map(k => [k, this[k]])); }
 }
