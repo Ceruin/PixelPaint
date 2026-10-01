@@ -3,6 +3,7 @@ import { drawPose } from './mascot.js';
 import { pixelText } from './pixelFont.js';
 import { modal, toast } from './dialogs.js';
 import { download } from '../core/util.js';
+import { local } from '../core/storage.js';
 import { arena } from './pyxlRace.js';
 import { COURSE_VERSION, generateCourse, prepareTrack, drawTrack, flag, normalizeCourse, LIMITS } from './raceCourse.js';
 import { listCourses, saveCourse, deleteCourse, courseFile, fileName, readCourseFile, courseLink } from './courseShare.js';
@@ -55,9 +56,16 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
   const cv = h('canvas.race-canvas.cb-canvas'), ctx = cv.getContext('2d');
   const toolBtns = TOOLS.map(([tid, tip, ic]) => iconBtn(ic, tip, () => setTool(tid), { dataset: { tool: tid } }));
   const nameIn = h('input.cb-name', { type: 'text', maxLength: 40, 'aria-label': 'Course name', spellcheck: false });
+  // the tool bar folds down to just the current tool (handy on a phone, where it covers the page)
+  const fold = iconBtn('chevronsLeft', 'Fold the tools away', () => setFolded(!tools.classList.contains('folded')), { className: 'ibtn cb-fold' });
+  const setFolded = on => { tools.classList.toggle('folded', on); fold.replaceChildren(icon(on ? 'chevronsRight' : 'chevronsLeft')); fold.dataset.tip = fold.ariaLabel = on ? 'Show all the tools' : 'Fold the tools away'; local.set('pp.cbFolded', on); };
   const undoBtn = iconBtn('undo', 'Undo (Ctrl+Z)', () => history(undo, redo)), redoBtn = iconBtn('redo', 'Redo (Ctrl+Shift+Z)', () => history(redo, undo));
+  const tools = h('div.cb-tools', {}, fold, ...toolBtns, h('span.cb-sep'), undoBtn, redoBtn, iconBtn('trash', 'Clear the course', () => clearAll()));
+  // folded, tapping the current tool opens the bar again
+  tools.addEventListener('click', e => { if (tools.classList.contains('folded') && e.target.closest('.ibtn.on')) setFolded(false); });
+  setFolded(local.get('pp.cbFolded', matchMedia('(max-width: 640px)').matches));
   const layer = h('div.race-layer.course.builder', {}, cv,
-    h('div.cb-tools', {}, ...toolBtns, h('span.cb-sep'), undoBtn, redoBtn, iconBtn('trash', 'Clear the course', () => clearAll())),
+    tools,
     h('div.race-head', {}, icon('film'), nameIn, iconBtn('folder', 'My courses', () => showList()), iconBtn('x', 'Close the builder (Esc)', () => close())),
     h('div.race-foot.cb-foot', {},
       h('button.btn', { type: 'button', 'data-tip': 'Pyxl draws a course for you to change', onclick: () => pyxlDraws() }, icon('sparkle'), h('span.lbl', {}, 'Pyxl draws one')),
@@ -86,10 +94,11 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
   setTool('pen'); syncBtns();
 
   // ---------------------------------------------------------------- coordinates
-  const fitK = () => { const k = Math.min(W / c.w, H / c.h); return { k, ox: (W - c.w * k) / 2, oy: (H - c.h * k) / 2 }; };
+  // the same fit the race uses (see prepareTrack): a course from another canvas shape is stretched a little
+  const fitK = () => { const k = Math.min(W / c.w, H / c.h), kx = Math.min(W / c.w, k * 1.5), ky = Math.min(H / c.h, k * 1.5); return { k, kx, ky, ox: (W - c.w * kx) / 2, oy: (H - c.h * ky) / 2 }; };
   const toCourse = e => {
-    const r = cv.getBoundingClientRect(), sx = (e.clientX - r.left) * cv.width / r.width, sy = (e.clientY - r.top) * cv.height / r.height, { k, ox, oy } = fitK();
-    return [Math.round(Math.max(0, Math.min(c.w, (sx - ox) / k))), Math.round(Math.max(0, Math.min(c.h, (sy - oy) / k)))];
+    const r = cv.getBoundingClientRect(), sx = (e.clientX - r.left) * cv.width / r.width, sy = (e.clientY - r.top) * cv.height / r.height, { kx, ky, ox, oy } = fitK();
+    return [Math.round(Math.max(0, Math.min(c.w, (sx - ox) / kx))), Math.round(Math.max(0, Math.min(c.h, (sy - oy) / ky)))];
   };
   // a flag / pad goes on the ground just under where you tap (if there's ground close below)
   const snapDown = ([x, y]) => {
@@ -240,13 +249,13 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
   // ---------------------------------------------------------------- drawing
   const frame = now => {
     raf = requestAnimationFrame(frame);
-    if (tVer !== ver) { T = prepareTrack(c, W, H, { turn: false }); tVer = ver; }
+    if (tVer !== ver) { T = prepareTrack(c, W, H); tVer = ver; }
     ctx.clearRect(0, 0, W, H);
-    const { k, ox, oy } = fitK(), S = (x, y) => [ox + x * k, oy + y * k];
+    const { kx, ky, ox, oy } = fitK(), S = (x, y) => [ox + x * kx, oy + y * ky];
     if (ox > 1 || oy > 1) {   // the course was made for another shape: show its edges
       ctx.fillStyle = 'rgba(34,24,34,.35)';
-      for (let x = Math.round(ox); x < ox + c.w * k; x += 6) { ctx.fillRect(x, Math.round(oy), 3, 1); ctx.fillRect(x, Math.round(oy + c.h * k) - 1, 3, 1); }
-      for (let y = Math.round(oy); y < oy + c.h * k; y += 6) { ctx.fillRect(Math.round(ox), y, 1, 3); ctx.fillRect(Math.round(ox + c.w * k) - 1, y, 1, 3); }
+      for (let x = Math.round(ox); x < ox + c.w * kx; x += 6) { ctx.fillRect(x, Math.round(oy), 3, 1); ctx.fillRect(x, Math.round(oy + c.h * ky) - 1, 3, 1); }
+      for (let y = Math.round(oy); y < oy + c.h * ky; y += 6) { ctx.fillRect(Math.round(ox), y, 1, 3); ctx.fillRect(Math.round(ox + c.w * kx) - 1, y, 1, 3); }
     }
     const reveal = revealAt ? T.inkLen * Math.min(1, (now - revealAt) / 1400) : Infinity;
     const tip = drawTrack(ctx, T, { now, reveal, flags: false });
@@ -272,7 +281,7 @@ export function openBuilder(pyxl, { course = null, id = null, shared = false, li
     }
     if (!c.segs.length && !drag && !revealAt) {
       pixelText(ctx, 'DRAW A COURSE!', W / 2, H * 0.36, '#221822', { size: 16, align: 'center', outline: '#ffffff' });
-      pixelText(ctx, 'Pen for ground, then a start and a finish flag', W / 2, H * 0.36 + 26, '#221822', { align: 'center', outline: '#ffffff' });
+      pixelText(ctx, 'Pen for ground, then a start and a finish flag', W / 2, H * 0.36 + 34, '#221822', { align: 'center', outline: '#ffffff' });
     }
   };
   raf = requestAnimationFrame(frame);

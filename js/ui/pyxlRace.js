@@ -91,6 +91,10 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
     h('div.race-foot', {}, cheer, h('small', {}, 'Tap or Space to cheer — it costs stamina')));
   document.body.append(layer);
   document.body.dataset.game = '';
+  // the Pyxls who are racing are out on the course: their usual spots stand empty until they're back
+  const away = [pyxl, ...mates.map(r => r.mate)];
+  const hideRacers = on => away.forEach(m => { m.el.classList.toggle('racing', on); m.bubble.classList.toggle('racing', on); });
+  hideRacers(true);
 
   const seed = 1 + Math.floor(Math.random() * 2e9);
   let T = null, W = 0, H = 0, phase = test ? 'count' : 'draw';
@@ -194,6 +198,7 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
     cancelAnimationFrame(raf);
     removeEventListener('keydown', key, true); area.stop();
     layer.remove(); delete document.body.dataset.game;   // nothing was added to the drawing: it's just as it was
+    hideRacers(false);
     if (test) return onDone?.({ finished: !!me.done, time: me.time });
     const placeOf = r => (quit ? -1 : r.done ? r.done - 1 : finished.length), ringsFor = p => (p < 0 ? 0 : p < 3 ? prize * (3 - p) : custom ? 1 : 2);
     const place = placeOf(me);
