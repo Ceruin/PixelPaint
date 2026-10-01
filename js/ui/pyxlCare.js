@@ -5,6 +5,7 @@ import { clamp, download } from '../core/util.js';
 import { modal, toast } from './dialogs.js';
 import { pyxlFile, readPyxlFile, adoptSave, NEEDS, SNACKS, SHOP, SHOP_INFO, dealOfTheDay, priceOf, SKILLS, GRADES, PERSONALITIES, TYPES, ILLNESSES, LESSONS, LESSON_SLOT, LUCKY_NAMES, currentLesson } from './pyxlStats.js';
 import { RACES, raceUnlocked, medalName } from './pyxlRace.js';
+import { openBuilder } from './courseBuilder.js';
 import { iconCanvas } from './pixelIcons.js';
 import { radio } from './pyxlAudio.js';
 import { GAMES } from './pyxlGames.js';
@@ -126,6 +127,10 @@ export function careBody(pyxl, onPlay) {
           return h('button.pc-race', { type: 'button', disabled: !open, className: m != null ? `m${m}` : '', 'data-tip': open ? m != null ? `Best: ${medalName(m)}` : 'No medal yet' : `Win gold in the ${RACES[i - 1][1]} race first`, onclick: () => { onPlay?.(); pyxl.race(i); } },
             open ? iconCanvas('medal', 2) : icon('lock'), h('span', {}, label));
         })),
+        h('div.pc-label', {}, 'Your courses'),
+        h('div.pc-courses', {},
+          h('button.btn.sm', { type: 'button', 'data-tip': 'Draw your own race course over your drawing', onclick: () => { onPlay?.(); openBuilder(pyxl); } }, icon('pen'), h('span.lbl', {}, 'Build a course')),
+          h('button.btn.sm', { type: 'button', 'data-tip': 'Courses you saved or opened', onclick: () => { onPlay?.(); openBuilder(pyxl, { list: true }); } }, icon('folder'), h('span.lbl', {}, 'My courses'))),
       ];
     },
     // Pick an item to see what it does; the deal of the day is 30% off.

@@ -27,6 +27,8 @@ import { initTooltips } from './ui/tooltip.js';
 import { initSelects } from './ui/selects.js';
 import { toast } from './ui/dialogs.js';
 import { Mascot } from './ui/mascot.js';
+import { openBuilder } from './ui/courseBuilder.js';
+import { readCourseLink, readCourseFile } from './ui/courseShare.js';
 import { careBody, openCareCard } from './ui/pyxlCare.js';
 import { watchForUpdates, hideSplash } from './ui/updates.js';
 import { initZen } from './ui/zen.js';
@@ -246,7 +248,10 @@ const stage = $('#stage');
 stage.addEventListener('dragover', e => e.preventDefault());
 stage.addEventListener('drop', e => {
   e.preventDefault();
-  for (const f of e.dataTransfer.files) /\.(ora|pp)$/i.test(f.name) ? project.openFile(f) : f.type.startsWith('image/') && project.importLayer(f, f.name);
+  for (const f of e.dataTransfer.files) {
+    if (/\.course$/i.test(f.name)) f.text().then(t => { const c = readCourseFile(t); c ? openBuilder(mascot, { course: c, shared: true }) : toast('That isn’t a PixelPaint course file'); });
+    else /\.(ora|pp)$/i.test(f.name) ? project.openFile(f) : f.type.startsWith('image/') && project.importLayer(f, f.name);
+  }
 });
 
 initEink(app, mascot);
@@ -260,3 +265,15 @@ setMode(asked ?? local.get('pp.mode', 'paint'));
 globalThis.pixelpaint = app;
 hideSplash(loadPixel());
 await welcome;
+
+// A shared race course arrives in the link (#course=…): open it in the course builder.
+const sharedCourse = async () => {
+  if (!location.hash.startsWith('#course=')) return;
+  const c = await readCourseLink();
+  history.replaceState(null, '', location.pathname + location.search);
+  if (!c) return toast('That course link looks broken — ask for the .course file instead');
+  if (app.mode === 'notes') setMode('paint');
+  openBuilder(mascot, { course: c, shared: true });
+};
+sharedCourse();
+addEventListener('hashchange', sharedCourse);

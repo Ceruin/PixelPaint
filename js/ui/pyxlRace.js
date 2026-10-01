@@ -134,6 +134,7 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
       if (racing && !resultsAt) raceT += DT;
       if (phase === 'draw') continue;
       for (const r of racers) {
+        if (r.done) continue;   // over the line: they stay there celebrating
         if (racing && !r.me && !r.done && r.st > r.max * 0.45 && Math.random() < DT * 0.5) { r.boost = 0.6; r.st -= 7; }   // rivals cheer themselves on
         stepRacer(r, T, DT, racing && raceT > r.lag);
         if (racing && !r.done && atFinish(T, r)) { finished.push(r); r.done = finished.length; r.time = raceT; r.pose = 'done'; }
@@ -165,10 +166,10 @@ export function startRace(pyxl, level = 0, { course = null, mode = 'race', onDon
     if (phase === 'count') { const c = Math.ceil(COUNT_T - t); big(c > 0 ? String(c) : 'GO!', H * 0.3); }
     else if (phase === 'race' && t < 0.8) big('GO!', H * 0.3);
     if (test && phase === 'race') {
-      pixelText(ctx, clock(raceT), W - 10, 10, '#ffffff', { align: 'right', outline: '#221822' });
+      pixelText(ctx, clock(raceT), 10, 10, '#ffffff', { outline: '#221822' });
       if (resultsAt) {
         big(me.done ? 'FINISH!' : 'OUT OF TIME', H * 0.22);
-        pixelText(ctx, me.done ? `${clock(me.time)}  -  R to ride again` : 'Can she reach the flag? R to retry', W / 2, H * 0.22 + 26, '#ffffff', { align: 'center', outline: '#221822' });
+        pixelText(ctx, me.done ? `${clock(me.time)}  -  R to ride again` : 'Can she reach the flag? R to retry', W / 2, H * 0.22 + 36, '#ffffff', { align: 'center', outline: '#221822' });
       }
     } else if (resultsAt) {
       const rows = standing(), bw = 150, bh = 22 + rows.length * 12, bx = Math.round(W / 2 - bw / 2), by = Math.round(H * 0.18);

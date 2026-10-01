@@ -69,6 +69,25 @@ export function generateCourse(W, H, levelId = 'beginner', seed = 1 + Math.floor
   }
   return c;
 }
+// A course from anywhere (a file, a link, storage) made safe to use: numbers only, sane sizes and
+// counts, everything rounded. Returns null if it isn't a course at all.
+export const LIMITS = { segs: 3000, water: 60, hazards: 60, takes: 120 };
+export function normalizeCourse(c) {
+  if (!c || typeof c !== 'object' || !Array.isArray(c.segs)) return null;
+  const w = Math.round(clamp(+c.w || 0, 120, 4000)), h = Math.round(clamp(+c.h || 0, 120, 4000));
+  if (!(+c.w > 0 && +c.h > 0)) return null;
+  const num = (v, hi) => (Number.isFinite(+v) ? Math.round(clamp(+v, -hi * 0.25, hi * 1.25)) : null);
+  const pt = p => { if (!Array.isArray(p)) return null; const x = num(p[0], w), y = num(p[1], h); return x == null || y == null ? null : [x, y]; };
+  const quad = q => { if (!Array.isArray(q) || q.length < 4) return null; const a = pt(q.slice(0, 2)), b = pt(q.slice(2, 4)); return a && b ? [...a, ...b] : null; };
+  const list = (arr, f, n) => (Array.isArray(arr) ? arr.slice(0, n).map(f).filter(Boolean) : []);
+  const box = q => { const r = quad(q); return r && [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])]; };
+  return {
+    v: COURSE_VERSION, name: String(c.name ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 40) || 'Untitled course', w, h,
+    segs: list(c.segs, quad, LIMITS.segs).filter(([ax, ay, bx, by]) => ax !== bx || ay !== by),
+    water: list(c.water, box, LIMITS.water), hazards: list(c.hazards, box, LIMITS.hazards), takes: list(c.takes, pt, LIMITS.takes),
+    start: pt(c.start), finish: pt(c.finish),
+  };
+}
 export const isVertical = c => c.h > c.w * 1.15;
 
 // ---------------------------------------------------------------- a course fitted to an arena
@@ -155,7 +174,7 @@ export function placeAtFraction(t, q) {
 
 // ---------------------------------------------------------------- physics
 export function makeRacer(o) {
-  return Object.assign({ st: o.max, x: 0, y: 0, vx: 0, vy: 0, px: 0, boost: 0, trip: 0, tumble: 0, dead: 0, took: -1, prog: 0, best: 0, done: 0, pose: 'wait', dir: 1, safe: null, safeAt: 0, lag: 0 }, o);
+  return Object.assign({ st: o.max, x: 0, y: 0, vx: 0, vy: 0, px: 0, boost: 0, trip: 0, tumble: 0, dead: 0, took: -1, hop: 0, prog: 0, best: 0, done: 0, pose: 'wait', dir: 1, safe: null, safeAt: 0, lag: 0 }, o);
 }
 function collide(r, t) {
   r.grounded = null; r.blocked = 0;
@@ -201,6 +220,11 @@ export function stepRacer(r, t, dt, racing) {
       if (vt < target) { const dv = Math.min(460 * dt, target - vt); r.vx += tx * dv; r.vy += ty * dv; }
       r.st -= 1.6 * dt; r.pose = 'run';
       if (Math.random() < dt * 0.02 * (1 - sk01(r.sk.luck) / 1.7)) r.trip = 0.7;   // Luck: fewer stumbles
+      // the ground ends just ahead (a drawn gap with no pad): hop off the ledge rather than drop
+      const end = (b[0] - a[0]) * dir > 0 ? b : a;
+      if (r.hop <= 0 && Math.abs(end[0] - r.x) < 5 && (end[0] - r.x) * dir >= -1 && !t.segs.some(o => o !== r.grounded && !o.edge && (Math.hypot(o.a[0] - end[0], o.a[1] - end[1]) < 5 || Math.hypot(o.b[0] - end[0], o.b[1] - end[1]) < 5))) {
+        r.hop = 0.5; r.vy = -(190 + 70 * sk01(r.sk.shape)); r.vx = dir * Math.max(Math.abs(r.vx), 70) * boost; r.grounded = null;
+      }
       for (const tk of t.takes) {   // a jump pad / takeoff edge
         if (r.took === tk.id || Math.abs(r.y - tk.y) > 12 || Math.abs(r.x - tk.x) > 7) continue;
         r.took = tk.id; r.vy = -(250 + 90 * sk01(r.sk.shape)); r.vx = dir * Math.max(Math.abs(r.vx), 74) * boost; r.grounded = null; break;
@@ -213,7 +237,7 @@ export function stepRacer(r, t, dt, racing) {
   r.x += r.vx * dt; r.y += r.vy * dt;
   collide(r, t);
   if (!was && r.grounded && vy0 > 380 && racing && Math.random() < 0.3 * (1 - sk01(r.sk.luck) / 1.7)) r.trip = 0.8;   // hard landing
-  r.boost -= dt; r.trip -= dt; r.tumble -= dt; if (!r.grounded && !water) r.st = Math.min(r.max, r.st + 2 * dt);
+  r.boost -= dt; r.trip -= dt; r.tumble -= dt; r.hop -= dt; if (!r.grounded && !water) r.st = Math.min(r.max, r.st + 2 * dt);
   if (!racing) return;
   if (inside(t.hazards, r.x, r.y) || r.y > t.H + 30 || r.y < -200) { r.dead = 0.6; return; }   // a pit / off the arena
   const p = progressOf(t, r.x, r.y);

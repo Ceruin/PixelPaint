@@ -93,5 +93,13 @@ export const ICONS = {
   film: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7 4v16M17 4v16M3 8h4M3 12h4M3 16h4M17 8h4M17 12h4M17 16h4"/>',
   tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
   star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
+  line: '<path d="M4 20 20 4"/><circle cx="4" cy="20" r="1.6"/><circle cx="20" cy="4" r="1.6"/>',
+  water: '<path d="M2 9c2.5-2 4.5 2 7 0s4.5-2 7 0 3.5 2 6 0M2 14c2.5-2 4.5 2 7 0s4.5-2 7 0 3.5 2 6 0M2 19c2.5-2 4.5 2 7 0s4.5-2 7 0 3.5 2 6 0"/>',
+  spring: '<path d="M4 21h16M6 18h12M7 18l10-3-10-3 10-3M5 6h14"/>',
+  spikes: '<path d="M2 20h20M3 20l3-8 3 8 3-8 3 8 3-8 3 8"/>',
+  flag: '<path d="M5 22V3"/><path d="M5 4h13l-3 4.5 3 4.5H5"/>',
+  finish: '<path d="M5 22V3"/><path d="M5 4h14v9H5z"/><path d="M9.7 4v4.5H5M14.3 4v4.5h4.7M9.7 8.5h4.6V13"/>',
+  share: '<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="m8.3 10.8 7.4-4.4M8.3 13.2l7.4 4.4"/>',
+  link: '<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.3-3.3a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.3 3.3a4.5 4.5 0 0 0 6.4 6.4l1.3-1.3"/>',
 };
 ICONS.assist = ICONS.ruler;
