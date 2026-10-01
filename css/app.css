@@ -581,8 +581,8 @@ body[data-game] .pyxl-card { visibility: hidden; }
 .race-layer.course .race-foot { top: auto; bottom: 10px; }
 .mascot.racing, .m-bubble.racing { visibility: hidden; }   /* she's out on the race course */
 .race-layer.builder { cursor: default; }
-.cb-canvas { touch-action: none; cursor: crosshair; }
-.cb-canvas[data-tool=eraser] { cursor: cell; }
+.race-layer.builder .cb-canvas { touch-action: none; cursor: crosshair; }   /* a finger draws (it doesn't scroll or zoom the page) */
+.race-layer.builder .cb-canvas[data-tool=eraser] { cursor: cell; }
 .cb-tools { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 2px; padding: 4px; border-radius: var(--r); background: var(--panel); box-shadow: var(--shadow); max-height: calc(100% - 16px); overflow-y: auto; }
 .cb-tools .ibtn.on { background: var(--accent); color: #fff; }
 .cb-sep { height: 1px; margin: 3px 2px; background: var(--line); }
