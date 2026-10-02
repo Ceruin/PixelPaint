@@ -19,7 +19,7 @@
 <h1>Character builder</h1>
 <p>Draws a character from shapes (<code>tools/characters/</code>, see <code>docs/CHARACTERS.md</code>) in all 18 of Pyxl's poses, packs them into one sheet, and writes the sprite table. Serve the repo and open <code>/tools/character-builder.html</code>.</p>
 <div class="row">
-  <label>Character <select id="who"><option value="piton">Piton — mountain climber</option></select></label>
+  <label>Character <select id="who"><option value="piton">Piton — mountain climber</option><option value="mannequin">Mannequin — Pyxl's base body</option></select></label>
   <label>Zoom <select id="zoom"><option>3</option><option selected>4</option><option>6</option></select></label>
   <button id="dl">Download sheet</button>
   <button id="dlj">Download sprite table</button>
@@ -28,7 +28,7 @@
 <pre id="table"></pre>
 <script type="module">
   import { pack } from './characters/rig.js';
-  const CHARS = { piton: () => import('./characters/piton.js') };
+  const CHARS = { piton: () => import('./characters/piton.js'), mannequin: () => import('./characters/mannequin.js') };
   let out, name;
   const run = async () => {
     const m = await CHARS[who.value]();

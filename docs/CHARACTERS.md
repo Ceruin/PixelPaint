@@ -6,7 +6,10 @@ walking, being carried, sleeping, racing) has a frame to show.
 
 For colour swaps and clothing *on Pyxl*, see `docs/PYXL.md` §6 instead.
 
-The worked example is **Piton**, a little mountain climber.
+Every character is a **costume on the mannequin**: Pyxl's body as plain parts, posed like her. The
+worked example is **Piton**, a little mountain climber.
+
+![The mannequin](../assets/characters/mannequin-pixel.png)
 
 ![Piton's sheet](../assets/characters/piton-pixel.png)
 
@@ -63,11 +66,13 @@ are what make the style.
 
 | File | What it does |
 | --- | --- |
-| `tools/characters/rig.js` | The renderer. Shapes, outline, shading and packing. Shared by every character |
-| `tools/characters/piton.js` | Piton himself: palette, parts and the 18 poses |
-| `tools/character-builder.html` | Preview page. Draws the sheet, shows the `SPRITES` table, downloads both |
-| `assets/characters/piton-pixel.png` | The finished sheet: 671 × 57, 39 colours, 0 semi-transparent pixels |
-| `assets/characters/piton-sprites.json` | His pose table, in the same `[x, y, w, h, anchorX, feetY]` form as Pyxl's |
+| `tools/characters/rig.js` | The renderer. Shapes, outline, shading, stamps, rotation and packing |
+| `tools/characters/mannequin.js` | **The mannequin.** Pyxl's proportions (`BODY`), the 18 pose skeletons (`SKELETONS`), the face stamps, shared effects, and `figure()` / `poses()` that dress a costume |
+| `tools/characters/piton.js` | Piton: a palette and a costume (about 120 lines). No pose code at all |
+| `tools/character-builder.html` | Preview page. Pick a character (or the bare mannequin), see the sheet and `SPRITES` table, download both |
+| `assets/characters/mannequin-pixel.png` | The bare mannequin in all 18 poses, as a reference sheet |
+| `assets/characters/piton-pixel.png` | Piton's sheet: 750 × 59, lossless, 0 semi-transparent pixels |
+| `assets/characters/*-sprites.json` | Pose tables, in the same `[x, y, w, h, anchorX, feetY]` form as Pyxl's |
 
 To preview, serve the repo (`python3 -m http.server`) and open `/tools/character-builder.html`.
 
@@ -118,33 +123,72 @@ Nothing is hand-placed except the face. A character is a **list of parts drawn b
    between the feet on the floor** (`OX`, `FY`), so `feetY` comes out consistent. `anchorX` is the
    hood centre, which is where the app hangs him when carried, like Pyxl's beret.
 
-## 4. How a pose is described
+## 4. The mannequin
 
-`pose(o)` in `piton.js` builds the parts from a handful of settings:
+`mannequin.js` is Pyxl reduced to plain parts. You can see it bare in the builder:
 
-```js
-pose({
-  view: 'front' | 'side' | 'back',      // side faces right; the left-facing 'side' pose is mirrored
-  legs: 'stand' | 'stepA' | 'stepB' | 'sit',
-  bob: -1,                               // whole body up 1px (breathing, walking)
-  hands: { back: [x, y], front: [x, y] },// mitten positions, relative to the origin
-  tool: { hand: 'front', angle: -35 },   // the mallet, from that hand, at that angle (degrees)
-  eyes: 'open' | 'closed' | 'happy' | 'half' | 'wide',
-  mouth: 'smile' | 'open' | 'o' | 'none',
-  extras: [ ...parts ],                  // ice chips, a sweat drop…
-})
-```
+- **`BODY`:** her proportions, measured from her sheet.
+  - The skull (hair volume) is centred 33px above the feet, 28 × 25px.
+  - The face window sits in the lower half of the head.
+  - The torso runs from −21 to −9 and tapers from 12px to 18px wide.
+  - Arms are 1.9px capsules, hands 2.1px, and legs 2px.
+- **`SKELETONS`:** the 18 poses as data. They copy Pyxl's poses by measuring where her head,
+  hands and feet are in each one:
+  ```js
+  brush:  { view: 'side', feet: [[-6, 0], [5, 0]], hands: [[-5, -11], [16, -21]], tool: { hand: 1, angle: -50 } },
+  drowsy: { view: 'side', legs: 'sitSide', headDy: 1, eyes: 'closed', mouth: 'none', fx: [['doze', 22, -30]] },
+  sleep:  { view: 'front', lie: true, eyes: 'closed' },
+  ```
+  - `view` is front, side (facing right) or back. The left-facing `side` pose is a mirror.
+  - Hands and feet are positions measured from the floor point between the feet. The arm and leg
+    capsules connect them to the shoulders and hips.
+  - `bob` lifts the whole body, e.g. for breathing or the `cheer` jump.
+  - `legs` can be `sit` (front) or `sitSide`, and `lie` turns the standing pose a quarter turn.
+  - `tool` says which hand holds the prop, and at what angle.
+  - `eyes` / `mouth` set the expression, and `fx` adds effects (splat, spray, note, sweat, doze).
+- **House rules built in:**
+  - Pyxl-style eye stamps, blush and a tiny mouth.
+  - Draw order: things behind, far arm, legs, torso, head, face, hair, hat, near arm and tool,
+    effects.
+  - A hand raised above the shoulders in side view goes **behind** the head, so an arm never
+    crosses the face.
 
-The arms are capsules from the shoulder to wherever you put the mitten, so a new pose is usually
-one line. `poses()` lists all 18 by Pyxl's names. `sleep` is the standing pose with closed eyes,
-turned a quarter turn with `rotate()` (lossless for pixel art) and set on the floor.
+### A costume fills slots
+
+Every slot is optional. A missing one falls back to the plain mannequin.
+
+| Slot | What it gets / returns | Piton uses it for |
+| --- | --- | --- |
+| `skin`, `iris`, `eye`, `blush`, `mouth` | colours | ginger-brown eyes |
+| `skull(g)` | the head's big shape | the hood |
+| `faceFrame(g)`, `faceClip(g)`, `faceOutlineColour` | around / limits of the face window | the fur ring |
+| `hair(g)` | drawn over the face window | spiky bangs and side locks |
+| `hat(g)` | drawn last on the head | pompom, goggles and strap |
+| `torso(g)` | the body | parka, fur hem, pack straps |
+| `behind(g)` | before everything | backpack and rope (side view) |
+| `sleeve`, `handMat` / `hand(g, i, far)` | arms and hands | parka sleeves, red mittens |
+| `legs` / `foot(g, foot, far)` | legs and feet | trousers, fur-cuffed boots |
+| `tool(x, y, angle, g)` | the held prop | the ice mallet |
+| `fx: { splat, spray, … }` | replace an effect | ice chips instead of paint |
+| `front(g)` | after everything | — |
+
+`g` describes the pose being dressed:
+
+- `g.v` (the view) and `g.sk` (the skeleton)
+- `g.head` `{x, y, rx, ry, shape}` and `g.face` `{x, y, shape}`
+- `g.torso` `{top, bot, shape}`
+- `g.hands`, `g.feet`, `g.hips` and `g.shoulders`
+- `X()` / `Y()` to place things from the origin
+
+A slot just returns rig parts, so it can't break the poses. That's why Piton has no pose code.
 
 ## 5. Making your own character
 
-1. **Copy `piton.js`** to `tools/characters/<name>.js` and rename it.
-2. **Silhouette first.** Follow the proportions in §1: the head is about 3/5 of the height and as
-   wide as the sprite, the body is tiny, and the limbs are stubs. Fill the big shapes flat and look
-   at them zoomed out before adding anything else.
+1. **Copy `piton.js`** to `tools/characters/<name>.js`, rename it, and clear the costume down to
+   a few slots. Open the builder on the bare **mannequin** to see what you're dressing.
+2. **Silhouette first:** `skull` (hair mass, hood or helmet), `hat` and `torso`. The mannequin
+   already has the proportions. Keep big shapes about the size of the skull, so the head stays
+   about 3/5 of the height.
 3. **Hair and eyes next.** They carry the style. Use bangs and locks that break the face outline,
    and Pyxl-style eye stamps.
 4. **Palette:** one `[shadow, base, light]` ramp per material, with:
@@ -156,14 +200,15 @@ turned a quarter turn with `rotate()` (lossless for pixel art) and set on the fl
    of hue 150–205.
 5. **A signature detail** that shows from every side (Piton's goggles and pack). This is what makes
    a character more than a recolour.
-6. **The front pose, then the rest.** Get `front` right and use it to judge the others. Do the side
-   walk cycle (`idle0 → idle1 → walk`) next, then the action and emotion poses.
+6. **Check every view.** A slot runs in all three views (`g.v`). Get `front` right, then check
+   the `side` poses (the walk cycle) and `back`. The poses themselves come free.
 7. **Add it to the builder:** one line in `CHARS` in `tools/character-builder.html`.
 8. **Look at it at 1× and zoomed, next to Pyxl.** Things that commonly go wrong:
-   - parts covering each other in the wrong order (draw back to front)
-   - tools crossing the face (move the hand or the angle)
-   - details that sit outside the silhouette (clip them with `and(...)`)
-   - limbs hidden under a round body (lengthen them or raise the body)
+   - details that sit outside the silhouette: clip them with `and(...)`, e.g. Piton's face is
+     clipped to his hood
+   - something that should be behind showing in front: move it to `behind`, or check `g.v`
+   - a pose that's wrong for **every** character: fix its skeleton in `mannequin.js`, and every
+     character gets the fix
 9. **Download the sheet and table**, put them in `assets/characters/`, and run the checklist in
    PYXL.md §7: lossless, no semi-transparent pixels, one outline colour, anchors match.
 
