@@ -17,9 +17,9 @@
 </head>
 <body>
 <h1>Pyxl variant builder</h1>
-<p>Builds a character sheet from Pyxl's by a recipe in <code>tools/variants/</code> (see <code>docs/PYXL.md</code>), checks it, and lets you download it as a lossless PNG. Serve the repo and open <code>/tools/variant-builder.html</code>.</p>
+<p>Builds a skin of Pyxl (colours, clothing) by a recipe in <code>tools/variants/</code> (see <code>docs/PYXL.md</code>; for a whole new character use <code>character-builder.html</code>), checks it, and lets you download it as a lossless PNG. Serve the repo and open <code>/tools/variant-builder.html</code>.</p>
 <div class="row">
-  <label>Recipe <select id="recipe"><option value="climber">Peak — mountain climber</option></select></label>
+  <label>Recipe <select id="recipe"><option value="bluebird">Bluebird — blue beret</option></select></label>
   <label>Outfit <select id="tint"><option value="">as drawn (teal)</option><option value="#3b7bff">blue</option><option value="#ff5a7a">pink</option><option value="#2fb36b">green</option></select></label>
   <button id="dl">Download sheet</button>
 </div>
@@ -28,8 +28,8 @@
 <pre id="report"></pre>
 <script type="module">
   import { loadSheet, build, check } from './variants/variant.js';
-  import { climber, NAME } from './variants/climber.js';
-  const RECIPES = { climber: [climber, NAME] };
+  import { bluebird, NAME } from './variants/bluebird.js';
+  const RECIPES = { bluebird: [bluebird, NAME] };
   const K = 4, show = (cv, src) => { Object.assign(cv, { width: src.width * K, height: src.height * K }); const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, 0, 0, cv.width, cv.height); };
   let out;
   const run = async () => {

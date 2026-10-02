@@ -222,55 +222,6 @@ Suggested slots, so items don't fight: `hat` (replaces the beret), `face` (glass
 
 ---
 
-## 8. Worked example: "Peak", a mountain climber
-
-**Peak** is a climber in a puffy hooded parka with a fur-trimmed face opening and a fur pompom, red
-mittens and boots, and an ice mallet. The look is inspired by classic mountain-climber heroes,
-with an original design. Peak was made **entirely from Pyxl's sheet by rules**, so every pose,
-anchor and animation already fits the app.
-
-- **Recipe:** `tools/variants/climber.js`
-- **Engine:** `tools/variants/variant.js`. It loads the sheet, runs a recipe over each pose and
-  checks the result against §7.
-- **Builder page:** `tools/variant-builder.html`. Serve the repo (`python3 -m http.server`), open
-  `/tools/variant-builder.html`, preview the result with an outfit colour, and download it.
-- **Output:** `assets/variants/peak-pixel.png`. Lossless PNG: 1034 × 59, 29 colours,
-  0 semi-transparent pixels.
-
-What the recipe does to each pose:
-
-1. **Finds the beret** as the biggest connected cluster of red, together with the splats painted
-   on it. Every other red or blue cluster is either the **brush tip** (small) or a **paint splash**
-   (big, more than 40 px). The head is the beret's box, grown down over the face.
-2. **Finds the face:** skin pixels, plus the dark pixels sitting between them (eyes, mouth) and
-   just above them (lashes).
-3. **Hood:** the beret plus the hair, made into one smooth silhouette. Small gaps are closed and
-   strands up to about 3px are removed, so it reads as cloth rather than hair.
-   - Filled with the **teal ramp**, so the whole parka recolours with her outfit.
-   - Shaded as one round form lit from the top-left.
-   - Outlined in `#221822` wherever it meets the background or the parka below, so the hood
-     separates from the body.
-4. **Fur:** hood pixels within 1px of the face, or 2px along the forehead, become fur: base
-   colour, shadow on the far side, highlight along the top edge. The beret's little top nub
-   becomes a **pompom**.
-5. **Below the head:**
-   - the brush tip and its bristles → a **wooden mallet head**, lit from the top-left
-   - the yellow ferrule and buckles → **steel**
-   - paint splashes → **ice and snow**
-   - skin (hands, sock tops) → **red mittens and boots**
-6. **Decorations** that float beside her (music note, Z's, "oops" drops) are put back exactly as
-   drawn.
-
-**What rules can't do (hand touch-up list):**
-- **Long hair at the back:** in the walk and side poses it makes the hood quite big and fluffy.
-  Trim it to taste.
-- **The doze swirl** touches her hood, so the recolour rules partly turn it red and grey.
-- **Fur placement:** the fur rim follows the face shape, so a couple of poses get an uneven brim.
-  Nudge a few pixels.
-
-As with Pyxl, treat the generated sheet as a strong first pass, then hand-paint the details. A
-new recipe is just another file next to `climber.js`.
-
 ## 7. Checklist before committing art
 
 - [ ] Lossless file with 0 semi-transparent pixels.
@@ -292,3 +243,14 @@ new recipe is just another file next to `climber.js`.
 - The overlay "wear" system (§B): load `assets/wear/*.webp`, draw slots in order with magenta
   masking, and make items buyable in the Shop.
 - A small script that checks a sheet against this checklist.
+
+---
+
+## 8. Skins vs. new characters
+
+- **A skin of Pyxl** (new colours, clothing, accessories) starts from her sheet. Write a recipe in
+  `tools/variants/` (the example `bluebird.js` swaps her beret to blue), preview and download it in
+  `tools/variant-builder.html`.
+- **A whole new character** is drawn from scratch with the shape rig in `tools/characters/`, in the
+  same 18 poses, so the app's states and animations still work. See **`docs/CHARACTERS.md`**; the
+  worked example is **Piton**, a mountain climber.

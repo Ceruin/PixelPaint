@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Character builder</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; padding: 16px; font: 14px system-ui, sans-serif; background: #1b1d23; color: #e6e8ee; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { color: #9aa1b1; margin: 0 0 12px; max-width: 70ch; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  canvas { image-rendering: pixelated; background: #eef1f6; border-radius: 6px; max-width: 100%; }
+  button, select { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid #3a3f4b; background: #262a33; color: inherit; cursor: pointer; }
+  pre { background: #262a33; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Character builder</h1>
+<p>Draws a character from shapes (<code>tools/characters/</code>, see <code>docs/CHARACTERS.md</code>) in all 18 of Pyxl's poses, packs them into one sheet, and writes the sprite table. Serve the repo and open <code>/tools/character-builder.html</code>.</p>
+<div class="row">
+  <label>Character <select id="who"><option value="piton">Piton — mountain climber</option></select></label>
+  <label>Zoom <select id="zoom"><option>3</option><option selected>4</option><option>6</option></select></label>
+  <button id="dl">Download sheet</button>
+  <button id="dlj">Download sprite table</button>
+</div>
+<canvas id="sheet"></canvas>
+<pre id="table"></pre>
+<script type="module">
+  import { pack } from './characters/rig.js';
+  const CHARS = { piton: () => import('./characters/piton.js') };
+  let out, name;
+  const run = async () => {
+    const m = await CHARS[who.value]();
+    name = who.value;
+    out = pack(m.poses(), { originX: m.OX, floorY: m.FY, anchorOf: m.anchorOf });
+    const K = +zoom.value, cv = document.getElementById('sheet'), x = cv.getContext('2d');
+    Object.assign(cv, { width: out.canvas.width * K, height: out.canvas.height * K });
+    x.imageSmoothingEnabled = false; x.drawImage(out.canvas, 0, 0, cv.width, cv.height);
+    table.textContent = 'export const SPRITES = {\n' + Object.entries(out.sprites).map(([k, v]) => `  ${k}: [${v.join(', ')}],`).join('\n') + '\n};';
+  };
+  const save = (href, file) => Object.assign(document.createElement('a'), { href, download: file }).click();
+  dl.onclick = () => save(out.canvas.toDataURL('image/png'), `${name}-pixel.png`);
+  dlj.onclick = () => save(URL.createObjectURL(new Blob([JSON.stringify(out.sprites, null, 1)], { type: 'application/json' })), `${name}-sprites.json`);
+  who.onchange = zoom.onchange = run;
+  run();
+</script>
+</body>
+</html>
