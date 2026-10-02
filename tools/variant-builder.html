@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pyxl variant builder</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; padding: 16px; font: 14px system-ui, sans-serif; background: #1b1d23; color: #e6e8ee; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p { color: #9aa1b1; margin: 0 0 12px; max-width: 70ch; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+  canvas { image-rendering: pixelated; background: #eef1f6; border-radius: 6px; max-width: 100%; }
+  button, select { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid #3a3f4b; background: #262a33; color: inherit; cursor: pointer; }
+  pre { background: #262a33; padding: 10px; border-radius: 6px; overflow: auto; }
+</style>
+</head>
+<body>
+<h1>Pyxl variant builder</h1>
+<p>Builds a character sheet from Pyxl's by a recipe in <code>tools/variants/</code> (see <code>docs/PYXL.md</code>), checks it, and lets you download it as a lossless PNG. Serve the repo and open <code>/tools/variant-builder.html</code>.</p>
+<div class="row">
+  <label>Recipe <select id="recipe"><option value="climber">Peak — mountain climber</option></select></label>
+  <label>Outfit <select id="tint"><option value="">as drawn (teal)</option><option value="#3b7bff">blue</option><option value="#ff5a7a">pink</option><option value="#2fb36b">green</option></select></label>
+  <button id="dl">Download sheet</button>
+</div>
+<h3>Pyxl</h3><canvas id="before"></canvas>
+<h3 id="title">Variant</h3><canvas id="after"></canvas>
+<pre id="report"></pre>
+<script type="module">
+  import { loadSheet, build, check } from './variants/variant.js';
+  import { climber, NAME } from './variants/climber.js';
+  const RECIPES = { climber: [climber, NAME] };
+  const K = 4, show = (cv, src) => { Object.assign(cv, { width: src.width * K, height: src.height * K }); const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(src, 0, 0, cv.width, cv.height); };
+  let out;
+  const run = async () => {
+    const base = await loadSheet('../assets/pyxl-pixel.webp');
+    show(document.getElementById('before'), base.canvas);
+    const [fn, name] = RECIPES[recipe.value];
+    out = build(await loadSheet('../assets/pyxl-pixel.webp'), fn);
+    document.getElementById('title').textContent = name;
+    let view = out;
+    if (tint.value) {   // preview the outfit recolour the app applies (same code)
+      const img = new Image(); img.src = out.toDataURL(); await img.decode();
+      view = recolour(img, tint.value);
+    }
+    show(document.getElementById('after'), view);
+    report.textContent = JSON.stringify(check(out), null, 1);
+  };
+  // tinted() recolours the app's own atlas; for a preview, apply the same rule to this sheet
+  const recolour = (img, hexc) => {
+    const c = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height }), x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height), p = d.data, hsv = (r, g, b) => { const v = Math.max(r, g, b), dd = v - Math.min(r, g, b); return [dd === 0 ? 0 : v === r ? ((g - b) / dd + 6) % 6 * 60 : v === g ? ((b - r) / dd + 2) * 60 : ((r - g) / dd + 4) * 60, v ? dd / v : 0, v / 255]; };
+    const rgb = (hh, s, v) => { const f = n => { const k = (n + hh / 60) % 6; return Math.round(255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
+    const [th, ts, tv] = hsv(...[1, 3, 5].map(i => parseInt(hexc.slice(i, i + 2), 16)));
+    for (let i = 0; i < p.length; i += 4) { if (!p[i + 3]) continue; const [hh, s, v] = hsv(p[i], p[i + 1], p[i + 2]); if (!(hh > 150 && hh < 205 && s > 0.25 && v > 0.2)) continue; [p[i], p[i + 1], p[i + 2]] = rgb(th, Math.min(1, ts * s / 0.6), Math.min(1, v * tv / 0.62)); }
+    x.putImageData(d, 0, 0); return c;
+  };
+  recipe.onchange = tint.onchange = run;
+  dl.onclick = () => { const a = document.createElement('a'); a.href = out.toDataURL('image/png'); a.download = `${recipe.value}-pixel.png`; a.click(); };
+  run();
+</script>
+</body>
+</html>
