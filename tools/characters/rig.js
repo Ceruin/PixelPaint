@@ -36,7 +36,8 @@ export const and = (a, b) => (x, y) => a(x, y) && b(x, y);
 export const minus = (a, b) => (x, y) => a(x, y) && !b(x, y);
 
 // ---- drawing a pose ----
-// part: { shape, mat: [shadow, base, light] | '#hex', shade: 'round' | 'edge' | 'flat', outline: true, light: [cx, cy, rx, ry] }
+// part: { shape, mat: [shadow, base, light] | '#hex', shade: 'round' | 'edge' | 'flat', outline: true, light: [cx, cy, rx, ry],
+//         paint(x, y, k) → colour (optional override per pixel; k = 0 shadow, 1 base, 2 light), pixels: [[x, y, colour]] }
 export function drawPose(W, H, parts) {
   const px = new Array(W * H).fill(null);
   const get = (x, y) => (x >= 0 && y >= 0 && x < W && y < H ? px[y * W + x] : null);
@@ -65,7 +66,7 @@ export function drawPose(W, H, parts) {
         if (rimD) k = Math.min(k, 0);
         if (rimL && k === 1) k = 2;
       }
-      px[y * W + x] = ramp[k];
+      px[y * W + x] = part.paint ? part.paint(x, y, k) ?? ramp[k] : ramp[k];   // paint: per-pixel colour (hair strands…)
     }
     for (const [x, y, c] of part.pixels ?? []) if (x >= 0 && y >= 0 && x < W && y < H) px[y * W + x] = c;   // hand-placed details (eyes…)
   }
@@ -96,4 +97,26 @@ export function pack(poses, { originX, floorY, anchorOf }) {
     ox += b.w + 1;
   }
   return { canvas: c, sprites };
+}
+
+// Hand-drawn pixels from text rows: stamp(x0, y0, ['.aa.', 'abba'], { a: '#221822', b: '#fff' }) → pixels for a part.
+// '.' and spaces are left alone; flip mirrors the rows.
+export function stamp(x0, y0, rows, legend, flip = false) {
+  const out = [];
+  rows.forEach((row, j) => [...row].forEach((ch, i) => {
+    const c = legend[ch];
+    if (c) out.push([Math.round(x0) + (flip ? row.length - 1 - i : i), Math.round(y0) + j, c]);
+  }));
+  return out;
+}
+
+// Turn a drawn pose a quarter turn (pixel art stays crisp): dir -1 = anticlockwise (head goes left).
+export function rotate(p, dir = -1, dx = 0, dy = 0) {
+  const { W, H } = p, px = new Array(W * H).fill(null), cx = W / 2, cy = H / 2;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = p.px[y * W + x]; if (!c) continue;
+    const rx = x + 0.5 - cx, ry = y + 0.5 - cy, nx = Math.floor(cx + (dir < 0 ? ry : -ry) + dx), ny = Math.floor(cy + (dir < 0 ? -rx : rx) + dy);
+    if (nx >= 0 && ny >= 0 && nx < W && ny < H) px[ny * W + nx] = c;
+  }
+  return { ...p, px };
 }
