@@ -110,7 +110,11 @@ export function prepareTrack(course, W, H, { stretch = true } = {}) {
     start: c.start ? P(...c.start) : [W * 0.1, H * 0.5], finish: c.finish ? P(...c.finish) : null,
   };
   t.segs.push({ a: [2, 0], b: [2, H], edge: true }, { a: [W - 2, 0], b: [W - 2, H], edge: true });   // the arena's sides
-  let acc = 0; for (const sg of t.segs) if (!sg.edge) acc += Math.hypot(sg.b[0] - sg.a[0], sg.b[1] - sg.a[1]);
+  // lava and water have a floor of their own (unseen): you wade a few pixels deep through lava and swim
+  // above a pool's bottom, even where one's drawn over a gap with no ground under it
+  for (const z of t.hazards) t.segs.push({ a: [z.x0, Math.min(z.y1, z.y0 + 6)], b: [z.x1, Math.min(z.y1, z.y0 + 6)], floor: true });
+  for (const z of t.water) t.segs.push({ a: [z.x0, z.y1], b: [z.x1, z.y1], floor: true });
+  let acc = 0; for (const sg of t.segs) if (!sg.edge && !sg.floor) acc += Math.hypot(sg.b[0] - sg.a[0], sg.b[1] - sg.a[1]);
   t.inkLen = acc;
   return t;
 }
@@ -229,8 +233,8 @@ export const fractionOf = (t, x, y) => { const p = progressOf(t, x, y); return p
 // A standing spot about `q` (0..1) of the way along the course: for re-placing racers on a new track.
 export function placeAtFraction(t, q) {
   let best = null, bd = Infinity;
-  for (const { a, b, edge } of t.segs) {
-    if (edge) continue;
+  for (const { a, b, edge, floor } of t.segs) {
+    if (edge || floor) continue;   // (never re-placed into lava or a pool)
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (!L || Math.abs(b[1] - a[1]) > L * 0.8) continue;   // standable lines only
     for (let s = 0; s <= L; s += 8) {
       const x = a[0] + (b[0] - a[0]) * s / L, y = a[1] + (b[1] - a[1]) * s / L, f = fractionOf(t, x, y - 2);
@@ -264,6 +268,7 @@ function collide(r, t) {
   r.grounded = null; r.blocked = 0; r.touching = false;
   for (let pass = 0; pass < 2; pass++) for (const sg of t.segs) {
     const [ax, ay] = sg.a, [bx, by] = sg.b;
+    if (sg.floor && r.y0 > ay + 1) continue;   // lava / pool floors only catch you from above (walking in at ground level, you stay on the ground)
     const [cx, cy, px, py] = closest(r.x, r.y - R, r.x, r.y - BODY + R, ax, ay, bx, by);
     let dx = cx - px, dy = cy - py, d = Math.hypot(dx, dy);
     if (d >= R) continue;
@@ -324,6 +329,7 @@ export function stepRacer(r, t, dt, racing) {
   if (water) { r.vx *= 1 - 1.4 * dt; r.vy *= 1 - 3.2 * dt; }
   r.px = r.x;
   const vy0 = r.vy, was = r.grounded;
+  r.y0 = r.y;
   r.x += r.vx * dt; r.y += r.vy * dt;
   collide(r, t);
   if (!was && r.grounded && vy0 > 380 && racing && Math.random() < 0.3 * (1 - sk01(r.sk.luck) / 1.7)) r.trip = 0.8;   // hard landing
@@ -395,7 +401,7 @@ export function drawTrack(ctx, t, { now = performance.now(), reveal = Infinity, 
     for (let x = x0 + 2; x < x0 + w - 2; x += 7) { const ph = (x * 7 + bub) % 9; if (ph < 3) ctx.fillRect(x, y0 - ph, 2, 2); }
   }
   let tip = null;
-  const lines = t.segs.filter(sg => !sg.edge);
+  const lines = t.segs.filter(sg => !sg.edge && !sg.floor);
   for (const pass of [0, 1]) {   // a light halo under dark ink, so the course reads over any drawing
     ctx.fillStyle = pass ? '#221822' : 'rgba(255,255,255,.9)';
     let acc = 0;
