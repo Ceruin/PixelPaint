@@ -28,6 +28,7 @@ import { initSelects } from './ui/selects.js';
 import { toast } from './ui/dialogs.js';
 import { Mascot } from './ui/mascot.js';
 import { initRoster } from './ui/pyxlRoster.js';
+import { initCamera } from './ui/camera.js';
 import { openBuilder } from './ui/courseBuilder.js';
 import { readCourseLink, readCourseFile } from './ui/courseShare.js';
 import { careBody, openCareCard } from './ui/pyxlCare.js';
@@ -39,6 +40,8 @@ import { TOOL_META } from './tools/index.js';
 const welcome = showWelcome();
 loadCustomTips();
 const app = new App($('#view'));
+app.cameraUI = initCamera(app);   // camera folders (multiplane)
+document.body.toggleAttribute('data-advanced', !!app.settings.advanced);
 const project = createProject(app);
 const panels = new Panels($('#workspace'));
 const mascot = new Mascot(app);

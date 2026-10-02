@@ -1,4 +1,5 @@
 import { h, icon, iconBtn, slider } from './dom.js';
+import { cameraControls } from './camera.js';
 import { bus } from '../core/bus.js';
 import { actions } from '../core/actions.js';
 import { isClipped } from '../engine/compositor.js';
@@ -77,14 +78,22 @@ export function layersPanel(app) {
       h('button.ibtn.sm.vis', { type: 'button', 'data-tip': 'Visibility', onclick: () => d.editProps(n.visible ? 'Hide Layer' : 'Show Layer', n, { visible: !n.visible }) }, icon(n.visible ? 'eye' : 'eyeOff')),
       clipped && h('span.clip-mark', {}, '↳'),
       n.type === 'group'
-        ? [h('button.ibtn.sm', { type: 'button', onclick: () => { n.collapsed = !n.collapsed; render(); } }, icon(n.collapsed ? 'chevronRight' : 'chevron')), h('span.folder', {}, icon('folder'))]
+        ? [h('button.ibtn.sm', { type: 'button', onclick: () => { n.collapsed = !n.collapsed; render(); } }, icon(n.collapsed ? 'chevronRight' : 'chevron')), h(`span.folder${n.camera ? '.cam' : ''}`, {}, icon(n.camera ? 'camera' : 'folder'))]
         : n.type === 'filter' ? h('span.thumb-wrap.fx', {}, icon('sparkle')) : h('span.thumb-wrap', {}, thumb(n)),
-      h('span.layer-meta', {}, h('span.layer-name', {}, n.name), h('span.layer-sub', {}, `${Math.round(n.opacity * 100)}% · ${n.type === 'filter' ? 'Filter layer' : BLEND_SHORT[n.blend] ?? 'Pass Through'}`)),
+      h('span.layer-meta', {}, h('span.layer-name', {}, n.name), h('span.layer-sub', {}, `${Math.round(n.opacity * 100)}% · ${n.camera ? `Camera${n.camera.view ? ' · viewing' : ''}` : n.type === 'filter' ? 'Filter layer' : BLEND_SHORT[n.blend] ?? 'Pass Through'}${d.parentOf(n)?.camera?.multiplane ? ` · depth ${Math.round(n.depth ?? 100)}` : ''}`)),
       h('span.badges', {}, n.clip && icon('clip'), n.alphaLock && icon('alpha'), n.locked && icon('lock')),
+      n === d.active && h('button.ibtn.sm.layer-more', { type: 'button', 'data-tip': 'More (or right-click a layer)', onclick: ev => menu(ev.currentTarget) }, icon('menu')),
       h('span.layer-grip', { 'data-tip': 'Drag to move' }, icon('grip')));
     el.node = n;
+    el.addEventListener('contextmenu', ev => { ev.preventDefault(); ev.stopPropagation(); if (d.active !== n) d.setActive(n); menu(el, ev); });
     el.addEventListener('pointerdown', e => !e.target.closest('button') && startDrag(n, e, !!e.target.closest('.layer-grip')));
     return el;
+  };
+
+  // A layer's own menu: right-click a row, or its ⋯ button.
+  const menu = (anchor, ev) => {
+    const m = popMenu(anchor, ['layer.camera', 'layer.group', 'layer.dup', 'layer.mergeDown', '-', 'layer.clip', 'layer.alphaLock', '-', 'layer.del']);
+    if (ev) Object.assign(m.style, { left: `${Math.min(ev.clientX, innerWidth - 270)}px`, top: `${ev.clientY}px` });
   };
 
   // Rebuilding the rows keeps the list where it was, then only nudges it to show the active layer.
@@ -175,5 +184,5 @@ export function layersPanel(app) {
     iconBtn('merge', 'Merge down', () => actions.run('layer.mergeDown'), { 'data-action': 'layer.mergeDown' }),
     iconBtn('trash', 'Delete layer', () => actions.run('layer.del'), { 'data-action': 'layer.del' }));
 
-  return h('div.layers', {}, h('div.layer-props', {}, blend, h('div.flags', {}, flags), opacity.el), list, foot);
+  return h('div.layers', {}, h('div.layer-props', {}, blend, h('div.flags', {}, flags), opacity.el, cameraControls(app)), list, foot);
 }

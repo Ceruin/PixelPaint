@@ -1,6 +1,7 @@
 import { makeCanvas, Rect, clamp } from '../core/util.js';
 import { bus } from '../core/bus.js';
 import { renderDoc } from './compositor.js';
+import { cameraView } from './camera.js';
 
 // Screen presentation: doc composite (dirty-rect cached) → transformed blit → overlays.
 // The view canvas is a normal double-buffered one (the browser shows each frame whole, so it
@@ -85,6 +86,7 @@ export class Viewport {
   }
   invalidate(r) {
     if (!this.doc) return;
+    if (cameraView(this.doc)) r = { x: 0, y: 0, w: this.doc.w, h: this.doc.h };   // through a camera, a change anywhere can show up anywhere
     r = Rect.clip(r, this.doc.w, this.doc.h);
     this.dirty = Rect.union(this.dirty, r);
     this.pending = Rect.union(this.pending, r);

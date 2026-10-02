@@ -63,6 +63,8 @@ export class CanvasInput {
     if (e.button === 2 && !pencil) { bus.emit('popup', { x: e.clientX, y: e.clientY }); return; }
     if (e.button === 1 || app.keys.space) { this.pan = { id: e.pointerId, x: e.clientX, y: e.clientY }; return; }
     if (e.button !== 0 && !(pencil && e.button === 2)) return;
+    const cam = app.cameraDrag?.(e);   // looking through a camera: dragging moves the camera, not paint
+    if (cam) { this.cam = { id: e.pointerId, ...cam }; return; }
     if (app.tool.down(this.point(e), e) !== false) Object.assign(this, { active: e.pointerId, activeTouch: touch, activeAt: e.timeStamp });
   }
 
@@ -71,6 +73,7 @@ export class CanvasInput {
     if (e.pointerType === 'pen') this.penAt = e.timeStamp;
     if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX - this.rect.left, y: e.clientY - this.rect.top });
     if (this.gesture) return this.updateGesture();
+    if (this.cam?.id === e.pointerId) return this.cam.move(e);
     if (this.pan?.id === e.pointerId) {
       app.view.pan(e.clientX - this.pan.x, e.clientY - this.pan.y);
       this.pan.x = e.clientX; this.pan.y = e.clientY;
@@ -88,6 +91,7 @@ export class CanvasInput {
     this.pointers.delete(e.pointerId);
     if (this.gesture) { if (!this.pointers.size) this.endGesture(e); return; }
     if (this.pan?.id === e.pointerId) { this.pan = null; return; }
+    if (this.cam?.id === e.pointerId) { this.cam.up(); this.cam = null; return; }
     if (e.pointerId !== this.active) return;
     this.active = null;
     this.app.tool.up(this.point(e), e);

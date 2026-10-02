@@ -99,6 +99,21 @@ export function slider({ label, min = 0, max = 100, step = 1, value, fmt = v => 
   return { el, input, set(v) { input.value = v; paint(); } };
 }
 
+// A compact bar slider: the label and value sit inside a bar that fills as you drag across it (the
+// whole bar is the handle). `pen` adds a small toggle at the end — e.g. "follow pen pressure".
+export function bar({ pen, ...opts }) {
+  const s = slider(opts), fill = h('i.bar-fill'), out = s.el.querySelector('.sl-val');
+  const sync = () => { fill.style.width = s.input.style.getPropertyValue('--p'); };
+  s.input.addEventListener('input', sync); sync();
+  const row = h('div.bar-row', {}, h('label.bar', {}, fill, h('span.bar-lbl', {}, opts.label), out, s.input));
+  if (pen) {
+    const b = h('button.bar-pen', { type: 'button', className: pen.on ? 'on' : '', 'data-tip': pen.tip, 'aria-label': pen.tip, 'aria-pressed': String(!!pen.on),
+      onclick: () => { const on = !b.classList.contains('on'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); pen.onToggle(on); } }, icon('pen'));
+    row.append(b);
+  }
+  return { el: row, input: s.input, set(v) { s.set(v); sync(); } };
+}
+
 export function select(options, value, onChange, extra = {}) {
   const s = h('select', { onchange: () => onChange(s.value), ...extra }, options.map(([v, l]) => h('option', { value: v }, l)));
   s.value = value;

@@ -273,7 +273,8 @@ export class Doc {
   clone(n) {
     if (n.type === 'filter') return Object.assign(new FilterLayer(n.filter, n.vals), { visible: n.visible, opacity: n.opacity });
     const c = n.type === 'group' ? new Group(n.name) : new Layer(this, n.name);
-    for (const k of ['visible', 'opacity', 'blend', 'locked', 'alphaLock', 'clip', 'collapsed']) if (k in n) c[k] = n[k];
+    for (const k of ['visible', 'opacity', 'blend', 'locked', 'alphaLock', 'clip', 'collapsed', 'depth']) if (k in n) c[k] = n[k];
+    if (n.camera) c.camera = structuredClone(n.camera);
     if (n.type === 'group') c.children = n.children.map(k => this.clone(k));
     else c.cels = n.cels.map(k => (k ? copyOf(k) : k));
     return c;
@@ -330,7 +331,7 @@ export class Doc {
   }
 
   flatten() {
-    const cels = this.frames.map((_, f) => flatten(this, f));
+    const cels = this.frames.map((_, f) => flatten(this, f, { camera: false }));   // flattening keeps the drawing as drawn (a camera only shows it)
     this.editTree('Flatten', () => {
       const l = new Layer(this, 'Background');
       l.cels = cels;

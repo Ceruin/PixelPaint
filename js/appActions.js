@@ -195,9 +195,11 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     const v = await form('Settings', [
       { id: 'haptics', label: 'Haptic feedback (supported devices)', type: 'checkbox', value: app.settings.haptics },
       { id: 'fingerDraw', label: 'Draw with finger (off = touch only navigates)', type: 'checkbox', value: app.settings.fingerDraw },
+      { id: 'advanced', label: 'Advanced options (more brush, camera and timeline settings)', type: 'checkbox', value: !!app.settings.advanced },
       { id: 'mem', label: 'Undo memory budget (MB)', value: Math.round(doc().history.maxBytes / 2 ** 20), min: 64, max: 4096 },
     ]);
     if (!v) return;
+    app.setAdvanced(v.advanced);
     app.setSetting('haptics', v.haptics);
     app.setSetting('fingerDraw', v.fingerDraw);
     app.setSetting('historyMB', clamp(v.mem, 64, 4096));
@@ -397,6 +399,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'anim.delFrame', label: 'Delete Frame', icon: 'trash', key: 'Alt+Delete', run: () => { app.player.stop(); doc().deleteFrame(); } },
     { id: 'anim.clearCel', label: 'Blank Cel', icon: 'eraser', run: () => doc().activeLayer && doc().clearCel(doc().activeLayer) },
     { id: 'anim.holdCel', label: 'Hold Previous Cel', icon: 'last', run: () => doc().activeLayer && doc().holdCel(doc().activeLayer) },
+    { id: 'view.advanced', label: 'Advanced Options', checked: () => !!app.settings.advanced, run: () => app.setAdvanced(!app.settings.advanced) },
     { id: 'anim.onion', label: 'Onion Skin', icon: 'onion', key: 'F3', checked: () => app.opts.onion, run: () => app.setOpt('onion', !app.opts.onion) },
     { id: 'anim.tag', label: 'New Tag', icon: 'tag', key: 'F2', run: () => { const r = timeline.tagRange() ?? [doc().frame, doc().frame]; doc().addTag(...r); } },
     { id: 'anim.export', label: 'Export Animation…', icon: 'film', key: 'Ctrl+Alt+E', run: exportAnim },
@@ -467,11 +470,11 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', '-', 'image.panels']],
-      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
-      ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'anim.import', 'anim.export']],
+      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
+      ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'camera.view', 'camera.key', 'camera.depths', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
-      ['View', 'eye', ['view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
+      ['View', 'eye', ['view.advanced', '-', 'view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.lock', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
       ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],

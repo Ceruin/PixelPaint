@@ -5,7 +5,7 @@ import { Doc, Layer, Group, FilterLayer, BLANK } from './document.js';
 
 // Autosave snapshot: JSON tree + PNG blob per layer (kept in IndexedDB).
 const VERSION = 1;
-const PROPS = ['name', 'visible', 'opacity', 'blend', 'locked', 'alphaLock', 'clip', 'collapsed'];
+const PROPS = ['name', 'visible', 'opacity', 'blend', 'locked', 'alphaLock', 'clip', 'collapsed', 'camera', 'depth'];   // camera: a camera folder's settings + keys; depth: a plane's distance in one
 
 // Encodes changed cels only; `cache` (WeakMap) remembers each cel canvas's last PNG by version.
 export async function packDoc(doc, cache = new WeakMap()) {
@@ -68,7 +68,7 @@ export async function encodeORA(doc) {
   const files = [{ name: 'mimetype', data: 'image/openraster' }];
   let n = 0;
   const node = async (x, pad) => {
-    const common = `name="${esc(x.name)}" visibility="${x.visible ? 'visible' : 'hidden'}" opacity="${x.opacity}"`;
+    const common = `name="${esc(x.name)}" visibility="${x.visible ? 'visible' : 'hidden'}" opacity="${x.opacity}"${x.depth != null ? ` pp:depth="${x.depth}"` : ''}${x.camera ? ` pp:camera="${esc(JSON.stringify(x.camera))}"` : ''}`;
     if (x.type === 'group') {
       const kids = [];
       for (const k of [...x.children].reverse()) kids.push(await node(k, pad + ' '));
@@ -108,6 +108,9 @@ export async function decodeORA(blob) {
   const props = (el, n) => {
     n.visible = el.getAttribute('visibility') !== 'hidden';
     n.opacity = +(el.getAttribute('opacity') ?? 1);
+    const depth = el.getAttributeNS(NS, 'depth'), cam = el.getAttributeNS(NS, 'camera');
+    if (depth) n.depth = +depth;
+    if (cam && n.type === 'group') try { n.camera = JSON.parse(cam); } catch { /* not ours */ }
   };
   const build = async el => {
     const kids = [];

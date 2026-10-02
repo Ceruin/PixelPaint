@@ -69,9 +69,9 @@ export function initTimeline(app, el) {
     rows().forEach(({ n, depth }, r) => {
       const row = r + 3, active = n === d.active;
       grid.append(h('div.tl-name', { className: active ? 'on' : '', style: { gridRow: row, paddingLeft: `${6 + depth * 12}px` }, onclick: () => d.setActive(n) },
-        icon(n.type === 'group' ? 'folder' : n.type === 'filter' ? 'sparkle' : 'layers'), h('span', {}, n.name)));
+        icon(n.camera ? 'camera' : n.type === 'group' ? 'folder' : n.type === 'filter' ? 'sparkle' : 'layers'), h('span', {}, n.name)));
       for (let f = 0; f < N; f++) {
-        const k = n.type === 'layer' ? n.cels[f] : null, kind = k ? 'key' : k === 0 ? 'blank' : n.type === 'layer' && n.view(f) ? 'hold' : '';
+        const k = n.type === 'layer' ? n.cels[f] : null, kind = n.camera ? (n.camera.keys?.some(c => c.f === f) ? 'camkey' : '') : k ? 'key' : k === 0 ? 'blank' : n.type === 'layer' && n.view(f) ? 'hold' : '';   // camera folders show their keys
         grid.append(h('div.tl-cel', {
           className: [f === d.frame && 'col', active && 'row', f === d.frame && active && 'on', inRange(f) && 'sel'].filter(Boolean).join(' '),
           style: { gridRow: row },

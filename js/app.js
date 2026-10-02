@@ -95,6 +95,8 @@ export class App {
   onionCfg() { const o = this.opts; return o.onion ? { prev: o.onionPrev, next: o.onionNext, alpha: o.onionAlpha } : null; }
   syncOnion() { this.view.onion = this.onionCfg(); this.view.redraw(); }
   setSetting(k, v) { this.settings[k] = v; local.set('pp.settings', this.settings); haptics.enabled = this.settings.haptics; }
+  // Simple (default) or Advanced: advanced-only controls carry .adv-only and show with body[data-advanced].
+  setAdvanced(on) { this.setSetting('advanced', !!on); document.body.toggleAttribute('data-advanced', !!on); bus.emit('opts'); }
 
   symmetry() { return symmetryFns(this.opts.symmetry, this.doc.w / 2, this.doc.h / 2, this.opts.radial); }
 
