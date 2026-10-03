@@ -304,7 +304,7 @@ body[data-layout=zen] .float-layer { z-index: 60; }   /* over Focus's bars, like
 .recent:empty::after { content: 'Colors you paint with land here'; grid-column: 1 / -1; color: var(--muted); font-size: 11.5px; }
 
 /* ---------- brushes ---------- */
-.panel[data-panel=brushes] .panel-body { padding: 4px 6px; }
+.panel[data-panel=brushes] .panel-body { padding: 4px 6px; display: flex; flex-direction: column; overflow: hidden; }   /* the panel holds still: categories and brushes each scroll on their own */
 .brush-search { position: sticky; top: 0; z-index: 1; display: flex; gap: 6px; padding: 2px 0 6px; background: var(--panel); }
 .brush-search input { flex: 1; height: 28px; padding: 0 8px; border-radius: var(--r); border: 1px solid var(--line); background: var(--bg); min-width: 0; }
 .brush-cat summary { display: flex; align-items: center; gap: 7px; padding: 5px 4px; cursor: pointer; color: var(--muted); list-style: none; font-size: 11.5px; letter-spacing: .6px; text-transform: uppercase; }
@@ -775,7 +775,7 @@ body[data-theme=paper] .card { box-shadow: none; border: 1.5px solid #111; }
 .pp-hint { position: absolute; left: 0; right: 0; bottom: -28px; text-align: center; color: var(--muted); display: flex; gap: 6px; justify-content: center; }
 
 /* ---------- brush library extras ---------- */
-.brush-lib { display: flex; flex-direction: column; min-height: 0; }
+.brush-lib { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .brush-body { display: grid; grid-template-columns: 96px 1fr; gap: 6px; flex: 1; min-height: 0; }
 .brush-rail { display: flex; flex-direction: column; gap: 1px; padding-right: 6px; border-right: 1px solid var(--line); overflow-y: auto; min-height: 0; scrollbar-width: thin; }
 .brush-cat-btn { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; column-gap: 6px; padding: 4px 6px; border: 0; border-radius: var(--r); background: none; color: var(--muted); font-size: 12px; text-align: left; cursor: pointer; }

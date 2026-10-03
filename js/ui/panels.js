@@ -27,7 +27,7 @@ export class Panels {
       if (this.narrow !== innerWidth < 900) { this.narrow = !this.narrow; this.placeAll(); }
     }).observe(ws);
     document.addEventListener('pointerdown', e => {
-      if (this.fly && !this.fly.p.el.contains(e.target) && !this.fly.anchor.contains(e.target) && !e.target.closest('.modal-back, .menu-drop')) this.closeFlyout();
+      if (this.fly && !this.fly.p.el.contains(e.target) && !this.fly.anchor.contains(e.target) && !e.target.closest('.modal-back, .menu-drop, .brush-name')) this.closeFlyout();   // the brush chip is rebuilt on every brush change: its click toggles
     }, true);
   }
 
@@ -99,8 +99,9 @@ export class Panels {
     this.fly = { p, anchor };
     const r = anchor.getBoundingClientRect(), right = r.left > innerWidth / 2;
     p.el.classList.add('flyout');
-    // Focus's top bar sits over the docks: its popovers open below the bar, where the header can be grabbed
-    const below = !!anchor.closest('.zen-top');
+    // Focus's top bar sits over the docks: its popovers open below the bar, where the header can be grabbed;
+    // the options bar's brush chip is a dropdown too
+    const below = !!anchor.closest('.zen-top, #optionsbar');
     Object.assign(p.el.style, below
       ? { top: `${r.bottom + 8}px`, width: '', height: '', left: `${r.left}px`, right: 'auto' }
       : { top: `${Math.max(8, r.top)}px`, width: '', height: '', left: right ? 'auto' : `${r.right + 8}px`, right: right ? `${innerWidth - r.left + 8}px` : 'auto' });
