@@ -21,6 +21,7 @@ import { showGuide } from './ui/guide.js';
 import { startTour } from './ui/tour.js';
 import { showGallery } from './ui/gallery.js';
 import { VERSION } from './version.js';
+import { RELEASE_NOTES } from './releaseNotes.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ...PAGES, ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
@@ -436,6 +437,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
           h('a.btn', { href: mail('PixelPaint suggestion') }, icon('sparkle'), 'Suggest a feature'),
           h('a.btn', { href: mail('PixelPaint bug report', 'What happened:\n\nWhat I expected:\n\nSteps to reproduce:\n') }, icon('note'), 'Report a bug'))), [['Close', 'ok', true]]);
     } },
+    { id: 'help.notes', label: 'Release Notes', icon: 'history', run: () => modal('Release notes', h('div.relnotes', {}, RELEASE_NOTES.map(([v, items]) => [
+      h('h4', {}, v), h('ul', {}, items.map(t => h('li', { className: t[0] === '+' ? 'add' : 'fix' }, h('b', {}, t[0]), t.slice(2))))])), [['Close', 'ok', true]]) },
     { id: 'help.about', label: 'About PixelPaint', icon: 'bubble', run: () => modal('About PixelPaint', h('p', {}, `PixelPaint ${VERSION} — a painting, pixel art, animation and notes app that runs in your browser and works offline. Your work autosaves on this device.`), [['OK', 'ok', true]]) },
     // Themes: Dark, Light and Paper (calm e-ink colours with a pencil-on-paper feel). view.theme cycles them.
     ...THEMES.map(([id, label, ic]) => ({ id: `theme.${id}`, label: `${label} Theme`, icon: ic, checked: () => app.settings.theme === id, run: () => setTheme(id) })),
@@ -488,7 +491,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
       ['View', 'eye', ['view.advanced', '-', 'view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.lock', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
-      ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.feedback', '-', 'help.update', 'help.reload', '-', 'help.about']],
+      ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.notes', 'help.feedback', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],
   };
 }
