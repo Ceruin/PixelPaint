@@ -424,6 +424,18 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'help.tour', label: 'Guided Tour', icon: 'play', run: () => startTour(mascot) },
     { id: 'help.update', label: 'Check for Updates…', icon: 'download', run: () => checkForUpdates() },
     { id: 'help.reload', label: 'Reload App', icon: 'rotCW', run: reloadFresh },
+    // Feedback: mail links with the subject (and a bug template) filled in, plus Copy for browsers with no mail app.
+    { id: 'help.feedback', label: 'Send Feedback…', icon: 'note', run: () => {
+      const to = 'fuey500contact@gmail.com', sign = `\n\n- sent from PixelPaint ${VERSION}`;
+      const mail = (subject, body = '') => `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + sign)}`;
+      modal('Send feedback', h('div.feedback', {},
+        h('p', {}, 'Ideas or bugs? Email me:'),
+        h('div.fb-addr', {}, h('a', { href: `mailto:${to}` }, to),
+          h('button.btn.sm', { type: 'button', onclick: () => navigator.clipboard.writeText(to).then(() => app.toast('Address copied'), () => app.toast('Copy the address by hand: clipboard is blocked')) }, icon('copy'), 'Copy')),
+        h('div.fb-btns', {},
+          h('a.btn', { href: mail('PixelPaint suggestion') }, icon('sparkle'), 'Suggest a feature'),
+          h('a.btn', { href: mail('PixelPaint bug report', 'What happened:\n\nWhat I expected:\n\nSteps to reproduce:\n') }, icon('note'), 'Report a bug'))), [['Close', 'ok', true]]);
+    } },
     { id: 'help.about', label: 'About PixelPaint', icon: 'bubble', run: () => modal('About PixelPaint', h('p', {}, `PixelPaint ${VERSION} — a painting, pixel art, animation and notes app that runs in your browser and works offline. Your work autosaves on this device.`), [['OK', 'ok', true]]) },
     // Themes: Dark, Light and Paper (calm e-ink colours with a pencil-on-paper feel). view.theme cycles them.
     ...THEMES.map(([id, label, ic]) => ({ id: `theme.${id}`, label: `${label} Theme`, icon: ic, checked: () => app.settings.theme === id, run: () => setTheme(id) })),
@@ -476,7 +488,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
       ['View', 'eye', ['view.advanced', '-', 'view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.lock', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
-      ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.update', 'help.reload', '-', 'help.about']],
+      ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.feedback', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],
   };
 }
