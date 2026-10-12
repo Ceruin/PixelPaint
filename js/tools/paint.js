@@ -110,7 +110,8 @@ export class PaintTool {
     if (this.snap && !this.decided && Math.hypot(last.x - this.start.x, last.y - this.start.y) > 4 / this.app.view.zoom) { this.lock = pickLock(this.app.doc.assistants, this.start, last); this.decided = true; }
     if (this.snap && !this.decided) return;
     pts.forEach(p => this.engine.move(this.lock ? project(this.lock, p) : p));
-    this.flush();
+    this.flusher ??= () => this.engine && this.flush();
+    this.app.view.prep.add(this.flusher); this.app.view.schedule();   // copied to the canvas once per frame, not per pointer event
   }
 
   up(p) {
@@ -132,6 +133,7 @@ export class PaintTool {
   }
 
   cleanup() {
+    if (this.flusher) this.app.view.prep.delete(this.flusher);
     this.app.view.previews.delete(this.layer);
     if (this.preview) this.preview.ensure = null;
     release(this.preview); release(this.buf, this.total ?? undefined);

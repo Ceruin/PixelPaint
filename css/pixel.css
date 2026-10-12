@@ -57,7 +57,7 @@
 #pixel .brand b i:nth-of-type(5){color:#ff3b47;}
 
 /* ---- light theme, shared with the main app (Settings ▸ View ▸ Light Theme) ---- */
-body.light #pixel{--bg:#e9ebf0; --panel:#f7f8fa; --panel2:#eceef2; --line:#c9ced8; --text:#1b1d23; --muted:#5b6273; --check-a:#b3b3b3; --check-b:#8a8a8a; color-scheme:light;}
+body.light #pixel{--bg:#d6d6d6; --panel:#e6e6e6; --panel2:#dadada; --line:#a9a9a9; --text:#1f1f1f; --muted:#555555; --check-a:#cfcfcf; --check-b:#b1b1b1; --stage:#bfbfbf; --panel3:#cccccc; color-scheme:light;}
 body.light #pixel .brand em{color:#2f5fd6 !important;}
 
 /* ---- shared mode switch (mirrors the main app's top bar) ---- */

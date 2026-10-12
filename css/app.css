@@ -9,8 +9,8 @@
   color-scheme: dark;
 }
 body.light {
-  --bg: #e9ebf0; --stage: #d5d8df; --panel: #f7f8fa; --panel2: #eceef2; --panel3: #dfe2e9; --line: #c9ced8;
-  --text: #1b1d23; --muted: #5b6273; --check-a: #fff; --check-b: #e4e6eb; --shadow: 0 8px 24px rgba(20, 24, 40, .16); color-scheme: light;
+  --bg: #d6d6d6; --stage: #bfbfbf; --panel: #e6e6e6; --panel2: #dadada; --panel3: #cccccc; --line: #a9a9a9;
+  --text: #1f1f1f; --muted: #555555; --check-a: #cfcfcf; --check-b: #b1b1b1;   /* neutral greys, like Aseprite */ --shadow: 0 8px 24px rgba(20, 24, 40, .16); color-scheme: light;
 }
 /* The app chrome follows data-layout, which keeps the last non-Pixel mode while Pixel mode covers
    it: entering Pixel then changes nothing underneath (no hidden panels re-shown, no re-theme). */

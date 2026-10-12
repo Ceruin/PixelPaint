@@ -16,6 +16,7 @@ export class Viewport {
     Object.assign(this, { full: true, pending: null, moved: new Set(), boxes: new WeakMap() });
     this.ctx = canvas.getContext('2d', { alpha: true });
     this.overlays = new Set();
+    this.prep = new Set();   // work to do once at the start of the next frame (a stroke's buffered dabs), however many pointer events came in
     this.previews = new Map();
     this.checkKey = ''; this.themeChecker();
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
@@ -117,6 +118,7 @@ export class Viewport {
     this.raf = 0; this.lastFrame = performance.now();
     const { doc, el } = this;
     if (!doc) return;
+    if (this.prep.size) { const p = [...this.prep]; this.prep.clear(); p.forEach(f => f()); }
     this.compose();
     const all = { x: 0, y: 0, w: this.vw, h: this.vh };
     const r = this.full || this.wrap ? all : Rect.clip(Rect.union(this.toScreenRect(this.pending), this.overlayBox()), this.vw, this.vh);

@@ -3,6 +3,9 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.12', [
+    '+ Light mode uses neutral greys too, with a softer checkerboard',
+    '- Fixed a stutter just after finishing a brush stroke',
+    '- Brush strokes stay smoother with pens and fast mice',
     '+ Dark mode uses softer neutral greys, and see-through areas show a dark grey checkerboard instead of a bright white one',
     '+ Type a zoom percentage in the status bar, with zoom in and out buttons beside it',
     '+ More zoom steps, up to 12800%',
