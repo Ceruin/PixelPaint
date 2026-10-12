@@ -6,7 +6,7 @@ import { Rect, DEG } from '../core/util.js';
 // On a turned view (`turn` degrees, `flip` mirrored) the square stays upright on screen.
 export class PixelEngine {
   constructor({ target, color, size = 1, perfect = true, symmetry, dither = false, turn = 0, flip = false }) {
-    Object.assign(this, { ctx: target, size: Math.max(1, Math.round(size)), perfect, sym: symmetry, dither, dirty: null, path: [] });
+    Object.assign(this, { ctx: target, size: Math.max(1, Math.round(size)), perfect, sym: symmetry, dither, dirty: null, path: [], inked: new Set() });
     this.rows = stampRows(this.size, turn % 90 ? turn * DEG : 0, flip);
     const top = this.rows[0][0], left = Math.min(...this.rows.map(r => r[1])), right = Math.max(...this.rows.map(r => r[2]));
     this.box = { x: left, y: top, w: right - left + 1, h: this.rows.length };
@@ -14,7 +14,7 @@ export class PixelEngine {
   }
   cell(p) { const o = (this.size - 1) / 2; return [Math.floor(p.x - o), Math.floor(p.y - o)]; }
 
-  begin(p) { this.path = []; this.add(this.cell(p)); }
+  begin(p) { this.path = []; this.inked.clear(); this.add(this.cell(p)); }
   move(p) {
     const [x1, y1] = this.cell(p), last = this.path.at(-1);
     if (!last) return this.add([x1, y1]);
@@ -36,8 +36,15 @@ export class PixelEngine {
     // pixel-perfect: a, b, c where b is the elbow of an L — drop b (1px only: a wider elbow overlaps a and c)
     if (this.perfect && this.size === 1 && n >= 2) {
       const a = path[n - 2], b = path[n - 1];
-      if ((a[0] === b[0] || a[1] === b[1]) && (b[0] === c[0] || b[1] === c[1]) && a[0] !== c[0] && a[1] !== c[1]) { this.plot(b, true); path.pop(); }
+      if ((a[0] === b[0] || a[1] === b[1]) && (b[0] === c[0] || b[1] === c[1]) && a[0] !== c[0] && a[1] !== c[1]) {
+        // an elbow the stroke had already inked on an earlier pass stays: clearing it would punch a hole
+        if (b[2]) { this.plot(b, true); this.inked.delete(`${b[0]},${b[1]}`); }
+        path.pop();
+      }
     }
+    const key = `${c[0]},${c[1]}`;
+    c = [c[0], c[1], !this.inked.has(key)];
+    this.inked.add(key);
     path.push(c);
     if (path.length > 3) path.shift();
     this.plot(c);

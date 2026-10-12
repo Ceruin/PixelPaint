@@ -3,6 +3,9 @@ import { bus } from '../core/bus.js';
 import { renderDoc } from './compositor.js';
 import { cameraView } from './camera.js';
 
+// Zoom In / Out step through these; typing a zoom or pinching can land anywhere between the ends.
+export const ZOOM_LEVELS = [0.02, 0.03, 0.05, 0.0625, 0.0833, 0.125, 0.1667, 0.25, 0.3333, 0.5, 0.6667, 0.75, 1, 1.5, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 128];
+
 // Screen presentation: doc composite (dirty-rect cached) → transformed blit → overlays.
 // The view canvas is a normal double-buffered one (the browser shows each frame whole, so it
 // can't flicker), and only the screen region that changed is repainted: a brush stroke costs
@@ -44,12 +47,12 @@ export class Viewport {
   fit() {
     const { doc, cw, ch } = this, pad = cw < 600 ? 16 : 48, z = Math.min((cw - pad) / doc.w, (ch - pad) / doc.h);
     // pixel canvases fit at a whole-number zoom so every pixel is the same size on screen
-    this.set(doc.pixelArt && z >= 1 ? Math.min(64, Math.floor(z)) : Math.min(z, 4), 0, cw / 2, ch / 2, { x: doc.w / 2, y: doc.h / 2 });
+    this.set(doc.pixelArt && z >= 1 ? Math.min(ZOOM_LEVELS.at(-1), Math.floor(z)) : Math.min(z, 4), 0, cw / 2, ch / 2, { x: doc.w / 2, y: doc.h / 2 });
   }
 
   // Sets zoom/rotation while keeping doc point under screen point (sx, sy).
   set(zoom, rot, sx = this.cw / 2, sy = this.ch / 2, anchor = this.toDoc(sx, sy)) {
-    this.zoom = clamp(zoom, 0.02, 64);
+    this.zoom = clamp(zoom, ZOOM_LEVELS[0], ZOOM_LEVELS.at(-1));
     this.rot = rot;
     const q = new DOMMatrix().rotate(this.rot).scale(this.zoom * (this.flip ? -1 : 1), this.zoom).transformPoint(anchor);
     this.x = sx - q.x; this.y = sy - q.y;
@@ -71,6 +74,11 @@ export class Viewport {
   }
 
   zoomAt(f, sx, sy) { this.set(this.zoom * f, this.rot, sx, sy); }
+  // The next fixed level up (dir 1) or down (dir -1) from wherever the zoom is now.
+  zoomStep(dir) {
+    const z = this.zoom, next = dir > 0 ? ZOOM_LEVELS.find(l => l > z * 1.001) : ZOOM_LEVELS.findLast(l => l < z * 0.999);
+    if (next) this.set(next, this.rot);
+  }
   pan(dx, dy) { this.x += dx; this.y += dy; this.changed(); }
 
   changed() { this.m = this.inv = null; this.bound(); bus.emit('view', this); this.redraw(); }

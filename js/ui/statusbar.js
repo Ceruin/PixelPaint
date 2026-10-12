@@ -4,12 +4,19 @@ import { actions } from '../core/actions.js';
 
 export function statusbar(app, el, canvas) {
   const zoom = h('button.st-btn', { type: 'button', 'data-tip': 'Fit to screen', 'data-action': 'view.fit', onclick: () => actions.run('view.fit') });
+  const zoomStep = (ic, tip, id) => h('button.st-btn', { type: 'button', 'data-tip': tip, 'data-action': id, onclick: () => actions.run(id) }, icon(ic));
+  // type a percentage and press Enter; anything unreadable puts the current zoom back
+  const zin = h('input.st-zoom', { spellcheck: false, 'data-tip': 'Zoom: type a percentage',
+    onfocus: () => zin.select(),
+    onkeydown: e => { if (e.key === 'Enter' || e.key === 'Escape') zin.blur(); },
+    onchange: () => { const n = parseFloat(zin.value); if (n > 0) app.view.set(n / 100, app.view.rot); showZoom(); } });
+  const showZoom = () => { const z = app.view.zoom; zin.value = `${(z * 100).toFixed(z < 0.1 ? 1 : 0)}%`; };
   const t = () => h('b', { style: { fontWeight: 400 } });
   const [zt, st, pt, mt, svt, tt] = [t(), t(), t(), t(), t(), t()];
-  zoom.append(icon('zoom'), zt);
-  el.append(zoom, h('span.st-size', {}, icon('image'), st), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
+  zoom.append(icon('fit'));
+  el.append(h('span.st-zoomer', {}, zoom, zoomStep('minus', 'Zoom out', 'view.out'), zin, zoomStep('plus', 'Zoom in', 'view.in'), zt), h('span.st-size', {}, icon('image'), st), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
   svt.textContent = 'Not saved yet';
-  bus.on('view', v => { zt.textContent = `${(v.zoom * 100).toFixed(v.zoom < 0.1 ? 1 : 0)}%${v.rot ? ` · ${Math.round(v.rot)}°` : ''}`; });
+  bus.on('view', v => { if (document.activeElement !== zin) showZoom(); zt.textContent = v.rot ? `${Math.round(v.rot)}°` : ''; });
   bus.on('doc', d => { st.textContent = `${d.w} × ${d.h}`; });
   bus.on('resize', d => { st.textContent = `${d.w} × ${d.h}`; });
   bus.on('history', hist => { mt.textContent = `${(hist.bytes / 2 ** 20).toFixed(0)} MB undo`; });

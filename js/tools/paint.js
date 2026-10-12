@@ -120,7 +120,7 @@ export class PaintTool {
     this.flush();
     const r = this.total, pv = this.preview;
     if (r) pv.ensure?.(r);   // the stroke's bounding box can span tiles no dab touched: fill them from the layer first
-    if (r) this.app.doc.editPixels(LABEL[this.id], this.layer, r, ctx => { ctx.clearRect(r.x, r.y, r.w, r.h); drawRect(ctx, pv, r); });
+    if (r) this.app.doc.editPixels(LABEL[this.mode === 'destination-out' ? 'eraser' : this.id], this.layer, r, ctx => { ctx.clearRect(r.x, r.y, r.w, r.h); drawRect(ctx, pv, r); });
     this.cleanup();
   }
 
@@ -212,7 +212,7 @@ export class PixelTool extends PaintTool {
   makeEngine(target) {
     const { app } = this;
     const o = app.opts, base = { target, color: app.color.fg, size: o.pixelSize, symmetry: app.symmetry(), dither: o.pixelDither, turn: app.view.rot, flip: app.view.flip };
-    return this.id === 'pxshape' ? new PixelShapeEngine({ ...base, kind: o.shape, filled: o.pixelFill }) : new PixelEngine({ ...base, perfect: o.pixelPerfect });
+    return this.id === 'pxshape' ? new PixelShapeEngine({ ...base, kind: o.shape, filled: o.pixelFill }) : new PixelEngine({ ...base, perfect: o.pixelPerfect && this.mode !== 'destination-out' });   // an eraser clears every pixel it crosses
   }
   // The cursor is the square the pencil will fill, upright on screen like its stamp on a turned view.
   cellRect(view) {

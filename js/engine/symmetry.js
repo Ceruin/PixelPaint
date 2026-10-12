@@ -1,5 +1,5 @@
 // Each fn maps a dab (x, y, angle) to [x, y, angle, mirrored].
-export const SYMMETRY = [['none', 'Off'], ['vertical', 'Vertical'], ['horizontal', 'Horizontal'], ['quad', 'Quadrant'], ['radial', 'Radial']];
+export const SYMMETRY = [['none', 'Symmetry off', 'x'], ['vertical', 'Mirror left / right', 'flipH'], ['horizontal', 'Mirror up / down', 'flipV'], ['quad', 'Mirror both ways', 'grid'], ['radial', 'Radial', 'symmetry']];
 
 export function symmetryFns(mode, cx, cy, n = 6) {
   const id = (x, y, a) => [x, y, a, false];

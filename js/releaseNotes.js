@@ -2,6 +2,17 @@
 // Add to this on every version bump (see CLAUDE.md). One short line per change, in words a user
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
+  ['2026.10.12', [
+    '+ Type a zoom percentage in the status bar, with zoom in and out buttons beside it',
+    '+ More zoom steps, up to 12800%',
+    '+ Symmetry buttons on the Pencil and Pixel Shapes bar',
+    '+ The eyedropper returns to the tool you were using after one pick',
+    '+ Palettes are loaded into your own palette from a Load list; right-click a color to remove it',
+    '- Erasing with the Pencil no longer skips pixels or brings back ones it already erased',
+    '- Pixel-perfect lines no longer leave holes when a stroke crosses itself',
+    '- Recent colors now update when you draw with the Pencil and shape tools',
+    '- Side panel tabs hide and show their panel',
+  ]],
   ['2026.10.03', [
     '+ Release notes in the Help menu',
     '+ All your Pyxls join a focus session, share one radio and pass the ball to each other',

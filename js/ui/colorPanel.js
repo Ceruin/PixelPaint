@@ -108,27 +108,40 @@ export function colorPicker(app) {
 
   dragPad(sv, (x, y) => { ss = x; vv = 1 - y; commit(); });
   dragPad(hue, x => { hh = x * 359.9; drawSV(); commit(); });
-  // Palettes: built-ins, imported files (.gpl / .pal / .hex) and "My palette".
-  let palName = local.get('pp.palette', 'PixelPaint');
+  // One working palette. Built-ins and imported files (.gpl / .pal / .hex) are loaded into it,
+  // replacing its colors; they are not browsed in place.
+  let mine = local.get('pp.swatches', null) ?? allPalettes()[local.get('pp.palette', 'PixelPaint')] ?? PALETTES.PixelPaint;
   const palSel = h('span.pal-sel');
-  const renderPalette = () => {
-    const all = allPalettes();
-    if (!all[palName]) palName = 'PixelPaint';
-    palSel.replaceChildren(select(Object.keys(all).map(n => [n, n]), palName, v => { palName = v; local.set('pp.palette', v); renderPalette(); }));
-    swatches.replaceChildren(...all[palName].map(sw));
+  const setMine = colors => { mine = colors; local.set('pp.swatches', mine); renderPalette(); };
+  const palSw = c => {
+    const b = sw(c);
+    b.dataset.tip = `${c} - right-click to remove`;
+    b.oncontextmenu = e => { e.preventDefault(); setMine(mine.filter(m => m !== c)); };
+    return b;
   };
-  const saveCustom = (name, colors) => { local.set('pp.palettes', { ...local.get('pp.palettes', {}), [name]: colors }); palName = name; local.set('pp.palette', name); renderPalette(); };
+  const renderPalette = () => {
+    palSel.replaceChildren(select([['', 'Load palette...'], ...Object.keys(allPalettes()).map(n => [n, n])], '', v => v && loadPalette(allPalettes()[v])));
+    swatches.replaceChildren(...mine.map(palSw));
+  };
+  const savePalette = (name, colors) => local.set('pp.palettes', { ...local.get('pp.palettes', {}), [name]: colors });
+  // Loading replaces your colors: a palette you built yourself is kept as "My palette" first.
+  const loadPalette = colors => {
+    if (!Object.values(allPalettes()).some(p => p.join() === mine.join())) savePalette('My palette', mine);
+    setMine(colors);
+  };
   const importPal = async () => {
     const f = await pickFile('.gpl,.pal,.hex,.txt');
     const colors = f && parsePalette(await f.text());
-    if (colors?.length) saveCustom(f.name.replace(/\.\w+$/, ''), colors.slice(0, 256));
+    if (!colors?.length) return;
+    savePalette(f.name.replace(/\.\w+$/, ''), colors.slice(0, 256));
+    loadPalette(colors.slice(0, 256));
   };
-  const addColor = () => { const mine = allPalettes()['My palette'] ?? []; saveCustom('My palette', [...new Set([...mine, app.color.fg])]); };
+  const addColor = () => setMine([...new Set([...mine, app.color.fg])]);
   const eyedrop = window.EyeDropper && iconBtn('picker', 'Pick a color from anywhere on screen', async () => { try { app.setColor((await new EyeDropper().open()).sRGBHex); } catch { /* cancelled */ } });
   renderPalette();
   bus.on('color', () => { if (!self) { [hh, ss, vv] = rgbToHsv(...hexToRgb(app.color.fg)); drawSV(); } place(); });
   bus.on('history', hist => {
-    if (!['Brush', 'Fill'].includes(hist.done.at(-1)?.label) || recent[0] === app.color.fg) return;
+    if (!['Brush', 'Pencil', 'Pixel Shape', 'Fill', 'Shape'].includes(hist.done.at(-1)?.label) || recent[0] === app.color.fg) return;
     recent = [app.color.fg, ...recent.filter(c => c !== app.color.fg)].slice(0, 10);
     local.set('pp.recent', recent);
     drawRecent();
@@ -139,6 +152,6 @@ export function colorPicker(app) {
     segmented([['square', 'Square', 'marquee'], ['wheel', 'Wheel', 'palette']], style, setStyle, true),
     pads,
     h('div.picker-row', {}, h('div.chips.inline', {}, bg, fg), icon('palette'), hex, eyedrop),
-    h('div.picker-row', {}, palSel, iconBtn('plus', 'Add current color to “My palette”', addColor), iconBtn('upload', 'Import palette (.gpl, .pal, .hex)', importPal)),
+    h('div.picker-row', {}, palSel, iconBtn('plus', 'Add current color to the palette', addColor), iconBtn('upload', 'Import palette (.gpl, .pal, .hex)', importPal)),
     swatches, h('div.sub-label', {}, 'Recent'), recents);
 }

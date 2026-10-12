@@ -64,6 +64,7 @@ export class App {
 
   setTool(id) {
     if (this.tool.id === id || !this.tools[id]) return;
+    if (id === 'picker') this.pickReturn = this.tool.id;
     this.tool.deactivate?.();
     this.tool = this.tools[id];
     this.tool.activate?.();

@@ -406,8 +406,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'anim.export', label: 'Export Animation…', icon: 'film', key: 'Ctrl+Alt+E', run: exportAnim },
     { id: 'anim.import', label: 'Import Frames (image sequence)…', icon: 'upload', run: importFrames },
 
-    { id: 'view.in', label: 'Zoom In', key: 'Ctrl+=', run: () => v().zoomAt(1.25, v().cw / 2, v().ch / 2) },
-    { id: 'view.out', label: 'Zoom Out', key: 'Ctrl+-', run: () => v().zoomAt(0.8, v().cw / 2, v().ch / 2) },
+    { id: 'view.in', label: 'Zoom In', key: 'Ctrl+=', run: () => v().zoomStep(1) },
+    { id: 'view.out', label: 'Zoom Out', key: 'Ctrl+-', run: () => v().zoomStep(-1) },
     { id: 'view.fit', label: 'Fit to Screen', key: 'Ctrl+0', run: () => v().fit() },
     { id: 'view.actual', label: 'Actual Pixels', key: 'Ctrl+1', run: () => v().set(1, v().rot) },
     { id: 'view.rotL', label: 'Rotate View Left', key: 'Shift+ArrowLeft', run: () => v().set(v().zoom, v().rot - 15) },

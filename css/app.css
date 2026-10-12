@@ -391,6 +391,9 @@ body[data-layout=zen] .float-layer { z-index: 60; }   /* over Focus's bars, like
 .statusbar > .st-save b { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 520px) { .statusbar { gap: 10px; } }
 .statusbar .ic { width: 13px; height: 13px; }
+.statusbar .st-zoomer { gap: 6px; }
+.st-zoom { width: 52px; height: 18px; padding: 0 4px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); color: var(--text); font: inherit; text-align: center; }
+.st-zoom:focus { outline: none; border-color: var(--accent); }
 .st-btn { border: 0; background: none; padding: 0; color: var(--text); }
 
 /* ---------- modals, toast, tooltip ---------- */
