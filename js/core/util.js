@@ -79,5 +79,22 @@ export const pickFiles = accept => new Promise(res => {
 });
 
 export const toBlob = (c, type = 'image/png', q) => new Promise(r => c.toBlob(r, type, q));
+// PNG-encodes a canvas in a worker: the main thread only takes a snapshot (createImageBitmap), so
+// reading a big GPU canvas back never stalls a frame. Falls back to toBlob where workers can't.
+let encoder = null, encId = 0;
+const pendingEnc = new Map();
+export async function toBlobOffThread(c) {
+  try {
+    if (!encoder) {
+      if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap === 'undefined') throw 0;
+      const src = 'onmessage=async({data:{id,bmp}})=>{try{const o=new OffscreenCanvas(bmp.width,bmp.height);o.getContext(\'2d\').drawImage(bmp,0,0);bmp.close();postMessage({id,blob:await o.convertToBlob({type:\'image/png\'})})}catch(e){postMessage({id,blob:null})}}';
+      encoder = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      encoder.onmessage = ({ data }) => { pendingEnc.get(data.id)?.(data.blob); pendingEnc.delete(data.id); };
+    }
+    const bmp = await createImageBitmap(c), id = ++encId;
+    const blob = await new Promise(r => { pendingEnc.set(id, r); encoder.postMessage({ id, bmp }, [bmp]); });
+    return blob ?? toBlob(c);
+  } catch { encoder = null; return toBlob(c); }
+}
 export const readJSON = async file => JSON.parse(await file.text());
 export const isTouchDevice = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;

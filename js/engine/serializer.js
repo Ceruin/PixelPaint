@@ -1,4 +1,4 @@
-import { toBlob, makeCanvas } from '../core/util.js';
+import { toBlob, toBlobOffThread, makeCanvas } from '../core/util.js';
 import { flatten } from './compositor.js';
 import { zip, unzip } from './zip.js';
 import { Doc, Layer, Group, FilterLayer, BLANK } from './document.js';
@@ -14,7 +14,7 @@ export async function packDoc(doc, cache = new WeakMap()) {
     if (c === BLANK) return -1;
     if (!c) return null;
     let hit = cache.get(c);
-    if (!hit || hit.v !== c.v) cache.set(c, hit = { v: c.v, blob: await toBlob(c) });
+    if (!hit || hit.v !== c.v) cache.set(c, hit = { v: c.v, blob: await toBlobOffThread(c) });
     return blobs.push(hit.blob) - 1;
   };
   const node = async n => {

@@ -43,6 +43,7 @@ const app = new App($('#view'));
 app.cameraUI = initCamera(app);   // camera folders (multiplane)
 document.body.toggleAttribute('data-advanced', !!app.settings.advanced);
 const project = createProject(app);
+if (new URLSearchParams(location.search).has('perf')) import('./ui/perfHud.js').then(m => m.perfHud(app));   // frame monitor for hunting hitches
 const panels = new Panels($('#workspace'));
 const mascot = new Mascot(app);
 initRoster(app, mascot);   // and her friends from shop eggs

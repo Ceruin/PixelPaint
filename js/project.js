@@ -110,7 +110,8 @@ export function createProject(app) {
 
   // ---- the browser library: named projects kept in this browser (index + one entry per project) ----
   // Blank = every pixel of the merged picture the same (an empty or plain-coloured canvas).
-  const isBlank = (c = flatten(app.doc)) => { const d = new Uint32Array(c.getContext('2d').getImageData(0, 0, c.width, c.height).data.buffer); return d.every(v => v === d[0]); };
+  // Checked on a 64px copy (scaled on the GPU): reading back 16 KB instead of the whole picture keeps it inside one frame.
+  const isBlank = (c = flatten(app.doc)) => { const k = Math.min(1, 64 / c.width, 64 / c.height), t = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))), x = t.getContext('2d'); x.drawImage(c, 0, 0, t.width, t.height); const d = new Uint32Array(x.getImageData(0, 0, t.width, t.height).data.buffer); return d.every(v => v === d[0]); };
   const thumbOf = (w = 240, c = flatten(app.doc)) => { const k = Math.min(1, w / c.width, w / c.height), t = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/png'); };
   const library = {
     list: async () => Object.values(await idb.get('library') ?? {}).sort((a, b) => b.date - a.date),

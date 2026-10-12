@@ -3,6 +3,8 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.12', [
+    '- Fixed short freezes when you start a new stroke right after the painting saves itself',
+    '+ Add ?perf to the page address to show a frame-rate monitor you can copy a report from',
     '+ Light mode uses neutral greys too, with a softer checkerboard',
     '- Fixed a stutter just after finishing a brush stroke',
     '- Brush strokes stay smoother with pens and fast mice',
