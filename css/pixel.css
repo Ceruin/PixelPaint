@@ -12,12 +12,12 @@
 #pixel :where(*:not(svg, svg *)) { all: revert; }   /* :where keeps it below every Pixel rule */
 
 #pixel{
-  --bg:#1b1d23; --panel:#23262e; --panel2:#2b2f39; --line:#3a3f4b;
-  --text:#e6e8ee; --muted:#9aa1b1; --accent:#5b8cff; --accent2:#3a6bff;
+  --bg:#1f1f1f; --panel:#282828; --panel2:#323232; --line:#474747;
+  --text:#e2e2e2; --muted:#a3a3a3; --check-a:#5e5e5e; --check-b:#4a4a4a; --accent:#5b8cff; --accent2:#3a6bff;
   --danger:#e0556a; --ok:#46c07a;
   /* every other theme value the app changes on <body> (Paper mode), set here too: then a theme
      switch leaves this box's computed style unchanged and its ~1000 nodes are never restyled */
-  --stage:#15171c; --panel3:#343945; --accent-ink:#fff; --shadow:0 8px 24px rgba(0,0,0,.4); color-scheme:dark;
+  --stage:#181818; --panel3:#3d3d3d; --accent-ink:#fff; --shadow:0 8px 24px rgba(0,0,0,.4); color-scheme:dark;
 }
 #pixel, #pixel *{box-sizing:border-box;}
 #pixel{
@@ -57,7 +57,7 @@
 #pixel .brand b i:nth-of-type(5){color:#ff3b47;}
 
 /* ---- light theme, shared with the main app (Settings ▸ View ▸ Light Theme) ---- */
-body.light #pixel{--bg:#e9ebf0; --panel:#f7f8fa; --panel2:#eceef2; --line:#c9ced8; --text:#1b1d23; --muted:#5b6273; color-scheme:light;}
+body.light #pixel{--bg:#e9ebf0; --panel:#f7f8fa; --panel2:#eceef2; --line:#c9ced8; --text:#1b1d23; --muted:#5b6273; --check-a:#b3b3b3; --check-b:#8a8a8a; color-scheme:light;}
 body.light #pixel .brand em{color:#2f5fd6 !important;}
 
 /* ---- shared mode switch (mirrors the main app's top bar) ---- */
@@ -152,7 +152,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 #pixel .tl-drop{position:absolute; width:3px; border-radius:2px; background:var(--accent);
   box-shadow:0 0 7px var(--accent); pointer-events:none; z-index:4;}
 #pixel .tl-frame .tl-thumb{image-rendering:pixelated; display:block; border:1px solid #0006;
-  background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 10px 10px;}
+  background:repeating-conic-gradient(var(--check-a) 0% 25%, var(--check-b) 0% 50%) 0 0 / 10px 10px;}
 #pixel .tl-frame .tl-x{position:absolute; top:-7px; right:-7px; width:16px; height:16px; border-radius:50%;
   background:var(--panel); border:1px solid var(--line); align-items:center; justify-content:center; color:var(--muted); display:none;}
 #pixel .tl-frame:hover .tl-x{display:inline-flex;}
@@ -313,7 +313,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 #pixel .canvas-wrap{
   box-shadow:0 8px 30px #0008, 0 0 0 1px #0006;
   image-rendering:pixelated;
-  background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 20px 20px;
+  background:repeating-conic-gradient(var(--check-a) 0% 25%, var(--check-b) 0% 50%) 0 0 / 20px 20px;
 }
 #pixel #pxView{display:block; image-rendering:pixelated; cursor:crosshair; touch-action:none;}
 /* full-stage overlay for placing/resizing a pasted image — lets handles live in the gray "no man's land" */
@@ -432,7 +432,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 #pixel .layer .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 #pixel .layer .op{width:62px;}
 #pixel .layer .thumb{width:28px; height:28px; border-radius:4px; image-rendering:pixelated;
-  background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 8px 8px; border:1px solid #0006;}
+  background:repeating-conic-gradient(var(--check-a) 0% 25%, var(--check-b) 0% 50%) 0 0 / 8px 8px; border:1px solid #0006;}
 
 #pixel .statusbar{
   display:flex; gap:18px; align-items:center; padding:5px 12px;
@@ -532,7 +532,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 #pixel .shi-sw .none{color:var(--muted); font-size:12px;}
 #pixel .shi-prev{flex:1; min-width:0; max-height:190px; overflow:auto;
   border:1px solid var(--line); border-radius:8px;
-  background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 16px 16px;}
+  background:repeating-conic-gradient(var(--check-a) 0% 25%, var(--check-b) 0% 50%) 0 0 / 16px 16px;}
 #pixel .shi-prev canvas{display:block; width:100%; height:auto; image-rendering:pixelated; cursor:crosshair;}
 #pixel .shi-hint{color:var(--muted); font-size:11px; line-height:1.45;}
 /* A packed sheet is as likely to be square as wide, so the preview fits inside a fixed box
@@ -543,7 +543,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 /* The checkerboard sits on the canvas, not the box, and the canvas is sized in script to the
    sheet's aspect — so what you see checkered is exactly the sheet, edges and all. */
 #pixel .pk-prev canvas{image-rendering:pixelated; display:block; box-shadow:0 0 0 1px #ffffff2e;
-  background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 16px 16px;}
+  background:repeating-conic-gradient(var(--check-a) 0% 25%, var(--check-b) 0% 50%) 0 0 / 16px 16px;}
 /* what went into the pack, as chips — a plain list of 400 names would bury the dialog */
 #pixel .pk-list{display:flex; flex-wrap:wrap; gap:4px; flex:1; min-width:0; max-height:82px; overflow:auto;}
 #pixel .pk-i{font-size:10.5px; color:var(--muted); background:var(--panel2); border:1px solid var(--line);
@@ -554,7 +554,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 #pixel .vx-wrap{display:flex; gap:12px;}
 #pixel .vx-prev{position:relative; flex:1; min-width:0; height:230px; display:flex; align-items:center; justify-content:center;
   border:1px solid var(--line); border-radius:8px; overflow:hidden; touch-action:none; cursor:grab;
-  background:repeating-conic-gradient(#3a3f4b 0% 25%, #2b2f39 0% 50%) 0 0 / 18px 18px;}
+  background:repeating-conic-gradient(var(--panel3) 0% 25%, var(--panel2) 0% 50%) 0 0 / 18px 18px;}
 #pixel .vx-prev:active{cursor:grabbing;}
 #pixel .vx-prev canvas{image-rendering:pixelated;}
 #pixel .vx-drag{position:absolute; bottom:5px; right:7px; font-size:10px; color:var(--muted); pointer-events:none;}
@@ -596,7 +596,7 @@ body.light #pixel .brand em{color:#2f5fd6 !important;}
 #pixel .rc-i:hover{border-color:var(--accent);}
 #pixel .rc-th{flex:0 0 44px; width:44px; height:44px; display:flex; align-items:center; justify-content:center;
   border-radius:6px; overflow:hidden; color:var(--muted);
-  background:repeating-conic-gradient(#b3b3b3 0% 25%, #7f7f7f 0% 50%) 0 0 / 11px 11px;}
+  background:repeating-conic-gradient(var(--check-a) 0% 25%, var(--check-b) 0% 50%) 0 0 / 11px 11px;}
 #pixel .rc-th.none{background:var(--panel);}
 /* blown up to fill the box, pixels kept square: a 8 px sprite is recognisable at 44 px, and
    nothing is stretched out of shape on the way */

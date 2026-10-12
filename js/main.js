@@ -154,7 +154,7 @@ function setTheme(theme) {
   document.body.classList.toggle('light', theme === 'light');
   document.body.dataset.theme = theme;
   app.profile = theme === 'paper' ? { smoothing: 0.3, grain: 0.35 } : {};
-  app.view.flat = theme === 'paper'; app.view.redraw();
+  app.view.flat = theme === 'paper'; app.view.themeChecker(); app.view.redraw();
   if (modeBox.isConnected) modeBox.replaceChildren(modeSwitch(app.mode, { focus: app.focus, theme }));
   notes.toggles.replaceChildren(...modeToggles(app.mode, { focus: app.focus, theme }));
   bus.emit('theme', theme);

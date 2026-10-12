@@ -14,10 +14,7 @@ export class Viewport {
     this.ctx = canvas.getContext('2d', { alpha: true });
     this.overlays = new Set();
     this.previews = new Map();
-    const t = makeCanvas(16, 16), tc = t.getContext('2d');
-    tc.fillStyle = '#fff'; tc.fillRect(0, 0, 16, 16);
-    tc.fillStyle = '#e4e6eb'; tc.fillRect(0, 0, 8, 8); tc.fillRect(8, 8, 8, 8);
-    this.checker = this.ctx.createPattern(t, 'repeat');
+    this.checkKey = ''; this.themeChecker();
     new ResizeObserver(() => this.resize()).observe(canvas.parentElement);
     bus.on('dirty', r => this.invalidate(r));
     this.onion = null;
@@ -122,6 +119,16 @@ export class Viewport {
     if (r !== all) { c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip(); }
     this.paint(c, r === all || !this.insideDoc(r));
     c.restore();
+  }
+
+  // The transparency checker takes its two greys from the theme (--check-a/-b in css/app.css), rebuilt only when they change.
+  themeChecker() {
+    const cs = getComputedStyle(document.body), a = cs.getPropertyValue('--check-a').trim() || '#fff', b = cs.getPropertyValue('--check-b').trim() || '#e4e6eb';
+    if (a + b === this.checkKey) return;
+    const t = makeCanvas(16, 16), tc = t.getContext('2d');
+    tc.fillStyle = a; tc.fillRect(0, 0, 16, 16);
+    tc.fillStyle = b; tc.fillRect(0, 0, 8, 8); tc.fillRect(8, 8, 8, 8);
+    this.checker = this.ctx.createPattern(t, 'repeat'); this.checkKey = a + b;
   }
 
   // One frame (the caller clips it to the region being repainted).
