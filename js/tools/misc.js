@@ -73,7 +73,7 @@ export class PickerTool {
     return true;
   }
   move(pts) { this.pick(pts.at(-1)); }
-  up() { this.close(true); haptics.success(); }
+  up() { this.close(true); haptics.success(); this.app.setTool(this.app.pickReturn); }   // one pick, then back to the tool you were drawing with
   cancel() { this.close(); }
   interrupt() { this.close(); }
   pick(p) { this.app.pickColor(p.x, p.y); this.loupe.style.setProperty('--now', this.app.color.fg); }

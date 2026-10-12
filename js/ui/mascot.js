@@ -332,8 +332,9 @@ export class Mascot {
     addEventListener('resize', reclamp); visualViewport?.addEventListener('resize', reclamp);
     this.el.addEventListener('pointerdown', e => {
       if (e.button !== 0 || this.phys) return;
-      // her school bag just slides where you put it; Pyxl (or her egg) hangs from your pointer
-      const slide = this.stats.need === 'school' || ['school', 'focus', 'depart', 'arrive', 'cocoon'].includes(this.state), r0 = this.el.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
+      // her school bag just slides where you put it; Pyxl (or her egg) hangs from your pointer -
+      // during a focus session too: she's right here, not away at school
+      const slide = (this.stats.need === 'school' && !this.stats.school?.focus) || ['school', 'depart', 'arrive', 'cocoon'].includes(this.state), r0 = this.el.getBoundingClientRect(), x0 = e.clientX, y0 = e.clientY;
       let lifting = false;
       // window listeners: moving her into the floating box would drop an element pointer capture
       const move = ev => {
@@ -717,8 +718,8 @@ export class Mascot {
     if (s.stage === 'egg' && this.state !== 'egg' && this.state !== 'hatch') { this.play('egg'); this.eggSince = now; }
     if (this.state === 'egg' && !this.phys && now - (this.eggSince ??= now) > EGG_TIME) this.hatchNow();   // (not while you're holding it)
     if (s.school && now > s.school.until) {
-      const r = s.finishSchool(), name = LESSONS.find(l => l[0] === r?.id)?.[1] ?? 'something';
-      if (r?.focus) return this.backFromSchool(r, name);   // she never left
+      const lead = s.school.lead !== false, r = s.finishSchool(), name = LESSONS.find(l => l[0] === r?.id)?.[1] ?? 'something';
+      if (r?.focus) return this.backFromSchool(r, name, lead);   // she never left
       this.play('arrive');   // she walks back in, then tells you about it
       return setTimeout(() => this.backFromSchool(r, name), 1400);
     }
@@ -728,12 +729,13 @@ export class Mascot {
       bus.emit('pyxl:stats', s);
     }
     const away = s.school?.focus ? 'focus' : 'school';
-    if (s.school && ![away, 'depart'].includes(this.state)) this.play(away);
+    if (s.school && ![away, 'depart'].includes(this.state) && !this.phys) this.play(away);   // not while she's held or flying
     if (['school', 'focus'].includes(this.state) && !s.school) this.base();
     this.cocoonStep(now);
   }
-  backFromSchool(r, name) {
+  backFromSchool(r, name, lead = true) {
     const s = this.stats;
+    if (r?.focus && !lead) return this.react('cheer', { icon: 'star', n: 3, force: true });   // the one you asked calls the break
     if (r?.focus) {   // end of a focus session: a short break, then another round if you like
       sfx('chime');
       this.breakUntil = Date.now() + (s.pomos % 4 === 0 ? 15 : 5) * 60e3;
@@ -1223,15 +1225,17 @@ export class Mascot {
     this.stats.happy(0.5); this.stats.feel('joy', 20);
     this.react(id, { say: { ball: 'Catch!', box: 'Where am I? Tap to find me!', crayons: 'Let me draw!' }[id] });
   }
-  // The radio plays lofi until you switch it off; she sits by it, nodding along.
+  // The radio plays lofi until you switch it off. There's one radio: any Pyxl's card works it and
+  // everyone who's awake sits nodding along (only the one you asked says the track's name).
   setRadio(on, track) {
+    const all = this.roster?.all ?? [this];
     radioNotes(this, on);
-    if (on) {
-      radio.play(track);
-      if (this.awake()) { this.stats.change({ fun: 10 }, 1); this.stats.feel('joy', 15); this.play('vibe', { say: `♪ ${radio.name}` }); }
+    if (on) radio.play(track); else radio.stop();
+    for (const m of all) {
+      if (on && m.awake() && !m.phys) { m.stats.change({ fun: 10 }, 1); m.stats.feel('joy', 15); m.play('vibe', m === this ? { say: `♪ ${radio.name}` } : {}); }
+      if (!on && m.state === 'vibe') m.base();
+      bus.emit('pyxl:stats', m.stats);
     }
-    else { radio.stop(); if (this.state === 'vibe') this.base(); }
-    bus.emit('pyxl:stats', this.stats);
   }
   // Quiet mode: no chatter, no reactions — she just sits there, sad.
   setSilent(on) {
@@ -1242,20 +1246,28 @@ export class Mascot {
   }
 
   // Kindergarten, or a focus session (pomodoro): she studies while you work, and a break follows.
+  // A focus session is for everyone: every Pyxl who's awake settles down to work for the same
+  // stretch, so nobody is left wandering about to distract you. Only the one you asked speaks.
   school(focusMin) {
-    const s = this.stats;
+    const s = this.stats, now = Date.now();
     if (!this.awake()) return this.say('Zzz…');
-    s.attend(currentLesson()[0], Date.now(), focusMin ? focusMin * 60e3 : undefined, !!focusMin);
-    this.breakUntil = 0;
-    if (focusMin) this.play('focus', { say: `Focus time! I’ll work with you for ${focusMin} minutes.` });
-    else this.play('depart', { say: 'Off to kindergarten!' });
+    if (!focusMin) { s.attend(currentLesson()[0], now); this.breakUntil = 0; return this.play('depart', { say: 'Off to kindergarten!' }); }
+    for (const m of this.roster?.all ?? [this]) {
+      if (m !== this && !m.awake()) continue;
+      m.stats.attend(currentLesson()[0], now, focusMin * 60e3, true);
+      m.stats.school.lead = m === this; m.stats.save();
+      m.breakUntil = 0;
+      if (!m.phys) m.play('focus', m === this ? { say: `Focus time! We’ll work with you for ${focusMin} minutes.` } : {});
+      bus.emit('pyxl:stats', m.stats);
+    }
   }
   leaveSchool() {
     if (!this.stats.school) return;
     const focus = this.stats.school.focus;
     this.stats.school = null; this.stats.save();
-    if (focus) this.react('think', { say: 'Stopping already? Okay!' });
-    else this.play('arrive', { say: 'Back already?' });
+    if (!focus) return this.play('arrive', { say: 'Back already?' });
+    this.react('think', { say: 'Stopping already? Okay!' });
+    for (const m of this.roster?.all ?? []) if (m !== this && m.stats.school?.focus) { m.stats.school = null; m.stats.save(); m.base(); bus.emit('pyxl:stats', m.stats); }   // the session ends for everyone
   }
 
   doctor() {

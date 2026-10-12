@@ -175,7 +175,8 @@ actions.define([
   { id: 'file.fromPixel', label: 'Send to Draw as a Layer', icon: 'brush', run: () => pixelBox.dispatchEvent(new CustomEvent('pp-get-frame', { detail: c => { setMode('paint'); project.importLayer(c, 'From Pixel'); } })) },
 ]);
 menubar($('#menubar'), menus, modeBox);
-optionsBar(app, $('#optionsbar'), e => openPanel('brushes', e));
+// the brush chip always drops the library down under itself, wherever the Brushes panel lives
+optionsBar(app, $('#optionsbar'), e => panels.flyout('brushes', e.currentTarget));
 // Mouse wheel scrolls the options bar sideways when it overflows (sliders keep their own wheel).
 $('#optionsbar').addEventListener('wheel', e => {
   const bar = e.currentTarget;

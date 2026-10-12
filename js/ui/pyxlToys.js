@@ -30,16 +30,25 @@ const frames = fn => { let last = performance.now(), on = true; const f = now =>
 
 // ---- Ball: she throws it out onto the page; it bounces off the edges and lands on panels or the
 // floor. Flick it back and she catches it (and throws again); leave it and she gives up after a while.
-function ball(pyxl) {
-  const s = pyxl.stats, el = sprite('ball', 2, '.ball'), st = stageBox(pyxl.app), from = hand(pyxl);
+// With friends around they play together: whoever catches it lobs it to another Pyxl.
+const G = 2200;   // the world's gravity (pyxlWorld), for aiming a lob
+function ball(first) {
+  const el = sprite('ball', 2, '.ball'), st = stageBox(first.app), from = hand(first);
   const dir = st.left + st.width / 2 > from.x ? 1 : -1;
   const b = { x: from.x, y: from.y, vx: dir * (500 + Math.random() * 400), vy: -900 - Math.random() * 300, r: el.size / 2 - 1 };
-  let held = null, thrown = false, restSince = 0, asked = false, rounds = 0, flying = performance.now();
+  let held = null, thrown = false, restSince = 0, asked = false, rounds = 0, flying = performance.now(), pyxl = first, s = first.stats;
+  // everyone awake and on their feet is in the game
+  const players = () => (first.roster?.all ?? [first]).filter(m => m.awake() && !m.phys && !m.gone);
+  // a lob that lands in a friend's hands about 0.9 s later
+  const lobTo = (to, x, y) => { const T = 0.9, t = middle(to); return { vx: (t.x - x) / T, vy: (t.y - y) / T - G * T / 2 }; };
   active.add('ball');
-  pyxl.play('toss', { say: 'Catch!' });
+  const mate = players().find(m => m !== first);
+  if (mate) Object.assign(b, lobTo(mate, b.x, b.y));
+  pyxl.play('toss', { say: mate ? `${mate.stats.name}, catch!` : 'Catch!' });
   const done = (say, caught) => {
     stop(); active.delete('ball');
     el.classList.add('gone'); setTimeout(() => el.remove(), 300);
+    for (const m of players()) if (m !== pyxl) { if (caught) { m.stats.change({ fun: 6 }, 1); m.react('happy', { icon: 'heart', n: 2, force: true }); } else if (m.state === 'watch') m.base(); }
     if (caught) { s.change({ fun: 8 + rounds * 3, love: thrown ? 3 : 0 }, 1); s.feel('joy', 15); pyxl.react('cheer', { icon: 'heart', n: 3, say, force: true }); }
     else pyxl.react(s.is('crybaby') ? 'cry' : 'sit', { say, force: true });
   };
@@ -55,6 +64,22 @@ function ball(pyxl) {
       if (rest) restSince ||= now; else restSince = 0;
     }
     el.at(b.x, b.y);
+    // the ball belongs to whoever it's nearest (the thrower can't catch her own throw straight away)
+    const team = players(), near = team.filter(m => m !== pyxl || now - flying > 600).sort((p, q) => Math.hypot(b.x - middle(p).x, b.y - middle(p).y) - Math.hypot(b.x - middle(q).x, b.y - middle(q).y))[0];
+    for (const m of team) if (m !== pyxl && ['idle', 'vibe', 'sit', 'watch', 'point'].includes(m.state)) { if (m.state !== 'watch') m.play('watch'); m.flip = b.x < middle(m).x; }
+    const catcher = near && !held && now - flying > 300 && Math.hypot(b.x - middle(near).x, b.y - middle(near).y) < 46 ? near : null;
+    if (catcher && catcher !== pyxl) {   // a friend caught it: her turn, and she passes it on
+      rounds++; sfx('pop');
+      if (pyxl.state === 'watch' || pyxl.state === 'toss') pyxl.base();
+      pyxl = catcher; s = catcher.stats; s.change({ fun: 4 });
+      const next = team.filter(m => m !== catcher)[Math.floor(Math.random() * (team.length - 1))];
+      if (rounds >= 8 || !next) return done('Got it! That was fun!', true);
+      const h2 = hand(catcher);
+      Object.assign(b, { x: h2.x, y: h2.y }, lobTo(next, h2.x, h2.y));
+      catcher.play('toss', { say: ['Here!', 'Yours!', 'Catch!'][rounds % 3] });
+      thrown = false; flying = now; restSince = 0; asked = false;
+      return;
+    }
     const me = middle(pyxl), d = Math.hypot(b.x - me.x, b.y - me.y), free = pyxl.awake() && !pyxl.phys;
     if (free && ['toss', 'watch', 'idle', 'point'].includes(pyxl.state)) {   // she watches it, pointing
       if (pyxl.state !== 'watch' && pyxl.state !== 'toss') pyxl.play('watch');
@@ -67,6 +92,8 @@ function ball(pyxl) {
         sfx('pop'); pyxl.play('toss', { say: ['Got it! Again!', 'Yay! Here!', 'Nice throw!'][rounds % 3] });
         const st2 = stageBox(pyxl.app), dir2 = st2.left + st2.width / 2 > me.x ? 1 : -1, h2 = hand(pyxl);
         Object.assign(b, { x: h2.x, y: h2.y, vx: dir2 * (450 + Math.random() * 500), vy: -850 - Math.random() * 400 });
+        const pal = players().find(m => m !== pyxl);   // with a friend around, the throw goes to her
+        if (pal) Object.assign(b, lobTo(pal, h2.x, h2.y));
         thrown = false; flying = now; restSince = 0; asked = false;
         s.change({ fun: 3 }); return;
       }

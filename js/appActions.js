@@ -21,6 +21,7 @@ import { showGuide } from './ui/guide.js';
 import { startTour } from './ui/tour.js';
 import { showGallery } from './ui/gallery.js';
 import { VERSION } from './version.js';
+import { RELEASE_NOTES } from './releaseNotes.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ...PAGES, ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
@@ -405,8 +406,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'anim.export', label: 'Export Animation…', icon: 'film', key: 'Ctrl+Alt+E', run: exportAnim },
     { id: 'anim.import', label: 'Import Frames (image sequence)…', icon: 'upload', run: importFrames },
 
-    { id: 'view.in', label: 'Zoom In', key: 'Ctrl+=', run: () => v().zoomAt(1.25, v().cw / 2, v().ch / 2) },
-    { id: 'view.out', label: 'Zoom Out', key: 'Ctrl+-', run: () => v().zoomAt(0.8, v().cw / 2, v().ch / 2) },
+    { id: 'view.in', label: 'Zoom In', key: 'Ctrl+=', run: () => v().zoomStep(1) },
+    { id: 'view.out', label: 'Zoom Out', key: 'Ctrl+-', run: () => v().zoomStep(-1) },
     { id: 'view.fit', label: 'Fit to Screen', key: 'Ctrl+0', run: () => v().fit() },
     { id: 'view.actual', label: 'Actual Pixels', key: 'Ctrl+1', run: () => v().set(1, v().rot) },
     { id: 'view.rotL', label: 'Rotate View Left', key: 'Shift+ArrowLeft', run: () => v().set(v().zoom, v().rot - 15) },
@@ -424,6 +425,20 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'help.tour', label: 'Guided Tour', icon: 'play', run: () => startTour(mascot) },
     { id: 'help.update', label: 'Check for Updates…', icon: 'download', run: () => checkForUpdates() },
     { id: 'help.reload', label: 'Reload App', icon: 'rotCW', run: reloadFresh },
+    // Feedback: mail links with the subject (and a bug template) filled in, plus Copy for browsers with no mail app.
+    { id: 'help.feedback', label: 'Send Feedback…', icon: 'note', run: () => {
+      const to = 'fuey500contact@gmail.com', sign = `\n\n- sent from PixelPaint ${VERSION}`;
+      const mail = (subject, body = '') => `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + sign)}`;
+      modal('Send feedback', h('div.feedback', {},
+        h('p', {}, 'Ideas or bugs? Email me:'),
+        h('div.fb-addr', {}, h('a', { href: `mailto:${to}` }, to),
+          h('button.btn.sm', { type: 'button', onclick: () => navigator.clipboard.writeText(to).then(() => app.toast('Address copied'), () => app.toast('Copy the address by hand: clipboard is blocked')) }, icon('copy'), 'Copy')),
+        h('div.fb-btns', {},
+          h('a.btn', { href: mail('PixelPaint suggestion') }, icon('sparkle'), 'Suggest a feature'),
+          h('a.btn', { href: mail('PixelPaint bug report', 'What happened:\n\nWhat I expected:\n\nSteps to reproduce:\n') }, icon('note'), 'Report a bug'))), [['Close', 'ok', true]]);
+    } },
+    { id: 'help.notes', label: 'Release Notes', icon: 'history', run: () => modal('Release notes', h('div.relnotes', {}, RELEASE_NOTES.map(([v, items]) => [
+      h('h4', {}, v), h('ul', {}, items.map(t => h('li', { className: t[0] === '+' ? 'add' : 'fix' }, h('b', {}, t[0]), t.slice(2))))])), [['Close', 'ok', true]]) },
     { id: 'help.about', label: 'About PixelPaint', icon: 'bubble', run: () => modal('About PixelPaint', h('p', {}, `PixelPaint ${VERSION} — a painting, pixel art, animation and notes app that runs in your browser and works offline. Your work autosaves on this device.`), [['OK', 'ok', true]]) },
     // Themes: Dark, Light and Paper (calm e-ink colours with a pencil-on-paper feel). view.theme cycles them.
     ...THEMES.map(([id, label, ic]) => ({ id: `theme.${id}`, label: `${label} Theme`, icon: ic, checked: () => app.settings.theme === id, run: () => setTheme(id) })),
@@ -476,7 +491,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
       ['View', 'eye', ['view.advanced', '-', 'view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.lock', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
-      ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.update', 'help.reload', '-', 'help.about']],
+      ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.notes', 'help.feedback', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],
   };
 }

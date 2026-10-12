@@ -27,7 +27,7 @@ export class Panels {
       if (this.narrow !== innerWidth < 900) { this.narrow = !this.narrow; this.placeAll(); }
     }).observe(ws);
     document.addEventListener('pointerdown', e => {
-      if (this.fly && !this.fly.p.el.contains(e.target) && !this.fly.anchor.contains(e.target) && !e.target.closest('.modal-back, .menu-drop')) this.closeFlyout();
+      if (this.fly && !this.fly.p.el.contains(e.target) && !this.fly.anchor.contains(e.target) && !e.target.closest('.modal-back, .menu-drop, .brush-name')) this.closeFlyout();   // the brush chip is rebuilt on every brush change: its click toggles
     }, true);
   }
 
@@ -99,8 +99,9 @@ export class Panels {
     this.fly = { p, anchor };
     const r = anchor.getBoundingClientRect(), right = r.left > innerWidth / 2;
     p.el.classList.add('flyout');
-    // Focus's top bar sits over the docks: its popovers open below the bar, where the header can be grabbed
-    const below = !!anchor.closest('.zen-top');
+    // Focus's top bar sits over the docks: its popovers open below the bar, where the header can be grabbed;
+    // the options bar's brush chip is a dropdown too
+    const below = !!anchor.closest('.zen-top, #optionsbar');
     Object.assign(p.el.style, below
       ? { top: `${r.bottom + 8}px`, width: '', height: '', left: `${r.left}px`, right: 'auto' }
       : { top: `${Math.max(8, r.top)}px`, width: '', height: '', left: right ? 'auto' : `${r.right + 8}px`, right: right ? `${innerWidth - r.left + 8}px` : 'auto' });
@@ -176,15 +177,15 @@ export class Panels {
     dock.classList.toggle('folded', folded);
     dock.classList.toggle('empty', ![...this.map.values()].some(p => p.s.dock === side && !p.s.hidden));
     const arrow = (side === 'left') === folded ? 'chevronsRight' : 'chevronsLeft';
-    // Folded: icons open flyouts. Expanded: icons show / collapse each panel in place.
+    // Folded: icons open flyouts. Expanded: icons show / hide each panel in place.
     const shown = p => !p.s.hidden && !p.s.collapsed;
-    const toggle = p => (p.s.hidden ? this.patch(p.id, { hidden: false, collapsed: false, dock: p.s.dock ?? side }) : this.patch(p.id, { collapsed: !p.s.collapsed }));
+    const toggle = p => (shown(p) ? this.patch(p.id, { hidden: true }) : this.patch(p.id, { hidden: false, collapsed: false, dock: p.s.dock ?? side }));
     const expand = side === 'left' && !this.holdsMore('left') ? [] : [h('button.ibtn.sm.rail-toggle', { type: 'button', 'data-tip': folded ? 'Expand side panel' : 'Collapse side panel', onclick: () => this.fold(side) }, icon(arrow))];
     this.rails[side].replaceChildren(
       ...expand,
       ...docked.map(p => folded
         ? h('button.ibtn.rail-btn', { type: 'button', 'data-tip': p.title, onclick: e => this.flyout(p.id, e.currentTarget) }, icon(p.icon))
-        : h('button.ibtn.sm.rail-mini', { type: 'button', className: shown(p) ? 'on' : '', 'data-tip': `${p.title} — show / collapse`, onclick: () => toggle(p) }, icon(p.icon))));
+        : h('button.ibtn.sm.rail-mini', { type: 'button', className: shown(p) ? 'on' : '', 'data-tip': `${p.title} — show / hide`, onclick: () => toggle(p) }, icon(p.icon))));
   }
 
   clampFloat({ el, s }) {

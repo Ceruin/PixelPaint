@@ -64,10 +64,10 @@ export function optionsBar(app, el, openBrushes) {
       toggle('Filled', o.pixelFill, v => app.setOpt('pixelFill', v)));
     if (t === 'pencil' || t === 'pxshape') parts.push(
       mini({ label: 'Pixel size', min: 1, max: 16, value: o.pixelSize, fmt: v => `${v}px`, onInput: v => { setOpt('pixelSize')(v); app.view.redrawOverlays(app.tool); } }),
+      segmented(SYMMETRY, o.symmetry, v => app.setOpt('symmetry', v)),
       t === 'pencil' && toggle('Pixel-perfect lines', o.pixelPerfect, v => app.setOpt('pixelPerfect', v)),
       toggle('Dither', o.pixelDither, v => app.setOpt('pixelDither', v)),
       toggle('Erase (or right-click)', o.pixelErase, v => app.setOpt('pixelErase', v)),
-      h('label.inline', { 'data-tip': 'Symmetry' }, icon('symmetry'), select(SYMMETRY, o.symmetry, v => { app.setOpt('symmetry', v); render(); })),
       toggle('Pixel grid', o.pixelGrid, v => app.setOpt('pixelGrid', v)),
       h('span.muted', {}, 'Alt-click picks a colour'));
     if (t === 'shape') parts.push(
