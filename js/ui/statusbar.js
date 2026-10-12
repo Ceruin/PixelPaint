@@ -35,7 +35,9 @@ export function statusbar(app, el, canvas) {
   };
   const refit = () => { fitting ||= requestAnimationFrame(fit); };
   new ResizeObserver(refit).observe(el);
-  ['saved', 'brush', 'tool', 'view', 'doc', 'history'].forEach(ev => bus.on(ev, refit));
+  ['saved', 'brush', 'tool', 'doc', 'history'].forEach(ev => bus.on(ev, refit));
+  let zr = '';   // panning changes the view every frame but not the zoom readout: re-fit (layout reads) only when it does
+  bus.on('view', v => { const k = `${v.zoom}|${v.rot}`; if (k !== zr) { zr = k; refit(); } });
   // Cursor position: at most once per frame, from the input's cached canvas rect (no layout reads).
   let last = null, raf = 0;
   canvas.addEventListener('pointermove', e => {

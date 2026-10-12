@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.12', [
+    '- Panning the canvas (middle mouse, space or the hand) is smooth again',
     '- Fixed hiccups while drawing zoomed out on some graphics cards',
     '- Fixed short freezes when you start a new stroke right after the painting saves itself',
     '+ Add ?perf to the page address to show a frame-rate monitor you can copy a report from',

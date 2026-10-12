@@ -96,7 +96,7 @@ export function slider({ label, min = 0, max = 100, step = 1, value, fmt = v => 
   input.addEventListener('change', () => +input.value !== v0 && onCommit?.(+input.value, v0));
   paint();
   const el = h('label.slider', {}, h('span.sl-label', {}, label), out, input);
-  return { el, input, set(v) { input.value = v; paint(); } };
+  return { el, input, set(v) { if (+input.value === +v) return; input.value = v; paint(); } };   // unchanged: no restyle (the navigator sets these every frame of a pan)
 }
 
 // A compact bar slider: the label and value sit inside a bar that fills as you drag across it (the

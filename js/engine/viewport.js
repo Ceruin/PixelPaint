@@ -77,7 +77,12 @@ export class Viewport {
     const z = this.zoom, next = dir > 0 ? ZOOM_LEVELS.find(l => l > z * 1.001) : ZOOM_LEVELS.findLast(l => l < z * 0.999);
     if (next) this.set(next, this.rot);
   }
-  pan(dx, dy) { this.x += dx; this.y += dy; this.changed(); }
+  // While panning, the page is scaled the fast way; full quality comes back once it stops moving.
+  pan(dx, dy) {
+    this.x += dx; this.y += dy; this.panning = true;
+    clearTimeout(this.panTimer); this.panTimer = setTimeout(() => { this.panning = false; this.redraw(); }, 150);
+    this.changed();
+  }
 
   changed() { this.m = this.inv = null; this.bound(); bus.emit('view', this); this.redraw(); }
   // The page can't be pushed out of sight: at least a strip of it (up to 160px) always stays on
@@ -153,7 +158,7 @@ export class Viewport {
       this.checker.setTransform(new DOMMatrix().scale(1 / this.zoom));   // same size squares on screen at any zoom
       ctx.fillStyle = this.checker; ctx.fillRect(0, 0, doc.w, doc.h);
       ctx.imageSmoothingEnabled = this.zoom < 2 && !doc.pixelArt;
-      ctx.imageSmoothingQuality = this.fast ? 'low' : 'high';   // 'high' rebuilds the picture's mipmaps on the GPU each time it changes: too slow to do every frame of a stroke
+      ctx.imageSmoothingQuality = this.fast || this.panning ? 'low' : 'high';   // 'high' rebuilds the picture's mipmaps on the GPU each time it changes: too slow to do every frame of a stroke
       ctx.drawImage(this.comp, 0, 0);
       this.drawOnion(ctx);
     }
