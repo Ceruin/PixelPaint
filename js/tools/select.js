@@ -1,6 +1,6 @@
 import { toolCursor } from '../ui/cursors.js';
 import { TAU, Rect } from '../core/util.js';
-import { regionMask } from './misc.js';
+import { regionMask, sampleSource, getFillWorker, floodInWorker } from './misc.js';
 
 const modeOf = (app, e) => (e.shiftKey ? 'add' : e.altKey ? 'sub' : app.opts.selMode);
 
@@ -46,8 +46,15 @@ export class LassoTool extends DragSelect {
 export class WandTool {
   constructor(app) { Object.assign(this, { app, id: 'wand', cursor: toolCursor('wand') }); }
   down(p, e) {
-    const m = regionMask(this.app, p);
-    if (m) this.app.doc.selection.apply('Magic Wand', modeOf(this.app, e), c => c.drawImage(m, 0, 0));
+    const { app } = this, { doc } = app, mode = modeOf(app, e), x = Math.floor(p.x), y = Math.floor(p.y), worker = getFillWorker();
+    if (!worker) { const m = regionMask(app, p); if (m) doc.selection.apply('Magic Wand', mode, c => c.drawImage(m, 0, 0)); return false; }
+    if (x < 0 || y < 0 || x >= doc.w || y >= doc.h) return false;
+    // flooded in the fill worker, so a big canvas doesn't freeze while every pixel is read back
+    createImageBitmap(sampleSource(app)).then(src => floodInWorker(worker, { w: doc.w, h: doc.h, x, y, rgba: 0xffffffff, tolerance: app.opts.tolerance, contiguous: app.opts.contiguous, wand: true, src }, [src])).then(r => {
+      if (r.error || !r.fill || app.doc !== doc) { r.fill?.bmp.close(); if (r.error) console.warn('wand failed', r.error); return; }
+      doc.selection.apply('Magic Wand', mode, c => c.drawImage(r.fill.bmp, r.fill.bounds.x, r.fill.bounds.y));
+      r.fill.bmp.close();
+    });
     return false;
   }
 }

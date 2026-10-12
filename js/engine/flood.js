@@ -1,4 +1,4 @@
-import { makeCanvas } from '../core/util.js';
+// No imports: the fill worker (fillWorker.js) loads this too, where there is no DOM.
 
 // Channel c of pixel byte-offset k as it looks over white paper.
 const seen = (data, k, c) => data[k + c] * data[k + 3] / 255 + 255 - data[k + 3];
@@ -23,16 +23,10 @@ export function floodMask({ data, width: w, height: h }, sx, sy, tolerance, cont
   if (closeGaps) {
     const wall = new Uint8Array(w * h);
     for (let i = 0; i < wall.length; i++) wall[i] = match(i) ? 0 : 1;
-    const open = new Uint8Array(w * h);
-    for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++) {
-      if (wall[i]) continue;
-      let clear = 1;
-      for (let dy = -1; dy <= 1 && clear; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const X = x + dx, Y = y + dy;
-        if (X >= 0 && Y >= 0 && X < w && Y < h && wall[Y * w + X]) { clear = 0; break; }
-      }
-      open[i] = clear;
-    }
+    // open = no wall in the 3×3 around: a row pass (wall left/here/right), then a column pass over it
+    const row = new Uint8Array(w * h), open = new Uint8Array(w * h);
+    for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++) row[i] = wall[i] | (x > 0 ? wall[i - 1] : 0) | (x < w - 1 ? wall[i + 1] : 0);
+    for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++) open[i] = (row[i] | (y > 0 ? row[i - w] : 0) | (y < h - 1 ? row[i + w] : 0)) ? 0 : 1;
     // a seed in a sliver too thin to survive the closing fills the normal way
     if (open[sy * w + sx]) {
       const m = scan(w, h, sx, sy, i => open[i] === 1), out = m.slice();
@@ -90,16 +84,25 @@ export function edgeRing(m, { data, width: w, height: h }, seed, under, rings = 
   return ring;
 }
 
-// Returns a canvas painted with `rgba` where the mask is set; `.bounds` holds the mask's bbox.
+// Returns a doc-sized canvas painted with `rgba` where the mask is set; `.bounds` holds the mask's bbox
+// (null when empty). Only the bbox is written, so a small fill on a big canvas stays cheap.
 export function maskToCanvas(mask, w, h, rgba = 0xffffffff) {
-  const c = makeCanvas(w, h), ctx = c.getContext('2d'), img = ctx.createImageData(w, h), d = new Uint32Array(img.data.buffer);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
   let x0 = w, y0 = h, x1 = -1, y1 = -1;
-  for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++) {
-    if (!mask[i]) continue;
-    d[i] = rgba;
-    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y;
+  for (let y = 0, i = 0; y < h; y++) {
+    let any = false;
+    for (let x = 0; x < w; x++, i++) if (mask[i]) { any = true; if (x < x0) x0 = x; break; }
+    if (!any) continue;
+    i = y * w + w - 1;
+    for (let x = w - 1; x >= 0; x--, i--) if (mask[i]) { if (x > x1) x1 = x; break; }
+    i = (y + 1) * w;
+    if (y < y0) y0 = y; y1 = y;
   }
-  ctx.putImageData(img, 0, 0);
-  c.bounds = x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  if (x1 < 0) { c.bounds = null; return c; }
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1, ctx = c.getContext('2d'), img = ctx.createImageData(bw, bh), d = new Uint32Array(img.data.buffer);
+  for (let y = 0, j = 0; y < bh; y++) for (let x = 0, i = (y0 + y) * w + x0; x < bw; x++, i++, j++) if (mask[i]) d[j] = rgba;
+  ctx.putImageData(img, x0, y0);
+  c.bounds = { x: x0, y: y0, w: bw, h: bh };
   return c;
 }

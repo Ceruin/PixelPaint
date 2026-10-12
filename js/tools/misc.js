@@ -1,6 +1,6 @@
 import { toolCursor } from '../ui/cursors.js';
 import { floodMask, edgeRing, maskToCanvas } from '../engine/flood.js';
-import { makeCanvas } from '../core/util.js';
+import { makeCanvas, drawRect } from '../core/util.js';
 import { hexToU32 } from '../core/color.js';
 import { haptics } from '../input/haptics.js';
 import { h } from '../ui/dom.js';
@@ -19,9 +19,60 @@ export function regionMask(app, p, rgba = 0xffffffff) {
   return maskToCanvas(floodMask(img, x, y, opts.tolerance, opts.contiguous), doc.w, doc.h, rgba);
 }
 
+// The fill runs in a worker (engine/fillWorker.js) where it can: the page snapshots the canvases and
+// draws the result a frame or two later, instead of freezing while it reads back and floods every pixel.
+let fillWorker = null, fillId = 0;
+const fillJobs = new Map();
+export function getFillWorker() {
+  if (fillWorker === false) return null;
+  try {
+    if (typeof OffscreenCanvas === 'undefined' || typeof createImageBitmap === 'undefined') throw 0;
+    if (!fillWorker) {
+      fillWorker = new Worker(new URL('../engine/fillWorker.js', import.meta.url), { type: 'module' });
+      fillWorker.onmessage = ({ data }) => { fillJobs.get(data.id)?.(data); fillJobs.delete(data.id); };
+      fillWorker.onerror = () => { fillWorker = false; fillJobs.forEach(r => r({ error: 'worker' })); fillJobs.clear(); };
+    }
+    return fillWorker;
+  } catch { fillWorker = false; return null; }
+}
+
+// Floods in the worker: resolves { fill: { bmp, bounds } | null } or { error }. Transfers the bitmaps.
+export function floodInWorker(worker, job, bitmaps) {
+  return new Promise(res => { const id = ++fillId; fillJobs.set(id, res); worker.postMessage({ id, ...job }, bitmaps.filter(Boolean)); });
+}
+
 export class FillTool {
   constructor(app) { Object.assign(this, { app, id: 'fill', cursor: toolCursor('fill') }); }
   down(p) {
+    const { app } = this, { doc } = app, layer = doc.activeLayer;
+    if (!layer || layer.locked) { app.toast('Select an unlocked layer'); return false; }
+    const { w, h } = doc, x = Math.floor(p.x), y = Math.floor(p.y);
+    if (x < 0 || y < 0 || x >= w || y >= h) return false;
+    const worker = getFillWorker();
+    if (!worker) return this.fillSync(p);
+    const { opts } = app, soft = !doc.pixelArt, src = sampleSource(app), under = soft && !layer.alphaLock ? layer.view() : null, sel = doc.selection.clip;
+    Promise.all([createImageBitmap(src), under && createImageBitmap(under), sel && createImageBitmap(sel)]).then(([sb, ub, selb]) => floodInWorker(worker,
+      { w, h, x, y, rgba: hexToU32(app.color.fg), tolerance: opts.tolerance, contiguous: opts.contiguous, soft, alphaLock: layer.alphaLock, src: sb, under: ub, sel: selb }, [sb, ub, selb])).then(r => {
+      if (r.error) { if (r.error === 'worker') this.fillSync(p); else console.warn('fill failed', r.error); return; }
+      const parts = [r.fill, r.under, r.over];
+      if (!r.fill || app.doc !== doc || layer.locked || !doc.layers.includes(layer)) { parts.forEach(q => q?.bmp.close()); return; }   // nothing to fill, or the picture changed meanwhile
+      const all = parts.filter(Boolean).map(q => q.bounds), x0 = Math.min(...all.map(q => q.x)), y0 = Math.min(...all.map(q => q.y));
+      const box = { x: x0, y: y0, w: Math.max(...all.map(q => q.x + q.w)) - x0, h: Math.max(...all.map(q => q.y + q.h)) - y0 };
+      doc.editPixels('Fill', layer, box, ctx => {
+        ctx.globalCompositeOperation = layer.alphaLock ? 'source-atop' : 'source-over';
+        ctx.drawImage(r.fill.bmp, r.fill.bounds.x, r.fill.bounds.y);
+        if (r.under) { ctx.globalCompositeOperation = 'destination-over'; ctx.drawImage(r.under.bmp, r.under.bounds.x, r.under.bounds.y); }
+        if (r.over) { ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(r.over.bmp, r.over.bounds.x, r.over.bounds.y); }
+        ctx.globalCompositeOperation = 'source-over';
+      });
+      parts.forEach(q => q?.bmp.close());
+      haptics.pulse(8);
+    }, e => { console.warn('fill failed', e); this.fillSync(p); });
+    return false;
+  }
+
+  // The same fill on the main thread, for browsers without workers that can draw.
+  fillSync(p) {
     const { app } = this, { doc } = app, layer = doc.activeLayer;
     if (!layer || layer.locked) { app.toast('Select an unlocked layer'); return false; }
     const { opts } = app, { w, h } = doc, x = Math.floor(p.x), y = Math.floor(p.y);
@@ -39,17 +90,19 @@ export class FillTool {
       const ring = edgeRing(core, img, y * w + x, under), opaque = new Uint8Array(ring.length);
       for (let i = 0; i < ring.length; i++) if (ring[i] && under?.[i * 4 + 3] === 255) { opaque[i] = 1; ring[i] = 0; }
       underRing = maskToCanvas(ring, w, h, rgba); overRing = maskToCanvas(opaque, w, h, rgba);
+      if (!underRing.bounds) underRing = null;
+      if (!overRing.bounds) overRing = null;
     }
     if (!fill.bounds) return false;
     const sel = doc.selection.clip;
-    if (sel) [fill, underRing, overRing].forEach(c => { if (!c) return; const fc = c.getContext('2d'); fc.globalCompositeOperation = 'destination-in'; fc.drawImage(sel, 0, 0); });
+    if (sel) [fill, underRing, overRing].forEach(c => { if (!c) return; const fc = c.getContext('2d'); fc.globalCompositeOperation = 'destination-in'; drawRect(fc, sel, c.bounds); });
     const all = [fill, underRing, overRing].map(c => c?.bounds).filter(Boolean), x0 = Math.min(...all.map(r => r.x)), y0 = Math.min(...all.map(r => r.y));
     const box = { x: x0, y: y0, w: Math.max(...all.map(r => r.x + r.w)) - x0, h: Math.max(...all.map(r => r.y + r.h)) - y0 };
     doc.editPixels('Fill', layer, box, ctx => {
       ctx.globalCompositeOperation = layer.alphaLock ? 'source-atop' : 'source-over';
-      ctx.drawImage(fill, 0, 0);
-      if (underRing?.bounds) { ctx.globalCompositeOperation = 'destination-over'; ctx.drawImage(underRing, 0, 0); }
-      if (overRing?.bounds) { ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(overRing, 0, 0); }
+      drawRect(ctx, fill, fill.bounds);   // each only over its own box: the rest of these doc-sized canvases is empty
+      if (underRing) { ctx.globalCompositeOperation = 'destination-over'; drawRect(ctx, underRing, underRing.bounds); }
+      if (overRing) { ctx.globalCompositeOperation = 'multiply'; drawRect(ctx, overRing, overRing.bounds); }
       ctx.globalCompositeOperation = 'source-over';
     });
     haptics.pulse(8);
