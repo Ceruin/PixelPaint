@@ -153,7 +153,7 @@ export class Viewport {
       this.checker.setTransform(new DOMMatrix().scale(1 / this.zoom));   // same size squares on screen at any zoom
       ctx.fillStyle = this.checker; ctx.fillRect(0, 0, doc.w, doc.h);
       ctx.imageSmoothingEnabled = this.zoom < 2 && !doc.pixelArt;
-      ctx.imageSmoothingQuality = 'high';
+      ctx.imageSmoothingQuality = this.fast ? 'low' : 'high';   // 'high' rebuilds the picture's mipmaps on the GPU each time it changes: too slow to do every frame of a stroke
       ctx.drawImage(this.comp, 0, 0);
       this.drawOnion(ctx);
     }

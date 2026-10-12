@@ -65,7 +65,7 @@ export class CanvasInput {
     if (e.button !== 0 && !(pencil && e.button === 2)) return;
     const cam = app.cameraDrag?.(e);   // looking through a camera: dragging moves the camera, not paint
     if (cam) { this.cam = { id: e.pointerId, ...cam }; return; }
-    if (app.tool.down(this.point(e), e) !== false) Object.assign(this, { active: e.pointerId, activeTouch: touch, activeAt: e.timeStamp });
+    if (app.tool.down(this.point(e), e) !== false) { Object.assign(this, { active: e.pointerId, activeTouch: touch, activeAt: e.timeStamp }); app.view.fast = true; }
   }
 
   move(e) {
@@ -95,6 +95,7 @@ export class CanvasInput {
     if (e.pointerId !== this.active) return;
     this.active = null;
     this.app.tool.up(this.point(e), e);
+    this.app.view.fast = false; this.app.view.redraw();   // back to smooth zoomed-out scaling once the stroke is done
     if (e.pointerType === 'touch') this.app.tool.hover?.(null);
   }
 
@@ -104,7 +105,7 @@ export class CanvasInput {
       // A second finger right after the first means "gesture", not "stroke".
       if (this.activeTouch && e.timeStamp - this.activeAt < 350) this.app.tool.cancel?.();
       else this.app.tool.up(this.point(e), e);
-      this.active = null;
+      this.active = null; this.app.view.fast = false;
     }
     const v = this.app.view;
     this.gesture ??= { t0: e.timeStamp, max: 0, moved: 0 };
