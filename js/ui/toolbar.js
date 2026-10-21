@@ -28,7 +28,7 @@ export function toolbar(app, openColor) {
   addEventListener('pointerdown', e => menu && !menu.contains(e.target) && !e.target.closest('.tool.grouped') && closeMenu(), true);
   const btns = TOOL_GROUPS.map(grp => {
     const [g, name, ids] = grp, many = ids.length > 1 && g !== 'shape';
-    const b = h(`button.tool${many ? '.grouped' : ''}`, { type: 'button', 'data-tip': name, dataset: { group: g } });
+    const b = h(`button.tool.grp${many ? '.grouped' : ''}`, { type: 'button', 'data-tip': name, dataset: { group: g } });
     let timer = 0, long = false;
     b.addEventListener('pointerdown', () => { long = false; if (many) timer = setTimeout(() => { long = true; openMenu(grp, b); }, 420); });
     b.addEventListener('pointerup', () => clearTimeout(timer));
@@ -42,6 +42,14 @@ export function toolbar(app, openColor) {
     });
     return b;
   });
+  // Tall screens show every tool at once (like Krita's toolbox); shorter ones keep the grouped buttons.
+  // Both sets are built; CSS picks one by screen height. Shapes stay one button (it follows the canvas type).
+  const all = TOOL_GROUPS.flatMap(grp => (grp[0] === 'shape' ? [null] : grp[2]).map((id, i) => {
+    const b = h(`button.tool.all${i === 0 ? '.gstart' : ''}`, { type: 'button', dataset: { group: grp[0] } });
+    b.addEventListener('click', () => pick(grp[0], id ?? current(grp)));
+    b.fixed = id;
+    return b;
+  }));
   const fg = h('button.chip.fg', { type: 'button', 'data-tip': 'Foreground color', onclick: openColor });
   const bg = h('button.chip.bg', { type: 'button', 'data-tip': 'Background color (click to swap)', 'data-action': 'color.swap', onclick: () => app.swapColors() });
   const sync = () => {
@@ -51,9 +59,14 @@ export function toolbar(app, openColor) {
       b.classList.toggle('on', on);
       b.dataset.tip = grp[2].length > 1 && grp[0] !== 'shape' ? `${label(id)} — hold for ${grp[1]}` : label(id);
     });
+    all.forEach(b => {
+      const grp = TOOL_GROUPS.find(g => g[0] === b.dataset.group), id = b.fixed ?? current(grp);
+      if (b.dataset.tool !== id) { b.dataset.tool = id; b.replaceChildren(icon(id)); b.dataset.action = `tool.${id}`; b.dataset.tip = key(id) ? `${label(id)} (${key(id)})` : label(id); }
+      b.classList.toggle('on', app.tool.id === id);
+    });
     if (groupOf(app.tool.id)) last[groupOf(app.tool.id)[0]] = app.tool.id;
     fg.style.background = app.color.fg; bg.style.background = app.color.bg;
   };
   bus.on('tool', sync); bus.on('color', sync); bus.on('doc', sync); sync();
-  return h('div.toolbar', {}, btns, h('div.chips', {}, bg, fg));
+  return h('div.toolbar', {}, btns, all, h('div.chips', {}, bg, fg));
 }

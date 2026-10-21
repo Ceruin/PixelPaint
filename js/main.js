@@ -1,4 +1,4 @@
-import { $ } from './ui/dom.js';
+import { $, h } from './ui/dom.js';
 import { bus } from './core/bus.js';
 import { local } from './core/storage.js';
 import { actions, bindKeys, isTyping } from './core/actions.js';
@@ -176,6 +176,13 @@ actions.define([
   { id: 'file.fromPixel', label: 'Send to Draw as a Layer', icon: 'brush', run: () => pixelBox.dispatchEvent(new CustomEvent('pp-get-frame', { detail: c => { setMode('paint'); project.importLayer(c, 'From Pixel'); } })) },
 ]);
 menubar($('#menubar'), menus, modeBox);
+// The drawing's name in the middle of the menu bar (Krita's document tab): click it to rename.
+const docName = h('input.doc-title', { spellcheck: false, 'aria-label': 'Drawing name', 'data-tip': 'Drawing name: click to rename',
+  onkeydown: e => (e.key === 'Enter' || e.key === 'Escape') && docName.blur(),
+  onchange: () => { const n = docName.value.trim() || 'Untitled'; app.doc.name = docName.value = n; if (app.doc.libId) project.library.rename(app.doc.libId, n); } });
+const showName = () => { if (document.activeElement !== docName) docName.value = app.doc?.name || 'Untitled'; };
+bus.on('doc', showName); bus.on('saved', showName); showName();
+$('#menubar > .spacer').append(docName);
 // the brush chip always drops the library down under itself, wherever the Brushes panel lives
 optionsBar(app, $('#optionsbar'), e => panels.flyout('brushes', e.currentTarget));
 // Mouse wheel scrolls the options bar sideways when it overflows (sliders keep their own wheel).

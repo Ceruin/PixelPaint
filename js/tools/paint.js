@@ -93,7 +93,7 @@ export class PaintTool {
   makeEngine(target, b, smudge) {
     const { app } = this, { w, h } = app.doc;
     return new BrushEngine(b, {
-      target, color: app.color.fg, symmetry: app.symmetry(), scale: 1 / app.view.zoom, turn: app.view.rot, flip: app.view.flip,
+      target, color: app.color.fg, symmetry: app.symmetry(), scale: 1 / app.view.zoom, turn: app.view.rot + (app.view.flipV ? 180 : 0), flip: app.view.flip !== app.view.flipV,   // a vertical mirror = horizontal + half a turn
       profile: app.profile, alphaMul: b.buildup ? b.opacity : 1, smudge, wrap: app.opts.wrap ? { w, h } : null,
     });
   }

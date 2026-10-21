@@ -1,4 +1,4 @@
-import { h, icon, slider, select, segmented, toggle } from './dom.js';
+import { h, icon, bar, select, segmented, toggle } from './dom.js';
 import { bus } from '../core/bus.js';
 import { actions } from '../core/actions.js';
 import { TOOL_META, groupOf } from '../tools/index.js';
@@ -40,7 +40,14 @@ export function optionsBar(app, el, openBrushes) {
   const guard = fn => v => { busy = true; fn(v); busy = false; };
   const setBrush = k => guard(v => { app.brush[k] = v; app.brushChanged(); });
   const setOpt = k => guard(v => app.setOpt(k, v));
-  const mini = o => { const s = slider(o); s.el.classList.add('mini'); return s.el; };
+  // compact bars with the label and value inside, dragged across like Krita's (the whole bar is the handle)
+  const mini = o => { const s = bar(o); s.el.classList.add('ob-bar'); return s.el; };
+  // Mirror view, both ways, always at the end of the bar: artists flip to check a drawing constantly
+  const mirror = (id, tip, cls) => h(`button.ibtn${cls}`, { type: 'button', 'data-tip': tip, 'aria-label': tip, 'data-action': id, onclick: () => actions.run(id) }, icon('mirror'));
+  const flipH = mirror('view.flip', 'Mirror view (Shift+M)', ''), flipV = mirror('view.flipV', 'Mirror view vertically (Alt+Shift+M)', '.flip-v');
+  const views = h('div.ob-view', {}, flipH, flipV);
+  const syncView = () => { flipH.classList.toggle('on', app.view.flip); flipV.classList.toggle('on', app.view.flipV); };
+  bus.on('view', syncView);
 
   const render = () => {
     const t = app.tool.id, o = app.opts, b = app.brush;
@@ -98,7 +105,8 @@ export function optionsBar(app, el, openBrushes) {
       toggle('Proportional corners', o.uniform, v => app.setOpt('uniform', v)),
       btn('Apply', 'tool.commit'), btn('Cancel', 'tool.cancel'));
     if (t === 'hand' || t === 'zoom') parts.push(btn('Fit', 'view.fit'), btn('100%', 'view.actual'), btn('Reset rotation', 'view.resetRot'));
-    el.replaceChildren(...parts.filter(Boolean));
+    syncView();
+    el.replaceChildren(...parts.filter(Boolean), views);
   };
   bus.on('tool', render);
   bus.on('mode', render); bus.on('theme', render);

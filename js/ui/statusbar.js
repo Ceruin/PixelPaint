@@ -1,6 +1,7 @@
 import { h, icon } from './dom.js';
 import { bus } from '../core/bus.js';
 import { actions } from '../core/actions.js';
+import { ZOOM_LEVELS } from '../engine/viewport.js';
 
 export function statusbar(app, el, canvas) {
   const zoom = h('button.st-btn', { type: 'button', 'data-tip': 'Fit to screen', 'data-action': 'view.fit', onclick: () => actions.run('view.fit') });
@@ -10,13 +11,24 @@ export function statusbar(app, el, canvas) {
     onfocus: () => zin.select(),
     onkeydown: e => { if (e.key === 'Enter' || e.key === 'Escape') zin.blur(); },
     onchange: () => { const n = parseFloat(zin.value); if (n > 0) app.view.set(n / 100, app.view.rot); showZoom(); } });
+  // a zoom slider (log scale, like Krita's) and the view's turn, which resets on click
+  const zlo = Math.log(ZOOM_LEVELS[0]), zhi = Math.log(ZOOM_LEVELS.at(-1));
+  const zs = h('input.st-zslider', { type: 'range', min: 0, max: 1000, 'aria-label': 'Zoom', 'data-tip': 'Zoom',
+    oninput: () => app.view.set(Math.exp(zlo + (zhi - zlo) * zs.value / 1000), app.view.rot) });
+  const rot = h('button.st-btn.st-rot', { type: 'button', 'data-tip': 'View rotation: click to reset', 'data-action': 'view.resetRot', onclick: () => actions.run('view.resetRot') }, icon('rotCW'), h('b', { style: { fontWeight: 400 } }));
   const showZoom = () => { const z = app.view.zoom; zin.value = `${(z * 100).toFixed(z < 0.1 ? 1 : 0)}%`; };
   const t = () => h('b', { style: { fontWeight: 400 } });
-  const [zt, st, pt, mt, svt, tt] = [t(), t(), t(), t(), t(), t()];
+  const [st, pt, mt, svt, tt] = [t(), t(), t(), t(), t()];
   zoom.append(icon('fit'));
-  el.append(h('span.st-zoomer', {}, zoom, zoomStep('minus', 'Zoom out', 'view.out'), zin, zoomStep('plus', 'Zoom in', 'view.in'), zt), h('span.st-size', {}, icon('image'), st), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
+  el.append(h('span.st-zoomer', {}, zoom, zoomStep('minus', 'Zoom out', 'view.out'), zin, zoomStep('plus', 'Zoom in', 'view.in'), zs), rot, h('span.st-size', {}, icon('image'), st), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
   svt.textContent = 'Not saved yet';
-  bus.on('view', v => { if (document.activeElement !== zin) showZoom(); zt.textContent = v.rot ? `${Math.round(v.rot)}°` : ''; });
+  bus.on('view', v => {
+    if (document.activeElement !== zin) showZoom();
+    if (document.activeElement !== zs) zs.value = Math.round((Math.log(v.zoom) - zlo) / (zhi - zlo) * 1000);
+    const r = Math.round((((v.rot % 360) + 540) % 360) - 180), txt = `${r}°`;
+    if (rot.lastChild.textContent !== txt) rot.lastChild.textContent = txt;
+    rot.classList.toggle('turned', r !== 0);
+  });
   bus.on('doc', d => { st.textContent = `${d.w} × ${d.h}`; });
   bus.on('resize', d => { st.textContent = `${d.w} × ${d.h}`; });
   bus.on('history', hist => { mt.textContent = `${(hist.bytes / 2 ** 20).toFixed(0)} MB undo`; });
@@ -24,7 +36,7 @@ export function statusbar(app, el, canvas) {
   bus.on('brush', brushInfo); bus.on('tool', brushInfo); brushInfo();
   bus.on('saved', e => { svt.textContent = `${e?.auto ? 'Auto-saved' : 'Saved'} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; });
   // Never cut off: drop the least important readouts until the rest fits (text can be enlarged).
-  const order = ['.st-pos', '.st-mem', '.st-brush', '.st-size'].map(q => el.querySelector(q));
+  const order = ['.st-zslider', '.st-rot', '.st-pos', '.st-mem', '.st-brush', '.st-size'].map(q => el.querySelector(q));
   let fitting = 0;
   const fit = () => {
     fitting = 0;

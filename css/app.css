@@ -161,7 +161,7 @@ input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 2
 input[type=range]::-moz-range-track { height: 6px; border-radius: 2px; background: linear-gradient(90deg, var(--accent) var(--p, 50%), var(--panel3) var(--p, 50%)); }
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 16px; margin-top: -5px; border-radius: 2px; background: var(--text); border: 1px solid var(--bg); }
 input[type=range]::-moz-range-thumb { width: 8px; height: 14px; border-radius: 2px; background: var(--text); border: 1px solid var(--bg); }
-.toggle { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; padding: 3px 0; }
+.toggle { position: relative; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; padding: 3px 0; }   /* relative: holds its hidden checkbox (one escaping a scrolling bar widened the page) */
 .toggle input { position: absolute; opacity: 0; pointer-events: none; }
 .toggle .tg { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--muted); flex: none; display: grid; place-items: center; }
 .toggle input:checked + .tg { background: var(--accent); border-color: var(--accent); }
@@ -1142,3 +1142,53 @@ body:not([data-advanced]) .adv-only { display: none !important; }
 .depth-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; padding: 2px 4px; border-radius: 4px; }
 .depth-row.on { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .depth-row input { width: 64px; }
+
+/* ---------- layout pass (after Krita's workspace) ---------- */
+/* Tall screens show every tool at once; shorter ones keep one button per group (toolbar.js builds both). */
+.toolbar .tool.all { display: none; }
+@media (min-height: 900px) {
+  .toolbar .tool.grp { display: none; }
+  .toolbar .tool.all { display: grid; }
+  .dock.folded .toolbar .tool.all.gstart:not(:first-child) { margin-top: 5px; }   /* a little air between groups */
+}
+/* The right dock: Layers takes the room its rows need (up to half), Brushes gets the rest. */
+.dock .panel[data-panel=layers]:not(.collapsed) { flex: 0 1 auto; min-height: 200px; max-height: 50%; }
+.dock .panel[data-panel=brushes]:not(.collapsed) { flex: 1 1 260px; min-height: 220px; }
+/* Slimmer panel headers. */
+.panel-head { height: 26px; padding: 0 2px 0 8px; gap: 5px; }
+.panel-head .ibtn { width: 22px; height: 22px; }
+.panel-head .ibtn .ic { width: 13px; height: 13px; }
+.panel-title { font-size: 10.5px; }
+/* Brushes as a grid of stroke tiles; the categories become a strip above it. */
+.brush-lib.grid .brush-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; gap: 4px; }
+.brush-lib.grid .brush-rail { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 0 0 4px; border-right: 0; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.brush-lib.grid .brush-cat-btn { flex: none; grid-template-columns: 14px auto; }
+.brush-lib.grid .brush-cat-btn small { display: none; }
+.brush-lib.grid .brush-cat-btn.on { box-shadow: inset 0 -2px 0 var(--accent); }
+.brush-lib.grid .brush-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 4px; align-content: start; padding-bottom: 4px; }
+.brush-lib.grid .brush-row { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 2px; height: 44px; padding: 4px 5px; border-color: var(--line); background: var(--bg); }
+.brush-lib.grid .brush-row:hover { border-color: var(--muted); }
+.brush-lib.grid .brush-row.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.brush-lib.grid .brush-row canvas { order: 1; width: 100%; height: auto; aspect-ratio: 5 / 1; }
+.brush-lib.grid .brush-row .brush-label { order: 2; font-size: 10.5px; color: var(--muted); text-align: center; }
+.brush-lib.grid .brush-row.on .brush-label { color: var(--text); }
+.brush-lib.grid .brush-row .star { position: absolute; top: 1px; right: 1px; width: 18px; height: 18px; opacity: 0; }
+.brush-lib.grid .brush-row .star.on { opacity: 1; }
+.brush-lib.grid .brush-row:hover .star:not(.on) { opacity: .7; }
+/* Options bar: compact bars with the value inside; the mirror buttons sit at the far end. */
+.optionsbar .ob-bar { width: 148px; }
+.optionsbar .ob-bar .bar { height: 28px; }
+.ob-view { position: sticky; right: -12px; display: flex; gap: 2px; margin: 0 -12px 0 auto; padding: 0 12px 0 8px; height: 100%; align-items: center; background: var(--panel); box-shadow: -8px 0 8px -6px rgba(0, 0, 0, .35); }   /* stays in view when the bar scrolls */
+.ob-view .ibtn { width: 30px; height: 30px; }
+.flip-v .ic { transform: rotate(90deg); }
+/* The drawing's name in the middle of the menu bar. */
+.menubar > .spacer { display: flex; justify-content: center; min-width: 0; }
+.doc-title { width: auto; min-width: 0; max-width: min(320px, 100%); field-sizing: content; height: 26px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r); background: none; color: var(--muted); font: inherit; font-size: 12.5px; text-align: center; text-overflow: ellipsis; }
+.doc-title:hover { border-color: var(--line); color: var(--text); }
+.doc-title:focus { outline: none; border-color: var(--accent); background: var(--bg); color: var(--text); }
+@media (max-width: 760px) { .doc-title { display: none; } }
+/* Status bar: zoom slider and the view's turn. */
+.st-zslider { width: 110px; height: 14px; margin: 0; accent-color: var(--accent); }
+.st-rot b { font-variant-numeric: tabular-nums; min-width: 3ch; }
+.st-rot:not(.turned) { color: var(--muted); }
+.statusbar [hidden] { display: none !important; }

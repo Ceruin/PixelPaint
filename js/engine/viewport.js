@@ -12,7 +12,7 @@ export const ZOOM_LEVELS = [0.02, 0.03, 0.05, 0.0625, 0.0833, 0.125, 0.1667, 0.2
 // its own area, not the whole screen — which also keeps e-ink panels calm.
 export class Viewport {
   constructor(canvas) {
-    Object.assign(this, { el: canvas, zoom: 1, rot: 0, x: 0, y: 0, flip: false, wrap: false, dirty: null, raf: 0, dpr: 0, cw: 1, ch: 1, vw: 1, vh: 1 });
+    Object.assign(this, { el: canvas, zoom: 1, rot: 0, x: 0, y: 0, flip: false, flipV: false, wrap: false, dirty: null, raf: 0, dpr: 0, cw: 1, ch: 1, vw: 1, vh: 1 });
     Object.assign(this, { full: true, pending: null, moved: new Set(), boxes: new WeakMap() });
     this.ctx = canvas.getContext('2d', { alpha: true });
     this.overlays = new Set();
@@ -37,7 +37,7 @@ export class Viewport {
   }
 
   // Cached until the view changes (every input point maps through the inverse).
-  get matrix() { return this.m ??= new DOMMatrix().translate(this.x, this.y).rotate(this.rot).scale(this.zoom * (this.flip ? -1 : 1), this.zoom); }
+  get matrix() { return this.m ??= new DOMMatrix().translate(this.x, this.y).rotate(this.rot).scale(this.zoom * (this.flip ? -1 : 1), this.zoom * (this.flipV ? -1 : 1)); }
   get inverse() { return this.inv ??= this.matrix.inverse(); }
   toDoc(sx, sy) { return this.inverse.transformPoint({ x: sx, y: sy }); }
   toScreen(x, y) { return this.matrix.transformPoint({ x, y }); }
@@ -52,12 +52,13 @@ export class Viewport {
   set(zoom, rot, sx = this.cw / 2, sy = this.ch / 2, anchor = this.toDoc(sx, sy)) {
     this.zoom = clamp(zoom, ZOOM_LEVELS[0], ZOOM_LEVELS.at(-1));
     this.rot = rot;
-    const q = new DOMMatrix().rotate(this.rot).scale(this.zoom * (this.flip ? -1 : 1), this.zoom).transformPoint(anchor);
+    const q = new DOMMatrix().rotate(this.rot).scale(this.zoom * (this.flip ? -1 : 1), this.zoom * (this.flipV ? -1 : 1)).transformPoint(anchor);
     this.x = sx - q.x; this.y = sy - q.y;
     this.changed();
   }
   // Mirror the view (not the image) around the screen centre — a classic check for drawing errors.
   toggleFlip() { const a = this.toDoc(this.cw / 2, this.ch / 2); this.flip = !this.flip; this.set(this.zoom, this.rot, this.cw / 2, this.ch / 2, a); }
+  toggleFlipV() { const a = this.toDoc(this.cw / 2, this.ch / 2); this.flipV = !this.flipV; this.set(this.zoom, this.rot, this.cw / 2, this.ch / 2, a); }
   setWrap(on) { this.wrap = on; this.redraw(); }
 
   // Tile offsets covering the screen in wrap-around mode.
@@ -185,7 +186,7 @@ export class Viewport {
       this.shadowTile = Object.assign(t, { m });
     }
     const t = this.shadowTile, o = this.toScreen(0, 0), d = this.dpr;
-    ctx.setTransform(new DOMMatrix().translate(o.x * d, o.y * d).rotate(this.rot).scale(this.flip ? -1 : 1, 1));
+    ctx.setTransform(new DOMMatrix().translate(o.x * d, o.y * d).rotate(this.rot).scale(this.flip ? -1 : 1, this.flipV ? -1 : 1));
     ctx.imageSmoothingEnabled = true;
     const M = 2 * m;
     ctx.drawImage(t, 0, 0, M, M, -m, -m, M, M);                       // corners

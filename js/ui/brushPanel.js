@@ -88,7 +88,7 @@ export function brushLibrary(app) {
     list.replaceChildren(...shown.map(p => {
       const c = h('canvas', { width: 220, height: 44 });
       thumbs.show(c, p, ink());
-      return h('div.brush-row', { dataset: { name: p.name }, className: app.brush.name === p.name ? 'on' : '', onclick: e => !e.target.closest('.star') && applyPreset(app, p) },
+      return h('div.brush-row', { dataset: { name: p.name, tip: p.name }, className: app.brush.name === p.name ? 'on' : '', onclick: e => !e.target.closest('.star') && applyPreset(app, p) },
         h('span.brush-label', {}, p.name), c,
         h('button.star', { type: 'button', className: fav.includes(p.name) ? 'on' : '', 'data-tip': 'Pin to the pop-up palette (right-click canvas)', onclick: () => { toggleFav(p.name); render(); } }, icon('star')));
     }), query && !all.length ? h('p.muted', {}, 'No brushes match.') : '');
@@ -101,11 +101,18 @@ export function brushLibrary(app) {
   bus.on('mode', reink); bus.on('theme', reink);
   bus.on('userBrushes', render); bus.on('favs', render);
   render();
-  return h('div.brush-lib', {},
-    h('div.brush-search', {}, search,
+  // a grid of stroke tiles (Krita's presets docker) or the named list; the categories go above the grid
+  const lib = h('div.brush-lib');
+  let grid = local.get('pp.brushGrid', true);
+  const viewBtn = iconBtn('grid', '', () => { grid = !grid; local.set('pp.brushGrid', grid); showView(); });
+  const showView = () => { lib.classList.toggle('grid', grid); viewBtn.replaceChildren(icon(grid ? 'menu' : 'grid')); viewBtn.dataset.tip = grid ? 'Show as a list' : 'Show as a grid'; viewBtn.setAttribute('aria-label', viewBtn.dataset.tip); };
+  showView();
+  lib.append(
+    h('div.brush-search', {}, search, viewBtn,
       iconBtn('upload', 'Import brush bundle…', importBundle),
       iconBtn('download', 'Export my brushes as a bundle…', exportBundle)),
     h('div.brush-body', {}, rail, list));
+  return lib;
 }
 
 function toggleFav(name) {

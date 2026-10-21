@@ -2,6 +2,16 @@
 // Add to this on every version bump (see CLAUDE.md). One short line per change, in words a user
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
+  ['2026.10.21', [
+    '+ Brushes show as a grid of stroke tiles, with the categories as a strip above (switch back to the list beside the search box)',
+    '+ Mirror the view sideways or upside down from the buttons at the right of the top bar',
+    '+ Your drawing\'s name sits in the middle of the menu bar: click it to rename',
+    '+ A zoom slider and the view\'s rotation in the status bar (click the rotation to reset it)',
+    '+ Tall screens show every tool in the toolbox at once',
+    '+ Size, opacity and the other brush sliders are compact bars you drag across',
+    '- Layers no longer take room they don\'t need, so the brushes get more; slimmer panel headers',
+    '- The page no longer scrolls sideways when the top bar is full',
+  ]],
   ['2026.10.12', [
     '- The fill bucket and magic wand no longer freeze the page on big canvases',
     '- Panning the canvas (middle mouse, space or the hand) is smooth again',
