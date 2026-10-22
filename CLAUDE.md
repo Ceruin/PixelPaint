@@ -1,6 +1,6 @@
 # PixelPaint
 
-Browser art studio (Draw, Notes, Sprite Studio, Pyxl the mascot). Plain ES modules, no build step.
+Browser art studio (Draw with its Painting / Pixel Art / Animation workspaces, Notes, Pyxl the mascot). Plain ES modules, no build step.
 This repo is public and is the live site: keep personal information out of it (the feedback
 address in the app is the only contact detail that belongs here).
 

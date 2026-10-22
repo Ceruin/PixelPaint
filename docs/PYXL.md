@@ -213,7 +213,7 @@ Suggested slots, so items don't fight: `hat` (replaces the beret), `face` (glass
 
 ### D. Tools for the art
 
-- **Any pixel editor with a 1:1 grid works**, for example PixelPaint's Sprite Studio or Aseprite.
+- **Any pixel editor with a 1:1 grid works**, for example PixelPaint's Pixel Art workspace (a pixel art canvas in Draw) or Aseprite.
   Use a hard 1px pencil and eraser, with no anti-aliasing or smoothing.
 - Load the §3 colours as a palette and stick to them.
 - Flip between neighbouring poses (onion skin, if your editor has it) to keep proportions

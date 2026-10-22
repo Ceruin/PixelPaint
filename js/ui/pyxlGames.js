@@ -11,12 +11,10 @@ export const GAMES = [
   ['doodle', 'Draw This!', 'sparkle', 'She names a thing; you have 30 s.'],
 ];
 
-// Where games play: the drawing itself (the page in Draw or Sprite Studio), clipped to what's on
+// Where games play: the drawing itself (the page in Draw), clipped to what's on
 // screen — or the whole canvas area when the page is too small or `page` is false. Notes: the board.
 // The drawing's page on screen (not clipped to the stage), or null where there's no page (Notes).
 export function pageRect(app) {
-  const px = document.getElementById('pxView');
-  if (px?.offsetParent && !px.closest('.parked') && document.getElementById('pxStage')?.getBoundingClientRect().width > 120) return px.getBoundingClientRect();
   const v = app?.view, d = app?.doc, st = document.getElementById('stage');
   if (!v || !d || !st?.offsetParent) return null;
   const c = document.getElementById('view').getBoundingClientRect(), pts = [[0, 0], [d.w, 0], [0, d.h], [d.w, d.h]].map(([x, y]) => v.toScreen(x, y)), xs = pts.map(q => q.x + c.left), ys = pts.map(q => q.y + c.top);
@@ -25,11 +23,10 @@ export function pageRect(app) {
 }
 
 export function stageBox(app, { page = true } = {}) {
-  const vis = el => (el?.offsetParent && !el.closest('.parked') ? el.getBoundingClientRect() : null);   // a parked (see-through) Sprite Studio still has a box
+  const vis = el => (el?.offsetParent ? el.getBoundingClientRect() : null);
   const clip = (a, b) => { const l = Math.max(a.left, b.left), t = Math.max(a.top, b.top), r = Math.min(a.right, b.right), bt = Math.min(a.bottom, b.bottom); return r > l && bt > t ? { left: l, top: t, right: r, bottom: bt } : null; };
-  let area = vis(document.getElementById('pxStage')), pg = null;
-  if (area?.width > 120) pg = vis(document.getElementById('pxView'));
-  else if ((area = vis(document.getElementById('stage')))?.width > 120) {
+  let area, pg = null;
+  if ((area = vis(document.getElementById('stage')))?.width > 120) {
     const v = app?.view, d = app?.doc, c = document.getElementById('view').getBoundingClientRect();
     if (v && d) {
       const pts = [[0, 0], [d.w, 0], [0, d.h], [d.w, d.h]].map(([x, y]) => v.toScreen(x, y)), xs = pts.map(q => q.x + c.left), ys = pts.map(q => q.y + c.top);

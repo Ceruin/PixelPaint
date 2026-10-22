@@ -3,7 +3,6 @@ import { bus } from './core/bus.js';
 import { local } from './core/storage.js';
 import { actions, bindKeys, isTyping } from './core/actions.js';
 import { isTouchDevice } from './core/util.js';
-import { flatten } from './engine/compositor.js';
 import { initEink } from './ui/eink.js';
 import { Doc } from './engine/document.js';
 import { App } from './app.js';
@@ -17,6 +16,7 @@ import { initWorkspaces } from './ui/workspaces.js';
 import { initTiles, tilesPanel } from './ui/tiles.js';
 import { initVoxels } from './ui/voxels.js';
 import { docTabs } from './ui/tabs.js';
+import { migrateSpriteStudio } from './ui/spriteMigration.js';
 import { brushLibrary, brushSettings, loadCustomTips } from './ui/brushPanel.js';
 import { layersPanel } from './ui/layersPanel.js';
 import { historyPanel } from './ui/historyPanel.js';
@@ -89,73 +89,34 @@ mascot.openCare = () => (dockable() && panels.isOpen('pyxl') ? openPanel('pyxl')
 panels.add('history', 'History', 'history', historyPanel(app), { dock: null, hidden: true, x: 440, y: 16, w: 230, h: 320 });
 initPopupPalette(app);
 
-// Pixel mode: the pixel-art editor lives in #pixel (styles: css/pixel.css); its top bar replaces ours.
-// Its script boots behind the boot splash, laid out at full size but parked off-screen: that one
-// long task runs while the compositor-animated splash still covers the app. Out of Pixel mode it
-// stays parked rather than display:none, so switching only moves it (no restyle of its ~500 nodes).
-const pixelBox = $('#pixel'), pixelSlot = $('#pixelSlot'), pixelSpot = $('#pyxlSpot');
-let pixelReady = null;
-const loadPixel = () => pixelReady ??= new Promise(done => {
-  const warm = app.mode !== 'pixel';
-  pixelBox.classList.toggle('parked', warm); pixelBox.hidden = false;
-  const s = Object.assign(document.createElement('script'), { src: 'js/pixel/editor.js' });
-  s.onload = s.onerror = () => { if (app.mode === 'pixel') { if (warm) dispatchEvent(new Event('resize')); requestAnimationFrame(placePixelPyxl); } done(); };
-  document.body.append(s);
-});
-const showPixel = on => {
-  pixelSlot.hidden = true;
-  if (!pixelReady) { if (on) loadPixel(); return; }
-  pixelBox.classList.toggle('parked', !on);
-  if (!on) return;
-  dispatchEvent(new Event('resize'));
-  requestAnimationFrame(placePixelPyxl);
-};
-// Pyxl stands in the editor's tool rail, over a spot it keeps free above Help (hidden if there's no room).
-const placePixelPyxl = () => {
-  const r = pixelSpot.getBoundingClientRect();
-  pixelSlot.hidden = app.mode !== 'pixel' || r.width < 80 || r.height < 70;
-  if (!pixelSlot.hidden) Object.assign(pixelSlot.style, { left: `${r.left + (r.width - 92) / 2}px`, top: `${r.bottom - 78}px` });
-};
-{ const ro = new ResizeObserver(placePixelPyxl); ro.observe(pixelSpot); ro.observe(pixelSpot.parentElement); }
-pixelBox.addEventListener('click', e => {
-  const b = e.target.closest('.mode-switch [data-mode]');
-  if (b) { e.preventDefault(); setMode(b.dataset.mode); }
-});
-// App-wide items in the editor's Help menu (updates, guide, theme…).
-pixelBox.addEventListener('pp-action', e => actions.run(e.detail));
-pixelBox.addEventListener('pp-drew', () => bus.emit('drew', 'pixel'));
-
-// Workspaces: Draw ('paint'), Pixel, Notes. Focus hides the chrome (remembered per workspace; Draw
-// starts focused on touch screens). The chrome's CSS follows data-layout, which Pixel leaves as it
-// was (it covers the app), and the theme follows data-theme.
+// Modes: Draw ('paint') and Notes. Focus hides the chrome (remembered per mode; Draw starts focused on
+// touch screens). The chrome's CSS follows data-layout, and the theme follows data-theme. Pixel art is
+// part of Draw: the old 'pixel' mode (Sprite Studio, links, installs) opens Draw's Pixel Art workspace.
 const focus = local.get('pp.focus', { paint: isTouchDevice, notes: false });
 function setMode(mode) {
   const legacy = LEGACY[mode];
   if (legacy) { if (legacy.focus) { focus.paint = true; local.set('pp.focus', focus); } if (legacy.theme) setTheme(legacy.theme); mode = legacy.mode; }
-  if (mode !== 'pixel' && !MODES.some(m => m[0] === mode)) mode = 'paint';
+  if (mode === 'pixel') { mode = 'paint'; workspaces.use('pixel'); }
+  if (!MODES.some(m => m[0] === mode)) mode = 'paint';
   app.tool.interrupt?.();
   app.mode = mode;
   document.body.dataset.mode = mode;
   local.set('pp.mode', mode);
-  if (mode !== 'pixel') notes.show(mode === 'notes');   // Pixel covers the app: leave it as it was
-  showPixel(mode === 'pixel');
+  notes.show(mode === 'notes');
   applyFocus();
 }
 function applyFocus() {
   const mode = app.mode;
-  app.focus = mode !== 'pixel' && !!focus[mode];
-  if (mode !== 'pixel') {
-    document.body.dataset.layout = mode === 'notes' ? 'notes' : app.focus ? 'zen' : 'paint';
-    document.body.toggleAttribute('data-focus', app.focus);
-  }
-  mascot.mount(mode === 'notes' ? notes.slot : mode === 'pixel' ? pixelSlot : app.focus ? zen.slot : $('#mascotSlot'));
+  app.focus = !!focus[mode];
+  document.body.dataset.layout = mode === 'notes' ? 'notes' : app.focus ? 'zen' : 'paint';
+  document.body.toggleAttribute('data-focus', app.focus);
+  mascot.mount(mode === 'notes' ? notes.slot : app.focus ? zen.slot : $('#mascotSlot'));
   modeBox.replaceChildren(modeSwitch(mode, { focus: app.focus, theme: app.settings.theme }));
   notes.toggles.replaceChildren(...modeToggles(mode, { focus: app.focus, theme: app.settings.theme }));
   bus.emit('mode', mode);
-  if (mode !== 'pixel') requestAnimationFrame(() => app.view.resize());
+  requestAnimationFrame(() => app.view.resize());
 }
 function toggleFocus(on = !app.focus) {
-  if (app.mode === 'pixel') return;
   focus[app.mode] = on;
   local.set('pp.focus', focus);
   applyFocus();
@@ -177,17 +138,6 @@ const timeline = initTimeline(app, $('#timeline'));
 const modeBox = document.createElement('div');
 const workspaces = initWorkspaces(app, panels, { timeline });
 const { menus } = defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline, mascot, workspaces });
-// Hand-offs between Draw and the Pixel editor: the picture opens there as a new pixel drawing, and
-// the Pixel editor's current frame comes back to Draw as a layer.
-actions.define([
-  { id: 'file.toPixel', label: 'Open Canvas in Sprite Studio', icon: 'pixel', run: async () => {
-    const blob = await new Promise(r => flatten(app.doc).toBlob(r, 'image/png'));
-    await loadPixel(); setMode('pixel');
-    pixelBox.dispatchEvent(new CustomEvent('pp-open-image', { detail: new File([blob], `${app.doc.name || 'Drawing'}.png`, { type: 'image/png' }) }));
-  } },
-  { id: 'mode.pixel', label: 'Sprite Studio (tiles, voxels, .aseprite)', icon: 'pixel', run: () => setMode('pixel') },
-  { id: 'file.fromPixel', label: 'Send to Draw as a Layer', icon: 'brush', run: () => pixelBox.dispatchEvent(new CustomEvent('pp-get-frame', { detail: c => { setMode('paint'); project.importLayer(c, 'From Pixel'); } })) },
-]);
 menubar($('#menubar'), menus, modeBox);
 // The drawing's name in the middle of the menu bar (Krita's document tab): click it to rename.
 const docName = h('input.doc-title', { spellcheck: false, 'aria-label': 'Drawing name', 'data-tip': 'Drawing name: click to rename',
@@ -211,7 +161,7 @@ initSelects();
 // space runs low or the site goes unused for a while. Asked on the first tap / click, since some
 // browsers show a prompt for it; most grant it quietly.
 addEventListener('pointerdown', () => navigator.storage?.persisted?.().then(p => p || navigator.storage.persist()).catch(() => {}), { once: true, capture: true });
-bindKeys(a => app.mode !== 'pixel' || /^mode\./.test(a.id));
+bindKeys();
 panels.apply(local.get('pp.layout'));
 bus.on('toast', toast);
 // touch: a finger covers the button it just tapped, so a tool change also names the new tool
@@ -265,7 +215,7 @@ addEventListener('pointerdown', e => {
 }
 
 // Space = temporary hand tool.
-addEventListener('keydown', e => { if (e.code === 'Space' && app.mode !== 'pixel' && !isTyping(e) && !app.keys.space) { app.keys.space = true; app.input.updateCursor(); e.preventDefault(); } });
+addEventListener('keydown', e => { if (e.code === 'Space' && !isTyping(e) && !app.keys.space) { app.keys.space = true; app.input.updateCursor(); e.preventDefault(); } });
 addEventListener('keyup', e => { if (e.code === 'Space') { app.keys.space = false; app.input.updateCursor(); } });
 // Space released while another window had focus never sends keyup: without this every press would pan.
 addEventListener('blur', () => { if (app.keys.space) { app.keys.space = false; app.input.updateCursor(); } });
@@ -289,13 +239,14 @@ if (!doc.libId) doc.fresh = true;
 app.setDoc(doc);
 app.tabs = docTabs(app, $('#docTabs'), blank);
 project.restoreTabs().catch(() => {});
-// ?mode=… (links from the Pixel editor) wins over the remembered mode.
+// ?mode=… (old links and installs, e.g. ?mode=pixel) wins over the remembered mode.
 const asked = new URLSearchParams(location.search).get('mode');
 if (asked) history.replaceState(null, '', location.pathname);
 setTheme(app.settings.theme);
 setMode(asked ?? local.get('pp.mode', 'paint'));
 globalThis.pixelpaint = app;
-hideSplash(loadPixel());
+hideSplash(Promise.resolve());
+migrateSpriteStudio(app, project.library).catch(() => {});
 await welcome;
 
 // A shared race course arrives in the link (#course=…): open it in the course builder.

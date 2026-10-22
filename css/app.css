@@ -953,8 +953,6 @@ body[data-layout=zen] #app > .timeline, body[data-layout=notes] #app > .timeline
 
 /* ---------- Pixel mode (styles in css/pixel.css): it covers our chrome with its own, and Pyxl
    floats over the spot it keeps free in its tool rail ---------- */
-.pixel-pyxl { position: fixed; z-index: 71; pointer-events: none; }
-.pixel-pyxl .mascot { pointer-events: auto; width: 92px; height: 76px; }
 
 /* ---------- touch screens: bigger targets, menus that fit and scroll ---------- */
 @media (pointer: coarse) {

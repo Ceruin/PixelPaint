@@ -143,7 +143,8 @@ export function createProject(app) {
   // Blank = every pixel of the merged picture the same (an empty or plain-coloured canvas).
   // Checked on a 64px copy (scaled on the GPU): reading back 16 KB instead of the whole picture keeps it inside one frame.
   const isBlank = (c = flatten(app.doc)) => { const k = Math.min(1, 64 / c.width, 64 / c.height), t = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))), x = t.getContext('2d'); x.drawImage(c, 0, 0, t.width, t.height); const d = new Uint32Array(x.getImageData(0, 0, t.width, t.height).data.buffer); return d.every(v => v === d[0]); };
-  const thumbOf = (w = 240, c = flatten(app.doc)) => { const k = Math.min(1, w / c.width, w / c.height), t = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/png'); };
+  // a small picture (pixel art) is enlarged by whole pixels, so its thumbnail stays crisp
+  const thumbOf = (w = 240, c = flatten(app.doc)) => { const f = Math.min(w / c.width, w / c.height), k = f >= 2 ? Math.floor(f) : Math.min(1, f), t = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))), x = t.getContext('2d'); x.imageSmoothingEnabled = k < 1; x.drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/png'); };
   const library = {
     list: async () => Object.values(await idb.get('library') ?? {}).sort((a, b) => b.date - a.date),
     // `d`: any open drawing (a tab being left is saved after the next one is showing)

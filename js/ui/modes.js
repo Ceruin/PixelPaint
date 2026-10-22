@@ -3,7 +3,7 @@ import { actions } from '../core/actions.js';
 
 // Two workspaces: Draw (painting and pixel art — pixel tools, sprite sheets and frames live there) and
 // Notes. Focus (full screen, what Zen used to be) and the theme (Dark / Light / E-ink) are toggles.
-// The classic pixel editor lives on as Sprite Studio (tiles, voxels, .aseprite), opened from Draw.
+// Sprite Studio, the old separate pixel editor, is part of Draw now (the Pixel Art workspace).
 export const MODES = [['paint', 'Draw', 'brush', 'Alt+1'], ['notes', 'Notes', 'note', 'Alt+2']];
 export const THEMES = [['dark', 'Dark', 'moon'], ['light', 'Light', 'sun'], ['paper', 'E-ink', 'paper']];
 // Old saved modes → workspace + toggle.

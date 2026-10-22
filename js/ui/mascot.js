@@ -1007,7 +1007,7 @@ export class Mascot {
     this.idleNap = s.asleep && local.get(this.keys.nap, false);   // napping when the app was closed
     const seen = () => { this.seenAt = Date.now(); this.sleepyShown = false; if (this.idleNap) this.idleWake(); };
     ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'].forEach(ev => addEventListener(ev, seen, { passive: true, capture: true }));
-    // Notes and Sprite Studio strokes (Draw's come through history below): she learns from all your drawing
+    // Notes strokes (Draw's come through history below): she learns from all your drawing
     on('drew', () => { s.train('line', 4); this.painted(); });
     on('history', hist => {
       const undone = hist.undone.length, top = hist.done.at(-1), label = top?.label ?? '', now = Date.now();

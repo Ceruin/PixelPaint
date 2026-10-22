@@ -1,4 +1,4 @@
-// Themed drop-down lists for every <select> in the app (Draw, Notes, dialogs, Sprite Studio).
+// Themed drop-down lists for every <select> in the app (Draw, Notes, dialogs).
 // The browser draws a <select>'s open list itself — system font, system colours, a blue highlight —
 // and CSS can't reach it. So mouse / pen clicks and the open keys show this list instead, while the
 // <select> stays the source of truth: picking sets its value and fires input + change like a native
@@ -42,8 +42,7 @@ const step = (i, d) => { const { items } = open; for (let j = i + d; j >= 0 && j
 function show(sel) {
   if (sel.disabled || sel.multiple) return;
   close(false);
-  // inside Sprite Studio, stay under #pixel so its theme variables apply
-  const host = sel.closest('#pixel') || document.body;
+  const host = document.body;
   const pop = document.createElement('div');
   pop.className = 'dd-pop';
   pop.setAttribute('role', 'listbox');
