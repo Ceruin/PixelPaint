@@ -1206,3 +1206,9 @@ body:not([data-advanced]) .adv-only { display: none !important; }
 .pal-count { font-size: 11px; }
 .toast.acts { display: flex; align-items: center; gap: 10px; pointer-events: auto; }
 .toast-act { flex: none; }
+/* ---------- pack files into a sheet ---------- */
+.pack { display: flex; flex-direction: column; gap: 8px; min-width: min(560px, 100%); }
+.pack-box { display: grid; place-items: center; min-height: 120px; max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: repeating-conic-gradient(var(--check-a) 0 25%, var(--check-b) 0 50%) 0 0 / 12px 12px; }
+.pack-prev { image-rendering: pixelated; max-width: 100%; }
+.pack-info { margin: 0; font-size: 12px; }
+.pack-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; }

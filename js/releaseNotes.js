@@ -3,6 +3,8 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.22', [
+    '+ File > Pack Files into a Sheet: arrange many images or projects into one sprite sheet with a live preview, then download it with a JSON map or open it as a canvas',
+    '+ Open Sprite Studio projects (.pxpaint) in Draw, with their frames, tags and tile grid',
     '+ Open and export Aseprite files (.aseprite): layers, groups, frames, held frames, tags and the palette',
     '+ Image > Trim to the Artwork and Rotate 180°',
     '+ Frame > Reverse Frames and Frame Rate',

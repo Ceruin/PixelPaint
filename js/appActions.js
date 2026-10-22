@@ -13,6 +13,7 @@ import { acquire, release } from './engine/compositor.js';
 import { TOOL_META } from './tools/index.js';
 import { MODES, THEMES } from './ui/modes.js';
 import { WORKSPACES } from './ui/workspaces.js';
+import { packFiles } from './ui/packDialog.js';
 import { LAYOUTS, PAGES, layoutRects, addPanels } from './tools/comic.js';
 import { hexToRgb } from './core/color.js';
 import { snapToPalette } from './engine/palettes.js';
@@ -382,6 +383,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
         { id: 'h', label: 'Frame height (px)', value: img.height, min: 1, max: 2048 }], 'Import');
       if (v) project.importSheet(f, dim(v.w), dim(v.h));
     } },
+    { id: 'file.pack', label: 'Pack Files into a Sheet…', icon: 'grid', run: () => packFiles(app) },
     { id: 'file.exportAse', label: 'Export Aseprite (.aseprite)', run: project.exportAseprite },
     { id: 'file.exportPsd', label: 'Export Photoshop (.psd)', icon: 'download', run: () => download(encodePSD(doc()), `${doc().name}.psd`) },
 
@@ -530,7 +532,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse', '-', 'file.toPixel', 'mode.pixel']],
+      ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.pixelArt', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],

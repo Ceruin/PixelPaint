@@ -5,6 +5,7 @@ import { Doc } from './engine/document.js';
 import { packDoc, unpackDoc, encodeORA, decodeORA, encodePP, decodePP } from './engine/serializer.js';
 import { flatten } from './engine/compositor.js';
 import { encodeAseprite, decodeAseprite } from './engine/aseprite.js';
+import { decodeSpriteProject, isSpriteProject } from './engine/spriteProject.js';
 import { palette } from './ui/paletteStore.js';
 import { haptics } from './input/haptics.js';
 
@@ -52,6 +53,10 @@ export function createProject(app) {
         doc.name = f.name.replace(/\.ase(prite)?$/i, '');
         app.setDoc(doc);
         if (pal.length) { palette.load(pal); app.toast(`Opened with its ${pal.length}-colour palette`); }
+      } else if (isSpriteProject(f)) {
+        const doc = await decodeSpriteProject(await f.text());
+        doc.name = f.name.replace(/\.\w+$/, '');
+        app.setDoc(doc);
       } else if (/\.ora$/i.test(f.name)) {
         const doc = await decodeORA(f);
         doc.name = f.name.replace(/\.ora$/i, '');
@@ -153,7 +158,7 @@ export function createProject(app) {
 
   return {
     saveLocal, restore, openFile, importLayer, exportAseprite, exportImage, exportSheet, importSheet, library, imageFile, projectFile,
-    open: async () => { const f = await pickFile('.pp,.ora,.aseprite,.ase,image/*'); if (f) openFile(f); },
+    open: async () => { const f = await pickFile('.pp,.ora,.aseprite,.ase,.pxpaint,image/*'); if (f) openFile(f); },
     exportProject: async () => { download(await projectFile(), `${app.doc.name || 'painting'}.pp`); bus.emit('saved', { auto: false }); },
     exportOra: async () => download(await encodeORA(app.doc), `${app.doc.name || 'painting'}.ora`),
   };
