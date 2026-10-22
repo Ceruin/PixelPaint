@@ -167,6 +167,7 @@ export class Doc {
 
   // Replaces every cel of every layer (resize, crop, flip, rotate) as one undoable step.
   remap(label, w, h, draw) {
+    this.pixel ??= this.pixelArt;   // a canvas keeps its kind when it changes size (the size guess is only for files that never said)
     const state = () => ({ w: this.w, h: this.h, cels: this.layers.map(l => [l, [...l.cels]]) });
     const apply = s => {
       this.w = s.w; this.h = s.h;
@@ -234,6 +235,22 @@ export class Doc {
   }
   setDuration(ms, all = false) {
     this.editFrames('Frame Duration', () => this.frames.forEach((f, i) => { if (all || i === this.frame) f.duration = ms; }));
+  }
+  reverseFrames() {
+    const N = this.frames.length;
+    if (N < 2) return;
+    this.editFrames('Reverse Frames', () => {
+      this.frames.reverse();
+      // a held cel (undefined) repeats the one before it: resolve the holds, reverse, then hold again
+      // wherever a frame shows the same picture as the one before
+      for (const l of this.layers) {
+        const shown = []; for (let i = 0; i < N; i++) shown[i] = l.cels[i] ?? shown[i - 1];
+        shown.reverse();
+        l.cels = shown.map((c, i) => (i && c === shown[i - 1] ? undefined : c));
+      }
+      this.tags = this.tags.map(t => ({ ...t, from: N - 1 - t.to, to: N - 1 - t.from }));
+      this.frame = N - 1 - this.frame;
+    });
   }
   clearCel(layer) { this.editFrames('Clear Cel', () => { layer.cels[this.frame] = this.blankCel(layer); }); }
   holdCel(layer) { if (this.frame) this.editFrames('Hold Previous', () => { layer.cels[this.frame] = undefined; }); }

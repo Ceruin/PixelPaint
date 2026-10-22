@@ -2,7 +2,7 @@ import { h, icon, iconBtn, slider } from './ui/dom.js';
 import { modal, form } from './ui/dialogs.js';
 import { actions, comboOf } from './core/actions.js';
 import { local } from './core/storage.js';
-import { clamp, download, pickFile, pickFiles, readJSON, toBlob } from './core/util.js';
+import { clamp, download, pickFile, pickFiles, readJSON, toBlob, alphaBounds, Rect } from './core/util.js';
 import { Doc } from './engine/document.js';
 import { FILTERS, LAYER_FILTERS, renderFilter } from './engine/filters.js';
 import { encodePSD } from './engine/psd.js';
@@ -160,6 +160,24 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     d.remap('Canvas Size', w, ht, (ctx, c) => ctx.drawImage(c, Math.round((w - d.w) * ax), Math.round((ht - d.h) * ay)));
   };
 
+  // Trim to the artwork: the smallest canvas holding every painted pixel of every frame. A layer named
+  // Background is solid by design, so it doesn't count (unless it's all there is).
+  const trim = () => {
+    const d = doc(), art = d.layers.filter(l => !/^background$/i.test(l.name)), from = art.length ? art : d.layers;
+    let box = null;
+    for (const l of from) for (const c of l.cels) { const b = c && alphaBounds(c); if (b) box = Rect.union(box, b); }
+    if (!box) return app.toast('Nothing to trim to: the canvas is empty');
+    if (box.w === d.w && box.h === d.h) return app.toast('Already trimmed');
+    app.tool.interrupt?.();
+    d.remap('Trim', box.w, box.h, (ctx, c) => ctx.drawImage(c, -box.x, -box.y));
+    app.view.fit?.();
+  };
+  // Frames per second for the whole animation (each frame keeps one duration).
+  const frameRate = async () => {
+    const d = doc(), now = Math.round(1000 / (d.frames[d.frame].duration || 100));
+    const v = await form('Frame Rate', [{ id: 'fps', label: 'Frames per second (all frames)', value: now, min: 1, max: 60 }], 'Apply');
+    if (v?.fps > 0) d.setDuration(Math.round(1000 / Math.min(60, v.fps)), true);
+  };
   const reorient = (label, swap, setup) => () => {
     const d = doc(), w = swap ? d.h : d.w, ht = swap ? d.w : d.h;
     app.tool.interrupt?.();
@@ -364,6 +382,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
         { id: 'h', label: 'Frame height (px)', value: img.height, min: 1, max: 2048 }], 'Import');
       if (v) project.importSheet(f, dim(v.w), dim(v.h));
     } },
+    { id: 'file.exportAse', label: 'Export Aseprite (.aseprite)', run: project.exportAseprite },
     { id: 'file.exportPsd', label: 'Export Photoshop (.psd)', icon: 'download', run: () => download(encodePSD(doc()), `${doc().name}.psd`) },
 
     { id: 'edit.undo', label: 'Undo', key: 'Ctrl+Z', run: () => app.undo() },
@@ -393,6 +412,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'image.flipH', label: 'Flip Horizontal', run: reorient('Flip Horizontal', false, (c, d) => { c.translate(d.w, 0); c.scale(-1, 1); }) },
     { id: 'image.flipV', label: 'Flip Vertical', run: reorient('Flip Vertical', false, (c, d) => { c.translate(0, d.h); c.scale(1, -1); }) },
     { id: 'image.rotCW', label: 'Rotate 90° CW', run: reorient('Rotate 90°', true, (c, d) => { c.translate(d.h, 0); c.rotate(Math.PI / 2); }) },
+    { id: 'image.rot180', label: 'Rotate 180°', run: reorient('Rotate 180°', false, (c, d) => { c.translate(d.w, d.h); c.rotate(Math.PI); }) },
+    { id: 'image.trim', label: 'Trim to the Artwork', icon: 'crop', run: trim },
     { id: 'image.rotCCW', label: 'Rotate 90° CCW', run: reorient('Rotate -90°', true, (c, d) => { c.translate(0, d.w); c.rotate(-Math.PI / 2); }) },
 
     { id: 'layer.new', label: 'New Layer', key: 'Ctrl+Shift+L', run: () => doc().addLayer() },
@@ -424,6 +445,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'anim.clearCel', label: 'Blank Cel', icon: 'eraser', run: () => doc().activeLayer && doc().clearCel(doc().activeLayer) },
     { id: 'anim.holdCel', label: 'Hold Previous Cel', icon: 'last', run: () => doc().activeLayer && doc().holdCel(doc().activeLayer) },
     { id: 'view.advanced', label: 'Advanced Options', checked: () => !!app.settings.advanced, run: () => app.setAdvanced(!app.settings.advanced) },
+    { id: 'anim.reverse', label: 'Reverse Frames', icon: 'swap', run: () => { app.player.stop(); doc().reverseFrames(); } },
+    { id: 'anim.fps', label: 'Frame Rate…', icon: 'play', run: frameRate },
     { id: 'anim.onion', label: 'Onion Skin', icon: 'onion', key: 'F3', checked: () => app.opts.onion, run: () => app.setOpt('onion', !app.opts.onion) },
     { id: 'anim.tag', label: 'New Tag', icon: 'tag', key: 'F2', run: () => { const r = timeline.tagRange() ?? [doc().frame, doc().frame]; doc().addTag(...r); } },
     { id: 'anim.export', label: 'Export Animation…', icon: 'film', key: 'Ctrl+Alt+E', run: exportAnim },
@@ -507,11 +530,11 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', '-', 'file.toPixel', 'mode.pixel']],
+      ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
-      ['Image', 'image', ['image.pixelArt', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', '-', 'image.panels']],
+      ['Image', 'image', ['image.pixelArt', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
-      ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'camera.view', 'camera.key', 'camera.depths', '-', 'anim.import', 'anim.export']],
+      ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', 'anim.reverse', 'anim.fps', '-', 'anim.onion', 'anim.tag', '-', 'camera.view', 'camera.key', 'camera.depths', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
       ['View', 'eye', ['view.advanced', '-', ...WORKSPACES.map(w => `workspace.${w[0]}`), '-', 'view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.flipV', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],

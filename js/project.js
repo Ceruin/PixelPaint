@@ -4,6 +4,8 @@ import { debounce, download, pickFile, toBlob, makeCanvas } from './core/util.js
 import { Doc } from './engine/document.js';
 import { packDoc, unpackDoc, encodeORA, decodeORA, encodePP, decodePP } from './engine/serializer.js';
 import { flatten } from './engine/compositor.js';
+import { encodeAseprite, decodeAseprite } from './engine/aseprite.js';
+import { palette } from './ui/paletteStore.js';
 import { haptics } from './input/haptics.js';
 
 // Persistence: IndexedDB autosave (incremental PNG re-encode per layer), OpenRaster projects, image export.
@@ -45,6 +47,11 @@ export function createProject(app) {
         const doc = await decodePP(f);
         doc.name ||= f.name.replace(/\.pp$/i, '');
         app.setDoc(doc);
+      } else if (/\.ase(prite)?$/i.test(f.name)) {
+        const { doc, palette: pal } = await decodeAseprite(await f.arrayBuffer());
+        doc.name = f.name.replace(/\.ase(prite)?$/i, '');
+        app.setDoc(doc);
+        if (pal.length) { palette.load(pal); app.toast(`Opened with its ${pal.length}-colour palette`); }
       } else if (/\.ora$/i.test(f.name)) {
         const doc = await decodeORA(f);
         doc.name = f.name.replace(/\.ora$/i, '');
@@ -136,13 +143,17 @@ export function createProject(app) {
   };
 
   // ---- files to share: the finished picture (one merged PNG) and the full project (.pp) ----
+  const exportAseprite = async () => {
+    if (typeof CompressionStream === 'undefined') return app.toast('This browser can\'t write Aseprite files (try a current Chrome, Edge, Firefox or Safari)');
+    download(await encodeAseprite(app.doc, palette.colors), `${app.doc.name || 'sprite'}.aseprite`);
+  };
   const merged = async () => toBlob(flatten(app.doc), 'image/png');
   const projectFile = async () => new File([await encodePP(app.doc, await merged())], `${app.doc.name || 'painting'}.pp`, { type: 'application/x-pixelpaint' });
   const imageFile = async () => new File([await merged()], `${app.doc.name || 'painting'}.png`, { type: 'image/png' });
 
   return {
-    saveLocal, restore, openFile, importLayer, exportImage, exportSheet, importSheet, library, imageFile, projectFile,
-    open: async () => { const f = await pickFile('.pp,.ora,image/*'); if (f) openFile(f); },
+    saveLocal, restore, openFile, importLayer, exportAseprite, exportImage, exportSheet, importSheet, library, imageFile, projectFile,
+    open: async () => { const f = await pickFile('.pp,.ora,.aseprite,.ase,image/*'); if (f) openFile(f); },
     exportProject: async () => { download(await projectFile(), `${app.doc.name || 'painting'}.pp`); bus.emit('saved', { auto: false }); },
     exportOra: async () => download(await encodeORA(app.doc), `${app.doc.name || 'painting'}.ora`),
   };

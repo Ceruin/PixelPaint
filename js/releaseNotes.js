@@ -3,6 +3,10 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.22', [
+    '+ Open and export Aseprite files (.aseprite): layers, groups, frames, held frames, tags and the palette',
+    '+ Image > Trim to the Artwork and Rotate 180°',
+    '+ Frame > Reverse Frames and Frame Rate',
+    '- Changing the canvas size no longer turns a small painting into a pixel art canvas',
     '+ Pixel art is a setting of the canvas: tick it in New Canvas or switch it in Image > Pixel Art Canvas; a PIXEL badge in the status bar shows it',
     '+ Workspaces in the View menu: Painting, Pixel Art and Animation each arrange the panels for that kind of work and remember how you left them',
     '+ A Palette panel: your palette as a big grid, with import and export (.gpl) and Snap layer to palette',

@@ -268,7 +268,7 @@ stage.addEventListener('drop', e => {
   e.preventDefault();
   for (const f of e.dataTransfer.files) {
     if (/\.course$/i.test(f.name)) f.text().then(t => { const c = readCourseFile(t); c ? openBuilder(mascot, { course: c, shared: true }) : toast('That isn’t a PixelPaint course file'); });
-    else /\.(ora|pp)$/i.test(f.name) ? project.openFile(f) : f.type.startsWith('image/') && project.importLayer(f, f.name);
+    else /\.(ora|pp|aseprite|ase)$/i.test(f.name) ? project.openFile(f) : f.type.startsWith('image/') && project.importLayer(f, f.name);
   }
 });
 
