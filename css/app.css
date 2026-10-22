@@ -1266,3 +1266,18 @@ body:not([data-advanced]) .adv-only { display: none !important; }
 .vox-modal .st-key{width:26px; height:24px; padding:0;}
 .vox-modal .st-key.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
 @media (max-width: 640px) { .vox-modal :is(.vx-wrap, .st-wrap) { flex-direction: column; } .vox-modal :is(.vx-ctl, .st-side) { width: auto; } .vox-modal .st-view { height: 300px; } }
+/* ---------- document tabs ---------- */
+.stage-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.stage-col > .stage { flex: 1; min-height: 0; }
+.doc-tabs { display: flex; align-items: flex-end; gap: 2px; height: 30px; padding: 4px 6px 0; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; flex: none; }
+.doc-tabs[hidden] { display: none; }
+.doc-tab { display: flex; align-items: center; gap: 6px; height: 26px; max-width: 220px; min-width: 0; padding: 0 4px 0 10px; border: 1px solid var(--line); border-bottom: 0; border-radius: 5px 5px 0 0; background: var(--panel2); color: var(--muted); font-size: 12px; cursor: pointer; flex: none; }
+.doc-tab:hover { color: var(--text); }
+.doc-tab.on { background: var(--stage); color: var(--text); box-shadow: inset 0 2px 0 var(--accent); }
+.doc-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-tab-px { font-size: 9.5px; letter-spacing: .4px; text-transform: uppercase; color: var(--accent); }
+.doc-tab-x { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 3px; background: none; color: inherit; opacity: .6; cursor: pointer; }
+.doc-tab-x:hover { opacity: 1; background: var(--panel3); }
+.doc-tab-x .ic { width: 12px; height: 12px; }
+.doc-tab-new { align-self: center; flex: none; }
+body[data-layout=zen] .doc-tabs { display: none; }

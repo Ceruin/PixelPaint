@@ -3,6 +3,8 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.22', [
+    '+ Several drawings open at once, as tabs over the canvas: opening or making a drawing adds a tab, each keeps its own view, and the tabs come back next time',
+    '+ Leaving or closing a tab keeps that drawing in My Art; File > Close Drawing, Alt+PageUp / PageDown to switch',
     '+ Image > Pseudo-3D turns a sprite into 8 facing directions, and Image > 3D Voxel Studio lets you sculpt, rig and pose it: both bake into a new canvas',
     '+ Tilesheets in Draw: Image > Tilesheet cuts the canvas into a grid of named tiles; the Tile tool picks them and strokes stay inside the tile they start in',
     '+ The Tiles panel adds and removes rows and columns (the art moves with its tiles), joins and splits tiles, renames, clears and exports them with a JSON map',

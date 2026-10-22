@@ -17,6 +17,7 @@ import { prewarm } from './engine/compositor.js';
 // never touches the DOM outside the view canvas.
 export class App {
   constructor(canvas) {
+    this.docs = [];   // the open drawings (tabs)
     this.color = local.get('pp.color', { fg: '#1b1d23', bg: '#ffffff' });
     this.opts = {
       selMode: 'replace', tolerance: 24, contiguous: true, sampleAll: true, transformMode: 'free', uniform: true,
@@ -47,19 +48,46 @@ export class App {
     bus.on('brush', () => local.set('pp.brushes', this.brushes));
   }
 
+  // Every open drawing is a tab (this.docs). Opening or making one adds a tab next to the current one,
+  // except over the untouched canvas the app starts with, which it replaces. Each keeps its own view.
   setDoc(doc) {
     this.tool.interrupt?.();
     this.player?.stop();
     if (this.player) this.player.tag = -1;
+    const cur = this.doc, at = this.docs.indexOf(cur);
+    if (cur && cur !== doc) {
+      const v = this.view;
+      cur.viewState = { zoom: v.zoom, rot: v.rot, x: v.x, y: v.y, flip: v.flip, flipV: v.flipV };
+      bus.emit('docLeave', cur);
+    }
+    if (!this.docs.includes(doc)) {
+      const untouched = cur?.fresh && !cur.history.done.length && !cur.history.undone.length;
+      if (at >= 0 && untouched) this.docs[at] = doc; else this.docs.splice(at + 1, 0, doc);
+    }
     this.doc = doc;
     if (this.settings.historyMB) doc.history.maxBytes = this.settings.historyMB * 2 ** 20;
     this.view.setDoc(doc);
+    if (doc.viewState) { Object.assign(this.view, doc.viewState); this.view.changed(); }
     bus.emit('doc', doc);
     bus.emit('layers');
     bus.emit('selection');
     bus.emit('history', doc.history);
+    bus.emit('tabs', this.docs);
     const warm = () => prewarm(doc.w, doc.h);   // stroke scratch canvases, off the critical path
     window.requestIdleCallback ? requestIdleCallback(warm, { timeout: 2000 }) : setTimeout(warm, 500);
+  }
+
+  // Closes a tab (its work was kept in My Art when it was last left or saved); the last one left
+  // becomes a fresh blank canvas.
+  closeDoc(doc = this.doc, blank) {
+    const i = this.docs.indexOf(doc);
+    if (i < 0) return;
+    bus.emit('docLeave', doc);
+    this.docs.splice(i, 1);
+    if (doc !== this.doc) return bus.emit('tabs', this.docs);
+    const next = this.docs[Math.min(i, this.docs.length - 1)] ?? blank();
+    this.doc = null;
+    this.setDoc(next);
   }
 
   setTool(id) {

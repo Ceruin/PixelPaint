@@ -1,5 +1,5 @@
 import { bus } from './core/bus.js';
-import { idb } from './core/storage.js';
+import { idb, local } from './core/storage.js';
 import { debounce, download, pickFile, toBlob, makeCanvas } from './core/util.js';
 import { Doc } from './engine/document.js';
 import { packDoc, unpackDoc, encodeORA, decodeORA, encodePP, decodePP } from './engine/serializer.js';
@@ -37,6 +37,25 @@ export function createProject(app) {
     if (app.doc.libId || !isBlank(flat)) { await idle(); library.save(app.doc.name, true, flat); }   // once it's in My Art it stays: no need to read every pixel back each time
   }), 2500);
   bus.on('history', autosave);
+  // Tabs: a drawing you leave or close is kept in My Art (if anything was drawn), and the set of open
+  // tabs comes back next time (the active one from the autosave, the others from My Art).
+  bus.on('docLeave', d => { if (d.history.done.length && (d.libId || !isBlank(flatten(d)))) library.save(d.name, true, null, d).then(rememberTabs); });
+  const lastTabs = local.get('pp.tabs', {});   // read before the first setDoc rewrites it
+  const rememberTabs = () => local.set('pp.tabs', { ids: app.docs.map(d => d.libId ?? null), active: app.docs.indexOf(app.doc) });
+  bus.on('tabs', rememberTabs); bus.on('saved', rememberTabs);
+  bus.on('docLeave', () => whenIdle(() => saveLocal(true)));   // the autosave follows the tab you're on
+  const restoreTabs = async () => {
+    const { ids = [], active = 0 } = lastTabs, here = app.doc;
+    const docs = [];
+    for (const [i, id] of ids.entries()) {
+      if (i === active || !id || id === here.libId) { docs.push(here); continue; }
+      const pack = await idb.get(`lib:${id}`).catch(() => null), d = pack && await unpackDoc(pack).catch(() => null);
+      if (d) { d.libId = id; docs.push(d); }
+    }
+    if (!docs.includes(here)) docs.unshift(here);
+    app.docs.splice(0, app.docs.length, ...new Set(docs));
+    bus.emit('tabs', app.docs);
+  };
   bus.on('assist', autosave);
   addEventListener('visibilitychange', () => document.hidden && saveLocal(true));
 
@@ -127,16 +146,19 @@ export function createProject(app) {
   const thumbOf = (w = 240, c = flatten(app.doc)) => { const k = Math.min(1, w / c.width, w / c.height), t = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/png'); };
   const library = {
     list: async () => Object.values(await idb.get('library') ?? {}).sort((a, b) => b.date - a.date),
-    async save(name = app.doc.name, auto = false, flat = null) {
-      const index = await idb.get('library') ?? {}, id = app.doc.libId ?? `p${Date.now().toString(36)}`;
-      app.doc.libId = id; app.doc.name = name;
-      await idb.set(`lib:${id}`, await packDoc(app.doc, cache));
-      index[id] = { id, name, date: Date.now(), thumb: thumbOf(240, flat ?? undefined), w: app.doc.w, h: app.doc.h };
+    // `d`: any open drawing (a tab being left is saved after the next one is showing)
+    async save(name = app.doc.name, auto = false, flat = null, d = app.doc) {
+      const index = await idb.get('library') ?? {}, id = d.libId ?? `p${Date.now().toString(36)}`;
+      d.libId = id; d.name = name;
+      await idb.set(`lib:${id}`, await packDoc(d, cache));
+      index[id] = { id, name, date: Date.now(), thumb: thumbOf(240, flat ?? flatten(d)), w: d.w, h: d.h };
       await idb.set('library', index);
       if (!auto) saveLocal(false);
       return id;
     },
     async open(id) {
+      const open = app.docs.find(d => d.libId === id);
+      if (open) return app.setDoc(open);   // already a tab: go to it
       const pack = await idb.get(`lib:${id}`);
       if (!pack) return app.toast('That project is no longer here');
       const doc = await unpackDoc(pack); doc.libId = id;
@@ -157,7 +179,7 @@ export function createProject(app) {
   const imageFile = async () => new File([await merged()], `${app.doc.name || 'painting'}.png`, { type: 'image/png' });
 
   return {
-    saveLocal, restore, openFile, importLayer, exportAseprite, exportImage, exportSheet, importSheet, library, imageFile, projectFile,
+    saveLocal, restore, restoreTabs, openFile, importLayer, exportAseprite, exportImage, exportSheet, importSheet, library, imageFile, projectFile,
     open: async () => { const f = await pickFile('.pp,.ora,.aseprite,.ase,.pxpaint,image/*'); if (f) openFile(f); },
     exportProject: async () => { download(await projectFile(), `${app.doc.name || 'painting'}.pp`); bus.emit('saved', { auto: false }); },
     exportOra: async () => download(await encodeORA(app.doc), `${app.doc.name || 'painting'}.ora`),

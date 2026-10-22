@@ -16,6 +16,7 @@ import { palettePanel } from './ui/palettePanel.js';
 import { initWorkspaces } from './ui/workspaces.js';
 import { initTiles, tilesPanel } from './ui/tiles.js';
 import { initVoxels } from './ui/voxels.js';
+import { docTabs } from './ui/tabs.js';
 import { brushLibrary, brushSettings, loadCustomTips } from './ui/brushPanel.js';
 import { layersPanel } from './ui/layersPanel.js';
 import { historyPanel } from './ui/historyPanel.js';
@@ -281,8 +282,13 @@ stage.addEventListener('drop', e => {
 });
 
 initEink(app, mascot);
-const doc = await project.restore().catch(() => null) ?? new Doc(1920, 1080);
+// the drawing you had open (a blank one is 'fresh': opening something replaces it rather than adding a tab)
+const blank = () => Object.assign(new Doc(1920, 1080), { fresh: true });
+const doc = await project.restore().catch(() => null) ?? blank();
+if (!doc.libId) doc.fresh = true;
 app.setDoc(doc);
+app.tabs = docTabs(app, $('#docTabs'), blank);
+project.restoreTabs().catch(() => {});
 // ?mode=… (links from the Pixel editor) wins over the remembered mode.
 const asked = new URLSearchParams(location.search).get('mode');
 if (asked) history.replaceState(null, '', location.pathname);
