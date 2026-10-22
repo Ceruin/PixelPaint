@@ -1,12 +1,9 @@
 import { h, icon, iconBtn, segmented, select } from './dom.js';
-import { PALETTES, parsePalette } from '../engine/palettes.js';
-import { pickFile } from '../core/util.js';
+import { palette, allPalettes } from './paletteStore.js';
 import { bus } from '../core/bus.js';
 import { local } from '../core/storage.js';
 import { clamp, TAU } from '../core/util.js';
 import { hexToRgb, rgbToHex, hsvToRgb, rgbToHsv } from '../core/color.js';
-
-const allPalettes = () => ({ ...PALETTES, ...local.get('pp.palettes', {}) });
 
 function dragPad(el, fn) {
   el.addEventListener('pointerdown', e => {
@@ -108,35 +105,20 @@ export function colorPicker(app) {
 
   dragPad(sv, (x, y) => { ss = x; vv = 1 - y; commit(); });
   dragPad(hue, x => { hh = x * 359.9; drawSV(); commit(); });
-  // One working palette. Built-ins and imported files (.gpl / .pal / .hex) are loaded into it,
-  // replacing its colors; they are not browsed in place.
-  let mine = local.get('pp.swatches', null) ?? allPalettes()[local.get('pp.palette', 'PixelPaint')] ?? PALETTES.PixelPaint;
+  // the shared working palette (paletteStore.js): right-click a swatch to remove it
   const palSel = h('span.pal-sel');
-  const setMine = colors => { mine = colors; local.set('pp.swatches', mine); renderPalette(); };
   const palSw = c => {
     const b = sw(c);
     b.dataset.tip = `${c} - right-click to remove`;
-    b.oncontextmenu = e => { e.preventDefault(); setMine(mine.filter(m => m !== c)); };
+    b.oncontextmenu = e => { e.preventDefault(); palette.remove(c); };
     return b;
   };
   const renderPalette = () => {
-    palSel.replaceChildren(select([['', 'Load palette...'], ...Object.keys(allPalettes()).map(n => [n, n])], '', v => v && loadPalette(allPalettes()[v])));
-    swatches.replaceChildren(...mine.map(palSw));
+    palSel.replaceChildren(select([['', 'Load palette...'], ...Object.keys(allPalettes()).map(n => [n, n])], '', v => v && palette.load(allPalettes()[v])));
+    swatches.replaceChildren(...palette.colors.map(palSw));
   };
-  const savePalette = (name, colors) => local.set('pp.palettes', { ...local.get('pp.palettes', {}), [name]: colors });
-  // Loading replaces your colors: a palette you built yourself is kept as "My palette" first.
-  const loadPalette = colors => {
-    if (!Object.values(allPalettes()).some(p => p.join() === mine.join())) savePalette('My palette', mine);
-    setMine(colors);
-  };
-  const importPal = async () => {
-    const f = await pickFile('.gpl,.pal,.hex,.txt');
-    const colors = f && parsePalette(await f.text());
-    if (!colors?.length) return;
-    savePalette(f.name.replace(/\.\w+$/, ''), colors.slice(0, 256));
-    loadPalette(colors.slice(0, 256));
-  };
-  const addColor = () => setMine([...new Set([...mine, app.color.fg])]);
+  bus.on('palette', renderPalette);
+  const addColor = () => palette.add(app.color.fg);
   const eyedrop = window.EyeDropper && iconBtn('picker', 'Pick a color from anywhere on screen', async () => { try { app.setColor((await new EyeDropper().open()).sRGBHex); } catch { /* cancelled */ } });
   renderPalette();
   bus.on('color', () => { if (!self) { [hh, ss, vv] = rgbToHsv(...hexToRgb(app.color.fg)); drawSV(); } place(); });
@@ -152,6 +134,6 @@ export function colorPicker(app) {
     segmented([['square', 'Square', 'marquee'], ['wheel', 'Wheel', 'palette']], style, setStyle, true),
     pads,
     h('div.picker-row', {}, h('div.chips.inline', {}, bg, fg), icon('palette'), hex, eyedrop),
-    h('div.picker-row', {}, palSel, iconBtn('plus', 'Add current color to the palette', addColor), iconBtn('upload', 'Import palette (.gpl, .pal, .hex)', importPal)),
+    h('div.picker-row', {}, palSel, iconBtn('plus', 'Add current color to the palette', addColor), iconBtn('upload', 'Import palette (.gpl, .pal, .hex)', palette.import)),
     swatches, h('div.sub-label', {}, 'Recent'), recents);
 }

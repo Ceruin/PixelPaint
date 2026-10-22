@@ -111,5 +111,5 @@ export class App {
   undo() { this.tool.interrupt?.(); if (this.doc.history.undo()) haptics.pulse(10); }
   redo() { this.tool.interrupt?.(); if (this.doc.history.redo()) haptics.pulse(10); }
 
-  toast(msg) { bus.emit('toast', msg); }
+  toast(msg, action) { bus.emit('toast', action ? { msg, action } : msg); }
 }

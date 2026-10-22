@@ -16,11 +16,13 @@ export function statusbar(app, el, canvas) {
   const zs = h('input.st-zslider', { type: 'range', min: 0, max: 1000, 'aria-label': 'Zoom', 'data-tip': 'Zoom',
     oninput: () => app.view.set(Math.exp(zlo + (zhi - zlo) * zs.value / 1000), app.view.rot) });
   const rot = h('button.st-btn.st-rot', { type: 'button', 'data-tip': 'View rotation: click to reset', 'data-action': 'view.resetRot', onclick: () => actions.run('view.resetRot') }, icon('rotCW'), h('b', { style: { fontWeight: 400 } }));
+  // a pixel canvas says so; click to switch it back to painting (or use Image > Pixel Art Canvas)
+  const px = h('button.st-px', { type: 'button', 'data-action': 'image.pixelArt', 'data-tip': 'Pixel art canvas: click to make it a painting canvas', onclick: () => actions.run('image.pixelArt') }, 'Pixel');
   const showZoom = () => { const z = app.view.zoom; zin.value = `${(z * 100).toFixed(z < 0.1 ? 1 : 0)}%`; };
   const t = () => h('b', { style: { fontWeight: 400 } });
   const [st, pt, mt, svt, tt] = [t(), t(), t(), t(), t()];
   zoom.append(icon('fit'));
-  el.append(h('span.st-zoomer', {}, zoom, zoomStep('minus', 'Zoom out', 'view.out'), zin, zoomStep('plus', 'Zoom in', 'view.in'), zs), rot, h('span.st-size', {}, icon('image'), st), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
+  el.append(h('span.st-zoomer', {}, zoom, zoomStep('minus', 'Zoom out', 'view.out'), zin, zoomStep('plus', 'Zoom in', 'view.in'), zs), rot, h('span.st-size', {}, icon('image'), st, px), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
   svt.textContent = 'Not saved yet';
   bus.on('view', v => {
     if (document.activeElement !== zin) showZoom();
@@ -29,7 +31,7 @@ export function statusbar(app, el, canvas) {
     if (rot.lastChild.textContent !== txt) rot.lastChild.textContent = txt;
     rot.classList.toggle('turned', r !== 0);
   });
-  bus.on('doc', d => { st.textContent = `${d.w} × ${d.h}`; });
+  bus.on('doc', d => { st.textContent = `${d.w} × ${d.h}`; px.hidden = !d.pixelArt; });
   bus.on('resize', d => { st.textContent = `${d.w} × ${d.h}`; });
   bus.on('history', hist => { mt.textContent = `${(hist.bytes / 2 ** 20).toFixed(0)} MB undo`; });
   const brushInfo = () => { tt.textContent = `${app.brush.name} · ${app.brush.size}px`; };

@@ -40,10 +40,13 @@ export async function form(title, fields, ok = 'OK') {
 }
 
 let toastEl, toastTimer;
-export function toast(msg) {
+// A short message; with an action ({ label, run }) it carries a button and stays up a little longer.
+export function toast(msg, action = msg?.action) {
+  if (typeof msg === 'object') msg = msg.msg;
   toastEl ??= document.body.appendChild(h('div.toast'));
-  toastEl.textContent = msg;
+  toastEl.replaceChildren(msg, action ? h('button.btn.sm.toast-act', { type: 'button', onclick: () => { toastEl.classList.remove('show'); action.run(); } }, action.label) : '');
+  toastEl.classList.toggle('acts', !!action);
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), action ? 6000 : 2400);
 }

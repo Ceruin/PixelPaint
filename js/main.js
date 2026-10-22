@@ -12,6 +12,8 @@ import { defineActions } from './appActions.js';
 import { Panels } from './ui/panels.js';
 import { toolbar } from './ui/toolbar.js';
 import { colorPicker } from './ui/colorPanel.js';
+import { palettePanel } from './ui/palettePanel.js';
+import { initWorkspaces } from './ui/workspaces.js';
 import { brushLibrary, brushSettings, loadCustomTips } from './ui/brushPanel.js';
 import { layersPanel } from './ui/layersPanel.js';
 import { historyPanel } from './ui/historyPanel.js';
@@ -65,6 +67,7 @@ const openPanel = (id, e) => {
 
 panels.add('tools', 'Tools', 'brush', toolbar(app, e => openPanel('color', e)), { dock: 'left', order: 0 });
 panels.add('color', 'Color', 'palette', colorPicker(app), { dock: 'right', order: 0 });
+panels.add('palette', 'Palette', 'pixel', palettePanel(app), { dock: 'right', order: 5, hidden: true });
 panels.add('brushes', 'Brushes', 'grid', brushLibrary(app), { dock: 'right', order: 2 }, { grow: true });
 panels.add('brushSettings', 'Brush Settings', 'sliders', brushSettings(app), { dock: null, hidden: true, x: 130, y: 16, w: 290, h: 520 });
 panels.add('layers', 'Layers', 'layers', layersPanel(app), { dock: 'right', order: 1 }, { grow: true });
@@ -163,7 +166,8 @@ function setTheme(theme) {
 
 const timeline = initTimeline(app, $('#timeline'));
 const modeBox = document.createElement('div');
-const { menus } = defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline, mascot });
+const workspaces = initWorkspaces(app, panels, { timeline });
+const { menus } = defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline, mascot, workspaces });
 // Hand-offs between Draw and the Pixel editor: the picture opens there as a new pixel drawing, and
 // the Pixel editor's current frame comes back to Draw as a layer.
 actions.define([

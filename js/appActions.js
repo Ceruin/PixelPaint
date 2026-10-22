@@ -12,8 +12,11 @@ import { bus } from './core/bus.js';
 import { acquire, release } from './engine/compositor.js';
 import { TOOL_META } from './tools/index.js';
 import { MODES, THEMES } from './ui/modes.js';
+import { WORKSPACES } from './ui/workspaces.js';
 import { LAYOUTS, PAGES, layoutRects, addPanels } from './tools/comic.js';
 import { hexToRgb } from './core/color.js';
+import { snapToPalette } from './engine/palettes.js';
+import { palette } from './ui/paletteStore.js';
 import { tipFromImage, registerTip } from './engine/tips.js';
 import { showWelcome } from './ui/welcome.js';
 import { checkForUpdates, reloadFresh } from './ui/updates.js';
@@ -25,11 +28,11 @@ import { RELEASE_NOTES } from './releaseNotes.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ...PAGES, ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
-const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
+const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['palette', 'Palette', 'pixel'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
 const SCALES = [1, 2, 4, 8, 16, 32].map(k => [String(k), `×${k}`]);
 
-export function defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline, mascot }) {
+export function defineActions(app, { panels, project, setMode, toggleFocus, setTheme, timeline, mascot, workspaces }) {
   const doc = () => app.doc;
   const editable = fn => () => {
     const l = doc().activeLayer;
@@ -105,17 +108,31 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
   // ---- image dialogs ----
   const newDoc = async () => {
     const v = await form('New Canvas', [
-      { id: 'preset', label: 'Preset', type: 'select', options: SIZES, value: '1920x1080', oninput: (i, f) => { if (i.value !== 'custom') [f.w.value, f.h.value] = i.value.split('x'); } },
+      { id: 'preset', label: 'Preset', type: 'select', options: SIZES, value: '1920x1080', oninput: (i, f) => { if (i.value !== 'custom') { [f.w.value, f.h.value] = i.value.split('x'); f.pixel.checked = f.w.value * f.h.value <= 512 * 512; } } },
       { id: 'w', label: 'Width (px)', value: 1920, min: 1, max: 8192 },
       { id: 'h', label: 'Height (px)', value: 1080, min: 1, max: 8192 },
       { id: 'bg', label: 'Background', type: 'select', options: [['white', 'White'], ['transparent', 'Transparent'], ['color', 'Background color']], value: 'white' },
       { id: 'panels', label: 'Comic panels', type: 'select', options: LAYOUTS, value: 'none' },
+      { id: 'pixel', label: 'Pixel art (hard pixels, Pixel Pencil, crisp zoom)', type: 'checkbox', value: false },
     ], 'Create');
     if (!v) return;
     const d = new Doc(dim(v.w), dim(v.h), { bg: { white: '#ffffff', transparent: null, color: app.color.bg }[v.bg] });
+    d.pixelArt = v.pixel;
     if (v.panels !== 'none') { d.addLayer('Art', false); addPanels(d, layoutRects(d, v.panels)); }
     app.setDoc(d);
     if (d.pixelArt) app.setTool('pencil');   // a pixel canvas starts with the Pixel Pencil
+  };
+
+  // Pixel art is the canvas's own setting: crisp zoom, hard-edged fills, the Pixel Pencil and pixel shapes.
+  const setPixelArt = on => {
+    const d = doc();
+    d.pixelArt = on;
+    if (on && ['brush', 'shape'].includes(app.tool.id)) app.setTool(app.tool.id === 'shape' ? 'pxshape' : 'pencil');
+    else if (!on && ['pencil', 'pxshape'].includes(app.tool.id)) app.setTool(app.tool.id === 'pxshape' ? 'shape' : 'brush');
+    app.view.redraw();
+    bus.emit('doc', d);
+    project.saveLocal(true);
+    app.toast(on ? 'Pixel art canvas: hard pixels and the Pixel Pencil' : 'Painting canvas: soft brushes and smooth zoom');
   };
 
   const imageSize = async () => {
@@ -224,7 +241,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       h('button.btn', { type: 'button', onclick: () => { saveLayout(); render(); } }, 'Save current…'),
       h('button.btn', { type: 'button', onclick: exportLayout }, 'Export'),
       h('button.btn', { type: 'button', onclick: importLayout }, 'Import'),
-      h('button.btn', { type: 'button', onclick: () => panels.reset() }, 'Reset')), list], [['Done', 'ok', true]]);
+      h('button.btn', { type: 'button', onclick: () => workspaces.reset() }, 'Reset')), list], [['Done', 'ok', true]]);
   };
   const exportLayout = () => download(new Blob([JSON.stringify({ type: 'pixelpaint-layout', layout: panels.layout(), keys: actions.keymap() }, null, 1)]), 'pixelpaint-layout.json');
   const importLayout = async () => {
@@ -365,6 +382,12 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'edit.shortcuts', label: 'Keyboard Shortcuts…', key: 'Ctrl+/', run: shortcuts },
     { id: 'edit.settings', label: 'Settings…', key: 'Ctrl+,', run: settings },
 
+    { id: 'layer.snapPalette', label: 'Snap Layer to Palette', icon: 'palette', run: () => {
+      const d = doc(), l = d.activeLayer;
+      if (!l || l.locked || l.type !== 'layer') return app.toast('Select an unlocked layer');
+      d.editPixels('Snap to Palette', l, d.bounds, ctx => { const img = ctx.getImageData(0, 0, d.w, d.h); ctx.putImageData(snapToPalette(img, palette.colors), 0, 0); });
+    } },
+    { id: 'image.pixelArt', label: 'Pixel Art Canvas', icon: 'pixel', checked: () => doc().pixelArt, run: () => setPixelArt(!doc().pixelArt) },
     { id: 'image.size', label: 'Image Size…', key: 'Ctrl+Alt+I', run: imageSize },
     { id: 'image.canvas', label: 'Canvas Size…', key: 'Ctrl+Alt+C', run: canvasSize },
     { id: 'image.flipH', label: 'Flip Horizontal', run: reorient('Flip Horizontal', false, (c, d) => { c.translate(d.w, 0); c.scale(-1, 1); }) },
@@ -464,7 +487,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'layout.manage', label: 'Manage Layouts…', run: manageLayouts },
     { id: 'layout.export', label: 'Export Layout…', run: exportLayout },
     { id: 'layout.import', label: 'Import Layout…', run: importLayout },
-    { id: 'layout.reset', label: 'Reset Layout', run: () => panels.reset() },
+    { id: 'layout.reset', label: 'Reset Layout', run: () => workspaces.reset() },
+    ...WORKSPACES.map(([id, label, ic]) => ({ id: `workspace.${id}`, label: `${label} Workspace`, icon: ic, checked: () => workspaces.current === id, run: () => workspaces.use(id) })),
     { id: 'layout.lock', label: 'Lock Panels', icon: 'lock', checked: () => !!panels.locked, run: () => panels.setLocked(!panels.locked) },
   ]);
 
@@ -485,12 +509,12 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     menus: [
       ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
-      ['Image', 'image', ['image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', '-', 'image.panels']],
-      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
+      ['Image', 'image', ['image.pixelArt', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', '-', 'image.panels']],
+      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', '-', 'anim.onion', 'anim.tag', '-', 'camera.view', 'camera.key', 'camera.depths', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],
-      ['View', 'eye', ['view.advanced', '-', 'view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.flipV', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
+      ['View', 'eye', ['view.advanced', '-', ...WORKSPACES.map(w => `workspace.${w[0]}`), '-', 'view.in', 'view.out', 'view.fit', 'view.actual', '-', 'view.rotL', 'view.rotR', 'view.resetRot', 'view.flip', 'view.flipV', 'view.wrap', '-', 'view.grid', 'view.pixelGrid', 'view.gridSize', '-', 'view.assist', 'assist.clear', '-', 'view.focus', 'view.fullscreen', '-', ...THEMES.map(t => `theme.${t[0]}`), 'view.einkSim', '-', ...MODES.map(m => `mode.${m[0]}`)]],
       ['Window', 'window', [...PANELS.map(p => `panel.${p[0]}`), '-', 'layout.lock', 'layout.save', 'layout.manage', 'layout.export', 'layout.import', 'layout.reset']],
       ['Help', 'info', ['help.guide', 'help.tour', 'edit.shortcuts', '-', 'help.notes', 'help.feedback', '-', 'help.update', 'help.reload', '-', 'help.about']],
     ],

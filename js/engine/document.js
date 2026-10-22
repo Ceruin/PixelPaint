@@ -70,8 +70,11 @@ export class Doc {
   }
 
   get bounds() { return { x: 0, y: 0, w: this.w, h: this.h }; }
-  // A small canvas is a pixel canvas: shown crisp at every zoom and fitted at whole-number zooms.
-  get pixelArt() { return this.w * this.h <= 512 * 512; }
+  // A pixel canvas: shown crisp at every zoom, fitted at whole-number zooms, filled with hard edges and
+  // drawn with the Pixel Pencil. You choose it (New Canvas, Image > Pixel Art Canvas); a canvas that
+  // never said (older files) is one when it's small.
+  get pixelArt() { return this.pixel ?? this.w * this.h <= 512 * 512; }
+  set pixelArt(on) { this.pixel = !!on; }
   *nodes(g = this.root) { for (const n of g.children) { yield n; if (n.type === 'group') yield* this.nodes(n); } }
   get layers() { return [...this.nodes()].filter(n => n.type === 'layer'); }
   get activeLayer() { return this.active?.type === 'layer' ? this.active : null; }

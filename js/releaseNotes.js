@@ -2,6 +2,12 @@
 // Add to this on every version bump (see CLAUDE.md). One short line per change, in words a user
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
+  ['2026.10.22', [
+    '+ Pixel art is a setting of the canvas: tick it in New Canvas or switch it in Image > Pixel Art Canvas; a PIXEL badge in the status bar shows it',
+    '+ Workspaces in the View menu: Painting, Pixel Art and Animation each arrange the panels for that kind of work and remember how you left them',
+    '+ A Palette panel: your palette as a big grid, with import and export (.gpl) and Snap layer to palette',
+    '- Every colour picker now shares one palette',
+  ]],
   ['2026.10.21', [
     '+ Brushes show as a grid of stroke tiles, with the categories as a strip above (switch back to the list beside the search box)',
     '+ Mirror the view sideways or upside down from the buttons at the right of the top bar',

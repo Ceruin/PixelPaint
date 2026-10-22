@@ -23,3 +23,33 @@ export function parsePalette(text) {
   }
   return [...new Set(out)];
 }
+
+// Maps every visible pixel of an ImageData to the nearest palette colour, in place. Distance is
+// measured in OKLab, where equal steps look equally different (plain RGB distance sends a near-black
+// blue to dark green). Alpha is kept; each distinct colour is looked up once.
+const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+export function oklab(r, g, b) {
+  const R = lin(r), G = lin(g), B = lin(b);
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B);
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B);
+  const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+}
+export function snapToPalette(img, colors) {
+  const pal = colors.map(c => { const rgb = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)); return { rgb, lab: oklab(...rgb) }; });
+  if (!pal.length) return img;
+  const d = img.data, memo = new Map();
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+    let best = memo.get(key);
+    if (!best) {
+      const [L, A, B] = oklab(d[i], d[i + 1], d[i + 2]);
+      let bd = Infinity;
+      for (const p of pal) { const dist = (L - p.lab[0]) ** 2 + (A - p.lab[1]) ** 2 + (B - p.lab[2]) ** 2; if (dist < bd) { bd = dist; best = p.rgb; } }
+      memo.set(key, best);
+    }
+    d[i] = best[0]; d[i + 1] = best[1]; d[i + 2] = best[2];
+  }
+  return img;
+}
