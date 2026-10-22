@@ -41,3 +41,27 @@ export function cellAt(s, x, y) {
 }
 export const sheetSize = s => ({ w: 2 * s.pad + s.cols.reduce((a, b) => a + b, 0) + s.gap * (s.cols.length - 1), h: 2 * s.pad + s.rows.reduce((a, b) => a + b, 0) + s.gap * (s.rows.length - 1) });
 export const tileName = (s, r, c) => s?.tiles?.[r]?.[c]?.name || `Tile ${r + 1}·${c + 1}`;
+export const cloneSheet = s => s && { tw: s.tw, th: s.th, gap: s.gap, pad: s.pad, cols: [...s.cols], rows: [...s.rows],
+  tiles: s.tiles.map(r => r.map(t => ({ name: t.name || '' }))), spans: (s.spans ?? []).map(p => ({ ...p })) };
+// After a plain resize (canvas size, trim, rotate), keep the rows and columns that still fit whole.
+export function fitSheet(s, w, h) {
+  if (!s) return null;
+  const n = cloneSheet(s);
+  while (n.cols.length && sheetSize(n).w > w) { n.cols.pop(); n.tiles.forEach(r => r.pop()); }
+  while (n.rows.length && sheetSize(n).h > h) { n.rows.pop(); n.tiles.pop(); }
+  if (!n.cols.length || !n.rows.length) return null;
+  n.spans = n.spans.filter(p => p.r + p.rs <= n.rows.length && p.c + p.cs <= n.cols.length);
+  return n;
+}
+// every tile as one block: a joined tile counts once, at its top-left cell
+export function tileBlocks(s) {
+  const out = [];
+  if (!s) return out;
+  s.rows.forEach((_, r) => s.cols.forEach((_, c) => {
+    const p = spanAt(s, r, c);
+    if (p && (p.r !== r || p.c !== c)) return;
+    const r1 = p ? p.r + p.rs - 1 : r, c1 = p ? p.c + p.cs - 1 : c;
+    out.push({ r, c, r1, c1, rect: blockRect(s, r, c, r1, c1), name: tileName(s, r, c) });
+  }));
+  return out;
+}

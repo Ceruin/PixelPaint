@@ -6,6 +6,7 @@ export const ICONS = {
   smudge: '<path d="M12 3s-4.5 5-4.5 8a4.5 4.5 0 0 0 9 0c0-3-4.5-8-4.5-8z"/><path d="M3 20c2.5-2 4.5 1 7 0s4.5-2 7 0 3 1 4 0"/>',
   fill: '<path d="M19 11 11 3 3.5 10.5a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0z"/><path d="M5 10h14"/><path d="M20 15s2 2.3 2 3.5a2 2 0 0 1-4 0c0-1.2 2-3.5 2-3.5z"/>',
   picker: '<path d="m2 22 1.5-.5L14 11"/><path d="M19 3a2.1 2.1 0 0 1 3 3l-3 3 1 1-2 2-6-6 2-2 1 1z"/><path d="m11.5 8.5-8 8V21H8l8-8"/>',
+  tile: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/><rect x="9" y="9" width="6" height="6" fill="currentColor"/>',
   marquee: '<path d="M4 7V4h3M10 4h4M17 4h3v3M20 10v4M20 17v3h-3M14 20h-4M7 20H4v-3M4 14v-4"/>',
   ellipse: '<ellipse cx="12" cy="12" rx="9" ry="7" stroke-dasharray="3 2.6"/>',
   lasso: '<path d="M8 16.5C5 15.3 3 13.3 3 10.8 3 6.5 7 3.5 12 3.5s9 3 9 7-4 6.8-8.5 6.8"/><path d="M10.5 15.2a2 2 0 1 0-2.3 3.1"/><path d="M8.2 18.3c-.3 1.5-1.4 2.6-3.2 3.2"/>',

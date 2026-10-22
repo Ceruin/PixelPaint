@@ -2,6 +2,7 @@ import { bus } from '../core/bus.js';
 import { DEG } from '../core/util.js';
 
 const HALF_PI = Math.PI / 2;
+const STROKES = new Set(['brush', 'pencil', 'eraser', 'smudge', 'fill', 'pxshape', 'shape']);
 
 // Pen altitude/azimuth (radians) from the Pointer Events API, with a tiltX/Y fallback.
 function tilt(e) {
@@ -65,6 +66,8 @@ export class CanvasInput {
     if (e.button !== 0 && !(pencil && e.button === 2)) return;
     const cam = app.cameraDrag?.(e);   // looking through a camera: dragging moves the camera, not paint
     if (cam) { this.cam = { id: e.pointerId, ...cam }; return; }
+    // a tilesheet keeps strokes inside one tile: the one the stroke starts in (none, in a gutter)
+    if (STROKES.has(app.tool.id) && app.tiles?.beforeStroke(this.point(e)) === false) return;
     if (app.tool.down(this.point(e), e) !== false) { Object.assign(this, { active: e.pointerId, activeTouch: touch, activeAt: e.timeStamp }); app.view.fast = true; }
   }
 

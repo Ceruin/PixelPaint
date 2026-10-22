@@ -29,7 +29,7 @@ import { RELEASE_NOTES } from './releaseNotes.js';
 
 const SIZES = [['1920x1080', 'HD — 1920 × 1080'], ...PAGES, ['32x32', 'Pixel art — 32 × 32'], ['64x64', 'Pixel art — 64 × 64'], ['128x128', 'Pixel art — 128 × 128'], ['320x180', 'Pixel scene — 320 × 180'], ['3840x2160', '4K — 3840 × 2160'], ['2048x2048', 'Square — 2048'], ['2480x3508', 'A4 @ 300 dpi'], ['1080x1920', 'Phone — 1080 × 1920'], ['custom', 'Custom']];
 const ANCHORS = [['0.5,0.5', 'Center'], ['0,0', 'Top left'], ['0.5,0', 'Top'], ['1,0', 'Top right'], ['0,0.5', 'Left'], ['1,0.5', 'Right'], ['0,1', 'Bottom left'], ['0.5,1', 'Bottom'], ['1,1', 'Bottom right']];
-const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['palette', 'Palette', 'pixel'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
+const PANELS = [['tools', 'Tools', 'brush'], ['color', 'Color', 'palette'], ['palette', 'Palette', 'pixel'], ['tiles', 'Tiles', 'tile'], ['brushes', 'Brushes', 'grid'], ['brushSettings', 'Brush Settings', 'sliders'], ['layers', 'Layers', 'layers'], ['navigator', 'Navigator', 'navigator'], ['reference', 'Reference', 'image'], ['history', 'History', 'history']];
 const dim = v => clamp(Math.round(v) || 1, 1, 8192);
 const SCALES = [1, 2, 4, 8, 16, 32].map(k => [String(k), `×${k}`]);
 
@@ -408,6 +408,11 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       if (!l || l.locked || l.type !== 'layer') return app.toast('Select an unlocked layer');
       d.editPixels('Snap to Palette', l, d.bounds, ctx => { const img = ctx.getImageData(0, 0, d.w, d.h); ctx.putImageData(snapToPalette(img, palette.colors), 0, 0); });
     } },
+    { id: 'image.tiles', label: 'Tilesheet…', icon: 'tile', run: () => app.tiles.setup() },
+    { id: 'image.tilesExport', label: 'Export Tiles…', icon: 'download', run: () => app.tiles.export() },
+    { id: 'tiles.rename', label: 'Rename Tile…', icon: 'text', run: () => app.tiles.rename() },
+    { id: 'tiles.join', label: 'Join Tiles', icon: 'merge', run: () => app.tiles.join() },
+    { id: 'tiles.split', label: 'Split Tile', icon: 'copy', run: () => app.tiles.split() },
     { id: 'image.pixelArt', label: 'Pixel Art Canvas', icon: 'pixel', checked: () => doc().pixelArt, run: () => setPixelArt(!doc().pixelArt) },
     { id: 'image.size', label: 'Image Size…', key: 'Ctrl+Alt+I', run: imageSize },
     { id: 'image.canvas', label: 'Canvas Size…', key: 'Ctrl+Alt+C', run: canvasSize },
@@ -534,7 +539,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     menus: [
       ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
-      ['Image', 'image', ['image.pixelArt', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.panels']],
+      ['Image', 'image', ['image.pixelArt', 'image.tiles', 'image.tilesExport', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', 'anim.reverse', 'anim.fps', '-', 'anim.onion', 'anim.tag', '-', 'camera.view', 'camera.key', 'camera.depths', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],

@@ -93,6 +93,11 @@ export function optionsBar(app, el, openBrushes) {
       toggle('Show', o.showAssist, v => app.setOpt('showAssist', v)),
       btn('Clear all', 'assist.clear'),
       h('span.muted', {}, 'Drag to add · drag handles to move · Alt-click to delete'));
+    if (t === 'tile') parts.push(...(app.doc?.sheet ? [
+      toggle('Keep strokes inside one tile', o.tileClip !== false, v => app.tiles.setClip(v)),
+      btn('Rename…', 'tiles.rename'), btn('Join', 'tiles.join'), btn('Split', 'tiles.split'), btn('Settings…', 'image.tiles'),
+      h('span.muted', {}, 'Click a tile to work in it · Shift-click or drag for a block'),
+    ] : [btn('Make a tilesheet…', 'image.tiles'), h('span.muted', {}, 'Cut the canvas into a grid of named tiles')]));
     if (SELECT.includes(t)) parts.push(
       segmented([['replace', 'New', 'select'], ['add', 'Add', 'plus'], ['sub', 'Subtract', 'minus']], o.selMode, v => app.setOpt('selMode', v), true),
       btn('Select all', 'sel.all'), btn('Deselect', 'sel.none'), btn('Invert', 'sel.invert'), btn('Feather…', 'sel.feather'));

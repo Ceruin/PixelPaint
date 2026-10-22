@@ -15,6 +15,7 @@ const PRESETS = {
     color: { dock: 'right', order: 1, collapsed: true },
     layers: { dock: 'right', order: 2 },
     navigator: { dock: 'right', order: 3, hidden: false },
+    tiles: { dock: 'right', order: 4, hidden: false, collapsed: true },
     brushes: { hidden: true },
   } },
   // layers and a preview first; the brushes fold away until wanted

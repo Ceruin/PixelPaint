@@ -5,6 +5,7 @@ import { StateCommand, Compound } from './commands.js';
 import { Selection } from './selection.js';
 import { flatten } from './compositor.js';
 import { FILTERS } from './filters.js';
+import { cloneSheet, fitSheet, sheetSize, tileRect } from './tiles.js';
 
 let uid = 1;
 class Node {
@@ -166,11 +167,13 @@ export class Doc {
   }
 
   // Replaces every cel of every layer (resize, crop, flip, rotate) as one undoable step.
-  remap(label, w, h, draw) {
+  // `sheet` (optional): the tile grid that goes with the new size, undone together with it.
+  remap(label, w, h, draw, sheet = this.sheet) {
     this.pixel ??= this.pixelArt;   // a canvas keeps its kind when it changes size (the size guess is only for files that never said)
-    const state = () => ({ w: this.w, h: this.h, cels: this.layers.map(l => [l, [...l.cels]]) });
+    const state = () => ({ w: this.w, h: this.h, sheet: cloneSheet(this.sheet), cels: this.layers.map(l => [l, [...l.cels]]) });
     const apply = s => {
-      this.w = s.w; this.h = s.h;
+      this.w = s.w; this.h = s.h; this.sheet = cloneSheet(s.sheet);
+      bus.emit('sheet', this);
       s.cels.forEach(([l, c]) => { l.cels = [...c]; l.version++; });
       this.selection.reset();
       bus.emit('resize', this);
@@ -178,9 +181,41 @@ export class Doc {
     };
     const before = state();
     let n = 0;
-    const after = { w, h, cels: before.cels.map(([l, cels]) => [l, cels.map(c => { if (!c) return c; n++; const k = makeCanvas(w, h); draw(k.getContext('2d'), c); return k; })]) };
+    const after = { w, h, sheet: cloneSheet(sheet === this.sheet ? fitSheet(this.sheet, w, h) : sheet), cels: before.cels.map(([l, cels]) => [l, cels.map(c => { if (!c) return c; n++; const k = makeCanvas(w, h); draw(k.getContext('2d'), c); return k; })]) };
     apply(after);
     this.history.push(new StateCommand(label, apply, before, after, w * h * 4 * n));
+  }
+
+  // ---- tilesheets (engine/tiles.js): the grid and its names / joins, undoable ----
+  // Grid-only changes (names, joins, turning it on over the drawing as it is).
+  setSheet(label, next) {
+    const apply = s => { this.sheet = cloneSheet(s); bus.emit('sheet', this); };
+    const before = cloneSheet(this.sheet);
+    apply(next);
+    this.history.push(new StateCommand(label, apply, before, cloneSheet(next)));
+  }
+  // Structural changes: `next` is the grid you want, mapRow / mapCol say where each current row and
+  // column went (-1: removed; null: nothing moved). Every tile's pixels move to their new place, in
+  // every frame; joined tiles follow their cells.
+  reshapeSheet(label, next, mapRow, mapCol) {
+    const old = this.sheet, at = (m, i) => (m ? m[i] ?? -1 : i), size = sheetSize(next), moves = [];
+    if (old) for (let r = 0; r < old.rows.length; r++) for (let c = 0; c < old.cols.length; c++) {
+      const nr = at(mapRow, r), nc = at(mapCol, c), from = tileRect(old, r, c), to = nr >= 0 && nc >= 0 && tileRect(next, nr, nc);
+      if (from && to) moves.push([from, to]);
+    }
+    next.spans = (next.spans ?? []).map(p => {
+      const rs = [], cs = [];
+      for (let i = p.r; i < p.r + p.rs; i++) { const v = at(mapRow, i); if (v >= 0) rs.push(v); }
+      for (let i = p.c; i < p.c + p.cs; i++) { const v = at(mapCol, i); if (v >= 0) cs.push(v); }
+      if (!rs.length || !cs.length) return null;
+      const r0 = Math.min(...rs), c0 = Math.min(...cs);
+      return { r: r0, c: c0, rs: Math.max(...rs) - r0 + 1, cs: Math.max(...cs) - c0 + 1 };
+    }).filter(p => p && p.rs * p.cs > 1);
+    this.remap(label, size.w, size.h, (ctx, c) => {
+      ctx.imageSmoothingEnabled = false;
+      if (!old) return ctx.drawImage(c, 0, 0);
+      for (const [f, t] of moves) { const w = Math.min(f.w, t.w), h = Math.min(f.h, t.h); if (w > 0 && h > 0) ctx.drawImage(c, f.x, f.y, w, h, t.x, t.y, w, h); }   // a shrunk tile keeps its top left
+    }, next);
   }
 
   // ---- animation: frames, durations, tags (all undoable) ----

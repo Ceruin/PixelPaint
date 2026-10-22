@@ -14,6 +14,7 @@ import { toolbar } from './ui/toolbar.js';
 import { colorPicker } from './ui/colorPanel.js';
 import { palettePanel } from './ui/palettePanel.js';
 import { initWorkspaces } from './ui/workspaces.js';
+import { initTiles, tilesPanel } from './ui/tiles.js';
 import { brushLibrary, brushSettings, loadCustomTips } from './ui/brushPanel.js';
 import { layersPanel } from './ui/layersPanel.js';
 import { historyPanel } from './ui/historyPanel.js';
@@ -68,6 +69,11 @@ const openPanel = (id, e) => {
 panels.add('tools', 'Tools', 'brush', toolbar(app, e => openPanel('color', e)), { dock: 'left', order: 0 });
 panels.add('color', 'Color', 'palette', colorPicker(app), { dock: 'right', order: 0 });
 panels.add('palette', 'Palette', 'pixel', palettePanel(app), { dock: 'right', order: 5, hidden: true });
+app.tiles = initTiles(app);
+panels.add('tiles', 'Tiles', 'tile', tilesPanel(app, app.tiles), { dock: 'right', order: 6, hidden: true });
+// a tilesheet shows its panel when it opens or is made
+const showTiles = d => d?.sheet && !panels.isOpen('tiles') && panels.patch('tiles', { hidden: false, collapsed: false });
+bus.on('doc', showTiles); bus.on('sheet', showTiles);
 panels.add('brushes', 'Brushes', 'grid', brushLibrary(app), { dock: 'right', order: 2 }, { grow: true });
 panels.add('brushSettings', 'Brush Settings', 'sliders', brushSettings(app), { dock: null, hidden: true, x: 130, y: 16, w: 290, h: 520 });
 panels.add('layers', 'Layers', 'layers', layersPanel(app), { dock: 'right', order: 1 }, { grow: true });
