@@ -14,6 +14,7 @@ import { TOOL_META } from './tools/index.js';
 import { MODES, THEMES } from './ui/modes.js';
 import { WORKSPACES } from './ui/workspaces.js';
 import { packFiles } from './ui/packDialog.js';
+import { pseudo3D, voxelStudio } from './ui/voxels.js';
 import { LAYOUTS, PAGES, layoutRects, addPanels } from './tools/comic.js';
 import { hexToRgb } from './core/color.js';
 import { snapToPalette } from './engine/palettes.js';
@@ -413,6 +414,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'tiles.rename', label: 'Rename Tile…', icon: 'text', run: () => app.tiles.rename() },
     { id: 'tiles.join', label: 'Join Tiles', icon: 'merge', run: () => app.tiles.join() },
     { id: 'tiles.split', label: 'Split Tile', icon: 'copy', run: () => app.tiles.split() },
+    { id: 'image.pseudo3d', label: 'Pseudo-3D (8 directions)…', icon: 'rotCW', run: pseudo3D },
+    { id: 'image.voxels', label: '3D Voxel Studio…', icon: 'shape', run: voxelStudio },
     { id: 'image.pixelArt', label: 'Pixel Art Canvas', icon: 'pixel', checked: () => doc().pixelArt, run: () => setPixelArt(!doc().pixelArt) },
     { id: 'image.size', label: 'Image Size…', key: 'Ctrl+Alt+I', run: imageSize },
     { id: 'image.canvas', label: 'Canvas Size…', key: 'Ctrl+Alt+C', run: canvasSize },
@@ -539,7 +542,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     menus: [
       ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse', '-', 'file.toPixel', 'mode.pixel']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
-      ['Image', 'image', ['image.pixelArt', 'image.tiles', 'image.tilesExport', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.panels']],
+      ['Image', 'image', ['image.pixelArt', 'image.tiles', 'image.tilesExport', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.pseudo3d', 'image.voxels', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', 'anim.reverse', 'anim.fps', '-', 'anim.onion', 'anim.tag', '-', 'camera.view', 'camera.key', 'camera.depths', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],

@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.22', [
+    '+ Image > Pseudo-3D turns a sprite into 8 facing directions, and Image > 3D Voxel Studio lets you sculpt, rig and pose it: both bake into a new canvas',
     '+ Tilesheets in Draw: Image > Tilesheet cuts the canvas into a grid of named tiles; the Tile tool picks them and strokes stay inside the tile they start in',
     '+ The Tiles panel adds and removes rows and columns (the art moves with its tiles), joins and splits tiles, renames, clears and exports them with a JSON map',
     '+ File > Pack Files into a Sheet: arrange many images or projects into one sprite sheet with a live preview, then download it with a JSON map or open it as a canvas',

@@ -1220,3 +1220,49 @@ body:not([data-advanced]) .adv-only { display: none !important; }
 .tiles-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .tiles-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .tiles-pad .btn { justify-content: center; }
+/* ---------- pseudo-3D and the voxel studio (ui/voxels.js; styles moved from Sprite Studio) ---------- */
+.vox-modal { width: min(820px, calc(100vw - 24px)); max-width: none; }
+.vox-modal .vox-msg:empty { display: none; }
+.vox-modal button:not(.btn) { padding: 5px 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel2); color: var(--text); font: inherit; cursor: pointer; }
+.vox-modal button.primary:not(.btn) { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+.vox-modal select, .vox-modal input[type=text], .vox-modal input[type=number] { min-width: 0; }
+.vox-modal .chk { display: flex; align-items: center; gap: 6px; color: var(--muted); cursor: pointer; user-select: none; }
+.vox-modal .shi-hint{color:var(--muted); font-size:11px; line-height:1.45;}
+.vox-modal .vx-wrap{display:flex; gap:12px;}
+.vox-modal .vx-prev{position:relative; flex:1; min-width:0; height:230px; display:flex; align-items:center; justify-content:center;
+  border:1px solid var(--line); border-radius:8px; overflow:hidden; touch-action:none; cursor:grab;
+  background:repeating-conic-gradient(var(--panel3) 0% 25%, var(--panel2) 0% 50%) 0 0 / 18px 18px;}
+.vox-modal .vx-prev:active{cursor:grabbing;}
+.vox-modal .vx-prev canvas{image-rendering:pixelated;}
+.vox-modal .vx-drag{position:absolute; bottom:5px; right:7px; font-size:10px; color:var(--muted); pointer-events:none;}
+.vox-modal .vx-ctl{width:236px; flex:none; display:flex; flex-direction:column; gap:8px;}
+.vox-modal .vx-ctl .row{display:flex; align-items:center; gap:8px;}
+.vox-modal .vx-ctl .row > label:first-child{width:56px; flex:none; color:var(--muted); font-size:11px;}
+.vox-modal .vx-dirs{display:grid; grid-template-columns:repeat(8,1fr); gap:3px; margin-top:2px;}
+.vox-modal .vx-dir{width:100%; height:auto; image-rendering:pixelated; background:#0003; border:1px solid var(--line); border-radius:3px; cursor:pointer;}
+.vox-modal .vx-dir:hover{border-color:#56607a;}
+.vox-modal .vx-dir.on{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
+.vox-modal .st-wrap{display:flex; gap:12px;}
+.vox-modal .st-view{position:relative; flex:1; min-width:0; height:420px; display:flex; align-items:center; justify-content:center;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; touch-action:none;}
+.vox-modal .st-view canvas{image-rendering:pixelated; cursor:crosshair;}
+.vox-modal .st-hint{position:absolute; bottom:5px; right:7px; font-size:10px; color:var(--muted); pointer-events:none;}
+.vox-modal .st-side{width:210px; flex:none; display:flex; flex-direction:column; gap:10px;}
+.vox-modal .st-side .row{display:flex; align-items:center; gap:8px;}
+.vox-modal .st-side .row > label:first-child{width:56px; flex:none; color:var(--muted); font-size:11px;}
+.vox-modal .st-tools{display:flex; gap:4px;}
+.vox-modal .st-tool{flex:1; padding:6px 0;}
+.vox-modal .st-tool.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
+.vox-modal .st-swatch{width:20px; height:20px; border-radius:3px; border:1px solid var(--line); display:inline-block;}
+.vox-modal .st-tabs{display:flex; gap:4px; margin-bottom:8px;}
+.vox-modal .st-mode{flex:1; padding:6px 0;}
+.vox-modal .st-mode.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
+.vox-modal .st-side .row{margin-top:6px;}
+.vox-modal .st-bones{display:flex; flex-direction:column; gap:3px; max-height:150px; overflow:auto;}
+.vox-modal .st-bone{display:flex; align-items:center; gap:6px; padding:4px 6px; border:1px solid var(--line); border-radius:var(--r); cursor:pointer; font-size:12px;}
+.vox-modal .st-bone.on{border-color:var(--accent); background:var(--panel);}
+.vox-modal .st-bdot{width:11px; height:11px; border-radius:2px; border:1px solid var(--line); flex:none;}
+.vox-modal .st-keys{display:flex; flex-wrap:wrap; gap:3px;}
+.vox-modal .st-key{width:26px; height:24px; padding:0;}
+.vox-modal .st-key.on{background:var(--accent2); border-color:var(--accent2); color:#fff;}
+@media (max-width: 640px) { .vox-modal :is(.vx-wrap, .st-wrap) { flex-direction: column; } .vox-modal :is(.vx-ctl, .st-side) { width: auto; } .vox-modal .st-view { height: 300px; } }
