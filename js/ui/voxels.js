@@ -37,6 +37,8 @@ function openModal(o) {
     root.querySelector('.vox-msg').textContent = o.message || '';
     root.querySelector('#modalBody').innerHTML = o.bodyHTML || '';
     root.querySelector('[data-v="1"]').textContent = o.okText || 'OK';
+    const cancel = root.querySelector('[data-v="0"]');
+    if (o.cancel === false) cancel.remove(); else cancel.textContent = o.cancelText || 'Cancel';   // the studio has only Done
     root.querySelectorAll('.modal-foot button').forEach(b => { b.onclick = () => done(b.dataset.v === '1'); });
     root.addEventListener('keydown', e => { if (e.key === 'Escape') done(false); });
     document.body.append(root);

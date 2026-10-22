@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.22', [
+    '- The 3D Voxel Studio shows just a Done button again',
     '- Sprite Studio is now part of Draw: its tools live in the Pixel Art workspace, and its recent files and palettes moved into My Art and your palette list',
     '- Pixel art thumbnails in My Art stay crisp',
     '+ Several drawings open at once, as tabs over the canvas: opening or making a drawing adds a tab, each keeps its own view, and the tabs come back next time',
