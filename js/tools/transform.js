@@ -1,4 +1,5 @@
 import { makeCanvas, alphaBounds, Rect, drawRect, DEG } from '../core/util.js';
+import { ROTATE_CURSOR } from '../ui/cursors.js';
 import { acquire, release } from '../engine/compositor.js';
 import { Compound } from '../engine/commands.js';
 import { bus } from '../core/bus.js';
@@ -116,9 +117,11 @@ export class TransformTool {
     if (k >= 0) return { kind: 'scale', fx: HANDLES[k][0], fy: HANDLES[k][1] };
     const L = M.inverse().transformPoint({ x: p.x, y: p.y });
     if (L.x >= 0 && L.y >= 0 && L.x <= w && L.y <= h) return { kind: 'move' };
-    // just outside the box rotates; a click well away from it is done with the transform
-    const scale = this.app.view.zoom * Math.max(Math.abs(s.m.sx), Math.abs(s.m.sy)), m = 48 / scale;
-    return L.x >= -m && L.y >= -m && L.x <= w + m && L.y <= h + m ? { kind: 'rotate' } : { kind: 'away' };
+    // a ring just outside the box (24 screen px, measured straight out, so corners don't reach further)
+    // rotates; a press beyond it is done with the transform
+    const sx = this.app.view.zoom * Math.abs(s.m.sx), sy = this.app.view.zoom * Math.abs(s.m.sy);
+    const out = Math.hypot(Math.max(-L.x, 0, L.x - w) * sx, Math.max(-L.y, 0, L.y - h) * sy);
+    return { kind: out <= 24 ? 'rotate' : 'away' };
   }
 
   down(p) {
@@ -159,7 +162,7 @@ export class TransformTool {
   hover(p) {
     if (!p || !this.s || this.drag) return;   // null: the pointer left the canvas
     const h = this.hit(p), el = this.app.view.el;
-    el.style.cursor = h.kind === 'scale' ? (h.fx === 0.5 ? 'ns-resize' : h.fy === 0.5 ? 'ew-resize' : (h.fx === h.fy ? 'nwse-resize' : 'nesw-resize')) : { move: 'move', mesh: 'move', rotate: 'grab', away: 'default' }[h.kind];
+    el.style.cursor = h.kind === 'scale' ? (h.fx === 0.5 ? 'ns-resize' : h.fy === 0.5 ? 'ew-resize' : (h.fx === h.fy ? 'nwse-resize' : 'nesw-resize')) : { move: 'move', mesh: 'move', rotate: ROTATE_CURSOR, away: 'default' }[h.kind];
   }
 
   commit() {

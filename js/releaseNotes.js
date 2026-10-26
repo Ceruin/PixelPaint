@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.26', [
+    '- Rotating a moved image only starts right next to its box, with a rotate cursor instead of the grab hand',
     '- Clicking away from a moved or pasted image finishes the move and goes back to your tool (just outside its box still rotates); the cursor shows which',
     '+ Pasting into an empty canvas offers to resize the canvas to the pasted image',
     '- New Canvas picks up images copied in other apps too, filling in their size',

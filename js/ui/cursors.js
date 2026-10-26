@@ -27,3 +27,7 @@ export function toolCursor(id) {
   cache.set(id, cur);
   return cur;
 }
+
+// Rotating a transform: a curved double arrow (same dark-on-white style), hotspot in the middle.
+const arc = '<path d="M6 12a10 10 0 0 1 20 0"/><path d="M3 9l3 3 3-3M23 9l3 3 3-3"/>';
+export const ROTATE_CURSOR = `${svg(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><g transform="translate(0 6)">${lines(arc, 4.4, '#fff')}${lines(arc, 1.8, '#1b1d23')}</g></svg>`)} 16 16, alias`;
