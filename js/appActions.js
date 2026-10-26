@@ -48,27 +48,47 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     app.clipboard = doc().extract(l);
     toBlob(app.clipboard.canvas).then(b => navigator.clipboard?.write?.([new ClipboardItem({ 'image/png': b })])).catch(() => {});
   };
-  const paste = async () => {
-    doc().selection.none();
+  // The image on the system clipboard (copied here or in any app). Without `ask`, only when the browser
+  // already lets us read it (no permission prompt out of the blue).
+  const readClipboardImage = async ask => {
     try {
+      if (!ask && (await navigator.permissions?.query({ name: 'clipboard-read' }))?.state !== 'granted') return null;
       for (const item of await navigator.clipboard.read()) {
         const type = item.types.find(t => t.startsWith('image/'));
-        if (!type) continue;
-        const blob = await item.getType(type), cb = app.clipboard;
-        if (cb && blob.size) {
-          const img = await createImageBitmap(blob);
-          if (img.width === cb.canvas.width && img.height === cb.canvas.height) break;
-        }
-        await project.importLayer(blob, 'Pasted');
-        return startTransform();
+        if (type) return await createImageBitmap(await item.getType(type));
       }
-    } catch { /* no permission or no image: fall back to the internal clipboard */ }
+    } catch { /* no permission, or no image */ }
+    return null;
+  };
+  // nothing drawn yet, apart from `except` (a solid Background doesn't count)
+  const canvasIsEmpty = except => doc().layers.every(l => l === except || /^background$/i.test(l.name) || l.cels.every(c => !c || !alphaBounds(c)));
+  const paste = async () => {
+    doc().selection.none();
     const cb = app.clipboard;
-    if (!cb) return app.toast('Clipboard is empty');
-    const l = doc().addLayer('Pasted');
-    l.ctx.drawImage(cb.canvas, cb.x, cb.y);
-    doc().touch(l);
+    let img = await readClipboardImage(true), l;
+    // what PixelPaint copied is on the system clipboard too: then use ours, which keeps its place
+    if (img && !(cb && img.width === cb.canvas.width && img.height === cb.canvas.height)) l = await project.importLayer(img, 'Pasted');
+    else if (cb) { img = cb.canvas; l = doc().addLayer('Pasted'); l.ctx.drawImage(cb.canvas, cb.x, cb.y); doc().touch(l); }
+    else return app.toast('Clipboard is empty');
+    const prev = app.tool.id;
     startTransform();
+    const d = doc();
+    if ((img.width !== d.w || img.height !== d.h) && canvasIsEmpty(l))
+      app.toast(`The canvas is empty: make it ${img.width} × ${img.height}, the size of what you pasted?`, { label: 'Fit the canvas to it', run: () => fitToPaste(d, l, img, prev) });
+  };
+  // Resize the canvas to the pasted image, with the image whole at full size in its layer (a big one
+  // was scaled down to fit the old canvas); a Background grows with its colour.
+  const fitToPaste = (d, l, img, prev) => {
+    if (d !== doc() || !d.layers.includes(l)) return;
+    app.tools.transform.cancel();
+    const bgLayer = d.layers.find(n => /^background$/i.test(n.name));
+    d.remap('Fit Canvas to Paste', img.width, img.height, (ctx, c) => {
+      if (c === l.cels[d.frame]) return ctx.drawImage(img, 0, 0);
+      if (bgLayer && c === bgLayer.cels[d.frame] && d.bg) { ctx.fillStyle = d.bg; ctx.fillRect(0, 0, img.width, img.height); }
+      ctx.drawImage(c, 0, 0);
+    });
+    app.setTool(prev !== 'transform' ? prev : 'brush');
+    app.view.fit();
   };
   const startTransform = () => { const t = app.tools.transform; t.commit(); app.setTool('transform'); t.begin(); };
 
@@ -111,13 +131,22 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
   // New Canvas remembers your last background (transparent the first time) and pixel-art choice. With
   // an image on the clipboard it offers the clipboard's size first, and can paste the image straight in.
   const newDoc = async () => {
-    const last = local.get('pp.newCanvas', { bg: 'transparent', pixel: false }), cb = app.clipboard?.canvas;
-    const clip = cb && `${cb.width}x${cb.height}`;
-    const sizes = clip ? [[clip, `Clipboard image — ${cb.width} × ${cb.height}`], ...SIZES] : SIZES;
+    // the clipboard image: the system one when we may read it (it's the latest copy, from any app), else ours
+    const last = local.get('pp.newCanvas', { bg: 'transparent', pixel: false });
+    let cb = (await readClipboardImage(false)) ?? app.clipboard?.canvas;
+    let clip = cb && `${cb.width}x${cb.height}`;
+    // can't read it unasked: picking this asks, then fills in the image's size
+    const sizes = clip ? [[clip, `Clipboard image — ${cb.width} × ${cb.height}`], ...SIZES] : [['ask', 'Clipboard image… (reads your clipboard)'], ...SIZES];
     const [w0, h0] = (clip ?? '1920x1080').split('x').map(Number);
     const v = await form('New Canvas', [
       { id: 'preset', label: 'Preset', type: 'select', options: sizes, value: clip ?? '1920x1080', oninput: (i, f) => {
         if (i.value === 'custom') return;
+        if (i.value === 'ask') return void readClipboardImage(true).then(img => {
+          if (!img) return app.toast('There’s no image on the clipboard: copy one first');
+          cb = img; clip = `${img.width}x${img.height}`;
+          Object.assign(i.selectedOptions[0], { value: clip, textContent: `Clipboard image — ${img.width} × ${img.height}` });
+          i.value = clip; i.dispatchEvent(new Event('input', { bubbles: true }));
+        });
         [f.w.value, f.h.value] = i.value.split('x'); f.pixel.checked = f.w.value * f.h.value <= 512 * 512;
         if (f.paste) f.paste.checked = i.value === clip;
       } },
@@ -126,11 +155,11 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       { id: 'bg', label: 'Background', type: 'select', options: [['transparent', 'Transparent'], ['white', 'White'], ['color', 'Background color']], value: last.bg },
       { id: 'panels', label: 'Comic panels', type: 'select', options: LAYOUTS, value: 'none' },
       { id: 'pixel', label: 'Pixel art (hard pixels, Pixel Pencil, crisp zoom)', type: 'checkbox', value: clip ? w0 * h0 <= 512 * 512 : last.pixel },
-      ...(clip ? [{ id: 'paste', label: 'Paste the clipboard image into it', type: 'checkbox', value: true }] : []),
+      { id: 'paste', label: 'Paste the clipboard image into it', type: 'checkbox', value: !!clip },
     ], 'Create');
     if (!v) return;
     local.set('pp.newCanvas', { bg: v.bg, pixel: v.pixel });
-    createDrawing(dim(v.w), dim(v.h), v.bg, v.pixel, v.panels, v.paste ? cb : null);
+    createDrawing(dim(v.w), dim(v.h), v.bg, v.pixel, v.panels, v.paste && cb ? cb : null);
   };
   const createDrawing = (w, h, bg, pixel, panels = 'none', image = null) => {
     const d = new Doc(w, h, { bg: { white: '#ffffff', transparent: null, color: app.color.bg }[bg] });

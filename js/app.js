@@ -93,6 +93,7 @@ export class App {
   setTool(id) {
     if (this.tool.id === id || !this.tools[id]) return;
     if (id === 'picker') this.pickReturn = this.tool.id;
+    this.lastTool = this.tool.id;   // e.g. where clicking away from a transform goes back to
     this.tool.deactivate?.();
     this.tool = this.tools[id];
     this.tool.activate?.();

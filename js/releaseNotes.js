@@ -3,6 +3,9 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.26', [
+    '- Clicking away from a moved or pasted image finishes the move and goes back to your tool (just outside its box still rotates); the cursor shows which',
+    '+ Pasting into an empty canvas offers to resize the canvas to the pasted image',
+    '- New Canvas picks up images copied in other apps too, filling in their size',
     '- Cutting lets go of the selection, so your next strokes are no longer stuck inside the empty box (one undo brings both back)',
     '+ New Canvas offers the size of the image you copied first, and can paste it straight in',
     '+ File > New from Clipboard: a canvas exactly the size of the copied image, with the image in it',

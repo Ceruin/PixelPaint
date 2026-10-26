@@ -45,7 +45,7 @@ function warpDraw(ctx, img, mesh) {
 // Move / scale / rotate / warp of the active layer or the selected part of it.
 export class TransformTool {
   constructor(app) { Object.assign(this, { app, id: 'transform', cursor: 'move', s: null, drag: null }); }
-  activate() { this.begin(); }
+  activate() { this.returnTo = this.app.lastTool; this.begin(); }
   deactivate() { this.commit(); }
   interrupt() { this.cancel(); }
 
@@ -115,13 +115,17 @@ export class TransformTool {
     const k = HANDLES.findIndex(([fx, fy]) => { const d = M.transformPoint({ x: fx * w, y: fy * h }); return near(d.x, d.y, 14); });
     if (k >= 0) return { kind: 'scale', fx: HANDLES[k][0], fy: HANDLES[k][1] };
     const L = M.inverse().transformPoint({ x: p.x, y: p.y });
-    return L.x >= 0 && L.y >= 0 && L.x <= w && L.y <= h ? { kind: 'move' } : { kind: 'rotate' };
+    if (L.x >= 0 && L.y >= 0 && L.x <= w && L.y <= h) return { kind: 'move' };
+    // just outside the box rotates; a click well away from it is done with the transform
+    const scale = this.app.view.zoom * Math.max(Math.abs(s.m.sx), Math.abs(s.m.sy)), m = 48 / scale;
+    return L.x >= -m && L.y >= -m && L.x <= w + m && L.y <= h + m ? { kind: 'rotate' } : { kind: 'away' };
   }
 
   down(p) {
     if (!this.s && !this.begin()) { this.app.toast('Nothing to transform on this layer'); return false; }
-    const s = this.s;
-    this.drag = { ...this.hit(p), p0: p, m0: { ...s.m }, M0: this.matrix(), mesh0: s.mesh?.map(q => ({ x: q.x, y: q.y })) };
+    const s = this.s, at = this.hit(p);
+    if (at.kind === 'away') { this.commit(); this.app.setTool(this.returnTo && this.returnTo !== 'transform' ? this.returnTo : 'brush'); return false; }
+    this.drag = { ...at, p0: p, m0: { ...s.m }, M0: this.matrix(), mesh0: s.mesh?.map(q => ({ x: q.x, y: q.y })) };
     return true;
   }
 
@@ -151,6 +155,12 @@ export class TransformTool {
   }
 
   up() { this.drag = null; }
+  // the cursor says what a press will do: move, resize, rotate, or (well away from the box) finish
+  hover(p) {
+    if (!p || !this.s || this.drag) return;   // null: the pointer left the canvas
+    const h = this.hit(p), el = this.app.view.el;
+    el.style.cursor = h.kind === 'scale' ? (h.fx === 0.5 ? 'ns-resize' : h.fy === 0.5 ? 'ew-resize' : (h.fx === h.fy ? 'nwse-resize' : 'nesw-resize')) : { move: 'move', mesh: 'move', rotate: 'grab', away: 'default' }[h.kind];
+  }
 
   commit() {
     const s = this.s;
