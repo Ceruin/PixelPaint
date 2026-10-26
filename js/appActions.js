@@ -108,21 +108,53 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
   }
 
   // ---- image dialogs ----
+  // New Canvas remembers your last background (transparent the first time) and pixel-art choice. With
+  // an image on the clipboard it offers the clipboard's size first, and can paste the image straight in.
   const newDoc = async () => {
+    const last = local.get('pp.newCanvas', { bg: 'transparent', pixel: false }), cb = app.clipboard?.canvas;
+    const clip = cb && `${cb.width}x${cb.height}`;
+    const sizes = clip ? [[clip, `Clipboard image — ${cb.width} × ${cb.height}`], ...SIZES] : SIZES;
+    const [w0, h0] = (clip ?? '1920x1080').split('x').map(Number);
     const v = await form('New Canvas', [
-      { id: 'preset', label: 'Preset', type: 'select', options: SIZES, value: '1920x1080', oninput: (i, f) => { if (i.value !== 'custom') { [f.w.value, f.h.value] = i.value.split('x'); f.pixel.checked = f.w.value * f.h.value <= 512 * 512; } } },
-      { id: 'w', label: 'Width (px)', value: 1920, min: 1, max: 8192 },
-      { id: 'h', label: 'Height (px)', value: 1080, min: 1, max: 8192 },
-      { id: 'bg', label: 'Background', type: 'select', options: [['white', 'White'], ['transparent', 'Transparent'], ['color', 'Background color']], value: 'white' },
+      { id: 'preset', label: 'Preset', type: 'select', options: sizes, value: clip ?? '1920x1080', oninput: (i, f) => {
+        if (i.value === 'custom') return;
+        [f.w.value, f.h.value] = i.value.split('x'); f.pixel.checked = f.w.value * f.h.value <= 512 * 512;
+        if (f.paste) f.paste.checked = i.value === clip;
+      } },
+      { id: 'w', label: 'Width (px)', value: w0, min: 1, max: 8192 },
+      { id: 'h', label: 'Height (px)', value: h0, min: 1, max: 8192 },
+      { id: 'bg', label: 'Background', type: 'select', options: [['transparent', 'Transparent'], ['white', 'White'], ['color', 'Background color']], value: last.bg },
       { id: 'panels', label: 'Comic panels', type: 'select', options: LAYOUTS, value: 'none' },
-      { id: 'pixel', label: 'Pixel art (hard pixels, Pixel Pencil, crisp zoom)', type: 'checkbox', value: false },
+      { id: 'pixel', label: 'Pixel art (hard pixels, Pixel Pencil, crisp zoom)', type: 'checkbox', value: clip ? w0 * h0 <= 512 * 512 : last.pixel },
+      ...(clip ? [{ id: 'paste', label: 'Paste the clipboard image into it', type: 'checkbox', value: true }] : []),
     ], 'Create');
     if (!v) return;
-    const d = new Doc(dim(v.w), dim(v.h), { bg: { white: '#ffffff', transparent: null, color: app.color.bg }[v.bg] });
-    d.pixelArt = v.pixel;
-    if (v.panels !== 'none') { d.addLayer('Art', false); addPanels(d, layoutRects(d, v.panels)); }
+    local.set('pp.newCanvas', { bg: v.bg, pixel: v.pixel });
+    createDrawing(dim(v.w), dim(v.h), v.bg, v.pixel, v.panels, v.paste ? cb : null);
+  };
+  const createDrawing = (w, h, bg, pixel, panels = 'none', image = null) => {
+    const d = new Doc(w, h, { bg: { white: '#ffffff', transparent: null, color: app.color.bg }[bg] });
+    d.pixelArt = pixel;
+    if (panels !== 'none') { d.addLayer('Art', false); addPanels(d, layoutRects(d, panels)); }
+    // the image goes on its own layer over a solid background, or is the first layer of a transparent canvas
+    if (image) { const l = bg === 'transparent' && panels === 'none' ? Object.assign(d.layers[0], { name: 'Pasted' }) : d.addLayer('Pasted', false); l.ctx.drawImage(image, 0, 0); d.setActive(l); }
     app.setDoc(d);
     if (d.pixelArt) app.setTool('pencil');   // a pixel canvas starts with the Pixel Pencil
+  };
+  // File > New from Clipboard: a canvas exactly the size of the image you copied (here or in another
+  // app), with the image in it as a layer, on your usual background.
+  const newFromClipboard = async () => {
+    let img = null;
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find(t => t.startsWith('image/'));
+        if (type) { img = await createImageBitmap(await item.getType(type)); break; }
+      }
+    } catch { /* no permission: the image copied in PixelPaint still works */ }
+    img ??= app.clipboard?.canvas;
+    if (!img) return app.toast('Copy an image first: select part of a drawing and press Ctrl+C');
+    const last = local.get('pp.newCanvas', { bg: 'transparent' });
+    createDrawing(img.width, img.height, last.bg, img.width * img.height <= 512 * 512, 'none', img);
   };
 
   // Pixel art is the canvas's own setting: crisp zoom, hard-edged fills, the Pixel Pencil and pixel shapes.
@@ -384,6 +416,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
         { id: 'h', label: 'Frame height (px)', value: img.height, min: 1, max: 2048 }], 'Import');
       if (v) project.importSheet(f, dim(v.w), dim(v.h));
     } },
+    { id: 'file.newFromClipboard', label: 'New from Clipboard', icon: 'paste', key: 'Ctrl+Alt+Shift+N', run: newFromClipboard },
     { id: 'file.close', label: 'Close Drawing', key: 'Ctrl+Alt+W', run: () => app.closeDoc(app.doc, () => Object.assign(new Doc(1920, 1080), { fresh: true })) },
     { id: 'tab.next', label: 'Next Drawing', key: 'Alt+PageDown', run: () => app.tabs?.step(1) },
     { id: 'tab.prev', label: 'Previous Drawing', key: 'Alt+PageUp', run: () => app.tabs?.step(-1) },
@@ -393,7 +426,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
 
     { id: 'edit.undo', label: 'Undo', key: 'Ctrl+Z', run: () => app.undo() },
     { id: 'edit.redo', label: 'Redo', key: 'Ctrl+Shift+Z', run: () => app.redo() },
-    { id: 'edit.cut', label: 'Cut', key: 'Ctrl+X', run: editable(l => { copy(l); doc().clearArea(l, 'Cut'); }) },
+    { id: 'edit.cut', label: 'Cut', key: 'Ctrl+X', run: editable(l => { copy(l); doc().cutArea(l); }) },
     { id: 'edit.copy', label: 'Copy', key: 'Ctrl+C', run: () => doc().activeLayer && copy(doc().activeLayer) },
     { id: 'edit.paste', label: 'Paste', key: 'Ctrl+V', run: paste },
     { id: 'edit.clear', label: 'Clear', key: 'Delete', run: editable(l => doc().clearArea(l)) },
@@ -543,7 +576,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.open', 'file.library', 'file.close', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse']],
+      ['File', 'folder', ['file.new', 'file.newFromClipboard', 'file.open', 'file.library', 'file.close', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.pixelArt', 'image.tiles', 'image.tilesExport', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.pseudo3d', 'image.voxels', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],

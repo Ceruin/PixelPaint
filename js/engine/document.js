@@ -404,14 +404,22 @@ export class Doc {
     return { canvas: c, x: r.x, y: r.y };
   }
 
-  clearArea(layer, label = 'Clear') {
+  clearCmd(layer, label) {
     const sel = this.selection;
-    this.editPixels(label, layer, sel.bounds ?? this.bounds, (ctx, r) => {
+    return this.pixelEdit(label, layer, sel.bounds ?? this.bounds, (ctx, r) => {
       if (!sel.active) return ctx.clearRect(r.x, r.y, r.w, r.h);
       ctx.globalCompositeOperation = 'destination-out';
       drawRect(ctx, sel.mask, r);
       ctx.globalCompositeOperation = 'source-over';
     });
+  }
+  clearArea(layer, label = 'Clear') { this.history.push(this.clearCmd(layer, label)); }
+  // Cut empties the selected area and lets go of the selection, in one undo step: a selection left
+  // around the hole kept every later stroke inside the empty box.
+  cutArea(layer) {
+    const px = this.clearCmd(layer, 'Cut'), sel = this.selection;
+    const drop = sel.active ? sel.edit('Deselect', c => c.clearRect(0, 0, this.w, this.h), false) : null;
+    if (px || drop) this.history.push(new Compound('Cut', [px, drop]));
   }
 
   fillArea(layer, color) {

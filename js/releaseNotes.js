@@ -2,6 +2,12 @@
 // Add to this on every version bump (see CLAUDE.md). One short line per change, in words a user
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
+  ['2026.10.26', [
+    '- Cutting lets go of the selection, so your next strokes are no longer stuck inside the empty box (one undo brings both back)',
+    '+ New Canvas offers the size of the image you copied first, and can paste it straight in',
+    '+ File > New from Clipboard: a canvas exactly the size of the copied image, with the image in it',
+    '- New Canvas starts transparent and remembers the background you chose last',
+  ]],
   ['2026.10.22', [
     '- The 3D Voxel Studio shows just a Done button again',
     '- Sprite Studio is now part of Draw: its tools live in the Pixel Art workspace, and its recent files and palettes moved into My Art and your palette list',
