@@ -1,5 +1,5 @@
-// Timelapse: while a drawing is recording, a small picture of it is kept after every change (at most
-// a couple a second) in the browser's storage, next to the drawing. Stopping, or closing the drawing,
+// Timelapse: while a drawing is recording, a small picture of it is kept after every change (each
+// stroke, fill, move…) in the browser's storage, next to the drawing. Stopping, or closing the drawing,
 // keeps it; the player shows it back at any length and saves it as a video or a GIF.
 // Storage: `tl:<id>` = { keys, w, h, start, last } and one image per snapshot under its key.
 import { h, icon } from './dom.js';
@@ -12,7 +12,7 @@ import { encodeGIF } from '../engine/gif.js';
 
 const LONG = 1280;     // a snapshot's longest side (pixel art is enlarged by whole pixels up to about this)
 const MAX = 1500;      // snapshots kept; past this every other one is dropped, so long sessions still fit
-const GAP = 600;       // ms between snapshots at most
+const BACKLOG = 384 * 2 ** 20;   // bytes of pictures waiting to be stored; past this a burst of changes is merged
 
 const newId = () => `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -31,36 +31,45 @@ function snapshot(d) {
 }
 
 export function initTimelapse(app) {
-  let queue = Promise.resolve(), timer = 0, lastAt = 0, lastSig = null;
+  let queue = Promise.resolve(), waiting = 0, lastSig = null;
   const on = d => !!d?.timelapse?.on;
   // one write at a time, in order
   const later = fn => (queue = queue.then(fn).catch(e => console.warn('timelapse', e)));
+  // each recording's index stays in memory while recording, and is written every few snapshots
+  const indexes = new Map(), indexOf = async id => { if (!indexes.has(id)) indexes.set(id, await idb.get(`tl:${id}`) ?? { keys: [], start: Date.now() }); return indexes.get(id); };
 
-  const capture = d => later(async () => {
-    const id = d.timelapse.id, c = snapshot(d);
-    const blob = await toBlob(c, 'image/webp', 0.85) ?? await toBlob(c, 'image/png');
-    const idx = await idb.get(`tl:${id}`) ?? { keys: [], start: Date.now() };
-    const key = `tl:${id}:${(idx.n = (idx.n ?? 0) + 1)}`;
-    await idb.set(key, blob);
-    idx.keys.push(key); Object.assign(idx, { w: c.width, h: c.height, last: Date.now() });
-    if (idx.keys.length > MAX) {   // thin out: keep every other one (and always the newest)
-      const drop = idx.keys.filter((_, i) => i % 2 === 1 && i < idx.keys.length - 1);
-      idx.keys = idx.keys.filter(k => !drop.includes(k));
-      for (const k of drop) await idb.del(k);
-    }
-    await idb.set(`tl:${id}`, idx);
-  });
+  // The picture is copied the moment it changes and encoded straight away (the browser does that off
+  // the main thread, several at once); storing happens in the background, in order. Scripts can make
+  // dozens of changes a second: only if the pictures waiting pass BACKLOG are changes merged.
+  const capture = d => {
+    if (waiting >= BACKLOG) return;
+    const id = d.timelapse.id, c = snapshot(d), bytes = c.width * c.height * 4;
+    waiting += bytes;
+    const blob = toBlob(c, 'image/webp', 0.85).then(b => b ?? toBlob(c, 'image/png')).finally(() => { waiting -= bytes; });
+    later(async () => {
+      const idx = await indexOf(id), b = await blob;
+      const key = `tl:${id}:${(idx.n = (idx.n ?? 0) + 1)}`;
+      await idb.set(key, b);
+      idx.keys.push(key); Object.assign(idx, { w: c.width, h: c.height, last: Date.now() });
+      if (idx.keys.length > MAX) {   // thin out: keep every other one (and always the newest)
+        const drop = new Set(idx.keys.filter((_, i) => i % 2 === 1 && i < idx.keys.length - 1));
+        idx.keys = idx.keys.filter(k => !drop.has(k));
+        for (const k of drop) await idb.del(k);
+      }
+      if (idx.n % 8 === 0 || waiting === 0) await idb.set(`tl:${id}`, idx);
+    });
+  };
+  // the index is written whenever the queue empties, so a closed tab loses at most a few snapshots
+  const flush = () => later(async () => { for (const [id, idx] of indexes) await idb.set(`tl:${id}`, idx); });
 
-  // after each change to the drawing in front, at most every GAP ms (the last change always lands)
+  // after every change to the drawing in front (each stroke, fill, move…)
   const changed = () => {
     const d = app.doc;
     if (!on(d)) return;
     const top = d.history.done.at(-1), sig = `${d.history.done.length}|${top?.label}`;
     if (top === lastSig?.top && sig === lastSig?.sig) return;
     lastSig = { top, sig };
-    clearTimeout(timer);
-    const wait = Math.max(0, GAP - (Date.now() - lastAt));
-    timer = setTimeout(() => { lastAt = Date.now(); if (app.doc === d) capture(d); }, wait);
+    capture(d);
   };
   bus.on('history', changed);
   bus.on('doc', d => { lastSig = { top: d.history.done.at(-1), sig: `${d.history.done.length}|${d.history.done.at(-1)?.label}` }; bus.emit('timelapse', d); });
@@ -75,20 +84,20 @@ export function initTimelapse(app) {
   const start = () => {
     const d = app.doc;
     d.timelapse = { id: d.timelapse?.id ?? newId(), on: true };
-    capture(d); lastAt = Date.now();
+    capture(d);
     bus.emit('timelapse', d);
     toast('Recording a timelapse: every change is kept. Stop it from File or the status bar');
   };
   const stop = async () => {
     const d = app.doc;
     if (!on(d)) return;
-    clearTimeout(timer); capture(d);
+    capture(d);
     d.timelapse.on = false;
     bus.emit('timelapse', d);
     await queue;
     play(d.timelapse.id, d.name);
   };
-  const play = (id, name) => queue.then(() => player(id, name ?? app.doc.name, () => { if (app.doc.timelapse?.id === id) { app.doc.timelapse = null; bus.emit('timelapse', app.doc); } }));
+  const play = (id, name) => flush().then(() => player(id, name ?? app.doc.name, () => { indexes.delete(id); if (app.doc.timelapse?.id === id) { app.doc.timelapse = null; bus.emit('timelapse', app.doc); } }));
   return {
     recording: () => on(app.doc),
     has: () => !!app.doc.timelapse?.id,

@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.27', [
+    '- Timelapses now keep every stroke, even when you draw fast, instead of merging quick strokes into one jump',
     '+ AI agents and scripts can now draw with PixelPaint through a simple built-in interface, described at pixelpaint.net/llms.txt',
     '+ Timelapse: File > Record Timelapse keeps a snapshot after every change; stop it (or close the drawing) to watch it back at any length and save it as a video or GIF',
     '- Pseudo-3D and the 3D Voxel Studio no longer freeze on a full-size painting: big pictures are shrunk to sprite size first',
