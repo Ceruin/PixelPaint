@@ -24,6 +24,14 @@ function readDoc() {
   const d = app.doc;
   W = d.w; H = d.h; primary = app.color.fg;
   frames = d.frames.map((_, i) => ({ canvas: flatten(d, i, { camera: false }) }));
+  // the volume grows with the picture's area: a full-size painting would freeze the tab for most of a
+  // minute, so anything bigger than a sprite is shrunk to fit MAX first
+  const MAX = 128, k = Math.min(1, MAX / Math.max(W, H));
+  if (k < 1) {
+    W = Math.max(1, Math.round(W * k)); H = Math.max(1, Math.round(H * k));
+    frames = frames.map(({ canvas }) => { const c = canvasOf(W, H), x = c.getContext('2d'); x.imageSmoothingEnabled = !d.pixelArt; x.drawImage(canvas, 0, 0, W, H); return { canvas: c }; });
+    showToast(`Shrunk to ${W} × ${H} for 3D: it works on sprite-sized pictures`);
+  }
   flat = frames[d.frame].canvas;
 }
 function openModal(o) {

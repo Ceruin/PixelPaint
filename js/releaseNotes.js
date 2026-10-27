@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.27', [
+    '- Pseudo-3D and the 3D Voxel Studio no longer freeze on a full-size painting: big pictures are shrunk to sprite size first',
     '+ Comic panels: a stroke or fill that starts inside a panel stays inside it (switch off with Stay inside the panel)',
     '+ Fill reference: mark your line art with Layer > Use as Fill Reference and fills see only those lines, so colours you already filled can\'t make the next fill spill',
     '+ Text starts at a size that suits the canvas',
