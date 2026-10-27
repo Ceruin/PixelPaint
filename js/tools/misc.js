@@ -52,7 +52,7 @@ export class FillTool {
     if (!worker) return this.fillSync(p);
     const { opts } = app, soft = !doc.pixelArt, src = sampleSource(app), under = soft && !layer.alphaLock ? layer.view() : null, sel = doc.selection.clip;
     Promise.all([createImageBitmap(src), under && createImageBitmap(under), sel && createImageBitmap(sel)]).then(([sb, ub, selb]) => floodInWorker(worker,
-      { w, h, x, y, rgba: hexToU32(app.color.fg), tolerance: opts.tolerance, contiguous: opts.contiguous, soft, alphaLock: layer.alphaLock, src: sb, under: ub, sel: selb }, [sb, ub, selb])).then(r => {
+      { w, h, x, y, rgba: hexToU32(app.color.fg), tolerance: opts.tolerance, contiguous: opts.contiguous, soft, gap: opts.fillGap ?? 3, alphaLock: layer.alphaLock, src: sb, under: ub, sel: selb }, [sb, ub, selb])).then(r => {
       if (r.error) { if (r.error === 'worker') this.fillSync(p); else console.warn('fill failed', r.error); return; }
       const parts = [r.fill, r.under, r.over];
       if (!r.fill || app.doc !== doc || layer.locked || !doc.layers.includes(layer)) { parts.forEach(q => q?.bmp.close()); return; }   // nothing to fill, or the picture changed meanwhile
@@ -80,7 +80,7 @@ export class FillTool {
     // a pixel canvas fills exact colours with hard edges; a painting closes small gaps in the line
     // art and tucks the fill under its soft edges
     const soft = !doc.pixelArt, img = sampleSource(app).getContext('2d').getImageData(0, 0, w, h), rgba = hexToU32(app.color.fg);
-    const core = floodMask(img, x, y, soft ? opts.tolerance : 0, opts.contiguous, soft);
+    const core = floodMask(img, x, y, soft ? opts.tolerance : 0, opts.contiguous, soft ? opts.fillGap ?? 3 : false);
     const src = layer.view(), under = src && src.getContext('2d').getImageData(0, 0, w, h).data;
     const fill = maskToCanvas(core, w, h, rgba);
     // the ring goes under see-through paint and is multiplied into opaque paint (where under-painting

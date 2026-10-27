@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.27', [
+    '+ Fill: a Close gaps setting (on by default) so colour stays inside line art that has small breaks',
     '- Shortcuts work again right after typing a colour, searching brushes or dragging a slider (they were being typed into the box, or ignored)',
     '- Renaming a layer by double-clicking it works with a mouse',
     '+ The airbrush keeps spraying while you hold it still, so glows build up like a real airbrush',

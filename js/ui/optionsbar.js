@@ -103,6 +103,8 @@ export function optionsBar(app, el, openBrushes) {
       btn('Select all', 'sel.all'), btn('Deselect', 'sel.none'), btn('Invert', 'sel.invert'), btn('Feather…', 'sel.feather'));
     if (t === 'wand' || t === 'fill') parts.push(
       mini({ label: 'Tolerance', value: o.tolerance, fmt: v => `${v}%`, onInput: setOpt('tolerance') }),
+      // line art always has small breaks: the fill treats gaps up to about twice this as closed (painting canvases)
+      t === 'fill' && !app.doc?.pixelArt && mini({ label: 'Close gaps', min: 0, max: 8, value: o.fillGap ?? 3, fmt: v => (v ? `${v}px` : 'off'), onInput: setOpt('fillGap') }),
       toggle('Contiguous', o.contiguous, v => app.setOpt('contiguous', v)),
       toggle('Sample all layers', o.sampleAll, v => app.setOpt('sampleAll', v)));
     if (t === 'transform') parts.push(

@@ -27,7 +27,7 @@ const paint = (m, w, h, rgba, sel) => {
 onmessage = ({ data: q }) => {
   try {
     const { w, h, x, y, rgba } = q, img = pixels(q.src, w, h);
-    const core = floodMask(img, x, y, q.soft || q.wand ? q.tolerance : 0, q.contiguous, q.soft);   // the wand: its own tolerance, no gap closing
+    const core = floodMask(img, x, y, q.soft || q.wand ? q.tolerance : 0, q.contiguous, q.soft ? q.gap ?? 3 : false);   // the wand: its own tolerance, no gap closing
     const out = { id: q.id, fill: paint(core, w, h, rgba, q.sel), under: null, over: null };
     if (q.soft && !q.alphaLock) {
       const under = q.under ? pixels(q.under, w, h).data : null;

@@ -6,8 +6,9 @@ const seen = (data, k, c) => data[k + c] * data[k + 3] / 255 + 255 - data[k + 3]
 // Scanline flood fill → Uint8 mask. Tolerance is 0..100 (% per channel). Colours are compared as
 // they look on white paper (so soft, half-transparent paint of the same colour doesn't wall the
 // fill off), with a smaller say for transparency itself. Tolerance 0 matches exact pixels (pixel art).
-// closeGaps: pixels touching a wall count as wall while flooding, so a line with a 1-2px break
-// still holds the fill in; the fill then grows back one pixel to meet the line again.
+// closeGaps (true = 1, or a radius in px): pixels within that distance of a wall count as wall while
+// flooding, so a line with a break up to about twice that wide still holds the fill in; the fill then
+// grows back the same distance to meet the line again.
 export function floodMask({ data, width: w, height: h }, sx, sy, tolerance, contiguous = true, closeGaps = false) {
   const t = tolerance * 2.55, k0 = (sy * w + sx) * 4;
   const [r0, g0, b0, a0] = [seen(data, k0, 0), seen(data, k0, 1), seen(data, k0, 2), data[k0 + 3]];
@@ -20,19 +21,42 @@ export function floodMask({ data, width: w, height: h }, sx, sy, tolerance, cont
     for (let i = 0; i < out.length; i++) if (match(i)) out[i] = 1;
     return out;
   }
-  if (closeGaps) {
+  const r = closeGaps === true ? 1 : Math.max(0, Math.min(16, closeGaps | 0));
+  if (r) {
     const wall = new Uint8Array(w * h);
     for (let i = 0; i < wall.length; i++) wall[i] = match(i) ? 0 : 1;
-    // open = no wall in the 3×3 around: a row pass (wall left/here/right), then a column pass over it
+    // open = no wall within r pixels (a square): running counts along each row, then down each column
     const row = new Uint8Array(w * h), open = new Uint8Array(w * h);
-    for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++) row[i] = wall[i] | (x > 0 ? wall[i - 1] : 0) | (x < w - 1 ? wall[i + 1] : 0);
-    for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++) open[i] = (row[i] | (y > 0 ? row[i - w] : 0) | (y < h - 1 ? row[i + w] : 0)) ? 0 : 1;
+    for (let y = 0; y < h; y++) {
+      const o = y * w;
+      let n = 0;
+      for (let x = 0; x <= Math.min(r, w - 1); x++) n += wall[o + x];
+      for (let x = 0; x < w; x++) {
+        row[o + x] = n ? 1 : 0;
+        if (x + r + 1 < w) n += wall[o + x + r + 1];
+        if (x - r >= 0) n -= wall[o + x - r];
+      }
+    }
+    for (let x = 0; x < w; x++) {
+      let n = 0;
+      for (let y = 0; y <= Math.min(r, h - 1); y++) n += row[y * w + x];
+      for (let y = 0; y < h; y++) {
+        open[y * w + x] = n ? 0 : 1;
+        if (y + r + 1 < h) n += row[(y + r + 1) * w + x];
+        if (y - r >= 0) n -= row[(y - r) * w + x];
+      }
+    }
     // a seed in a sliver too thin to survive the closing fills the normal way
     if (open[sy * w + sx]) {
-      const m = scan(w, h, sx, sy, i => open[i] === 1), out = m.slice();
-      for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++)
-        if (!m[i] && !wall[i] && ((x > 0 && m[i - 1]) || (x < w - 1 && m[i + 1]) || (y > 0 && m[i - w]) || (y < h - 1 && m[i + w]))) out[i] = 1;
-      return out;
+      let m = scan(w, h, sx, sy, i => open[i] === 1);
+      // grow back r pixels to meet the lines again (never into them)
+      for (let k = 0; k < r; k++) {
+        const out = m.slice();
+        for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++)
+          if (!m[i] && !wall[i] && ((x > 0 && m[i - 1]) || (x < w - 1 && m[i + 1]) || (y > 0 && m[i - w]) || (y < h - 1 && m[i + w]))) out[i] = 1;
+        m = out;
+      }
+      return m;
     }
   }
   return scan(w, h, sx, sy, match);
