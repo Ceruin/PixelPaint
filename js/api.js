@@ -33,7 +33,20 @@ export function initApi(app) {
     const pt = ([x, y, p = 1]) => { const s = app.view.toScreen(x, y); return { x, y, p: pen ? p : 1, sx: s.x, sy: s.y, tiltX: 0, tiltY: 0 }; };
     const ev = { button: 0, buttons: 1, shiftKey: false, altKey: false, ctrlKey: false, metaKey: false, pointerType: pen ? 'pen' : 'mouse', pointerId: 99, timeStamp: performance.now(), preventDefault() {}, stopPropagation() {} };
     if (app.tool.down(pt(pts[0]), ev) === false) return;
-    for (let i = 1; i < pts.length; i++) app.tool.move([pt(pts[i])], ev);
+    // recording a timelapse: pictures along the way, so the stroke is seen being drawn (about every 40px)
+    const rec = app.timelapse?.recording();
+    let travel = 0;
+    for (let i = 1; i < pts.length; i++) {
+      if (!rec) { app.tool.move([pt(pts[i])], ev); continue; }
+      // long straight segments are walked in 40px steps (the same line), a picture at each
+      const [x0, y0, p0 = 1] = pts[i - 1], [x1, y1, p1 = 1] = pts[i], n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 40));
+      for (let k = 1; k <= n; k++) {
+        const t = k / n;
+        app.tool.move([pt([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, p0 + (p1 - p0) * t])], ev);
+        travel += Math.hypot(x1 - x0, y1 - y0) / n;
+        if (travel >= 40 && (i < pts.length - 1 || k < n)) { travel = 0; app.tool.flush?.(); app.timelapse.live(); }
+      }
+    }
     app.tool.up(pt(pts.at(-1)), ev);
     doc().strokeClip = null;
   };

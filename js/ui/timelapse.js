@@ -1,6 +1,7 @@
 // Timelapse: while a drawing is recording, a small picture of it is kept after every change (each
 // stroke, fill, move…) in the browser's storage, next to the drawing. Stopping, or closing the drawing,
-// keeps it; the player shows it back at any length and saves it as a video or a GIF.
+// keeps it; the player shows it back at any length and saves it as a video.
+// Strokes are recorded as they are drawn too: a few times a second while the pen is down.
 // Storage: `tl:<id>` = { keys, w, h, start, last } and one image per snapshot under its key.
 import { h, icon } from './dom.js';
 import { modal, toast } from './dialogs.js';
@@ -8,17 +9,16 @@ import { bus } from '../core/bus.js';
 import { idb } from '../core/storage.js';
 import { makeCanvas, download, toBlob } from '../core/util.js';
 import { flatten } from '../engine/compositor.js';
-import { encodeGIF } from '../engine/gif.js';
 
 const LONG = 1280;     // a snapshot's longest side (pixel art is enlarged by whole pixels up to about this)
-const MAX = 1500;      // snapshots kept; past this every other one is dropped, so long sessions still fit
+const MAX = 5000;      // snapshots kept; past this every other one is dropped, so long sessions still fit
 const BACKLOG = 384 * 2 ** 20;   // bytes of pictures waiting to be stored; past this a burst of changes is merged
 
 const newId = () => `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 // the picture as it looks now, small enough to keep hundreds of
-function snapshot(d) {
-  const src = flatten(d), pixel = d.pixelArt;
+function snapshot(d, previews) {
+  const src = flatten(d, d.frame, { previews }), pixel = d.pixelArt;
   let k = LONG / Math.max(d.w, d.h);
   if (pixel) k = Math.max(1, Math.floor(k));
   else k = Math.min(1, k);
@@ -41,9 +41,11 @@ export function initTimelapse(app) {
   // The picture is copied the moment it changes and encoded straight away (the browser does that off
   // the main thread, several at once); storing happens in the background, in order. Scripts can make
   // dozens of changes a second: only if the pictures waiting pass BACKLOG are changes merged.
-  const capture = d => {
+  const capture = (d, live) => {
     if (waiting >= BACKLOG) return;
-    const id = d.timelapse.id, c = snapshot(d), bytes = c.width * c.height * 4;
+    // a stroke's preview is filled from its layer only where it was painted: the rest is filled first
+    if (live) for (const pv of app.view.previews.values()) pv.ensure?.(d.bounds);
+    const id = d.timelapse.id, c = snapshot(d, live ? app.view.previews : null), bytes = c.width * c.height * 4;
     waiting += bytes;
     const blob = toBlob(c, 'image/webp', 0.85).then(b => b ?? toBlob(c, 'image/png')).finally(() => { waiting -= bytes; });
     later(async () => {
@@ -74,6 +76,10 @@ export function initTimelapse(app) {
   bus.on('history', changed);
   bus.on('doc', d => { lastSig = { top: d.history.done.at(-1), sig: `${d.history.done.length}|${d.history.done.at(-1)?.label}` }; bus.emit('timelapse', d); });
 
+  // mid-stroke: while a stroke is being drawn (its paint still in the view's preview), every LIVE ms
+  const LIVE = 150;
+  setInterval(() => { if (on(app.doc) && app.view.previews.size) capture(app.doc, true); }, LIVE);
+
   // closing a recording drawing: what was recorded is kept, and can be watched straight away
   bus.on('docLeave', d => setTimeout(() => {
     if (!on(d) || app.docs.includes(d)) return;
@@ -102,13 +108,16 @@ export function initTimelapse(app) {
     recording: () => on(app.doc),
     has: () => !!app.doc.timelapse?.id,
     toggle: () => (on(app.doc) ? stop() : start()),
+    // a scripted stroke happens all at once: the API calls this as it goes, for the in-between pictures
+    live: () => { if (on(app.doc) && app.view.previews.size) capture(app.doc, true); },
     watch: () => app.doc.timelapse?.id ? play(app.doc.timelapse.id) : toast('This drawing has no timelapse yet'),
   };
 }
 
 // ---------------------------------------------------------------------------------------- the player
-const LENGTHS = [[5, '5 seconds'], [10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds'], [60, '1 minute'], [0, 'Every snapshot (10 a second)']];
-const FPS = 30;
+// every snapshot is always shown: a length is a target, stretched if the snapshots would pass FPS a second
+const LENGTHS = [[10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds'], [60, '1 minute'], [120, '2 minutes'], [300, '5 minutes']];
+const FPS = 60;
 
 async function player(id, name, onDelete) {
   const idx = await idb.get(`tl:${id}`);
@@ -125,13 +134,9 @@ async function player(id, name, onDelete) {
     }
     return b;
   };
-  let length = 10, hold = true, playing = false, pos = 0, raf = 0;
+  let length = 30, hold = true, playing = false, pos = 0, raf = 0;
   // which snapshot each shown frame is, and how long each is on screen
-  const plan = () => {
-    const count = length ? Math.min(N, Math.max(2, Math.round(length * FPS))) : N;
-    const seq = Array.from({ length: count }, (_, k) => (count === 1 ? 0 : Math.round(k * (N - 1) / (count - 1))));
-    return { seq, ms: length ? Math.max(1000 / FPS, length * 1000 / count) : 100 };
-  };
+  const plan = () => ({ seq: Array.from({ length: N }, (_, k) => k), ms: Math.min(250, Math.max(1000 / FPS, length * 1000 / N)) });
   const cv = h('canvas.tl-view', { width: idx.w, height: idx.h }), ctx = cv.getContext('2d');
   const show = async i => { const b = await frame(i); if (b) { ctx.drawImage(b, 0, 0, cv.width, cv.height); } };
   const scrub = h('input.tl-scrub', { type: 'range', min: 0, max: N - 1, value: N - 1, 'aria-label': 'Position', oninput: () => { pause(); show(+scrub.value); } });
@@ -161,20 +166,21 @@ async function player(id, name, onDelete) {
   const info = () => { const { seq, ms } = plan(); infoEl.textContent = `${N} snapshots over ${mins < 60 ? `${mins} min` : `${(mins / 60).toFixed(1)} h`} · plays in ${Math.round(seq.length * ms / 1000)} s`; };
   info();
 
-  // exports: a video (MP4 where the browser can make one, else WebM) and a GIF
+  // the export: a video (MP4 where the browser can make one, else WebM) with every snapshot in it
   const busy = (b, fn) => async () => { const label = b.textContent; b.disabled = true; pause(); try { await fn(t => { b.textContent = t; }); } catch (e) { toast(`Couldn't make it: ${e.message}`); } b.disabled = false; b.textContent = label; };
   const vidB = h('button.btn', { type: 'button' }, 'Save Video');
   vidB.onclick = busy(vidB, async say => {
     const type = ['video/mp4;codecs=avc1', 'video/webm;codecs=vp9', 'video/webm'].find(t => window.MediaRecorder?.isTypeSupported(t));
-    if (!type) throw new Error('this browser can\'t record video; try Save GIF');
+    if (!type) throw new Error('this browser can\'t record video');
     const { seq, ms } = plan();
     // even sizes: video encoders want them
     const c = makeCanvas(idx.w & ~1, idx.h & ~1), x = c.getContext('2d');
-    const stream = c.captureStream(FPS), chunks = [];
+    // a frame is sent exactly when each snapshot is drawn, so none is dropped or doubled
+    const stream = c.captureStream(0), track = stream.getVideoTracks()[0], chunks = [];
     const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8e6 });
     rec.ondataavailable = e => e.data.size && chunks.push(e.data);
     const done = new Promise(r => { rec.onstop = r; });
-    const draw = async i => { const b = await frame(i); if (b) x.drawImage(b, 0, 0, c.width, c.height); };
+    const draw = async i => { const b = await frame(i); if (b) x.drawImage(b, 0, 0, c.width, c.height); track.requestFrame?.(); };
     await draw(seq[0]); rec.start();
     const t0 = performance.now();
     for (let k = 0; k < seq.length; k++) {
@@ -183,32 +189,16 @@ async function player(id, name, onDelete) {
       const wait = t0 + (k + 1) * ms - performance.now();
       if (wait > 0) await new Promise(r => setTimeout(r, wait));
     }
-    if (hold) await new Promise(r => setTimeout(r, 1500));
+    if (hold) for (let t = 0; t < 1500; t += 100) { track.requestFrame?.(); await new Promise(r => setTimeout(r, 100)); }
     rec.stop(); await done;
     download(new Blob(chunks, { type: type.split(';')[0] }), `${name || 'drawing'} timelapse.${type.includes('mp4') ? 'mp4' : 'webm'}`);
   });
-  const gifB = h('button.btn', { type: 'button' }, 'Save GIF');
-  gifB.onclick = busy(gifB, async say => {
-    // GIFs get big fast: at most 480px and 150 frames
-    const { seq, ms } = plan(), k = Math.min(1, 480 / Math.max(idx.w, idx.h)), w = Math.round(idx.w * k), hh = Math.round(idx.h * k);
-    const step = Math.max(1, Math.ceil(seq.length / 150)), pick = seq.filter((_, i) => i % step === 0 || i === seq.length - 1);
-    const c = makeCanvas(w, hh), x = c.getContext('2d'), frames = [], delays = [];
-    for (let i = 0; i < pick.length; i++) {
-      const b = await frame(pick[i]); x.drawImage(b, 0, 0, w, hh);
-      frames.push(x.getImageData(0, 0, w, hh)); delays.push(ms * step);
-      if (i % 10 === 0) { say(`Making GIF… ${Math.round(i / pick.length * 100)}%`); await new Promise(r => setTimeout(r)); }
-    }
-    if (hold) delays[delays.length - 1] = 2000;
-    say('Making GIF…'); await new Promise(r => setTimeout(r, 30));
-    download(new Blob([encodeGIF(frames, delays)], { type: 'image/gif' }), `${name || 'drawing'} timelapse.gif`);
-  });
-
   setPlay(); show(N - 1);
   const body = h('div.tl-player', {},
     h('div.tl-stage', {}, cv),
     h('div.tl-ctl', {}, playB, scrub),
     h('div.tl-opts', {}, h('label.inline', {}, h('span', {}, 'Length'), lenSel), h('label.inline', {}, holdT, h('span', {}, 'Hold the finished picture')), infoEl),
-    h('div.tl-opts', {}, vidB, gifB));
+    h('div.tl-opts', {}, vidB));
   setTimeout(run, 300);
   const v = await modal(`Timelapse: ${name || 'drawing'}`, body, [['Delete Timelapse', 'del', 'danger'], ['Close', null, true]], 'tl-modal');
   pause(); cache.forEach(b => b?.close?.());

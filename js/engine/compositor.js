@@ -126,8 +126,9 @@ export function renderDoc(doc, ctx, r, previews, frame = doc.frame, o = { camera
 }
 
 // The finished picture of a frame — through the camera, as it exports (camera: false for the flat drawing).
-export function flatten(doc, frame = doc.frame, { camera = true } = {}) {
+// previews: the strokes still being drawn (the view's), for a picture of the canvas mid-stroke
+export function flatten(doc, frame = doc.frame, { camera = true, previews = null } = {}) {
   const c = makeCanvas(doc.w, doc.h);
-  renderDoc(doc, c.getContext('2d'), doc.bounds, null, frame, { camera: camera ? 'all' : false });
+  renderDoc(doc, c.getContext('2d'), doc.bounds, previews, frame, { camera: camera ? 'all' : false });
   return c;
 }

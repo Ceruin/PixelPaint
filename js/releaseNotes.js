@@ -3,6 +3,8 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.27', [
+    '+ Timelapses now show each stroke being drawn, not just the finished stroke',
+    '- Timelapse videos now include every recorded moment instead of skipping some to fit the length; the GIF option is gone',
     '- Timelapses now keep every stroke, even when you draw fast, instead of merging quick strokes into one jump',
     '+ AI agents and scripts can now draw with PixelPaint through a simple built-in interface, described at pixelpaint.net/llms.txt',
     '+ Timelapse: File > Record Timelapse keeps a snapshot after every change; stop it (or close the drawing) to watch it back at any length and save it as a video or GIF',
