@@ -3,8 +3,9 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.27', [
+    '- Fixed the app not starting after the last update (it\'s working again)',
     '+ Work on files on your computer: Open or drop a file and Save (Ctrl+S) writes back to it; Save As (Ctrl+Shift+S) picks a file and format (PixelPaint, PNG, JPEG, Aseprite, OpenRaster, Photoshop)',
-    '+ A dot on the drawing's name and tab shows changes not saved to its file yet; the file link survives a reload',
+    '+ A dot on the drawing\'s name and tab shows changes not saved to its file yet; the file link survives a reload',
   ]],
   ['2026.10.26', [
     '- Rotating a moved image only starts right next to its box, with a rotate cursor instead of the grab hand',
