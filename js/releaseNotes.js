@@ -3,6 +3,10 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.27', [
+    '+ Comic panels: a stroke or fill that starts inside a panel stays inside it (switch off with Stay inside the panel)',
+    '+ Fill reference: mark your line art with Layer > Use as Fill Reference and fills see only those lines, so colours you already filled can\'t make the next fill spill',
+    '+ Text starts at a size that suits the canvas',
+    '- A new comic page now leaves the art layer selected, not the panel borders',
     '- Pasting no longer offers to resize a canvas you\'ve drawn on, and Trim keeps what you drew on the Background layer',
     '- The status bar shows the pixel pencil\'s size when it\'s the tool, not the brush\'s',
     '+ Fill: a Close gaps setting (on by default) so colour stays inside line art that has small breaks',

@@ -13,7 +13,20 @@ export class Selection {
     bus.emit('selection');
   }
 
-  get clip() { return this.active ? this.mask : null; }
+  // What tools paint inside: the selection, and while a stroke is held to a rectangle (a comic panel,
+  // doc.strokeClip) that too. Built once per stroke.
+  get clip() {
+    const r = this.doc.strokeClip;
+    if (!r) return this.active ? this.mask : null;
+    if (this.clipFor !== r || this.clipVer !== this.ver) {
+      const c = (this.clipCv ??= makeCanvas(1, 1)), x = c.getContext('2d');
+      c.width = this.doc.w; c.height = this.doc.h;
+      x.fillStyle = '#fff'; x.fillRect(r.x, r.y, r.w, r.h);
+      if (this.active) { x.globalCompositeOperation = 'destination-in'; x.drawImage(this.mask, 0, 0); x.globalCompositeOperation = 'source-over'; }
+      this.clipFor = r; this.clipVer = this.ver;
+    }
+    return this.clipCv;
+  }
   state() { return { mask: this.active ? grab(this.mask, this.doc.bounds) : null }; }
   restore(s) {
     this.ctx.clearRect(0, 0, this.doc.w, this.doc.h);
@@ -68,7 +81,7 @@ export class Selection {
       if (v >= 128) a[i] = 1;
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y;
     }
-    this.active = x1 >= 0;
+    this.active = x1 >= 0; this.ver = (this.ver ?? 0) + 1;
     this.bounds = this.active ? { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } : null;
     this.path = this.active ? traceEdges(a, w, this.bounds) : null;
     bus.emit('selection');

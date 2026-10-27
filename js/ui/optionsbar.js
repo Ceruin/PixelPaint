@@ -84,7 +84,7 @@ export function optionsBar(app, el, openBrushes) {
       toggle('Fill (background color)', o.shapeFill, v => app.setOpt('shapeFill', v)));
     if (t === 'text') parts.push(
       h('label.inline', {}, icon('text'), select(FONTS, o.font, v => app.setOpt('font', v))),
-      mini({ label: 'Size', min: 8, max: 400, value: o.fontSize, fmt: v => `${v}px`, onInput: setOpt('fontSize') }),
+      mini({ label: 'Size', min: 8, max: 400, value: o.fontSize, fmt: v => `${v}px`, onInput: v => { setOpt('fontSize')(v); app.setOpt('fontSizeSet', true); } }),
       toggle('Bold', o.bold, v => app.setOpt('bold', v)),
       h('span.muted', {}, 'Click the canvas to type · Ctrl+Enter to place'));
     if (t === 'assist') parts.push(
@@ -106,16 +106,19 @@ export function optionsBar(app, el, openBrushes) {
       // line art always has small breaks: the fill treats gaps up to about twice this as closed (painting canvases)
       t === 'fill' && !app.doc?.pixelArt && mini({ label: 'Close gaps', min: 0, max: 8, value: o.fillGap ?? 3, fmt: v => (v ? `${v}px` : 'off'), onInput: setOpt('fillGap') }),
       toggle('Contiguous', o.contiguous, v => app.setOpt('contiguous', v)),
-      toggle('Sample all layers', o.sampleAll, v => app.setOpt('sampleAll', v)));
+      toggle('Sample all layers', o.sampleAll, v => app.setOpt('sampleAll', v)),
+      app.doc?.layers.some(l => l.ref) && toggle('Use the fill reference', o.useRef !== false, v => app.setOpt('useRef', v)));
     if (t === 'transform') parts.push(
       segmented([['free', 'Free', 'transform'], ['warp', 'Warp', 'wrap']], o.transformMode, v => { app.setOpt('transformMode', v); app.tools.transform.setWarp(v === 'warp'); }, true),
       toggle('Proportional corners', o.uniform, v => app.setOpt('uniform', v)),
       btn('Apply', 'tool.commit'), btn('Cancel', 'tool.cancel'));
     if (t === 'hand' || t === 'zoom') parts.push(btn('Fit', 'view.fit'), btn('100%', 'view.actual'), btn('Reset rotation', 'view.resetRot'));
+    // a comic page: strokes and fills stay inside the panel they start in (switch off to draw across)
+    if (app.doc?.panels?.length && ['brush', 'eraser', 'smudge', 'pencil', 'pxshape', 'fill'].includes(t)) parts.push(toggle('Stay inside the panel', o.panelClip !== false, v => app.setOpt('panelClip', v)));
     syncView();
     el.replaceChildren(...parts.filter(Boolean), views);
   };
-  bus.on('tool', render);
+  bus.on('tool', render); bus.on('doc', render); bus.on('opts', () => !busy && render());
   bus.on('mode', render); bus.on('theme', render);
   bus.on('brush', () => !busy && render());
   render();

@@ -250,6 +250,9 @@ const blank = () => Object.assign(new Doc(1920, 1080), { fresh: true });
 const doc = await project.restore().catch(() => null) ?? blank();
 if (!doc.libId) doc.fresh = true;
 app.setDoc(doc);
+// text starts at a size that suits the canvas (a speech bubble on a page, a label on a sprite), until you pick one
+const textFits = d => { if (d && !app.opts.fontSizeSet) app.opts.fontSize = Math.max(8, Math.min(160, Math.round(Math.min(d.w, d.h) / 25))); };
+bus.on('doc', textFits); textFits(app.doc);
 app.files = project.files;
 app.tabs = docTabs(app, $('#docTabs'), blank);
 project.restoreTabs().catch(() => {});

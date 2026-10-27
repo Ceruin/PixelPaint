@@ -71,7 +71,11 @@ export class CanvasInput {
     if (cam) { this.cam = { id: e.pointerId, ...cam }; return; }
     // a tilesheet keeps strokes inside one tile: the one the stroke starts in (none, in a gutter)
     if (STROKES.has(app.tool.id) && app.tiles?.beforeStroke(this.point(e)) === false) return;
-    if (app.tool.down(this.point(e), e) !== false) { Object.assign(this, { active: e.pointerId, activeTouch: touch, activeAt: e.timeStamp }); app.view.fast = true; }
+    // comic panels: a stroke (or fill) started inside a panel stays inside it
+    const pt = this.point(e), panels = app.doc.panels;
+    app.doc.strokeClip = STROKES.has(app.tool.id) && panels?.length && app.opts.panelClip !== false ? panels.find(r => pt.x >= r.x && pt.y >= r.y && pt.x < r.x + r.w && pt.y < r.y + r.h) ?? null : null;
+    if (app.tool.down(pt, e) === false) app.doc.strokeClip = null;
+    else { Object.assign(this, { active: e.pointerId, activeTouch: touch, activeAt: e.timeStamp }); app.view.fast = true; }
   }
 
   move(e) {
@@ -101,6 +105,7 @@ export class CanvasInput {
     if (e.pointerId !== this.active) return;
     this.active = null;
     this.app.tool.up(this.point(e), e);
+    this.app.doc.strokeClip = null;
     this.app.view.fast = false; this.app.view.redraw();   // back to smooth zoomed-out scaling once the stroke is done
     if (e.pointerType === 'touch') this.app.tool.hover?.(null);
   }
@@ -111,7 +116,7 @@ export class CanvasInput {
       // A second finger right after the first means "gesture", not "stroke".
       if (this.activeTouch && e.timeStamp - this.activeAt < 350) this.app.tool.cancel?.();
       else this.app.tool.up(this.point(e), e);
-      this.active = null; this.app.view.fast = false;
+      this.active = null; this.app.doc.strokeClip = null; this.app.view.fast = false;
     }
     const v = this.app.view;
     this.gesture ??= { t0: e.timeStamp, max: 0, moved: 0 };

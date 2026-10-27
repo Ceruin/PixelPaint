@@ -510,6 +510,12 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'layer.flatten', label: 'Flatten Image', run: () => doc().flatten() },
     ...LAYER_FILTERS.map(k => ({ id: `layer.filter.${k}`, label: `${FILTERS[k].label} Layer`, icon: 'sparkle', run: () => { const l = doc().addFilterLayer(k); if (FILTERS[k].params.length) bus.emit('filterLayer', l); } })),
     { id: 'layer.clip', label: 'Clipping Mask', key: 'Ctrl+Alt+G', checked: () => !!doc().active?.clip, run: () => { const n = doc().activeLayer; if (n) doc().editProps('Clipping Mask', n, { clip: !n.clip }); } },
+    { id: 'layer.ref', label: 'Use as Fill Reference (line art)', icon: 'fill', checked: () => !!doc().active?.ref, run: () => {
+      const n = doc().activeLayer; if (!n) return;
+      doc().editProps(n.ref ? 'Not a Fill Reference' : 'Fill Reference', n, { ref: !n.ref });
+      if (n.ref) app.toast(`Fills now see only the lines on “${n.name}”: fill your colours on another layer`);
+      bus.emit('opts', app.opts);
+    } },
     { id: 'layer.alphaLock', label: 'Alpha Lock', key: '/', checked: () => !!doc().active?.alphaLock, run: () => { const n = doc().activeLayer; if (n) doc().editProps('Alpha Lock', n, { alphaLock: !n.alphaLock }); } },
 
     { id: 'sel.all', label: 'Select All', key: 'Ctrl+A', run: () => doc().selection.all() },
@@ -618,7 +624,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       ['File', 'folder', ['file.new', 'file.newFromClipboard', 'file.open', 'file.library', 'file.close', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.saveAs', 'file.saveBrowser', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.pixelArt', 'image.tiles', 'image.tilesExport', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.pseudo3d', 'image.voxels', '-', 'image.panels']],
-      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
+      ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock', 'layer.ref']],
       ['Frame', 'film', ['anim.play', 'anim.first', 'anim.prev', 'anim.next', 'anim.last', '-', 'anim.newFrame', 'anim.dupFrame', 'anim.delFrame', 'anim.clearCel', 'anim.holdCel', 'anim.reverse', 'anim.fps', '-', 'anim.onion', 'anim.tag', '-', 'camera.view', 'camera.key', 'camera.depths', '-', 'anim.import', 'anim.export']],
       ['Select', 'select', ['sel.all', 'sel.none', 'sel.invert', 'sel.feather']],
       ['Filter', 'sparkle', Object.keys(FILTERS).map(k => `filter.${k}`)],

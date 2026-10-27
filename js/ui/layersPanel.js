@@ -81,7 +81,7 @@ export function layersPanel(app) {
         ? [h('button.ibtn.sm', { type: 'button', onclick: () => { n.collapsed = !n.collapsed; render(); } }, icon(n.collapsed ? 'chevronRight' : 'chevron')), h(`span.folder${n.camera ? '.cam' : ''}`, {}, icon(n.camera ? 'camera' : 'folder'))]
         : n.type === 'filter' ? h('span.thumb-wrap.fx', {}, icon('sparkle')) : h('span.thumb-wrap', {}, thumb(n)),
       h('span.layer-meta', {}, h('span.layer-name', {}, n.name), h('span.layer-sub', {}, `${Math.round(n.opacity * 100)}% · ${n.camera ? `Camera${n.camera.view ? ' · viewing' : ''}` : n.type === 'filter' ? 'Filter layer' : BLEND_SHORT[n.blend] ?? 'Pass Through'}${d.parentOf(n)?.camera?.multiplane ? ` · depth ${Math.round(n.depth ?? 100)}` : ''}`)),
-      h('span.badges', {}, n.clip && icon('clip'), n.alphaLock && icon('alpha'), n.locked && icon('lock')),
+      h('span.badges', {}, n.ref && h('span', { 'data-tip': 'Fill reference: fills see these lines' }, icon('fill')), n.clip && icon('clip'), n.alphaLock && icon('alpha'), n.locked && icon('lock')),
       n === d.active && h('button.ibtn.sm.layer-more', { type: 'button', 'data-tip': 'More (or right-click a layer)', onclick: ev => menu(ev.currentTarget) }, icon('menu')),
       h('span.layer-grip', { 'data-tip': 'Drag to move' }, icon('grip')));
     el.node = n;
@@ -92,7 +92,7 @@ export function layersPanel(app) {
 
   // A layer's own menu: right-click a row, or its ⋯ button.
   const menu = (anchor, ev) => {
-    const m = popMenu(anchor, ['layer.camera', 'layer.group', 'layer.dup', 'layer.mergeDown', '-', 'layer.clip', 'layer.alphaLock', '-', 'layer.del']);
+    const m = popMenu(anchor, ['layer.camera', 'layer.group', 'layer.dup', 'layer.mergeDown', '-', 'layer.clip', 'layer.alphaLock', 'layer.ref', '-', 'layer.del']);
     if (ev) Object.assign(m.style, { left: `${Math.min(ev.clientX, innerWidth - 270)}px`, top: `${ev.clientY}px` });
   };
 

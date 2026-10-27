@@ -5,9 +5,15 @@ import { hexToU32 } from '../core/color.js';
 import { haptics } from '../input/haptics.js';
 import { h } from '../ui/dom.js';
 
-// Returns the pixels a fill/wand should sample: the merged image or the active layer.
+// Returns the pixels a fill/wand should sample: the reference layers (line art marked as Fill
+// Reference: colours already filled can't steer the next fill), else the merged image or the active layer.
 export function sampleSource(app) {
-  const { doc, view, opts } = app;
+  const { doc, view, opts } = app, refs = opts.useRef === false ? [] : doc.layers.filter(l => l.ref && l.visible);
+  if (refs.length) {
+    const c = makeCanvas(doc.w, doc.h), x = c.getContext('2d');
+    for (const l of refs) { const v = l.view(); if (v) { x.globalAlpha = l.opacity; x.drawImage(v, 0, 0); } }
+    return c;
+  }
   if (opts.sampleAll || !doc.activeLayer) { view.compose(); return view.comp; }
   return doc.activeLayer.view() ?? makeCanvas(doc.w, doc.h);
 }

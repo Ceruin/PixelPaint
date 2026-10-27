@@ -49,7 +49,8 @@ function panelsLayer(doc, cmds) {
 // Cuts panel windows (x, y, w, h in doc px) into the Panels layer and draws their borders — one undo step.
 export function addPanels(doc, rects, border = panelBorder(doc), color = '#000000') {
   if (!rects.length) return;
-  const cmds = [], l = panelsLayer(doc, cmds), keepActive = doc.active;
+  // the layer you were on stays the one you draw on (read before the Panels layer is made: it becomes active)
+  const keepActive = doc.active, cmds = [], l = panelsLayer(doc, cmds);
   const pad = border + 2, box = rects.reduce((u, [x, y, w, h]) => {
     const r = { x: Math.floor(x - pad), y: Math.floor(y - pad), w: Math.ceil(w + 2 * pad), h: Math.ceil(h + 2 * pad) };
     return u ? { x: Math.min(u.x, r.x), y: Math.min(u.y, r.y), w: Math.max(u.x + u.w, r.x + r.w) - Math.min(u.x, r.x), h: Math.max(u.y + u.h, r.y + r.h) - Math.min(u.y, r.y) } : r;
@@ -60,6 +61,10 @@ export function addPanels(doc, rects, border = panelBorder(doc), color = '#00000
     for (const [x, y, w, h] of rects) ctx.strokeRect(x + border / 2, y + border / 2, w - border, h - border);
   }));
   if (keepActive && keepActive !== l) doc.active = keepActive;   // keep drawing on the art layer
+  // the panels' insides (inside the border): a stroke started in one stays in it
+  const before = doc.panels ?? [], after = [...before, ...rects.map(([x, y, w, h]) => ({ x: Math.round(x + border), y: Math.round(y + border), w: Math.round(w - 2 * border), h: Math.round(h - 2 * border) }))];
+  doc.panels = after;
+  cmds.push(new StateCommand('Panels', s => { doc.panels = s; }, before, after));
   doc.history.push(new Compound(rects.length > 1 ? 'Comic Panels' : 'Comic Panel', cmds));
   doc.changed?.();
 }
