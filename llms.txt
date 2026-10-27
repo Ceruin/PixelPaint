@@ -61,6 +61,8 @@ const png = api.snapshot({ maxSize: 512 });   // check the result
 
 ## Tips
 - Build pictures in layers (sky, background, shapes, line art, glow with blend 'Add' or 'Screen'), as a person would.
-- Big flat shapes: select a polygon, then `fillSelection`. Soft light and atmosphere: the 'Airbrush' or 'Soft Round' brush at low opacity.
+- Big flat shapes: select a polygon, then `fillSelection`. Soft tone and atmosphere: 'Soft Round' at low opacity.
+- Build-up brushes ('Airbrush') add paint over time, as a held spray can does; a scripted stroke is instant, so they leave very little. Use 'Soft Round' for predictable tone.
+- For depth, push the values: a clear highlight, a dark core shadow just inside the shadowed edge, a lighter rim of reflected light, and the darkest contact shadow where an object meets the ground.
 - Pixel art: `newCanvas(64, 64, { pixelArt: true, background: 'transparent' })`; strokes then use the Pixel Pencil, one pixel per point at size 1.
 - A drawing is kept in the browser (File > My Art) as it changes; `run('file.exportPng')` downloads it.
