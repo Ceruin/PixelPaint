@@ -88,7 +88,7 @@ export function brushLibrary(app) {
     list.replaceChildren(...shown.map(p => {
       const c = h('canvas', { width: 220, height: 44 });
       thumbs.show(c, p, ink());
-      return h('div.brush-row', { dataset: { name: p.name, tip: p.name }, className: app.brush.name === p.name ? 'on' : '', onclick: e => !e.target.closest('.star') && applyPreset(app, p) },
+      return h('div.brush-row', { dataset: { name: p.name, tip: p.name }, className: app.brush.name === p.name ? 'on' : '', onclick: e => { if (e.target.closest('.star')) return; applyPreset(app, p); search.blur(); } },
         h('span.brush-label', {}, p.name), c,
         h('button.star', { type: 'button', className: fav.includes(p.name) ? 'on' : '', 'data-tip': 'Pin to the pop-up palette (right-click canvas)', onclick: () => { toggleFav(p.name); render(); } }, icon('star')));
     }), query && !all.length ? h('p.muted', {}, 'No brushes match.') : '');

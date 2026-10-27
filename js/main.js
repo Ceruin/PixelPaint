@@ -241,6 +241,9 @@ stage.addEventListener('drop', e => {
   });
 });
 
+// Escape leaves a text box (a dialog's Escape closes the dialog instead)
+addEventListener('keydown', e => { if (e.key === 'Escape' && isTyping(e) && !e.target.closest('.modal-back, #notes')) e.target.blur(); }, true);
+
 initEink(app, mascot);
 // the drawing you had open (a blank one is 'fresh': opening something replaces it rather than adding a tab)
 const blank = () => Object.assign(new Doc(1920, 1080), { fresh: true });

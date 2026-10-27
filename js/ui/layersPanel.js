@@ -134,7 +134,9 @@ export function layersPanel(app) {
   // unless it grabs the row's grip, which drags straight away.
   const startDrag = (n, e, grip) => {
     const d = doc(), now = e.timeStamp, row = e.currentTarget;
-    if (!grip && lastTap.id === n.id && now - lastTap.t < 380) { lastTap = { id: 0, t: 0 }; return n.type === 'filter' ? editFilter(n) : rename(n); }
+    // a second press: rename (or adjust a filter). preventDefault keeps the mouse's own focus change from
+    // blurring the name box the moment it opens (which saved the old name: mouse renames never stuck)
+    if (!grip && lastTap.id === n.id && now - lastTap.t < 380) { e.preventDefault(); lastTap = { id: 0, t: 0 }; return n.type === 'filter' ? editFilter(n) : rename(n); }
     lastTap = { id: n.id, t: now };
     if (d.active !== n) d.setActive(n);
     let target = null, held = grip || e.pointerType === 'mouse';

@@ -29,7 +29,8 @@ export function comboOf(e) {
   return [(e.ctrlKey || e.metaKey) && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', k].filter(Boolean).join('+');
 }
 
-export const isTyping = e => !!e.target.closest?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
+// Typing = a box that takes text. Sliders, checkboxes and buttons don't: after dragging Size, B still picks the brush.
+export const isTyping = e => !!e.target.closest?.('input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=color]), textarea, select, [contenteditable="true"], [contenteditable=""]');
 
 // `allow` narrows which actions keys may trigger right now (e.g. only mode switches in Pixel mode).
 export function bindKeys(allow = () => true) {

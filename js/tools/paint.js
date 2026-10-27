@@ -86,6 +86,14 @@ export class PaintTool {
     app.view.previews.set(layer, this.preview);
     this.engine.begin(p);
     this.flush();
+    // A build-up brush (the airbrush) keeps spraying while the pen holds still, like a real one: a glow is a press held
+    this.movedAt = performance.now();
+    if (b.buildup && !smudge) this.spray = setInterval(() => {
+      if (!this.engine || performance.now() - this.movedAt < 60) return;
+      this.engine.dab({ ...this.engine.last });
+      this.flusher ??= () => this.engine && this.flush();
+      this.app.view.prep.add(this.flusher); this.app.view.schedule();
+    }, 33);
     return true;
   }
 
@@ -109,6 +117,7 @@ export class PaintTool {
     // snapping decides once the stroke has a direction: locked to a guide it heads along, or free
     if (this.snap && !this.decided && Math.hypot(last.x - this.start.x, last.y - this.start.y) > 4 / this.app.view.zoom) { this.lock = pickLock(this.app.doc.assistants, this.start, last); this.decided = true; }
     if (this.snap && !this.decided) return;
+    this.movedAt = performance.now();
     pts.forEach(p => this.engine.move(this.lock ? project(this.lock, p) : p));
     this.flusher ??= () => this.engine && this.flush();
     this.app.view.prep.add(this.flusher); this.app.view.schedule();   // copied to the canvas once per frame, not per pointer event
@@ -133,6 +142,7 @@ export class PaintTool {
   }
 
   cleanup() {
+    clearInterval(this.spray); this.spray = 0;
     if (this.flusher) this.app.view.prep.delete(this.flusher);
     this.app.view.previews.delete(this.layer);
     if (this.preview) this.preview.ensure = null;

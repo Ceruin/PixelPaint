@@ -46,6 +46,9 @@ export class CanvasInput {
   }
 
   down(e) {
+    // touching the canvas is done with any text box (hex, brush search, a name…): shortcuts work again
+    const typing = document.activeElement;
+    if (typing?.matches?.('input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea, select, [contenteditable]')) typing.blur();
     const { app } = this;
     this.rect = this.el.getBoundingClientRect();
     document.activeElement?.blur?.();

@@ -20,7 +20,8 @@ export function colorPicker(app) {
   let recent = local.get('pp.recent', []);
   const sv = h('canvas.sv', { width: 256, height: 160 }), hue = h('canvas.hue', { width: 256, height: 12 });
   const svKnob = h('i.knob'), hueKnob = h('i.knob');
-  const hex = h('input.hex', { maxLength: 7, spellcheck: false, onchange: () => /^#?[0-9a-f]{6}$/i.test(hex.value) && app.setColor('#' + hex.value.replace('#', '').toLowerCase()) });
+  const hex = h('input.hex', { maxLength: 7, spellcheck: false, onchange: () => /^#?[0-9a-f]{6}$/i.test(hex.value) && app.setColor('#' + hex.value.replace('#', '').toLowerCase()),
+    onkeydown: e => e.key === 'Enter' && hex.blur() });   // Enter applies it and gives the keys back to the shortcuts
   const fg = h('button.chip.fg', { type: 'button', 'data-tip': 'Foreground' }), bg = h('button.chip.bg', { type: 'button', 'data-tip': 'Swap colors', onclick: () => app.swapColors() });
   const swatches = h('div.swatches'), recents = h('div.swatches.recent');
 
