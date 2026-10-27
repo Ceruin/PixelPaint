@@ -15,6 +15,7 @@ import { palettePanel } from './ui/palettePanel.js';
 import { initWorkspaces } from './ui/workspaces.js';
 import { initTiles, tilesPanel } from './ui/tiles.js';
 import { initVoxels } from './ui/voxels.js';
+import { initTimelapse } from './ui/timelapse.js';
 import { docTabs } from './ui/tabs.js';
 import { migrateSpriteStudio } from './ui/spriteMigration.js';
 import { brushLibrary, brushSettings, loadCustomTips } from './ui/brushPanel.js';
@@ -73,6 +74,7 @@ panels.add('color', 'Color', 'palette', colorPicker(app), { dock: 'right', order
 panels.add('palette', 'Palette', 'pixel', palettePanel(app), { dock: 'right', order: 5, hidden: true });
 app.tiles = initTiles(app);
 initVoxels(app);
+app.timelapse = initTimelapse(app);
 panels.add('tiles', 'Tiles', 'tile', tilesPanel(app, app.tiles), { dock: 'right', order: 6, hidden: true });
 // a tilesheet shows its panel when it opens or is made
 const showTiles = d => d?.sheet && !panels.isOpen('tiles') && panels.patch('tiles', { hidden: false, collapsed: false });

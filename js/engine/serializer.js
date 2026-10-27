@@ -27,7 +27,7 @@ export async function packDoc(doc, cache = new WeakMap()) {
     o.active = n === doc.active;
     return o;
   };
-  const meta = { version: VERSION, w: doc.w, h: doc.h, bg: doc.bg, pixel: doc.pixel ?? null, sheet: doc.sheet ?? null, panels: doc.panels ?? null, name: doc.name, libId: doc.libId ?? null, assistants: doc.assistants, frames: doc.frames, tags: doc.tags, frame: doc.frame, tree: await node(doc.root) };
+  const meta = { version: VERSION, w: doc.w, h: doc.h, bg: doc.bg, pixel: doc.pixel ?? null, sheet: doc.sheet ?? null, panels: doc.panels ?? null, timelapse: doc.timelapse ?? null, name: doc.name, libId: doc.libId ?? null, assistants: doc.assistants, frames: doc.frames, tags: doc.tags, frame: doc.frame, tree: await node(doc.root) };
   return { meta, blobs };
 }
 
@@ -38,6 +38,7 @@ export async function unpackDoc({ meta, blobs }) {
   if (meta.pixel != null) doc.pixel = meta.pixel;
   if (meta.sheet) doc.sheet = meta.sheet;
   if (meta.panels) doc.panels = meta.panels;
+  if (meta.timelapse) doc.timelapse = meta.timelapse;
   doc.libId = meta.libId ?? null;
   doc.assistants = meta.assistants ?? [];
   if (meta.frames) Object.assign(doc, { frames: meta.frames, tags: meta.tags ?? [], frame: Math.min(meta.frame ?? 0, meta.frames.length - 1) });

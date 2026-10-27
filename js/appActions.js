@@ -456,6 +456,8 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       if (v) project.importSheet(f, dim(v.w), dim(v.h));
     } },
     { id: 'file.newFromClipboard', label: 'New from Clipboard', icon: 'paste', key: 'Ctrl+Alt+Shift+N', run: newFromClipboard },
+    { id: 'file.timelapse', label: 'Record Timelapse', icon: 'film', checked: () => !!app.timelapse?.recording(), run: () => app.timelapse.toggle() },
+    { id: 'file.watchTimelapse', label: 'Watch Timelapse…', icon: 'play', enabled: () => !!app.timelapse?.has(), run: () => app.timelapse.watch() },
     { id: 'file.close', label: 'Close Drawing', key: 'Ctrl+Alt+W', run: () => app.closeDoc(app.doc, () => Object.assign(new Doc(1920, 1080), { fresh: true })) },
     { id: 'tab.next', label: 'Next Drawing', key: 'Alt+PageDown', run: () => app.tabs?.step(1) },
     { id: 'tab.prev', label: 'Previous Drawing', key: 'Alt+PageUp', run: () => app.tabs?.step(-1) },
@@ -621,7 +623,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.newFromClipboard', 'file.open', 'file.library', 'file.close', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.saveAs', 'file.saveBrowser', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse']],
+      ['File', 'folder', ['file.new', 'file.newFromClipboard', 'file.open', 'file.library', 'file.close', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.saveAs', 'file.saveBrowser', 'file.exportProject', 'file.share', '-', 'file.timelapse', 'file.watchTimelapse', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.pixelArt', 'image.tiles', 'image.tilesExport', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.pseudo3d', 'image.voxels', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock', 'layer.ref']],

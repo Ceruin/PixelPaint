@@ -19,11 +19,15 @@ export function statusbar(app, el, canvas) {
   const rot = h('button.st-btn.st-rot', { type: 'button', 'data-tip': 'View rotation: click to reset', 'data-action': 'view.resetRot', onclick: () => actions.run('view.resetRot') }, icon('rotCW'), h('b', { style: { fontWeight: 400 } }));
   // a pixel canvas says so; click to switch it back to painting (or use Image > Pixel Art Canvas)
   const px = h('button.st-px', { type: 'button', 'data-action': 'image.pixelArt', 'data-tip': 'Pixel art canvas: click to make it a painting canvas', onclick: () => actions.run('image.pixelArt') }, 'Pixel');
+  // recording a timelapse: a red dot that stops it
+  const rec = h('button.st-rec', { type: 'button', hidden: true, 'data-action': 'file.timelapse', 'data-tip': 'Recording a timelapse: click to stop and watch it', onclick: () => actions.run('file.timelapse') }, h('i'), 'Rec');
+  const showRec = () => { rec.hidden = !app.timelapse?.recording(); };
+  bus.on('timelapse', showRec); bus.on('doc', () => setTimeout(showRec));
   const showZoom = () => { const z = app.view.zoom; zin.value = `${(z * 100).toFixed(z < 0.1 ? 1 : 0)}%`; };
   const t = () => h('b', { style: { fontWeight: 400 } });
   const [st, pt, mt, svt, tt] = [t(), t(), t(), t(), t()];
   zoom.append(icon('fit'));
-  el.append(h('span.st-zoomer', {}, zoom, zoomStep('minus', 'Zoom out', 'view.out'), zin, zoomStep('plus', 'Zoom in', 'view.in'), zs), rot, h('span.st-size', {}, icon('image'), st, px), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
+  el.append(h('span.st-zoomer', {}, zoom, zoomStep('minus', 'Zoom out', 'view.out'), zin, zoomStep('plus', 'Zoom in', 'view.in'), zs), rot, h('span.st-size', {}, icon('image'), st, px), h('span.st-pos', {}, icon('transform'), pt), h('div.spacer'), rec, h('span.st-brush', {}, icon('brush'), tt), h('span.st-mem', {}, icon('history'), mt), h('span.st-save', {}, icon('save'), svt));
   svt.textContent = 'Not saved yet';
   bus.on('view', v => {
     if (document.activeElement !== zin) showZoom();

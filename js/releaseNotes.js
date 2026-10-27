@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.10.27', [
+    '+ Timelapse: File > Record Timelapse keeps a snapshot after every change; stop it (or close the drawing) to watch it back at any length and save it as a video or GIF',
     '- Pseudo-3D and the 3D Voxel Studio no longer freeze on a full-size painting: big pictures are shrunk to sprite size first',
     '+ Comic panels: a stroke or fill that starts inside a panel stays inside it (switch off with Stay inside the panel)',
     '+ Fill reference: mark your line art with Layer > Use as Fill Reference and fills see only those lines, so colours you already filled can\'t make the next fill spill',
