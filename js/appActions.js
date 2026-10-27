@@ -2,7 +2,7 @@ import { h, icon, iconBtn, slider } from './ui/dom.js';
 import { modal, form } from './ui/dialogs.js';
 import { actions, comboOf } from './core/actions.js';
 import { local } from './core/storage.js';
-import { clamp, download, pickFile, pickFiles, readJSON, toBlob, alphaBounds, Rect } from './core/util.js';
+import { clamp, download, pickFile, pickFiles, readJSON, toBlob, alphaBounds, boundsUnlike, Rect, isUniform } from './core/util.js';
 import { Doc } from './engine/document.js';
 import { FILTERS, LAYER_FILTERS, renderFilter } from './engine/filters.js';
 import { encodePSD } from './engine/psd.js';
@@ -61,7 +61,9 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     return null;
   };
   // nothing drawn yet, apart from `except` (a solid Background doesn't count)
-  const canvasIsEmpty = except => doc().layers.every(l => l === except || /^background$/i.test(l.name) || l.cels.every(c => !c || !alphaBounds(c)));
+  // a Background that's still one flat colour doesn't count; one that's been drawn on does
+  const plainBg = l => /^background$/i.test(l.name) && l.cels.every(c => !c || isUniform(c));
+  const canvasIsEmpty = except => doc().layers.every(l => l === except || plainBg(l) || l.cels.every(c => !c || !alphaBounds(c)));
   const paste = async () => {
     doc().selection.none();
     const cb = app.clipboard;
@@ -223,12 +225,17 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     d.remap('Canvas Size', w, ht, (ctx, c) => ctx.drawImage(c, Math.round((w - d.w) * ax), Math.round((ht - d.h) * ay)));
   };
 
-  // Trim to the artwork: the smallest canvas holding every painted pixel of every frame. A layer named
-  // Background is solid by design, so it doesn't count (unless it's all there is).
+  // Trim to the artwork: the smallest canvas holding every painted pixel of every frame. On a Background
+  // layer, what counts is what differs from its colour (it's solid everywhere).
   const trim = () => {
-    const d = doc(), art = d.layers.filter(l => !/^background$/i.test(l.name)), from = art.length ? art : d.layers;
+    const d = doc();
     let box = null;
-    for (const l of from) for (const c of l.cels) { const b = c && alphaBounds(c); if (b) box = Rect.union(box, b); }
+    for (const l of d.layers) for (const c of l.cels) {
+      if (!c) continue;
+      const bg = /^background$/i.test(l.name) ? new Uint32Array(c.getContext('2d').getImageData(0, 0, 1, 1).data.buffer)[0] : null;
+      const b = bg != null ? boundsUnlike(c, bg) : alphaBounds(c);
+      if (b) box = Rect.union(box, b);
+    }
     if (!box) return app.toast('Nothing to trim to: the canvas is empty');
     if (box.w === d.w && box.h === d.h) return app.toast('Already trimmed');
     app.tool.interrupt?.();

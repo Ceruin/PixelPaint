@@ -2,6 +2,7 @@ import { h, icon } from './dom.js';
 import { bus } from '../core/bus.js';
 import { actions } from '../core/actions.js';
 import { ZOOM_LEVELS } from '../engine/viewport.js';
+import { TOOL_META } from '../tools/index.js';
 
 export function statusbar(app, el, canvas) {
   const zoom = h('button.st-btn', { type: 'button', 'data-tip': 'Fit to screen', 'data-action': 'view.fit', onclick: () => actions.run('view.fit') });
@@ -34,7 +35,13 @@ export function statusbar(app, el, canvas) {
   bus.on('doc', d => { st.textContent = `${d.w} × ${d.h}`; px.hidden = !d.pixelArt; });
   bus.on('resize', d => { st.textContent = `${d.w} × ${d.h}`; });
   bus.on('history', hist => { mt.textContent = `${(hist.bytes / 2 ** 20).toFixed(0)} MB undo`; });
-  const brushInfo = () => { tt.textContent = `${app.brush.name} · ${app.brush.size}px`; };
+  // what the current tool paints with: the brush and its size, the pixel pencil's size, or just the tool
+  const brushInfo = () => {
+    const id = app.tool.id;
+    tt.textContent = ['brush', 'eraser', 'smudge'].includes(id) ? `${app.brush.name} · ${app.brush.size}px`
+      : id === 'pencil' || id === 'pxshape' ? `${id === 'pencil' ? 'Pixel Pencil' : 'Pixel Shapes'} · ${app.opts.pixelSize}px` : TOOL_META.find(m => m[0] === id)?.[1] ?? '';
+  };
+  bus.on('opts', brushInfo);
   bus.on('brush', brushInfo); bus.on('tool', brushInfo); brushInfo();
   bus.on('saved', e => { svt.textContent = `${e?.auto ? 'Auto-saved' : 'Saved'} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; });
   // Never cut off: drop the least important readouts until the rest fits (text can be enlarged).

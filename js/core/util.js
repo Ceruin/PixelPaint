@@ -98,3 +98,17 @@ export async function toBlobOffThread(c) {
 }
 export const readJSON = async file => JSON.parse(await file.text());
 export const isTouchDevice = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
+
+// One flat colour all over (a plain background, or nothing at all)?
+export function isUniform(canvas) {
+  const { width: w, height: h } = canvas, d = new Uint32Array(canvas.getContext('2d').getImageData(0, 0, w, h).data.buffer);
+  for (let i = 1; i < d.length; i++) if (d[i] !== d[0]) return false;
+  return true;
+}
+// The box around every pixel that isn't `like` (a 0xAABBGGRR value, e.g. a background's colour), or null.
+export function boundsUnlike(canvas, like) {
+  const { width: w, height: h } = canvas, d = new Uint32Array(canvas.getContext('2d').getImageData(0, 0, w, h).data.buffer);
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++) if (d[i] !== like) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; }
+  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
