@@ -40,7 +40,7 @@ devtools console) and call `window.PixelPaintAPI` (the same object as `window.pi
 
 ### Layers
 - `addLayer(name, { blend, opacity, visible })` – the new layer becomes the one drawn on
-- `setLayer(nameOrIndex, { name, blend, opacity, visible, locked })` – choose the layer to draw on, and change it
+- `setLayer(nameOrIndex, { name, blend, opacity, visible, locked })` – choose the layer to draw on, and change it. It always makes that layer the active one: after hiding a sketch layer, `setLayer` back to the layer you were on, or new layers land under it
 - `deleteLayer(nameOrIndex)`
 - Blend modes: Normal, Multiply, Darken, Color Burn, Screen, Lighten, Color Dodge, Add, Overlay, Soft Light, Hard Light, Difference, Exclusion, …
 
