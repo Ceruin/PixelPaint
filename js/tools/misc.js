@@ -57,7 +57,8 @@ export class FillTool {
     const worker = getFillWorker();
     if (!worker) return this.fillSync(p);
     const { opts } = app, soft = !doc.pixelArt, src = sampleSource(app), under = soft && !layer.alphaLock ? layer.view() : null, sel = doc.selection.clip;
-    Promise.all([createImageBitmap(src), under && createImageBitmap(under), sel && createImageBitmap(sel)]).then(([sb, ub, selb]) => floodInWorker(worker,
+    // kept so scripts (the API) can wait for the fill to land
+    this.pending = Promise.all([createImageBitmap(src), under && createImageBitmap(under), sel && createImageBitmap(sel)]).then(([sb, ub, selb]) => floodInWorker(worker,
       { w, h, x, y, rgba: hexToU32(app.color.fg), tolerance: opts.tolerance, contiguous: opts.contiguous, soft, gap: opts.fillGap ?? 3, alphaLock: layer.alphaLock, src: sb, under: ub, sel: selb }, [sb, ub, selb])).then(r => {
       if (r.error) { if (r.error === 'worker') this.fillSync(p); else console.warn('fill failed', r.error); return; }
       const parts = [r.fill, r.under, r.over];

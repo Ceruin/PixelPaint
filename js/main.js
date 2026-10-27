@@ -16,6 +16,7 @@ import { initWorkspaces } from './ui/workspaces.js';
 import { initTiles, tilesPanel } from './ui/tiles.js';
 import { initVoxels } from './ui/voxels.js';
 import { initTimelapse } from './ui/timelapse.js';
+import { initApi } from './api.js';
 import { docTabs } from './ui/tabs.js';
 import { migrateSpriteStudio } from './ui/spriteMigration.js';
 import { brushLibrary, brushSettings, loadCustomTips } from './ui/brushPanel.js';
@@ -75,6 +76,8 @@ panels.add('palette', 'Palette', 'pixel', palettePanel(app), { dock: 'right', or
 app.tiles = initTiles(app);
 initVoxels(app);
 app.timelapse = initTimelapse(app);
+// scripting for AI agents and automation: see /llms.txt
+app.api = globalThis.PixelPaintAPI = initApi(app);
 panels.add('tiles', 'Tiles', 'tile', tilesPanel(app, app.tiles), { dock: 'right', order: 6, hidden: true });
 // a tilesheet shows its panel when it opens or is made
 const showTiles = d => d?.sheet && !panels.isOpen('tiles') && panels.patch('tiles', { hidden: false, collapsed: false });

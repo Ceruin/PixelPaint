@@ -1,0 +1,66 @@
+# PixelPaint
+
+> A browser art studio (painting, pixel art, animation, notes) at https://pixelpaint.net. Everything runs
+> in the page; nothing is uploaded. AI agents can draw with it through a small JavaScript API.
+
+## Scripting API
+
+Open https://pixelpaint.net in a browser you control (Playwright, Puppeteer, a browser extension, the
+devtools console) and call `window.PixelPaintAPI` (the same object as `window.pixelpaint.api`).
+
+- Coordinates are picture pixels: (0, 0) is the top-left of the canvas, whatever the zoom.
+- Colours are `'#rrggbb'`. Opacity and similar values take 0–1 (or 0–100).
+- Every call goes through the normal tools and undo history: `api.undo()` reverses any step.
+- Calls return `api.state()` (or a Promise of it, for `fill`). Bad arguments throw an Error that says what is allowed.
+- Wait for the page to load first: `await page.waitForFunction(() => window.PixelPaintAPI)`.
+
+### Look
+- `state()` – size, layers (name, blend, opacity, visible, active), tool, colours, brush, selection, last undo step
+- `snapshot({ scale, maxSize, type })` – the picture as a data URL (PNG by default); look at your work often
+- `pixel(x, y)` – `{ color, alpha }` of the finished picture at a point
+- `exportBlob(type)` – the picture as a Blob
+- `tools()`, `brushes()`, `blendModes()`, `actions()` – what is available
+
+### Make and change the canvas
+- `newCanvas(width, height, { background: 'white' | 'transparent' | '#rrggbb', pixelArt, name })`
+- `run(actionId)` – any menu command by id, e.g. `'image.flipH'`, `'filter.blur'`, `'file.exportPng'` (see `actions()`)
+- `undo()`, `redo()`
+
+### Draw
+- `setColor('#rrggbb', 'fg' | 'bg')`, `setBrush('Ink Pen')` or `setBrush({ size, opacity, flow, smoothing })`, `setTool(id)`
+- `stroke([[x, y], …], { brush, color, size, opacity, flow, tool })` – add a third value per point, 0–1, for pen pressure (thin to thick lines)
+- `fill(x, y, { color, tolerance, contiguous })` – the fill bucket (await it)
+- `click(x, y, opts)`, `drag(x0, y0, x1, y1, opts)` – any tool, e.g. shapes or the gradient
+- `setOption(key, value)` – tool options as the options bar sets them
+
+### Select (mode: 'replace' | 'add' | 'subtract')
+- `selectRect(x, y, w, h, mode)`, `selectEllipse(cx, cy, rx, ry, mode)`, `selectPolygon([[x, y], …], mode)`
+- `selectAll()`, `deselect()`, `fillSelection('#rrggbb')`, `clearSelection()`
+- Brush strokes stay inside an active selection.
+
+### Layers
+- `addLayer(name, { blend, opacity, visible })` – the new layer becomes the one drawn on
+- `setLayer(nameOrIndex, { name, blend, opacity, visible, locked })` – choose the layer to draw on, and change it
+- `deleteLayer(nameOrIndex)`
+- Blend modes: Normal, Multiply, Darken, Color Burn, Screen, Lighten, Color Dodge, Add, Overlay, Soft Light, Hard Light, Difference, Exclusion, …
+
+## Example
+
+```js
+const api = window.PixelPaintAPI;
+api.newCanvas(800, 500, { background: '#1b2a5a', name: 'Night hills' });
+api.addLayer('Moon');
+api.selectEllipse(620, 120, 60, 60); api.fillSelection('#fff1c8'); api.deselect();
+api.addLayer('Hills');
+api.selectPolygon([[0, 380], [200, 280], [420, 350], [800, 300], [800, 500], [0, 500]]);
+api.fillSelection('#173d2a'); api.deselect();
+api.addLayer('Ink');
+api.stroke([[80, 480], [84, 400, 0.5], [90, 330, 0.9], [96, 280, 0.2]], { brush: 'Ink Pen', size: 8, color: '#0b0b12' });
+const png = api.snapshot({ maxSize: 512 });   // check the result
+```
+
+## Tips
+- Build pictures in layers (sky, background, shapes, line art, glow with blend 'Add' or 'Screen'), as a person would.
+- Big flat shapes: select a polygon, then `fillSelection`. Soft light and atmosphere: the 'Airbrush' or 'Soft Round' brush at low opacity.
+- Pixel art: `newCanvas(64, 64, { pixelArt: true, background: 'transparent' })`; strokes then use the Pixel Pencil, one pixel per point at size 1.
+- A drawing is kept in the browser (File > My Art) as it changes; `run('file.exportPng')` downloads it.
