@@ -1279,3 +1279,4 @@ body:not([data-advanced]) .adv-only { display: none !important; }
 .doc-tab-x .ic { width: 12px; height: 12px; }
 .doc-tab-new { align-self: center; flex: none; }
 body[data-layout=zen] .doc-tabs { display: none; }
+.doc-tab-dirty { color: var(--accent); font-weight: 700; margin-left: -2px; }

@@ -2,6 +2,10 @@
 // Add to this on every version bump (see CLAUDE.md). One short line per change, in words a user
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
+  ['2026.10.27', [
+    '+ Work on files on your computer: Open or drop a file and Save (Ctrl+S) writes back to it; Save As (Ctrl+Shift+S) picks a file and format (PixelPaint, PNG, JPEG, Aseprite, OpenRaster, Photoshop)',
+    '+ A dot on the drawing's name and tab shows changes not saved to its file yet; the file link survives a reload',
+  ]],
   ['2026.10.26', [
     '- Rotating a moved image only starts right next to its box, with a rotate cursor instead of the grab hand',
     '- Clicking away from a moved or pasted image finishes the move and goes back to your tool (just outside its box still rotates); the cursor shows which',

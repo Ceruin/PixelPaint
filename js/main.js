@@ -142,9 +142,16 @@ menubar($('#menubar'), menus, modeBox);
 // The drawing's name in the middle of the menu bar (Krita's document tab): click it to rename.
 const docName = h('input.doc-title', { spellcheck: false, 'aria-label': 'Drawing name', 'data-tip': 'Drawing name: click to rename',
   onkeydown: e => (e.key === 'Enter' || e.key === 'Escape') && docName.blur(),
+  onfocus: () => { docName.value = app.doc.name || 'Untitled'; },
+  onblur: () => showName(),
   onchange: () => { const n = docName.value.trim() || 'Untitled'; app.doc.name = docName.value = n; if (app.doc.libId) project.library.rename(app.doc.libId, n); } });
-const showName = () => { if (document.activeElement !== docName) docName.value = app.doc?.name || 'Untitled'; };
-bus.on('doc', showName); bus.on('saved', showName); showName();
+// a drawing saved to a file says which, and shows a dot while it has changes the file doesn't
+const showName = () => {
+  const d = app.doc;
+  if (document.activeElement !== docName) docName.value = `${d?.name || 'Untitled'}${project.files.unsaved(d) ? ' •' : ''}`;
+  docName.dataset.tip = d?.fileHandle ? `${d.fileHandle.name}${project.files.unsaved(d) ? ': not saved yet (Ctrl+S)' : ': saved'} · click to rename` : 'Drawing name: click to rename';
+};
+bus.on('doc', showName); bus.on('saved', showName); bus.on('history', showName); showName();
 $('#menubar > .spacer').append(docName);
 // the brush chip always drops the library down under itself, wherever the Brushes panel lives
 optionsBar(app, $('#optionsbar'), e => panels.flyout('brushes', e.currentTarget));
@@ -225,10 +232,13 @@ const stage = $('#stage');
 stage.addEventListener('dragover', e => e.preventDefault());
 stage.addEventListener('drop', e => {
   e.preventDefault();
-  for (const f of e.dataTransfer.files) {
-    if (/\.course$/i.test(f.name)) f.text().then(t => { const c = readCourseFile(t); c ? openBuilder(mascot, { course: c, shared: true }) : toast('That isn’t a PixelPaint course file'); });
-    else /\.(ora|pp|aseprite|ase|pxpaint)$/i.test(f.name) ? project.openFile(f) : f.type.startsWith('image/') && project.importLayer(f, f.name);
-  }
+  // the file's handle (Chrome / Edge) has to be asked for during the drop itself: with it, Save writes back to that file
+  const handles = [...e.dataTransfer.items].map(i => (i.kind === 'file' ? i.getAsFileSystemHandle?.() : null));
+  [...e.dataTransfer.files].forEach(async (f, i) => {
+    if (/\.course$/i.test(f.name)) return f.text().then(t => { const c = readCourseFile(t); c ? openBuilder(mascot, { course: c, shared: true }) : toast('That isn’t a PixelPaint course file'); });
+    if (/\.(ora|pp|aseprite|ase|pxpaint)$/i.test(f.name)) return project.openFile(f, (await handles[i]?.catch(() => null)) ?? null);
+    if (f.type.startsWith('image/')) project.importLayer(f, f.name);
+  });
 });
 
 initEink(app, mascot);
@@ -237,6 +247,7 @@ const blank = () => Object.assign(new Doc(1920, 1080), { fresh: true });
 const doc = await project.restore().catch(() => null) ?? blank();
 if (!doc.libId) doc.fresh = true;
 app.setDoc(doc);
+app.files = project.files;
 app.tabs = docTabs(app, $('#docTabs'), blank);
 project.restoreTabs().catch(() => {});
 // ?mode=… (old links and installs, e.g. ?mode=pixel) wins over the remembered mode.

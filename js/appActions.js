@@ -405,7 +405,10 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
     { id: 'file.new', label: 'New Canvas…', key: 'Ctrl+Alt+N', run: newDoc },
     { id: 'file.open', label: 'Open…', key: 'Ctrl+O', run: project.open },
     { id: 'file.import', label: 'Import Image as Layer…', key: 'Ctrl+Shift+O', run: async () => { const f = await pickFile('image/*'); if (f) project.importLayer(f, f.name); } },
-    { id: 'file.save', label: 'Save to Browser', key: 'Ctrl+S', run: async () => {
+    // Save: to the drawing's file on your computer (Save As the first time); browsers without file access keep it in My Art
+    { id: 'file.save', label: 'Save', icon: 'save', key: 'Ctrl+S', run: () => (project.files.canPick ? project.files.save() : actions.run('file.saveBrowser')) },
+    { id: 'file.saveAs', label: 'Save As…', key: 'Ctrl+Shift+S', run: () => (project.files.canPick ? project.files.saveAs() : project.exportProject()) },
+    { id: 'file.saveBrowser', label: 'Save to Browser (My Art)', run: async () => {
       let name = doc().name;
       if (!doc().libId) {   // first save: name it
         const v = await form('Save to Browser', [{ id: 'n', label: 'Name', type: 'text', value: name && name !== 'Untitled' ? name : 'My painting' }], 'Save');
@@ -416,7 +419,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
       app.toast(`Saved “${name}” in this browser — find it in My Art`);
     } },
     { id: 'file.library', label: 'My Art (saved drawings)…', icon: 'folder', key: 'Ctrl+Shift+O', run: openLibrary },
-    { id: 'file.exportProject', label: 'Download Project (.pp)', key: 'Ctrl+Shift+S', run: project.exportProject },
+    { id: 'file.exportProject', label: 'Download Project (.pp)', run: project.exportProject },
     { id: 'file.exportOra', label: 'Export OpenRaster (.ora, for Krita / GIMP)', run: project.exportOra },
     { id: 'file.share', label: 'Share…', icon: 'upload', run: shareDialog },
     { id: 'file.exportPng', label: 'Export PNG', key: 'Ctrl+Shift+E', run: () => project.exportImage('image/png') },
@@ -605,7 +608,7 @@ export function defineActions(app, { panels, project, setMode, toggleFocus, setT
 
   return {
     menus: [
-      ['File', 'folder', ['file.new', 'file.newFromClipboard', 'file.open', 'file.library', 'file.close', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse']],
+      ['File', 'folder', ['file.new', 'file.newFromClipboard', 'file.open', 'file.library', 'file.close', 'file.import', 'file.importSheet', 'file.pack', '-', 'file.save', 'file.saveAs', 'file.saveBrowser', 'file.exportProject', 'file.share', '-', 'file.exportPng', 'file.exportScaled', 'file.exportSheet', 'file.exportJpg', 'file.exportPsd', 'file.exportOra', 'file.exportAse']],
       ['Edit', 'undo', ['edit.undo', 'edit.redo', '-', 'edit.cut', 'edit.copy', 'edit.paste', 'edit.clear', 'edit.clearCanvas', 'edit.fill', 'edit.replaceColor', '-', 'brush.fromSelection', '-', 'edit.shortcuts', 'edit.settings']],
       ['Image', 'image', ['image.pixelArt', 'image.tiles', 'image.tilesExport', '-', 'image.size', 'image.canvas', '-', 'image.flipH', 'image.flipV', 'image.rotCW', 'image.rotCCW', 'image.rot180', 'image.trim', '-', 'image.pseudo3d', 'image.voxels', '-', 'image.panels']],
       ['Layer', 'layers', ['layer.new', 'layer.newGroup', 'layer.group', 'layer.camera', 'layer.dup', 'layer.del', '-', ...LAYER_FILTERS.map(k => `layer.filter.${k}`), '-', 'layer.snapPalette', 'layer.mergeDown', 'layer.flatten', '-', 'layer.clip', 'layer.alphaLock']],
