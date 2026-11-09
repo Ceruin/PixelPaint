@@ -2,6 +2,9 @@
 // Add to this on every version bump (see CLAUDE.md). One short line per change, in words a user
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
+  ['2026.11.09', [
+    '+ Right-click a drawing\'s tab to Close it, Close Others, Close Tabs to the Left or Right, or Close All',
+  ]],
   ['2026.10.27', [
     '+ Timelapses now show each stroke being drawn, not just the finished stroke',
     '- Timelapse videos now include every recorded moment instead of skipping some to fit the length; the GIF option is gone',
