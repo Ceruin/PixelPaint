@@ -15,10 +15,11 @@ animates her, and step-by-step recipes for **colour variants**, **clothing / acc
 | 2026-09-25 `2f17f4f` | Front / side / back turnaround, idle variants, walk. | Claude |
 | 2026-09-26 `3000533` | Merged near-duplicate shades (27 → 17 colours), removed stray pixels. | Ceruin |
 | 2026-09-26 `52791ae` | **Hand-painted clean pass on all 18 sprites**: one light source (top-left), one shadow/base/light ramp per material, one outline colour, tail in every pose. Paint splats and Z's moved off the smock teal, so outfit recolours don't tint them. | Ceruin |
+| 2026-11-10 | **Cleanup of the action poses** (`idle0` … `drowsy`): smocks redrawn as clean shapes with one strap line, clear hands and cuffs, a dark line where the smock meets hair and tail, stray pixels in hair and beret removed. Silhouettes, boxes and anchors unchanged; 1,257 of 21,633 pixels changed. The scripts are in `tools/pyxl-cleanup/`. | Claude |
 
 No special tools or outside references were used: it was your character sheet, then code that
 quantised it to a palette and outlined it, then your hand pass. The cleanup scripts ran once in that
-early session and were **not** saved to the repo. Everything since then (poses, recolouring, Zzz's,
+early session and were **not** saved to the repo (the 2026-11-10 ones are, in `tools/pyxl-cleanup/`). Everything since then (poses, recolouring, Zzz's,
 physics, eggs) is code in `js/ui/mascot.js`.
 
 ---
@@ -85,26 +86,26 @@ hair, reds = beret, and so on), so check against the art before relying on it.
 
 | Hex | Pixels | Likely use | Recoloured with outfit? |
 |---|---|---|---|
-| `#221822` | 3906 | **outline** (the only outline colour) | no |
-| `#402d3b` | 3408 | hair: shadow | no |
-| `#5c3f4c` | 4717 | hair: base | no |
-| `#7d5566` | 235 | hair: light | no |
-| `#8b303b` | 1202 | beret: shadow | no |
-| `#dc4749` | 3085 | beret: base | no |
-| `#f47a5e` | 421 | beret: light / warm accent | no |
-| `#a86655` | 225 | skin: shadow | no |
-| `#eab8a0` | 414 | skin: mid | no |
-| `#fbe4d3` | 1211 | skin: light | no |
-| `#3d6f80` | 445 | **smock: shadow** | **yes** |
-| `#559aa6` | 914 | **smock: base** | **yes** |
-| `#86c5c0` | 74 | **smock: light** | **yes** |
+| `#221822` | 3973 | **outline** (the only outline colour) | no |
+| `#402d3b` | 3450 | hair: shadow | no |
+| `#5c3f4c` | 4621 | hair: base | no |
+| `#7d5566` | 240 | hair: light | no |
+| `#8b303b` | 1190 | beret: shadow | no |
+| `#dc4749` | 3100 | beret: base | no |
+| `#f47a5e` | 418 | beret: light / warm accent | no |
+| `#a86655` | 222 | skin: shadow | no |
+| `#eab8a0` | 408 | skin: mid | no |
+| `#fbe4d3` | 1126 | skin: light | no |
+| `#3d6f80` | 574 | **smock: shadow** | **yes** |
+| `#559aa6` | 946 | **smock: base** | **yes** |
+| `#86c5c0` | 85 | **smock: light** | **yes** |
 | `#2a4fb8` | 81 | blue: shadow (eyes / paint) | no |
 | `#427ede` | 265 | blue: base | no |
 | `#c98f2e` | 28 | yellow: shadow (brush ferrule / paint) | no |
 | `#f0c840` | 235 | yellow: base | no |
-| `#d6ad6e` | 13 | yellow: light / wood | no |
-| `#595c71` | 239 | cool grey (brush handle / shoes) | no |
-| `#a8988f` | 515 | warm grey (shoes / soles) | no |
+| `#d6ad6e` | 8 | yellow: light / wood | no |
+| `#595c71` | 181 | cool grey (brush handle / shoes) | no |
+| `#a8988f` | 482 | warm grey (shoes / soles) | no |
 
 **Shading rule:** light comes from the **top-left** in every pose.
 - Each material has a **shadow / base / light** ramp, and nothing else.

@@ -2,6 +2,9 @@
 // Add to this on every version bump (see CLAUDE.md). One short line per change, in words a user
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
+  ['2026.11.10', [
+    '- Pyxl\'s action poses are tidier: cleaner smock, strap and hands when she walks, paints, points and cheers',
+  ]],
   ['2026.11.09', [
     '+ Right-click a drawing\'s tab to Close it, Close Others, Close Tabs to the Left or Right, or Close All',
   ]],
