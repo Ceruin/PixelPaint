@@ -45,10 +45,13 @@ export function morph(el, next) {
 
 // Nudges a fixed-position popup back inside the viewport (and caps its height), now and
 // whenever its size changes — e.g. a section expanding inside it.
-export function keepOnScreen(el, m = 8) {
+// `below`: the top edge of a dropdown hung under its button. A tall list then stays there and scrolls
+// instead of sliding up over the button, unless the room below is too cramped to be usable.
+export function keepOnScreen(el, m = 8, below = null) {
   const fix = () => {
     if (!el.isConnected) return ro.disconnect();
-    el.style.maxHeight = `${innerHeight - m * 2}px`;
+    const room = below == null ? 0 : innerHeight - m - below;
+    el.style.maxHeight = `${room >= 240 ? room : innerHeight - m * 2}px`;
     const r = el.getBoundingClientRect();
     if (r.right > innerWidth - m) el.style.left = `${Math.max(m, innerWidth - m - r.width)}px`;
     if (r.bottom > innerHeight - m) el.style.top = `${Math.max(m, innerHeight - m - r.height)}px`;

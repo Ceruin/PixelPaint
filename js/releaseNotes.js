@@ -3,6 +3,7 @@
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
   ['2026.11.16', [
+    '- Long menus like View now open right under their button and scroll, instead of jumping up over the menu bar',
     '+ New app and browser-tab icon: Pyxl\'s head in her red beret',
   ]],
   ['2026.11.10', [
