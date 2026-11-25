@@ -834,6 +834,11 @@ body[data-theme=paper] .card { box-shadow: none; border: 1.5px solid #111; }
   position: absolute; z-index: 20; min-width: 60px; min-height: 1.3em; padding: 0; margin: 0; resize: none; overflow: hidden;
   background: transparent; border: 1px dashed var(--accent); outline: none; line-height: 1.25; white-space: pre; user-select: text;
 }
+.text-grip {
+  position: absolute; z-index: 21; width: 18px; height: 22px; display: grid; place-items: center; cursor: move; touch-action: none;
+  color: var(--text); background: var(--panel); border: 1px solid var(--accent); border-radius: 4px;
+}
+.text-grip .ic { width: 14px; height: 14px; pointer-events: none; }
 
 /* ---------- first-visit welcome ---------- */
 .welcome {

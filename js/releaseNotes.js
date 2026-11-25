@@ -2,6 +2,9 @@
 // Add to this on every version bump (see CLAUDE.md). One short line per change, in words a user
 // would use: '+' = something new, '-' = something fixed or removed.
 export const RELEASE_NOTES = [
+  ['2026.11.25', [
+    '+ Move a text box while you type: drag the handle beside it, or its dashed edge',
+  ]],
   ['2026.11.16', [
     '- Long menus like View now open right under their button and scroll, instead of jumping up over the menu bar',
     '+ New app and browser-tab icon: Pyxl\'s head in her red beret',
